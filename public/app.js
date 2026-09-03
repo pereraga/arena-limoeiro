@@ -74,9 +74,31 @@ function calculateDuration() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  initSocket();
+  // Carrega dados padrão imediatamente para que o site nunca fique em branco
+  loadInitialData();
   initEventListeners();
+  renderApp();
+  requestSchedule();
+  initSocket();
 });
+
+function loadInitialData() {
+  if (window.ARENA_DEFAULT_DATA) {
+    const d = window.ARENA_DEFAULT_DATA;
+    state.arenaInfo = d.arenaInfo;
+    state.categories = d.categories;
+    state.courts = d.initialCourts;
+    state.products = d.initialProducts;
+    state.monthlyMembers = d.initialMonthlyMembers;
+    state.adminUsers = d.initialAdmins;
+    state.coupons = d.coupons;
+    state.bookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    if (!state.selectedCourt && state.courts.length > 0) {
+      state.selectedCourt = state.courts[0];
+    }
+  }
+}
+
 
 function initSocket() {
   if (typeof io !== 'undefined') {
@@ -178,14 +200,120 @@ function initSocket() {
   });
 }
 
+
+function calculateLocalSchedule(courtId, date) {
+  const operatingHours = [
+    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
+    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
+    "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+  ];
+
+  const [y, m, d] = date.split('-');
+  const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+  const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+  const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
+
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const allBookings = [...(state.bookings || []), ...localBookings];
+
+  return operatingHours.map(time => {
+    const slotMin = timeToMinutes(time);
+
+    // 1. Mensalista fixo naquele dia da semana
+    const monthlyHolder = state.monthlyMembers.find(m => {
+      const mCourtId = m.court_id || m.courtId;
+      if (mCourtId && mCourtId !== courtId) return false;
+      const day = m.day_of_week || m.dayOfWeek;
+      if (day !== currentDayOfWeek) return false;
+      if (m.status && m.status !== 'active') return false;
+
+      const startTime = m.start_time || m.startTime || m.time;
+      const endTime = m.end_time || m.endTime;
+      if (startTime && endTime) {
+        const s = timeToMinutes(startTime);
+        const e = timeToMinutes(endTime);
+        return slotMin >= s && slotMin < e;
+      }
+      return startTime === time;
+    });
+
+    if (monthlyHolder) {
+      return {
+        time,
+        status: "booked",
+        statusLabel: "Mensalista Fixo",
+        isMensalista: true,
+        customerName: (monthlyHolder.team_name || monthlyHolder.teamName) + " (" + (monthlyHolder.responsible_name || monthlyHolder.responsibleName) + ")",
+        isAvailable: false
+      };
+    }
+
+    // 2. Reservas avulsas confirmadas
+    const booking = allBookings.find(b => {
+      const bCourtId = b.court_id || b.courtId;
+      if (bCourtId !== courtId || b.date !== date) return false;
+      if (b.status === 'cancelled') return false;
+
+      const bStart = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : null);
+      const bEnd = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : null);
+
+      if (bStart && bEnd) {
+        const s = timeToMinutes(bStart);
+        const e = timeToMinutes(bEnd);
+        return slotMin >= s && slotMin < e;
+      }
+      return bStart === time;
+    });
+
+    if (booking) {
+      return {
+        time,
+        status: "booked",
+        statusLabel: "Reservado",
+        isMensalista: booking.bookingType === 'mensalista',
+        customerName: booking.customer_name || booking.customerName || "Cliente",
+        isAvailable: false
+      };
+    }
+
+    return {
+      time,
+      status: "available",
+      statusLabel: "Livre para Agendamento",
+      isAvailable: true
+    };
+  });
+}
+
 function requestSchedule() {
-  if (state.selectedCourt && state.selectedDate && socket) {
+  if (!state.selectedCourt || !state.selectedDate) return;
+
+  // 1. Gera e atualiza a grade localmente na hora (autônomo para Vercel)
+  state.slots = calculateLocalSchedule(state.selectedCourt.id, state.selectedDate);
+
+  // Auto-seleciona primeiro horário livre se o atual estiver ocupado
+  const currentSlot = state.slots.find(s => s.time === state.startTime);
+  if (!currentSlot || currentSlot.status !== 'available') {
+    const firstAvailable = state.slots.find(s => s.status === 'available');
+    if (firstAvailable) {
+      state.startTime = firstAvailable.time;
+      const nextHourMin = timeToMinutes(firstAvailable.time) + 60;
+      state.endTime = minutesToTime(nextHourMin);
+    }
+  }
+
+  if (state.currentStep === 3) renderStep3Content();
+  if (state.currentMode === 'admin' && state.adminTab === 'schedule') renderAdminMatrix();
+
+  // 2. Se houver socket conectado (ambiente local), emite pedido
+  if (typeof socket !== 'undefined' && socket && socket.connected) {
     socket.emit('get_schedule', {
       courtId: state.selectedCourt.id,
       date: state.selectedDate
     });
   }
 }
+
 
 function renderApp() {
   renderHeader();
@@ -2500,21 +2628,40 @@ function submitBooking(grandTotal) {
       });
     });
   } else {
-    socket.emit('create_booking', {
+    const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
+    const bookingPayload = {
+      id: newBookingId,
       courtId: state.selectedCourt.id,
+      court_id: state.selectedCourt.id,
       date: state.selectedDate,
       startTime: state.startTime,
+      start_time: state.startTime,
       endTime: state.endTime,
+      end_time: state.endTime,
       time: `${state.startTime} às ${state.endTime}`,
       duration: state.selectedDuration,
       customerName: name,
+      customer_name: name,
       customerPhone: phone,
+      customer_phone: phone,
       observation: state.observation,
       productCart: state.productCart,
       totalPrice: grandTotal,
       paymentMethod: state.paymentMethod,
       bookingType: 'avulso'
-    });
+    };
+
+    // Salva no localStorage (persistência na Vercel)
+    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    localBookings.push(bookingPayload);
+    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+
+    if (typeof socket !== 'undefined' && socket && socket.connected) {
+      socket.emit('create_booking', bookingPayload);
+    } else {
+      showConfirmationSuccessModal(bookingPayload);
+      requestSchedule();
+    }
   }
 }
 
