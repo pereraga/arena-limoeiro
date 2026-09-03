@@ -1,0 +1,141 @@
+/* Identidade Visual Arena Limoeiro - Verde e Branco */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --brand-green: #00a859;
+  --brand-green-dark: #008444;
+  --brand-green-light: #10b981;
+  --brand-green-soft: #ecfdf5;
+  --brand-green-border: #a7f3d0;
+  
+  --dark-header: #07150e;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Header Verde Escuro */
+.arena-header-bg {
+  background: linear-gradient(135deg, #05140c 0%, #0a2416 60%, #05140c 100%);
+  border-bottom: 2px solid #00a859;
+}
+
+/* Stepper Custom */
+.stepper-step {
+  transition: all 0.3s ease;
+}
+
+.stepper-circle {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stepper-step.active .stepper-circle {
+  background: #ffffff;
+  color: #008444;
+  box-shadow: 0 0 0 4px rgba(0, 168, 89, 0.35);
+  font-weight: 800;
+}
+
+.stepper-step.completed .stepper-circle {
+  background: #00a859;
+  color: #ffffff;
+}
+
+/* Cards de Quadras e Serviços */
+.court-card, .service-card {
+  transition: all 0.25s ease-in-out;
+  border: 1.5px solid #e2e8f0;
+}
+
+.court-card:hover, .service-card:hover {
+  transform: translateY(-2px);
+  border-color: #00a859;
+  box-shadow: 0 10px 25px -5px rgba(0, 168, 89, 0.15), 0 8px 10px -6px rgba(0, 168, 89, 0.08);
+}
+
+.court-card.selected, .service-card.selected {
+  border-color: #00a859;
+  background-color: #f0fdf4;
+  box-shadow: 0 0 0 2px #00a859;
+}
+
+/* Botão Próxima Etapa */
+.btn-next-step {
+  background: #00a859;
+  transition: all 0.2s ease;
+}
+
+.btn-next-step:hover:not(:disabled) {
+  background: #008444;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 168, 89, 0.4);
+}
+
+.btn-next-step:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+/* Horários Slots */
+.slot-pill {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.slot-pill.available {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  color: #334155;
+  cursor: pointer;
+}
+
+.slot-pill.available:hover {
+  border-color: #00a859;
+  background: #f0fdf4;
+  color: #008444;
+  transform: scale(1.02);
+}
+
+.slot-pill.selected {
+  background: #00a859;
+  border-color: #00a859;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 168, 89, 0.35);
+}
+
+.slot-pill.booked {
+  background: #fee2e2;
+  border: 1.5px solid #fca5a5;
+  color: #b91c1c;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.slot-pill.blocked_admin {
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arena Limoeiro - Complexo Poliesportivo e Lazer | Agendamento Online</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Supabase JS Client & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/supabase-client.js"></script>
+
+  <!-- Socket.io Client (Apenas quando em localhost) -->
+  <script>
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      const s = document.createElement('script');
+      s.src = '/socket.io/socket.io.js';
+      document.head.appendChild(s);
+    }
+  </script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col pb-24">
+
+  <!-- CABEÇALHO ARENA LIMOEIRO VERDE E BRANCO -->
+  <header class="arena-header-bg text-white sticky top-0 z-40 shadow-xl">
+    <div class="max-w-6xl mx-auto px-4 py-3 sm:py-3.5 flex items-center justify-between border-b border-emerald-900/60">
+      <div class="flex items-center space-x-3.5">
+        <img src="/logo.jpg" alt="Arena Limoeiro" class="h-10 sm:h-12 w-auto object-contain rounded-lg bg-black p-1 border border-emerald-500/40 shadow">
+        <div>
+          <span class="text-[10px] uppercase tracking-widest text-emerald-400 font-extrabold block">SISTEMA DE AGENDAMENTO</span>
+          <h1 id="arenaTitle" class="text-sm sm:text-lg font-black text-white tracking-tight uppercase">
+            Arena Limoeiro
+          </h1>
+          <p class="text-[11px] text-emerald-200 hidden sm:block">Complexo Poliesportivo e Lazer</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Compartilhar Link -->
+        <button onclick="openShareModal()" 
+                class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/60 px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition-all flex items-center space-x-1.5 shadow-md">
+          <i data-lucide="share-2" class="w-4 h-4"></i>
+          <span>Compartilhar Link</span>
+        </button>
+
+        <!-- Botão Gestão com Verificação de Login -->
+        <button onclick="handleGestaoButtonClick()" 
+                class="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1.5 shadow-sm">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span class="hidden sm:inline" id="modeBtnText">Gestão</span>
+        </button>
+
+        <!-- Reiniciar -->
+        <button onclick="resetFlow()" title="Reiniciar Agendamento" class="text-emerald-300 hover:text-white p-1 rounded-lg transition-colors">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="max-w-6xl mx-auto px-4 py-3 sm:py-4">
+      <div id="stepperContainer" class="flex items-center justify-between">
+        <!-- Renderizado pelo app.js -->
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main id="mainContent" class="flex-1">
+    <!-- Renderizado pelo app.js -->
+  </main>
+
+  <!-- BARRA FIXA INFERIOR -->
+  <footer id="bottomBar" class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-200 z-30 shadow-lg">
+    <!-- Renderizado pelo app.js -->
+  </footer>
+
+  <!-- MODAIS -->
+  <div id="modalRoot"></div>
+
+  <!-- Main Script -->
+  <script src="/app.js"></script>
+</body>
+</html>
