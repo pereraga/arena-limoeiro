@@ -366,9 +366,13 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`\n======================================================`);
-  console.log(`🏟️  ARENA LIMOEIRO - SISTEMA DE AGENDAMENTO E GESTÃO`);
-  console.log(`⚡ Servidor ativo em: http://localhost:${PORT}`);
-  console.log(`======================================================\n`);
-});
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`\n======================================================`);
+    console.log(`🏟️  ARENA LIMOEIRO - SISTEMA DE AGENDAMENTO E GESTÃO`);
+    console.log(`⚡ Servidor ativo em: http://localhost:${PORT}`);
+    console.log(`======================================================\n`);
+  });
+}
+
+export default app;
