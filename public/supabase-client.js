@@ -11,8 +11,8 @@
     
     return {
       url: window.SUPABASE_URL || 'https://brmclyukjfijommbxhks.supabase.co',
-      anonKey: window.SUPABASE_ANON_KEY || '',
-      connected: false
+      anonKey: window.SUPABASE_ANON_KEY || 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+      connected: true
     };
   }
 
