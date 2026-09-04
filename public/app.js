@@ -108,7 +108,11 @@ function loadInitialData() {
     state.adminUsers = d.initialAdmins;
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    state.bookings = (localSaved && localSaved.length > 0) ? localSaved : (d.initialBookings || d.allBookings || []);
+    const cleanedLocal = localSaved.filter(b => b && b.id && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
+    if (cleanedLocal.length !== localSaved.length) {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
+    }
+    state.bookings = cleanedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
     if (!state.selectedCourt && state.courts.length > 0) {
       state.selectedCourt = state.courts[0];
@@ -1314,7 +1318,8 @@ function renderStep4(container) {
   // VALOR TOTAL ONLINE: APENAS O VALOR DAS HORAS DE JOGO DA QUADRA!
   const courtPrice = isMensal ? (court.monthlyPrice || court.basePricePerHour * 3.6) : (court.basePricePerHour * hoursFraction);
 
-  const savedBarItems = Object.entries(state.productCart).map(([prodId, qty]) => {
+  const savedBarItems = Object.entries(state.productCart || {}).map(([prodId, qty]) => {
+    if (prodId.startsWith('_') || typeof qty !== 'number' || qty <= 0) return null;
     const prod = state.products.find(p => p.id === prodId);
     return prod ? { ...prod, quantity: qty, totalEstimate: prod.price * qty } : null;
   }).filter(Boolean);
@@ -1764,9 +1769,13 @@ function renderLiveDashboardTab() {
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
-  // Junta reservas avulsas e mensalistas do dia
+  // Junta reservas avulsas e mensalistas do dia (sem duplicatas por ID)
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const allBookings = [...(state.bookings || []), ...localBookings];
+  const bookingMap = new Map();
+  [...(state.bookings || []), ...localBookings].forEach(b => {
+    if (b && b.id) bookingMap.set(b.id, b);
+  });
+  const allBookings = Array.from(bookingMap.values());
 
   let matchesList = [];
 
@@ -2397,7 +2406,11 @@ function renderBarControlTab() {
 
   // Encontra todas as reservas com pedidos no bar
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const allBookings = [...(state.bookings || []), ...localBookings];
+  const bookingMap = new Map();
+  [...(state.bookings || []), ...localBookings].forEach(b => {
+    if (b && b.id) bookingMap.set(b.id, b);
+  });
+  const allBookings = Array.from(bookingMap.values());
 
   const barOrders = allBookings.filter(b => {
     if (b.status === 'cancelled') return false;
@@ -3271,12 +3284,21 @@ async function handleSaveBarItems(e, bookingId) {
     const el = document.getElementById('qty_' + p.id);
     if (el) {
       const q = parseInt(el.innerText || '0', 10);
-      b.product_cart[p.id] = q;
-      additionalTotal += q * p.price;
+      if (q > 0) {
+        b.product_cart[p.id] = q;
+        additionalTotal += q * p.price;
+      } else {
+        delete b.product_cart[p.id];
+      }
     }
   });
 
-  b.product_cart._status = b.product_cart._status || 'waiting';
+  const validKeys = Object.keys(b.product_cart).filter(k => !k.startsWith('_'));
+  if (validKeys.length > 0) {
+    b.product_cart._status = b.product_cart._status || 'waiting';
+  } else {
+    b.product_cart = {};
+  }
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
@@ -4355,6 +4377,19 @@ async function submitBooking(grandTotal) {
   const newMemberId = 'mensal-' + Date.now();
 
   // Payload LIMPO estritamente compatível com o schema do Supabase (sem camelCase courtId!)
+  // Sanitiza o carrinho do bar para salvar estritamente itens selecionados (sem zeros ou unidades fantasmas)
+  const cleanProductCart = {};
+  if (state.productCart && typeof state.productCart === 'object') {
+    Object.entries(state.productCart).forEach(([k, v]) => {
+      if (!k.startsWith('_') && typeof v === 'number' && v > 0) {
+        cleanProductCart[k] = v;
+      }
+    });
+    if (Object.keys(cleanProductCart).length > 0) {
+      cleanProductCart._status = 'waiting';
+    }
+  }
+
   const dbBookingPayload = {
     id: newBookingId,
     court_id: courtId,
@@ -4370,7 +4405,7 @@ async function submitBooking(grandTotal) {
     status: 'confirmed',
     booking_type: 'avulso',
     payment_method: state.paymentMethod || 'local',
-    product_cart: state.productCart || {},
+    product_cart: cleanProductCart,
     observation: state.observation || ''
   };
 
@@ -4485,6 +4520,8 @@ async function submitBooking(grandTotal) {
   } else {
     showConfirmationSuccessModal(unifiedBooking);
   }
+  // Limpa o carrinho do agendamento para que a próxima reserva inicie 100% zerada
+  state.productCart = {};
 }
 
 function showConfirmationSuccessModal(booking) {
@@ -4502,6 +4539,7 @@ function showConfirmationSuccessModal(booking) {
                 (typeof booking.monthly_price === 'number' ? booking.monthly_price : 0));
 
   const savedItemsText = Object.entries(state.productCart || {}).map(([id, qty]) => {
+    if (id.startsWith('_') || typeof qty !== 'number' || qty <= 0) return '';
     const prod = state.products.find(p => p.id === id);
     return prod ? `${qty}x ${prod.name}` : '';
   }).filter(Boolean).join(', ');
@@ -4645,6 +4683,7 @@ function handleSearch(query) {
 }
 
 function selectCourt(courtId) {
+  state.productCart = {};
   const court = state.courts.find(c => c.id === courtId);
   if (!court) return;
   const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
