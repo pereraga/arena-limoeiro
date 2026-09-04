@@ -438,30 +438,6 @@ function renderStep1(container) {
   container.innerHTML = `
     <div class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
       
-      <!-- BANNER DE DESTAQUE: GARANTIR HORÁRIO FIXO PRO SEU TIME (NO TOPO) -->
-      <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-white flex flex-col md:flex-row items-center justify-between gap-4 border border-emerald-800/50 shadow-xl mb-6">
-        <div class="flex items-center space-x-3.5 sm:space-x-4">
-          <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-400/20 text-amber-300 flex items-center justify-center flex-shrink-0 border border-amber-400/30 shadow-inner">
-            <i data-lucide="trophy" class="w-6 h-6"></i>
-          </div>
-          <div>
-            <h4 class="text-xs sm:text-sm md:text-base font-black uppercase tracking-tight text-white">
-              Quer garantir horário fixo toda semana para o seu time?
-            </h4>
-            <p class="text-[11px] sm:text-xs text-emerald-200 mt-0.5">
-              Com o Plano Mensalista da Arena Limoeiro, você tem vaga reservada todo mês e desconto exclusivo na locação.
-            </p>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-2 w-full md:w-auto">
-          <button onclick="toggleBookingType()" 
-                  class="w-full md:w-auto px-5 py-2.5 sm:py-3 ${state.bookingType === 'mensalista' ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300' : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'} rounded-xl font-black text-xs sm:text-sm whitespace-nowrap shadow-lg transition-all flex items-center justify-center space-x-2">
-            <i data-lucide="${state.bookingType === 'mensalista' ? 'check-circle' : 'crown'}" class="w-4 h-4"></i>
-            <span>${state.bookingType === 'mensalista' ? '👑 Mensalista Ativo (Mudar p/ Avulso)' : '👑 Contratar Mensalista'}</span>
-          </button>
-        </div>
-      </div>
 
       <!-- Barra de Pesquisa Limpa -->
       <div class="relative w-full mb-6">
