@@ -279,28 +279,118 @@ const initialMonthlyMembers = [
 
 const initialBookings = [
   {
-    id: "book-101",
+    id: "ARENA-1001",
     courtId: "court-society-1",
-    date: "2026-09-01",
-    startTime: "19:00",
-    endTime: "20:00",
+    court_id: "court-society-1",
+    date: "2026-08-08",
     time: "19:00 às 20:00",
+    startTime: "19:00",
+    start_time: "19:00",
+    endTime: "20:00",
+    end_time: "20:00",
     duration: 60,
-    customerName: "Carlos Eduardo (Mensalista Terça)",
+    customerName: "Carlos Eduardo (Pelada da Terça)",
+    customer_name: "Carlos Eduardo (Pelada da Terça)",
     customerPhone: "(81) 99876-1122",
+    customer_phone: "(81) 99876-1122",
     status: "confirmed",
     bookingType: "mensalista",
+    booking_type: "mensalista",
     totalPrice: 140.00,
-    observation: "Horário fixo semanal"
+    total_price: 140.00,
+    paymentMethod: "pix",
+    payment_method: "pix",
+    productCart: { "prod-agua": 6, "prod-cerveja": 12, "_status": "ready" },
+    product_cart: { "prod-agua": 6, "prod-cerveja": 12, "_status": "ready" },
+    observation: "Horário fixo semanal do time"
+  },
+  {
+    id: "ARENA-1002",
+    courtId: "court-society-2",
+    court_id: "court-society-2",
+    date: "2026-08-08",
+    time: "20:00 às 21:00",
+    startTime: "20:00",
+    start_time: "20:00",
+    endTime: "21:00",
+    end_time: "21:00",
+    duration: 60,
+    customerName: "Lucas Mendonça (Pelada Noturna)",
+    customer_name: "Lucas Mendonça (Pelada Noturna)",
+    customerPhone: "(81) 99123-4455",
+    customer_phone: "(81) 99123-4455",
+    status: "confirmed",
+    bookingType: "avulso",
+    booking_type: "avulso",
+    totalPrice: 160.00,
+    total_price: 160.00,
+    paymentMethod: "pix",
+    payment_method: "pix",
+    productCart: { "prod-espetinho": 2, "_status": "chilling" },
+    product_cart: { "prod-espetinho": 2, "_status": "chilling" },
+    observation: "Jogo com resenha e espetinho"
+  },
+  {
+    id: "ARENA-1003",
+    courtId: "court-gym-1",
+    court_id: "court-gym-1",
+    date: "2026-08-15",
+    time: "16:00 às 18:00",
+    startTime: "16:00",
+    start_time: "16:00",
+    endTime: "18:00",
+    end_time: "18:00",
+    duration: 120,
+    customerName: "Matheus Silveira (Basquete Limoeiro)",
+    customer_name: "Matheus Silveira (Basquete Limoeiro)",
+    customerPhone: "(81) 98844-5566",
+    customer_phone: "(81) 98844-5566",
+    status: "confirmed",
+    bookingType: "avulso",
+    booking_type: "avulso",
+    totalPrice: 260.00,
+    total_price: 260.00,
+    paymentMethod: "cartao",
+    payment_method: "cartao",
+    productCart: { "prod-isotonico": 4, "_status": "delivered" },
+    product_cart: { "prod-isotonico": 4, "_status": "delivered" },
+    observation: "Treino da equipe"
+  },
+  {
+    id: "ARENA-1004",
+    courtId: "court-beach-1",
+    court_id: "court-beach-1",
+    date: "2026-08-08",
+    time: "08:00 às 10:00",
+    startTime: "08:00",
+    start_time: "08:00",
+    endTime: "10:00",
+    end_time: "10:00",
+    duration: 120,
+    customerName: "Fernanda Costa (Beach Tennis Tour)",
+    customer_name: "Fernanda Costa (Beach Tennis Tour)",
+    customerPhone: "(81) 99444-3322",
+    customer_phone: "(81) 99444-3322",
+    status: "confirmed",
+    bookingType: "avulso",
+    booking_type: "avulso",
+    totalPrice: 180.00,
+    total_price: 180.00,
+    paymentMethod: "pix",
+    payment_method: "pix",
+    productCart: { "prod-agua": 4, "prod-gelo": 1, "_status": "ready" },
+    product_cart: { "prod-agua": 4, "prod-gelo": 1, "_status": "ready" },
+    observation: "Torneio de duplas mistas"
   }
 ];
+
+const allBookings = [...initialBookings];
 
 const coupons = {
   "LIMOEIRO10": { discountPercent: 10, description: "10% de desconto na Arena Limoeiro" },
   "PRIMEIRA": { discountPercent: 15, description: "15% de desconto de boas-vindas" },
   "MENSALISTA": { discountPercent: 12, description: "12% de desconto no plano mensal" }
 };
-
 
 window.ARENA_DEFAULT_DATA = {
   arenaInfo,
@@ -310,5 +400,6 @@ window.ARENA_DEFAULT_DATA = {
   initialMonthlyMembers,
   initialAdmins,
   coupons,
+  initialBookings,
   allBookings
 };

@@ -14,7 +14,7 @@ let state = {
     orientation: 'portrait'
   },
   adminSubTab: 'spaces',
-  adminFilterDate: getFormattedDate(new Date()),
+  adminFilterDate: '2026-08-08',
   adminFilterCourt: 'all',
   adminFilterStatus: 'all',
   arenaInfo: null,
@@ -105,7 +105,8 @@ function loadInitialData() {
     state.monthlyMembers = d.initialMonthlyMembers;
     state.adminUsers = d.initialAdmins;
     state.coupons = d.coupons;
-    state.bookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    state.bookings = (localSaved && localSaved.length > 0) ? localSaved : (d.initialBookings || d.allBookings || []);
     if (!state.selectedCourt && state.courts.length > 0) {
       state.selectedCourt = state.courts[0];
     }
