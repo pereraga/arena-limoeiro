@@ -4,6 +4,15 @@ let state = {
   currentStep: 1,
   currentMode: 'client',
   adminTab: 'live_dashboard',
+  platform: {
+    device: 'desktop',
+    isMobile: false,
+    isTablet: false,
+    isDesktop: true,
+    isTouch: false,
+    os: 'other',
+    orientation: 'portrait'
+  },
   adminSubTab: 'spaces',
   adminFilterDate: getFormattedDate(new Date()),
   adminFilterCourt: 'all',
@@ -338,6 +347,86 @@ function requestSchedule() {
   }
 }
 
+
+
+// ==============================================================================
+// 📱 MOTOR DE DETECÇÃO DE PLATAFORMA & DISPOSITIVO (MOBILE, TABLET, DESKTOP)
+// ==============================================================================
+function detectPlatform() {
+  const width = window.innerWidth;
+  const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
+  
+  // Touch detection
+  const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
+
+  // OS Detection
+  let os = 'other';
+  if (/iphone|ipad|ipod/.test(ua)) os = 'ios';
+  else if (/android/.test(ua)) os = 'android';
+  else if (/windows phone|windows nt/.test(ua)) os = 'windows';
+  else if (/macintosh|mac os x/.test(ua)) os = 'mac';
+  else if (/linux/.test(ua)) os = 'linux';
+
+  // Device Detection: Mobile (<640px), Tablet (640-1024px), Desktop (>1024px)
+  let device = 'desktop';
+  const isMobileUA = /mobile|iphone|ipod|android.*mobile|blackberry|iemobile|opera mini/.test(ua);
+  const isTabletUA = /ipad|android(?!.*mobile)|tablet/.test(ua);
+
+  if (width < 640 || (isMobileUA && width < 768)) {
+    device = 'mobile';
+  } else if ((width >= 640 && width <= 1024) || isTabletUA) {
+    device = 'tablet';
+  } else {
+    device = 'desktop';
+  }
+
+  const orientation = window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+
+  return {
+    device,
+    isMobile: device === 'mobile',
+    isTablet: device === 'tablet',
+    isDesktop: device === 'desktop',
+    isTouch,
+    os,
+    orientation,
+    width,
+    height: window.innerHeight
+  };
+}
+
+function applyPlatformAttributes() {
+  const p = detectPlatform();
+  state.platform = p;
+
+  const html = document.documentElement;
+  html.setAttribute('data-device', p.device);
+  html.setAttribute('data-touch', p.isTouch ? 'true' : 'false');
+  html.setAttribute('data-os', p.os);
+  html.setAttribute('data-orientation', p.orientation);
+
+  html.classList.remove('is-mobile', 'is-tablet', 'is-desktop');
+  html.classList.add('is-' + p.device);
+
+  if (p.isTouch) html.classList.add('has-touch');
+  else html.classList.remove('has-touch');
+}
+
+// Inicializa e escuta redimensionamento com debounce
+window.addEventListener('DOMContentLoaded', applyPlatformAttributes);
+applyPlatformAttributes();
+
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    applyPlatformAttributes();
+  }, 150);
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(applyPlatformAttributes, 200);
+});
 
 function renderApp() {
   renderHeader();
@@ -4000,27 +4089,27 @@ function renderBottomBar() {
   const courtPrice = court ? (isMensal ? (court.monthlyPrice || court.basePricePerHour * 3.6) : (court.basePricePerHour * hoursFraction)) : 0;
 
   bar.innerHTML = `
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-5xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
       ${state.currentStep > 1 ? `
         <button onclick="goToStep(${state.currentStep - 1})" 
-                class="px-5 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm flex items-center space-x-1.5 transition-all">
+                class="px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm flex items-center space-x-1 sm:space-x-1.5 transition-all flex-shrink-0 touch-manipulation">
           <i data-lucide="chevron-left" class="w-4 h-4"></i>
           <span>Voltar</span>
         </button>
       ` : '<div></div>'}
 
-      <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2 sm:space-x-4">
         ${court && state.currentStep >= 3 ? `
-          <div class="text-right hidden sm:block">
-            <span class="text-[11px] text-slate-400 block font-bold">${isMensal ? 'Subtotal Mensal' : 'Valor das Horas de Jogo'}</span>
-            <span class="text-base font-black text-emerald-900">
+          <div class="text-right">
+            <span class="text-[10px] sm:text-[11px] text-slate-400 block font-bold leading-tight">${isMensal ? 'Mensal' : 'Total Horas'}</span>
+            <span class="text-sm sm:text-base font-black text-emerald-900 leading-tight">
               R$ ${courtPrice.toFixed(2).replace('.', ',')}
             </span>
           </div>
         ` : ''}
 
         <button onclick="nextStep()" ${!canProceed ? 'disabled' : ''} 
-                class="btn-next-step px-6 sm:px-8 py-3 sm:py-3.5 text-white rounded-xl font-extrabold text-sm sm:text-base flex items-center space-x-2 shadow-md">
+                class="btn-next-step px-5 sm:px-8 py-2.5 sm:py-3.5 text-white rounded-xl font-extrabold text-xs sm:text-base flex items-center space-x-1.5 sm:space-x-2 shadow-md touch-manipulation">
           <span>${btnText}</span>
           <i data-lucide="chevron-right" class="w-4 h-4"></i>
         </button>

@@ -13,8 +13,8 @@
   
   <!-- Supabase JS Client & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/supabase-client.js?v=3.3.0"></script>
-  <script src="/default-data.js?v=3.3.0"></script>
+  <script src="/supabase-client.js?v=3.4.0"></script>
+  <script src="/default-data.js?v=3.4.0"></script>
 
   <!-- Socket.io Client (Apenas quando em localhost) -->
   <script>
@@ -26,7 +26,7 @@
   </script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/styles.css?v=3.3.0">
+  <link rel="stylesheet" href="/styles.css?v=3.4.0">
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24">
 
@@ -47,16 +47,17 @@
       <div class="flex items-center space-x-2 sm:space-x-3">
         <!-- Compartilhar Link -->
         <button onclick="openShareModal()" 
-                class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/60 px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition-all flex items-center space-x-1.5 shadow-md">
-          <i data-lucide="share-2" class="w-4 h-4"></i>
-          <span>Compartilhar Link</span>
+                class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/60 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition-all flex items-center space-x-1 sm:space-x-1.5 shadow-md">
+          <i data-lucide="share-2" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+          <span class="hidden sm:inline">Compartilhar Link</span>
+          <span class="sm:hidden text-[11px]">Compartilhar</span>
         </button>
 
         <!-- Botão Gestão com Verificação de Login -->
         <button onclick="handleGestaoButtonClick()" 
-                class="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1.5 shadow-sm">
+                class="bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/50 px-2.5 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1 sm:space-x-1.5 shadow-sm">
           <i data-lucide="shield" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span class="hidden sm:inline" id="modeBtnText">Gestão</span>
+          <span id="modeBtnText" class="text-[11px] sm:text-xs">Gestão</span>
         </button>
 
         <!-- Reiniciar -->
@@ -88,6 +89,6 @@
   <div id="modalRoot"></div>
 
   <!-- Main Script -->
-  <script src="/app.js?v=3.3.0"></script>
+  <script src="/app.js?v=3.4.0"></script>
 </body>
 </html>
