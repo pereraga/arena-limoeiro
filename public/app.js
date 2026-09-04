@@ -2955,8 +2955,32 @@ async function syncDataFromSupabase() {
     const { data: dbMembers } = await client.from('monthly_members').select('*');
     if (dbMembers) state.monthlyMembers = dbMembers;
 
+    const { data: dbBookings } = await client.from('bookings').select('*');
+    if (dbBookings) state.bookings = dbBookings;
+
     renderApp();
     requestSchedule();
+
+    // Ativa sincronização Realtime instantânea para reservas e mensalistas
+    if (!window.supabaseRealtimeActive) {
+      window.supabaseRealtimeActive = true;
+      client.channel('realtime_arena')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, async () => {
+          const { data } = await client.from('bookings').select('*');
+          if (data) {
+            state.bookings = data;
+            requestSchedule();
+          }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_members' }, async () => {
+          const { data } = await client.from('monthly_members').select('*');
+          if (data) {
+            state.monthlyMembers = data;
+            requestSchedule();
+          }
+        })
+        .subscribe();
+    }
   } catch (err) {
     console.warn('Erro na sincronização Supabase:', err);
   }
