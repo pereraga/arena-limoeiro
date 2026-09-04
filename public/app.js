@@ -53,7 +53,8 @@ let state = {
   customerPhone: '',
   paymentMethod: 'pix',
   
-  slots: [] // Horários do dia com status 'available', 'booked', 'blocked_admin'
+  slots: [], // Horários do dia com status 'available', 'booked', 'blocked_admin'
+  maintenanceBlocks: JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]')
 };
 
 function getFormattedDate(date) {
@@ -106,6 +107,7 @@ function loadInitialData() {
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     state.bookings = (localSaved && localSaved.length > 0) ? localSaved : (d.initialBookings || d.allBookings || []);
+    state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
     if (!state.selectedCourt && state.courts.length > 0) {
       state.selectedCourt = state.courts[0];
     }
@@ -118,6 +120,91 @@ function initCloudSync() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
   }
+}
+
+// MOTOR ANTI-CHOQUE: Validação estrita de sobreposição e conflito de horário
+function checkScheduleConflict(courtId, date, startTime, endTime, excludeBookingId = null) {
+  const sMin = timeToMinutes(startTime);
+  const eMin = timeToMinutes(endTime);
+  if (sMin >= eMin) {
+    return { conflict: true, reason: 'O horário de término deve ser posterior ao horário de início.' };
+  }
+
+  const court = (state.courts || []).find(c => c.id === courtId);
+  const specs = court ? (typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {})) : {};
+  if (court && (court.isMaintenance === true || court.status === 'maintenance' || specs.status === 'maintenance')) {
+    return { conflict: true, reason: `O campo selecionado (${court.name}) está em manutenção preventiva geral.` };
+  }
+
+  // 1. Janela de Manutenção por Horário / Treinos Reservados
+  const localMaint = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
+  const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
+  const maintConflict = allMaint.find(mb => {
+    const mbCourtId = mb.court_id || mb.courtId;
+    if (mbCourtId !== courtId || mb.date !== date) return false;
+    const mbS = timeToMinutes(mb.start_time || mb.startTime);
+    const mbE = timeToMinutes(mb.end_time || mb.endTime);
+    return Math.max(sMin, mbS) < Math.min(eMin, mbE);
+  });
+  if (maintConflict) {
+    return { 
+      conflict: true, 
+      reason: `Este horário está reservado para treino / manutenção neste campo (${maintConflict.reason || 'Treino Fechado'}).` 
+    };
+  }
+
+  // 2. Mensalistas fixos naquele dia da semana
+  const [y, m, d] = date.split('-');
+  const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+  const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+  const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
+
+  const monthlyConflict = (state.monthlyMembers || []).find(mm => {
+    const mmCourtId = mm.court_id || mm.courtId;
+    if (mmCourtId && mmCourtId !== courtId) return false;
+    if ((mm.day_of_week || mm.dayOfWeek) !== currentDayOfWeek) return false;
+    if (mm.status && mm.status !== 'active') return false;
+
+    const mmS = timeToMinutes(mm.start_time || mm.startTime || mm.time);
+    const mmE = timeToMinutes(mm.end_time || mm.endTime || minutesToTime(mmS + 60));
+    return Math.max(sMin, mmS) < Math.min(eMin, mmE);
+  });
+  if (monthlyConflict) {
+    return { 
+      conflict: true, 
+      reason: `Este horário já está reservado para o time mensalista fixo: ${(monthlyConflict.team_name || monthlyConflict.teamName)}.` 
+    };
+  }
+
+  // 3. Reservas ativas no mesmo campo e data (ANTI-CHOQUE)
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const bookingMap = new Map();
+  [...(state.bookings || []), ...localBookings].forEach(b => {
+    if (b && b.id) bookingMap.set(b.id, b);
+  });
+  const allBookings = Array.from(bookingMap.values());
+
+  const bookingConflict = allBookings.find(b => {
+    const bCourtId = b.court_id || b.courtId;
+    if (bCourtId !== courtId || b.date !== date) return false;
+    if (b.status === 'cancelled') return false;
+    if (excludeBookingId && b.id === excludeBookingId) return false;
+
+    const bS = timeToMinutes(b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '00:00'));
+    const bE = timeToMinutes(b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : minutesToTime(bS + 60)));
+    return Math.max(sMin, bS) < Math.min(eMin, bE);
+  });
+  if (bookingConflict) {
+    const isM = bookingConflict.booking_type === 'manutencao' || bookingConflict.bookingType === 'manutencao';
+    return { 
+      conflict: true, 
+      reason: isM ? 
+        `Horário bloqueado para treino reservado ou manutenção (${bookingConflict.customer_name || bookingConflict.observation || 'Reservado'}).` :
+        `Choque de agendamento evitado: O horário das ${startTime} às ${endTime} já foi reservado neste campo por ${bookingConflict.customer_name || 'outro cliente'}.`
+    };
+  }
+
+  return { conflict: false };
 }
 
 function calculateLocalSchedule(courtId, date) {
@@ -140,7 +227,7 @@ function calculateLocalSchedule(courtId, date) {
     return operatingHours.map(time => ({
       time,
       status: "maintenance",
-      statusLabel: "Quadra em Manutenção",
+      statusLabel: "Quadra em Manutenção Geral",
       isMaintenance: true,
       customerName: reason,
       isAvailable: false
@@ -152,14 +239,43 @@ function calculateLocalSchedule(courtId, date) {
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
+  // 1. Janelas de Manutenção / Treinos Reservados por Horário
+  const localMaint = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
+  const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
+
+  // 2. Bookings consolidados
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const allBookings = [...(state.bookings || []), ...localBookings];
+  const bookingMap = new Map();
+  [...(state.bookings || []), ...localBookings].forEach(b => {
+    if (b && b.id) bookingMap.set(b.id, b);
+  });
+  const allBookings = Array.from(bookingMap.values());
 
   return operatingHours.map(time => {
     const slotMin = timeToMinutes(time);
 
-    // 1. Mensalista fixo naquele dia da semana
-    const monthlyHolder = state.monthlyMembers.find(m => {
+    // Checagem 1: Manutenção por janela de horário neste campo
+    const maintBlock = allMaint.find(mb => {
+      const mbCourtId = mb.court_id || mb.courtId;
+      if (mbCourtId !== courtId || mb.date !== date) return false;
+      const s = timeToMinutes(mb.start_time || mb.startTime);
+      const e = timeToMinutes(mb.end_time || mb.endTime);
+      return slotMin >= s && slotMin < e;
+    });
+
+    if (maintBlock) {
+      return {
+        time,
+        status: "maintenance",
+        statusLabel: maintBlock.reason || "Treino Reservado / Manutenção",
+        isMaintenance: true,
+        customerName: maintBlock.reason || "Treino Reservado",
+        isAvailable: false
+      };
+    }
+
+    // Checagem 2: Mensalista fixo naquele dia da semana
+    const monthlyHolder = (state.monthlyMembers || []).find(m => {
       const mCourtId = m.court_id || m.courtId;
       if (mCourtId && mCourtId !== courtId) return false;
       const day = m.day_of_week || m.dayOfWeek;
@@ -187,7 +303,7 @@ function calculateLocalSchedule(courtId, date) {
       };
     }
 
-    // 2. Reservas avulsas confirmadas
+    // Checagem 3: Reservas avulsas ou treinos salvos
     const booking = allBookings.find(b => {
       const bCourtId = b.court_id || b.courtId;
       if (bCourtId !== courtId || b.date !== date) return false;
@@ -205,12 +321,14 @@ function calculateLocalSchedule(courtId, date) {
     });
 
     if (booking) {
+      const isM = booking.booking_type === 'manutencao' || booking.bookingType === 'manutencao';
       return {
         time,
-        status: "booked",
-        statusLabel: "Reservado",
-        isMensalista: booking.bookingType === 'mensalista',
-        customerName: booking.customer_name || booking.customerName || "Cliente",
+        status: isM ? "maintenance" : "booked",
+        statusLabel: isM ? (booking.observation || "Treino Reservado / Manutenção") : "Reservado",
+        isMaintenance: isM,
+        isMensalista: booking.bookingType === 'mensalista' || booking.booking_type === 'mensalista',
+        customerName: booking.customer_name || booking.customerName || (isM ? "Treino Reservado" : "Cliente"),
         isAvailable: false
       };
     }
@@ -230,7 +348,7 @@ function requestSchedule() {
   // 1. Gera e atualiza a grade localmente na hora (autônomo para Vercel)
   state.slots = calculateLocalSchedule(state.selectedCourt.id, state.selectedDate);
 
-  // Auto-seleciona primeiro horário livre se o atual estiver ocupado
+  // Auto-seleciona primeiro horário livre se o atual estiver ocupado ou em manutenção
   const currentSlot = state.slots.find(s => s.time === state.startTime);
   if (!currentSlot || currentSlot.status !== 'available') {
     const firstAvailable = state.slots.find(s => s.status === 'available');
@@ -238,6 +356,7 @@ function requestSchedule() {
       state.startTime = firstAvailable.time;
       const nextHourMin = timeToMinutes(firstAvailable.time) + 60;
       state.endTime = minutesToTime(nextHourMin);
+      calculateDuration();
     }
   }
 
@@ -971,16 +1090,30 @@ function renderStep3Content() {
               </label>
               <select id="endTimeSelect" onchange="handleTimeChange(this.value, 'end')" 
                       class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
-                ${[1, 1.5, 2, 3].map(durHours => {
-                  const endMin = timeToMinutes(state.startTime) + (durHours * 60);
-                  const endStr = minutesToTime(endMin);
-                  if (endMin > timeToMinutes("23:00")) return '';
-                  return `
-                    <option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>
-                      ${endStr} (${durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
-                    </option>
-                  `;
-                }).join('')}
+                ${(() => {
+                  const options = [];
+                  for (const durHours of [1, 1.5, 2, 3]) {
+                    const endMin = timeToMinutes(state.startTime) + (durHours * 60);
+                    if (endMin > timeToMinutes("23:00")) continue;
+                    const endStr = minutesToTime(endMin);
+                    
+                    // ANTI-CHOQUE: Só exibe opções de término sem conflito de horário
+                    const conflictCheck = checkScheduleConflict(court.id, state.selectedDate, state.startTime, endStr);
+                    if (conflictCheck.conflict) continue;
+
+                    options.push(`
+                      <option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>
+                        ${endStr} (${durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
+                      </option>
+                    `);
+                  }
+                  if (options.length === 0) {
+                    const endMin = timeToMinutes(state.startTime) + 60;
+                    const endStr = minutesToTime(endMin);
+                    options.push(`<option value="${endStr}">${endStr} (1 hora de jogo)</option>`);
+                  }
+                  return options.join('');
+                })()}
               </select>
             </div>
           </div>
@@ -1941,23 +2074,40 @@ function renderLiveDashboardTab() {
 
 // 2. ABA DE CONTROLE DE QUADRAS & MANUTENÇÃO
 function renderCourtsControlTab() {
+  const localMaint = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
+  const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
+  const uniqueMaint = [];
+  const mIds = new Set();
+  allMaint.forEach(m => {
+    if (m && m.id && !mIds.has(m.id)) {
+      mIds.add(m.id);
+      uniqueMaint.push(m);
+    }
+  });
+
   return `
     <div class="space-y-6">
       
-      <!-- Cabeçalho explicativo -->
+      <!-- Cabeçalho explicativo com botões de ação rápida -->
       <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div class="flex items-center space-x-2">
             <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="wrench" class="w-5 h-5"></i></span>
-            <h3 class="text-lg font-black text-slate-900">Monitor de Quadras & Status de Manutenção</h3>
+            <h3 class="text-lg font-black text-slate-900">Monitor de Quadras, Treinos Reservados & Manutenção</h3>
           </div>
-          <p class="text-xs text-slate-500 mt-1">Ao colocar qualquer quadra em manutenção, ela é imediatamente bloqueada para agendamentos na visão pública dos clientes.</p>
+          <p class="text-xs text-slate-500 mt-1">Defina horários de início e término para treinos reservados ou manutenção pontual sem comprometer os demais horários nem as outras quadras.</p>
         </div>
 
-        <button onclick="openCourtModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-          <span>+ Cadastrar Nova Quadra</span>
-        </button>
+        <div class="flex items-center flex-wrap gap-2">
+          <button onclick="openMaintenanceModal()" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+            <i data-lucide="clock" class="w-4 h-4"></i>
+            <span>+ Agendar Treino / Manutenção (com Horário)</span>
+          </button>
+          <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>+ Nova Quadra</span>
+          </button>
+        </div>
       </div>
 
       <!-- Grid com as 6 Quadras -->
@@ -1967,10 +2117,13 @@ function renderCourtsControlTab() {
           const isUnderMaint = court.isMaintenance === true || court.status === 'maintenance' || specs.status === 'maintenance';
           const maintReason = specs.maintenance_reason || court.maintenance_reason || 'Manutenção preventiva';
 
+          // Checa se há treinos reservados hoje nesta quadra
+          const todayStr = state.adminFilterDate || state.selectedDate || getFormattedDate(new Date());
+          const courtMaintToday = uniqueMaint.filter(mb => (mb.court_id || mb.courtId) === court.id && mb.date === todayStr);
+
           // Checa se há jogo rolando agora nesta quadra
           const now = new Date();
           const currentMin = now.getHours() * 60 + now.getMinutes();
-          const todayStr = getFormattedDate(now);
 
           const liveBooking = (state.bookings || []).find(b => {
             if ((b.court_id || b.courtId) !== court.id || b.date !== todayStr || b.status === 'cancelled') return false;
@@ -1993,7 +2146,11 @@ function renderCourtsControlTab() {
                     </span>
                     ${isUnderMaint ? `
                       <span class="bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg border border-rose-400 shadow-md flex items-center animate-pulse">
-                        <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> EM MANUTENÇÃO
+                        <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> EM MANUTENÇÃO GERAL
+                      </span>
+                    ` : (courtMaintToday.length > 0 ? `
+                      <span class="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center">
+                        <i data-lucide="clock" class="w-3 h-3 mr-1"></i> ${courtMaintToday.length} TREINO(S) RESERVADO(S) HOJE
                       </span>
                     ` : (liveBooking ? `
                       <span class="bg-amber-500 text-black text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center animate-pulse">
@@ -2003,7 +2160,7 @@ function renderCourtsControlTab() {
                       <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center">
                         ✓ DISPONÍVEL
                       </span>
-                    `)}
+                    `))}
                   </div>
 
                   <div class="absolute bottom-2.5 left-3 text-white">
@@ -2016,9 +2173,20 @@ function renderCourtsControlTab() {
                     <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
                       <div class="font-black flex items-center mb-0.5">
                         <i data-lucide="wrench" class="w-4 h-4 text-rose-600 mr-1.5"></i>
-                        Quadra Interditada para Clientes
+                        Quadra Interditada o Dia Inteiro
                       </div>
                       <p class="font-medium text-[11px] text-rose-700">Motivo: <strong>${maintReason}</strong></p>
+                    </div>
+                  ` : (courtMaintToday.length > 0 ? `
+                    <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-1">
+                      <div class="font-black flex items-center text-amber-900">
+                        <i data-lucide="clock" class="w-4 h-4 text-amber-700 mr-1.5"></i>
+                        Treinos Reservados / Bloqueios nesta data:
+                      </div>
+                      ${courtMaintToday.map(mb => `
+                        <p class="text-[11px] text-amber-800 font-semibold">• ${mb.start_time} às ${mb.end_time}: ${mb.reason}</p>
+                      `).join('')}
+                      <p class="text-[10px] text-emerald-700 font-bold pt-1">Demais horários continuam livres para clientes.</p>
                     </div>
                   ` : (liveBooking ? `
                     <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
@@ -2032,11 +2200,11 @@ function renderCourtsControlTab() {
                     <div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
                       <div class="font-black flex items-center mb-0.5">
                         <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 mr-1.5"></i>
-                        Quadra Liberada para Jogos
+                        Quadra 100% Operacional
                       </div>
                       <p class="font-medium text-[11px] text-emerald-700">Clientes podem agendar normalmente no site.</p>
                     </div>
-                  `)}
+                  `))}
 
                   <div class="text-xs text-slate-600 space-y-1.5 pt-1">
                     <p class="flex items-center"><i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5"></i> Piso: ${specs.surface || specs.type || 'Oficial de Alto Desempenho'}</p>
@@ -2046,27 +2214,29 @@ function renderCourtsControlTab() {
                 </div>
               </div>
 
-              <!-- Botões de Controle de Manutenção -->
+              <!-- Botões de Ação por Campo -->
               <div class="p-5 pt-0 space-y-2">
-                ${isUnderMaint ? `
-                  <button onclick="setCourtMaintenance('${court.id}', false)" 
-                          class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center justify-center space-x-1.5 transition-all">
-                    <i data-lucide="check-circle" class="w-4 h-4"></i>
-                    <span>Liberar Quadra para Jogos</span>
-                  </button>
-                ` : `
-                  <button onclick="openMaintenanceModal('${court.id}')" 
-                          class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all">
-                    <i data-lucide="wrench" class="w-4 h-4"></i>
-                    <span>Colocar em Manutenção</span>
-                  </button>
-                `}
+                <button onclick="openMaintenanceModal('${court.id}')" 
+                        class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all">
+                  <i data-lucide="clock" class="w-4 h-4 text-rose-600"></i>
+                  <span>Agendar Treino / Manutenção (com Horário)</span>
+                </button>
 
                 <div class="flex items-center space-x-2">
-                  <button onclick="openCourtModal('${court.id}')" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center space-x-1 transition-all">
-                    <i data-lucide="edit" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>Editar Dados</span>
-                  </button>
+                  ${isUnderMaint ? `
+                    <button onclick="setCourtMaintenance('${court.id}', false)" 
+                            class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1 transition-all">
+                      <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                      <span>Liberar Dia</span>
+                    </button>
+                  ` : `
+                    <button onclick="setCourtMaintenance('${court.id}', true, 'Interdição geral da quadra')" 
+                            class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center space-x-1 transition-all">
+                      <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+                      <span>Fechar Dia</span>
+                    </button>
+                  `}
+                  
                   <button onclick="setAdminTab('schedule')" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center space-x-1 transition-all">
                     <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
                     <span>Ver Grade</span>
@@ -2077,6 +2247,77 @@ function renderCourtsControlTab() {
             </div>
           `;
         }).join('')}
+      </div>
+
+      <!-- SEÇÃO EXCLUSIVA: LISTA DE TREINOS RESERVADOS E BLOQUEIOS POR HORÁRIO -->
+      <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="p-1.5 rounded-lg bg-rose-100 text-rose-800"><i data-lucide="calendar-clock" class="w-4 h-4"></i></span>
+              <h4 class="text-base font-black text-slate-900">Treinos Reservados & Janelas de Manutenção Agendadas</h4>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Estes horários ficam 100% bloqueados no site para que nenhum cliente agende por engano. Os demais horários continuam disponíveis.</p>
+          </div>
+
+          <button onclick="openMaintenanceModal()" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 self-start sm:self-auto">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>+ Novo Horário Bloqueado</span>
+          </button>
+        </div>
+
+        ${uniqueMaint.length === 0 ? `
+          <div class="p-6 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+            <i data-lucide="check-circle" class="w-8 h-8 text-emerald-600 mx-auto mb-2"></i>
+            <h5 class="text-sm font-bold text-slate-800">Nenhum treino reservado ou manutenção pontual cadastrada</h5>
+            <p class="text-xs text-slate-500 mt-0.5">Todas as quadras estão liberadas para os clientes agendarem nos horários sem partidas.</p>
+          </div>
+        ` : `
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                  <th class="p-3">Campo / Quadra</th>
+                  <th class="p-3">Data</th>
+                  <th class="p-3">Horário Bloqueado</th>
+                  <th class="p-3">Finalidade / Motivo</th>
+                  <th class="p-3 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${uniqueMaint.map(mb => {
+                  const c = state.courts.find(x => x.id === (mb.court_id || mb.courtId));
+                  return `
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                      <td class="p-3 font-bold text-slate-900">
+                        <span class="inline-block px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 text-[10px] font-black border border-emerald-200 mr-1.5">
+                          ${c ? c.categoryLabel : 'Quadra'}
+                        </span>
+                        ${c ? c.name : mb.court_id}
+                      </td>
+                      <td class="p-3 font-bold text-slate-700">${formatDisplayDate(mb.date)}</td>
+                      <td class="p-3 font-black text-rose-700">
+                        <span class="inline-flex items-center px-2 py-1 rounded-lg bg-rose-50 border border-rose-200">
+                          <i data-lucide="clock" class="w-3 h-3 mr-1 text-rose-600"></i>
+                          ${mb.start_time} às ${mb.end_time}
+                        </span>
+                      </td>
+                      <td class="p-3 text-slate-800 font-medium">${mb.reason || 'Treino Reservado'}</td>
+                      <td class="p-3 text-right">
+                        <button onclick="deleteMaintenanceBlock('${mb.id}')" 
+                                class="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 rounded-lg text-xs font-bold border border-slate-200 hover:border-rose-300 transition-all inline-flex items-center space-x-1"
+                                title="Liberar horário para clientes">
+                          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                          <span>Liberar Horário</span>
+                        </button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
       </div>
 
     </div>
@@ -2566,7 +2807,9 @@ function renderAdminSubTabContent(tab) {
 
 // 5. FUNÇÕES DE SUPORTE OPERACIONAL (MANUTENÇÃO, BAR, JOGOS, RESERVAS DIRETAS)
 
-// Alternar status de manutenção de uma quadra
+// GESTÃO DE MANUTENÇÃO & TREINOS RESERVADOS POR CAMPO E HORÁRIO
+
+// Alternar status de manutenção geral de uma quadra (dia inteiro)
 async function setCourtMaintenance(courtId, inMaintenance, reason = '') {
   const court = state.courts.find(c => c.id === courtId);
   if (!court) return;
@@ -2595,22 +2838,25 @@ async function setCourtMaintenance(courtId, inMaintenance, reason = '') {
   lucide.createIcons();
 }
 
-function openMaintenanceModal(courtId) {
-  const court = state.courts.find(c => c.id === courtId);
-  if (!court) return;
-
+// Modal unificado para cadastrar Manutenção ou Treino Reservado com horário de início e término
+function openMaintenanceModal(courtId = null) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
+  const targetCourtId = courtId || (state.courts[0] ? state.courts[0].id : '');
+  const todayStr = state.adminFilterDate || state.selectedDate || getFormattedDate(new Date());
+
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
-        <div class="bg-rose-950 p-5 text-white flex items-center justify-between">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        <div class="bg-gradient-to-r from-rose-950 via-slate-900 to-rose-950 p-5 text-white flex items-center justify-between">
           <div class="flex items-center space-x-2.5">
-            <i data-lucide="wrench" class="w-6 h-6 text-rose-400"></i>
+            <div class="w-9 h-9 rounded-xl bg-rose-600/30 border border-rose-400/30 flex items-center justify-center text-rose-300">
+              <i data-lucide="clock" class="w-5 h-5"></i>
+            </div>
             <div>
-              <h3 class="text-base font-black uppercase">Colocar Quadra em Manutenção</h3>
-              <p class="text-xs text-rose-300 font-medium">${court.name}</p>
+              <h3 class="text-base font-black uppercase">Agendar Treino Reservado / Manutenção</h3>
+              <p class="text-xs text-rose-300 font-medium">Bloqueio exclusivo por campo com horário de início e término</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-rose-300 hover:text-white p-1">
@@ -2618,23 +2864,96 @@ function openMaintenanceModal(courtId) {
           </button>
         </div>
 
-        <form onsubmit="handleConfirmMaintenance(event, '${courtId}')" class="p-6 space-y-4">
-          <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800">
-            <strong>Atenção:</strong> Ao confirmar, a quadra ficará marcada como <strong>Em Manutenção</strong> e nenhum cliente poderá selecioná-la no site.
+        <form onsubmit="handleSaveMaintenanceBlock(event)" class="p-6 space-y-4 overflow-y-auto flex-1">
+          
+          <div class="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 space-y-1">
+            <p class="font-bold flex items-center">
+              <i data-lucide="shield-check" class="w-4 h-4 mr-1 text-rose-700"></i>
+              Garantia de Isolamento de Campo & Anti-Choque
+            </p>
+            <p class="text-[11px] text-rose-800">
+              Ao cadastrar uma hora de início e término, <strong>apenas o campo selecionado</strong> e <strong>apenas o intervalo definido</strong> ficarão bloqueados para agendamentos. Todos os demais horários e todos os outros campos da Arena permanecem 100% livres para clientes.
+            </p>
           </div>
 
+          <!-- Seleção da Quadra -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo da Manutenção *</label>
-            <input type="text" id="maintReasonInput" required 
-                   placeholder="Ex: Manutenção da grama sintética, Troca de refletores..." 
-                   value="Manutenção preventiva e reparos no piso"
-                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Campo / Quadra *</label>
+            <select id="maintCourtSelect" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-rose-500">
+              ${state.courts.map(c => `
+                <option value="${c.id}" ${c.id === targetCourtId ? 'selected' : ''}>${c.name}</option>
+              `).join('')}
+            </select>
           </div>
 
-          <div class="pt-2 flex items-center justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
-            <button type="submit" class="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md">Confirmar Manutenção</button>
+          <!-- Data -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data do Bloqueio *</label>
+            <input type="date" id="maintDateInput" required value="${todayStr}" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-rose-500">
           </div>
+
+          <!-- Tipo de Bloqueio -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Bloqueio</label>
+            <div class="grid grid-cols-2 gap-3">
+              <label class="p-3 border-2 border-rose-500 bg-rose-50/60 rounded-xl flex items-center space-x-2 cursor-pointer">
+                <input type="radio" name="maintTypeOption" value="hours" checked onchange="toggleMaintHoursView(true)" class="text-rose-600">
+                <span class="text-xs font-bold text-slate-900">⏱️ Janela por Horário</span>
+              </label>
+              <label class="p-3 border-2 border-slate-200 rounded-xl flex items-center space-x-2 cursor-pointer">
+                <input type="radio" name="maintTypeOption" value="full_day" onchange="toggleMaintHoursView(false)" class="text-rose-600">
+                <span class="text-xs font-bold text-slate-700">🔒 Dia Inteiro</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Horários (Início e Término) -->
+          <div id="maintHoursContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Horário de Início *</label>
+              <select id="maintStartSelect" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-rose-500">
+                ${["06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"].map(t => `
+                  <option value="${t}" ${t === '14:00' ? 'selected' : ''}>${t}</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Horário de Término *</label>
+              <select id="maintEndSelect" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-rose-500">
+                ${["07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00","23:00"].map(t => `
+                  <option value="${t}" ${t === '17:00' ? 'selected' : ''}>${t}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Motivo / Identificação -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo / Identificação do Treino *</label>
+            <input type="text" id="maintReasonInput" required 
+                   placeholder="Ex: Treino Reservado da Equipe Principal / Escolinha" 
+                   value="Treino Reservado da Equipe"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-rose-500">
+            
+            <!-- Sugestões Rápidas -->
+            <div class="flex flex-wrap gap-1.5 mt-2">
+              <button type="button" onclick="setQuickReason('Treino Reservado da Equipe')" class="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg">⚽ Treino Reservado</button>
+              <button type="button" onclick="setQuickReason('Treino Fechado da Escolinha')" class="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg">🏆 Escolinha</button>
+              <button type="button" onclick="setQuickReason('Manutenção da Iluminação / Refletores')" class="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg">💡 Refletores</button>
+              <button type="button" onclick="setQuickReason('Manutenção Preventiva do Piso / Grama')" class="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg">🌱 Piso / Gramado</button>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
+            <button type="submit" class="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              <span>Confirmar Bloqueio</span>
+            </button>
+          </div>
+
         </form>
       </div>
     </div>
@@ -2642,11 +2961,123 @@ function openMaintenanceModal(courtId) {
   lucide.createIcons();
 }
 
-function handleConfirmMaintenance(e, courtId) {
+function toggleMaintHoursView(showHours) {
+  const container = document.getElementById('maintHoursContainer');
+  if (container) {
+    container.style.display = showHours ? 'grid' : 'none';
+  }
+}
+
+function setQuickReason(val) {
+  const input = document.getElementById('maintReasonInput');
+  if (input) input.value = val;
+}
+
+async function handleSaveMaintenanceBlock(e) {
   e.preventDefault();
-  const reason = document.getElementById('maintReasonInput').value.trim();
+
+  const courtId = document.getElementById('maintCourtSelect').value;
+  const date = document.getElementById('maintDateInput').value;
+  const typeOption = document.querySelector('input[name="maintTypeOption"]:checked').value;
+  const reason = document.getElementById('maintReasonInput').value.trim() || 'Treino Reservado';
+
+  if (typeOption === 'full_day') {
+    closeModal();
+    await setCourtMaintenance(courtId, true, reason);
+    return;
+  }
+
+  const startTime = document.getElementById('maintStartSelect').value;
+  const endTime = document.getElementById('maintEndSelect').value;
+
+  if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
+    alert('O horário de término deve ser após o horário de início.');
+    return;
+  }
+
+  const blockId = 'maint-' + Date.now();
+  const block = {
+    id: blockId,
+    court_id: courtId,
+    courtId: courtId,
+    date,
+    start_time: startTime,
+    end_time: endTime,
+    reason,
+    type: 'manutencao'
+  };
+
+  // Salva no state
+  if (!state.maintenanceBlocks) state.maintenanceBlocks = [];
+  state.maintenanceBlocks.push(block);
+
+  // Salva no localStorage
+  localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
+
+  // Cria booking correspondente para espelhar no Supabase e no sistema de reservas
+  const bookingPayload = {
+    id: blockId,
+    court_id: courtId,
+    courtId: courtId,
+    date,
+    start_time: startTime,
+    end_time: endTime,
+    time: `${startTime} às ${endTime}`,
+    duration: timeToMinutes(endTime) - timeToMinutes(startTime),
+    customer_name: `[Treino Reservado] ${reason}`,
+    customer_phone: '(81) 00000-0000',
+    total_price: 0,
+    status: 'confirmed',
+    booking_type: 'manutencao',
+    payment_method: 'interno',
+    product_cart: {},
+    observation: reason
+  };
+
+  state.bookings.push(bookingPayload);
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  localBookings.push(bookingPayload);
+  localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+
+  // Salva no Supabase se disponível
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('bookings').insert([bookingPayload]);
+    } catch (err) {
+      console.warn('Erro ao sincronizar manutenção no Supabase:', err);
+    }
+  }
+
   closeModal();
-  setCourtMaintenance(courtId, true, reason);
+  requestSchedule();
+  renderStepContent();
+  lucide.createIcons();
+  alert(`✓ Treino reservado / manutenção agendado com sucesso!\nCampo: ${state.courts.find(c => c.id === courtId)?.name}\nHorário: ${startTime} às ${endTime}\nData: ${formatDisplayDate(date)}`);
+}
+
+async function deleteMaintenanceBlock(blockId) {
+  if (!confirm('Deseja liberar este horário para agendamento dos clientes?')) return;
+
+  state.maintenanceBlocks = (state.maintenanceBlocks || []).filter(mb => mb.id !== blockId);
+  localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
+
+  state.bookings = (state.bookings || []).filter(b => b.id !== blockId);
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const filtered = localBookings.filter(b => b.id !== blockId);
+  localStorage.setItem('arena_local_bookings', JSON.stringify(filtered));
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('bookings').delete().eq('id', blockId);
+    } catch(err) {}
+  }
+
+  requestSchedule();
+  renderStepContent();
+  lucide.createIcons();
+  alert('✓ Horário liberado com sucesso para novos agendamentos!');
 }
 
 // Iniciar ou Finalizar Partida
@@ -2971,6 +3402,13 @@ async function handleDirectBookingSubmit(e) {
   const endMins = (eMin % 60).toString().padStart(2, '0');
   const endTime = `${endHours}:${endMins}`;
 
+  // ANTI-CHOQUE NA RESERVA DIRETA: Verifica sobreposição antes de salvar
+  const conflict = checkScheduleConflict(courtId, date, startTime, endTime);
+  if (conflict.conflict) {
+    alert('⚠️ Não é possível realizar esta reserva direta!\n\nMotivo: ' + conflict.reason + '\n\nPor favor, altere o horário ou selecione outro campo livre.');
+    return;
+  }
+
   const court = state.courts.find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 140 };
   const courtPrice = (court.basePricePerHour || court.base_price_per_hour || 140) * (duration / 60);
 
@@ -3130,7 +3568,18 @@ function renderAdminMatrix() {
       <tr class="hover:bg-slate-50/60">
         <td class="p-2.5 font-bold text-slate-600 text-center bg-slate-50">${hour}</td>
         ${state.courts.map(c => {
-          const slot = (state.slots || []).find(s => s.time === hour);
+          // ISOLAMENTO ESTRITO POR CAMPO: Calcula a grade especificamente para cada quadra
+          const courtSlots = calculateLocalSchedule(c.id, state.adminFilterDate || state.selectedDate);
+          const slot = (courtSlots || []).find(s => s.time === hour);
+
+          if (slot && slot.status === 'maintenance') {
+            return `
+              <td class="p-2 text-center border-l border-slate-100 bg-amber-50 text-amber-900">
+                <span class="font-black text-[11px] block truncate">⚠️ ${slot.customerName || 'Treino Reservado'}</span>
+                <span class="text-[10px] text-amber-700 block font-semibold">Manutenção / Treino</span>
+              </td>
+            `;
+          }
 
           if (slot && slot.status === 'booked') {
             return `
@@ -3144,7 +3593,7 @@ function renderAdminMatrix() {
           if (slot && slot.status === 'blocked_admin') {
             return `
               <td class="p-2 text-center border-l border-slate-100 bg-slate-100 text-slate-600">
-                <span class="font-bold block">Manutenção</span>
+                <span class="font-bold block">Bloqueado</span>
                 <button onclick="adminToggleSlot('${c.id}', '${state.selectedDate}', '${hour}')" class="text-[10px] text-emerald-700 underline">Desbloquear</button>
               </td>
             `;
@@ -3152,7 +3601,7 @@ function renderAdminMatrix() {
 
           return `
             <td class="p-2 text-center border-l border-slate-100">
-              <button onclick="adminToggleSlot('${c.id}', '${state.selectedDate}', '${hour}')" 
+              <button onclick="openMaintenanceModal('${c.id}')" 
                       class="w-full py-1.5 px-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] border border-emerald-200 transition-all">
                 Livre (Bloquear)
               </button>
@@ -3814,12 +4263,49 @@ function submitBooking(grandTotal) {
   state.customerPhone = phone;
   const isMensal = state.bookingType === 'mensalista';
 
-  // Se o Supabase estiver vinculado, salva na nuvem com cadastro de cliente
+  // ANTI-CHOQUE RIGOROSO: Verifica conflito local imediatamente
+  const localCheck = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
+  if (localCheck.conflict) {
+    alert('⚠️ Choque de Agendamento Evitado!\n\n' + localCheck.reason + '\n\nPor favor, escolha outro horário livre ou outro campo da Arena Limoeiro.');
+    requestSchedule();
+    closeModal();
+    goToStep(3);
+    return;
+  }
+
+  // Se o Supabase estiver vinculado, valida no banco antes de salvar
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     (async () => {
       try {
-        const customer = await window.ArenaSupabase.getOrCreateCustomer(name, phone);
         const client = window.ArenaSupabase.getClient();
+
+        // Checagem anti-choque em tempo real no Supabase
+        const { data: dbConflicts } = await client
+          .from('bookings')
+          .select('id, start_time, end_time, customer_name, status')
+          .eq('court_id', state.selectedCourt.id)
+          .eq('date', state.selectedDate)
+          .neq('status', 'cancelled');
+
+        if (dbConflicts && dbConflicts.length > 0) {
+          const reqS = timeToMinutes(state.startTime);
+          const reqE = timeToMinutes(state.endTime);
+          const overlap = dbConflicts.find(b => {
+            const bS = timeToMinutes(b.start_time);
+            const bE = timeToMinutes(b.end_time);
+            return Math.max(reqS, bS) < Math.min(reqE, bE);
+          });
+          if (overlap) {
+            alert('⚠️ Choque de Agendamento Evitado!\n\nEste horário acabou de ser confirmado por outro cliente (' + (overlap.customer_name || 'Reservado') + ').\n\nPor favor, selecione outro horário disponível.');
+            syncDataFromSupabase();
+            requestSchedule();
+            closeModal();
+            goToStep(3);
+            return;
+          }
+        }
+
+        const customer = await window.ArenaSupabase.getOrCreateCustomer(name, phone);
 
         if (isMensal) {
           const newMemberId = 'mensal-' + Date.now();
@@ -3841,6 +4327,8 @@ function submitBooking(grandTotal) {
           };
 
           await client.from('monthly_members').insert([memberPayload]);
+          state.monthlyMembers.push(memberPayload);
+          requestSchedule();
           showConfirmationSuccessModal({
             id: newMemberId,
             customerName: name,
@@ -3856,6 +4344,7 @@ function submitBooking(grandTotal) {
           const bookingPayload = {
             id: newBookingId,
             court_id: state.selectedCourt.id,
+            courtId: state.selectedCourt.id,
             customer_id: customer.id,
             date: state.selectedDate,
             start_time: state.startTime,
@@ -3873,6 +4362,14 @@ function submitBooking(grandTotal) {
           };
 
           await client.from('bookings').insert([bookingPayload]);
+
+          // Atualiza estado local e localStorage imediatamente
+          state.bookings.push(bookingPayload);
+          const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+          localBookings.push(bookingPayload);
+          localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+
+          requestSchedule();
           showConfirmationSuccessModal(bookingPayload);
         }
         return;
@@ -3880,8 +4377,10 @@ function submitBooking(grandTotal) {
         console.warn('Erro ao salvar no Supabase, prosseguindo com fallback local:', err);
       }
     })();
+    return;
   }
 
+  // Fallback Local
   if (isMensal) {
     const newMemberId = 'mensal-' + Date.now();
     const newMember = {
@@ -3942,6 +4441,7 @@ function submitBooking(grandTotal) {
     };
 
     // Salva no localStorage (persistência na Vercel)
+    state.bookings.push(bookingPayload);
     const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     localBookings.push(bookingPayload);
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
@@ -4112,6 +4612,7 @@ function selectCourt(courtId) {
     return;
   }
   state.selectedCourt = court;
+  requestSchedule(); // Re-calcula horários com isolamento estrito para este campo
   renderStepContent();
   renderBottomBar();
   lucide.createIcons();
@@ -4139,6 +4640,9 @@ function applyCoupon() {
 
 function goToStep(step) {
   state.currentStep = step;
+  if (step === 3 && state.selectedCourt && state.selectedDate) {
+    requestSchedule();
+  }
   renderApp();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -4251,7 +4755,28 @@ async function syncDataFromSupabase() {
     if (dbMembers) state.monthlyMembers = dbMembers;
 
     const { data: dbBookings } = await client.from('bookings').select('*');
-    if (dbBookings) state.bookings = dbBookings;
+    if (dbBookings) {
+      state.bookings = dbBookings;
+      const maintFromDb = dbBookings
+        .filter(b => b.booking_type === 'manutencao' || b.bookingType === 'manutencao')
+        .map(b => ({
+          id: b.id,
+          court_id: b.court_id,
+          courtId: b.court_id,
+          date: b.date,
+          start_time: b.start_time,
+          end_time: b.end_time,
+          reason: b.observation || b.customer_name || 'Treino Reservado / Manutenção',
+          type: 'manutencao'
+        }));
+      if (maintFromDb.length > 0) {
+        const local = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
+        const map = new Map();
+        [...local, ...maintFromDb].forEach(item => map.set(item.id, item));
+        state.maintenanceBlocks = Array.from(map.values());
+        localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
+      }
+    }
 
     renderApp();
     requestSchedule();
