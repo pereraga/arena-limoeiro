@@ -36,9 +36,17 @@ let state = {
   searchQuery: '',
   selectedCourt: null,
   
-  // DATA SELECIONADA PRIMEIRO
-  selectedDate: getFormattedDate(new Date()),
-  currentMonthDate: new Date(),
+  // DATA SELECIONADA PRIMEIRO - Otimizado para Mês 8 (Agosto) conforme solicitado
+  selectedDate: (function() {
+    const now = new Date();
+    if (now.getMonth() === 7) return getFormattedDate(now);
+    return '2026-08-08';
+  })(),
+  currentMonthDate: (function() {
+    const now = new Date();
+    if (now.getMonth() === 7) return now;
+    return new Date(2026, 7, 1); // Mês 8 (Agosto)
+  })(),
   
   // DURAÇÃO E HORÁRIOS SELECIONADOS NA ETAPA 3
   startTime: '19:00',
@@ -483,7 +491,7 @@ function renderStepper() {
   stepperContainer.innerHTML = steps.map((s, idx) => {
     const isActive = state.currentStep === s.num;
     const isCompleted = state.currentStep > s.num;
-    const isClickable = s.num < state.currentStep;
+    const isClickable = s.num < state.currentStep || (s.num === 2 && state.selectedCourt);
 
     return `
       <div class="flex items-center flex-1 ${idx > 0 ? 'ml-2 sm:ml-4' : ''} ${isClickable ? 'cursor-pointer' : ''}" 
@@ -719,7 +727,7 @@ function changeSortBy(value) {
   lucide.createIcons();
 }
 
-// ETAPA 2: DATA DO JOGO (SELECIONADA PRIMEIRO)
+// ETAPA 2: DATA DO JOGO (SELECIONADA PRIMEIRO - CALENDÁRIO VISUAL DO MÊS 8 / ATUAL)
 function renderStep2(container) {
   const court = state.selectedCourt;
   if (!court) {
@@ -739,12 +747,12 @@ function renderStep2(container) {
     ];
 
     container.innerHTML = `
-      <div class="max-w-4xl mx-auto px-4 py-6 sm:py-8">
-        <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm mb-6">
+      <div class="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+        <div class="bg-white p-5 sm:p-8 rounded-3xl border border-slate-200 shadow-sm mb-6">
           <div class="flex items-center space-x-3 mb-5">
-            <span class="p-2 rounded-2xl bg-amber-100 text-amber-800"><i data-lucide="crown" class="w-6 h-6"></i></span>
+            <span class="p-2.5 rounded-2xl bg-amber-100 text-amber-800 shadow-sm"><i data-lucide="crown" class="w-6 h-6"></i></span>
             <div>
-              <h3 class="text-lg font-black text-slate-900">Configuração do Dia do Plano Mensalista</h3>
+              <h3 class="text-base sm:text-lg font-black text-slate-900">Configuração do Dia do Plano Mensalista</h3>
               <p class="text-xs text-slate-500">Selecione o dia fixo da semana para o seu time jogar toda semana no mês</p>
             </div>
           </div>
@@ -764,47 +772,52 @@ function renderStep2(container) {
         </div>
       </div>
     `;
+    lucide.createIcons();
     return;
   }
 
-  // Jogo Avulso: Calendário Limpo
+  // Jogo Avulso: Calendário Visual Completo do Mês
   container.innerHTML = `
-    <div class="max-w-4xl mx-auto px-4 py-6 sm:py-8">
+    <div class="max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
       
       <!-- Card da Quadra Selecionada -->
-      <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-3xl p-5 sm:p-6 text-white mb-6 flex items-center justify-between shadow-xl border border-emerald-800/50">
-        <div class="flex items-center space-x-4">
-          <img src="${court.image}" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
+      <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-3xl p-4 sm:p-6 text-white mb-6 flex items-center justify-between shadow-xl border border-emerald-800/50">
+        <div class="flex items-center space-x-3.5 sm:space-x-4">
+          <img src="${court.image}" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
           <div>
             <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
               Campo Selecionado
             </span>
-            <h2 class="text-base sm:text-xl font-black mt-1">${court.name}</h2>
+            <h2 class="text-base sm:text-xl font-black mt-1 leading-tight">${court.name}</h2>
             <p class="text-xs text-emerald-300 font-bold mt-0.5">
               R$ ${court.basePricePerHour.toFixed(2).replace('.', ',')} / hora
             </p>
           </div>
         </div>
-        <button onclick="goToStep(1)" class="text-xs text-emerald-300 hover:text-white underline font-bold flex items-center">
+        <button onclick="goToStep(1)" class="text-xs text-emerald-300 hover:text-white underline font-bold flex items-center flex-shrink-0 ml-2">
           <i data-lucide="edit-3" class="w-3.5 h-3.5 mr-1"></i> Trocar
         </button>
       </div>
 
-      <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm mb-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 pb-4 border-b border-slate-100">
+      <!-- Card do Calendário do Mês -->
+      <div class="bg-white p-4 sm:p-8 rounded-3xl border border-slate-200 shadow-sm mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-100">
           <div>
-            <h3 class="text-lg font-black text-slate-900 flex items-center">
-              <i data-lucide="calendar" class="w-5 h-5 text-emerald-600 mr-2"></i>
-              Selecione a Data da Partida
-            </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Escolha o dia em que o seu time irá jogar na Arena Limoeiro</p>
+            <div class="flex items-center space-x-2">
+              <span class="p-2 rounded-xl bg-emerald-100 text-emerald-800"><i data-lucide="calendar" class="w-5 h-5"></i></span>
+              <h3 class="text-base sm:text-lg font-black text-slate-900">
+                Selecione a Data da Partida
+              </h3>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">Escolha qual dia deste mês seu time irá jogar na Arena Limoeiro</p>
           </div>
-          <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-3.5 py-1.5 rounded-xl text-xs font-black self-start sm:self-auto">
-            Dia Selecionado: ${formatDisplayDate(state.selectedDate)}
+          <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-3.5 py-2 rounded-2xl text-xs font-black self-start sm:self-auto flex items-center space-x-2 shadow-sm">
+            <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+            <span>Dia Escolhido: ${formatDisplayDate(state.selectedDate)}</span>
           </div>
         </div>
 
-        <div id="calendarWidget" class="max-w-md mx-auto">
+        <div id="calendarWidget" class="max-w-xl mx-auto">
           ${renderCalendarHTML()}
         </div>
       </div>
@@ -812,6 +825,7 @@ function renderStep2(container) {
   `;
 
   requestSchedule();
+  lucide.createIcons();
 }
 
 function setMonthlyDayOfWeek(day) {
@@ -821,7 +835,7 @@ function setMonthlyDayOfWeek(day) {
   lucide.createIcons();
 }
 
-// Calendário
+// Calendário Visual Interativo do Mês
 function renderCalendarHTML() {
   const date = state.currentMonthDate;
   const year = date.getFullYear();
@@ -837,44 +851,151 @@ function renderCalendarHTML() {
   const todayStr = getFormattedDate(new Date());
 
   let html = `
-    <div class="calendar-header flex items-center justify-between mb-4">
-      <h4 class="text-base font-black text-slate-800">${monthNames[month]} ${year}</h4>
-      <div class="flex space-x-1">
-        <button onclick="changeMonth(-1)" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-        <button onclick="changeMonth(1)" class="p-1.5 rounded-xl hover:bg-slate-100 text-slate-600"><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
+    <!-- Seletor Rápido de Meses: Agosto (Mês 8), Setembro (Mês 9), Outubro (Mês 10) -->
+    <div class="grid grid-cols-3 gap-2 mb-4 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/80">
+      <button onclick="setCalendarMonth(7, ${year})" 
+              class="py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-1
+                     ${month === 7 ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+        <i data-lucide="calendar" class="w-3.5 h-3.5 ${month === 7 ? 'text-white' : 'text-emerald-600'}"></i>
+        <span>Agosto (Mês 8)</span>
+      </button>
+      <button onclick="setCalendarMonth(8, ${year})" 
+              class="py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-1
+                     ${month === 8 ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+        <i data-lucide="calendar" class="w-3.5 h-3.5 ${month === 8 ? 'text-white' : 'text-emerald-600'}"></i>
+        <span>Setembro (Mês 9)</span>
+      </button>
+      <button onclick="setCalendarMonth(9, ${year})" 
+              class="py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-1
+                     ${month === 9 ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
+        <i data-lucide="calendar" class="w-3.5 h-3.5 ${month === 9 ? 'text-white' : 'text-emerald-600'}"></i>
+        <span>Outubro (Mês 10)</span>
+      </button>
+    </div>
+
+    <!-- Barra de Navegação do Mês com Chevrons -->
+    <div class="calendar-header flex items-center justify-between mb-3 px-1">
+      <button onclick="changeMonth(-1)" class="p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors flex items-center space-x-1 border border-slate-200 sm:border-0" title="Mês Anterior">
+        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+        <span class="text-xs font-bold hidden sm:inline">Anterior</span>
+      </button>
+      
+      <div class="text-center">
+        <h4 class="text-base sm:text-lg font-black text-slate-900 flex items-center justify-center space-x-2">
+          <span>${monthNames[month]} ${year}</span>
+          <span class="text-[11px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+            Mês ${month + 1}
+          </span>
+        </h4>
+        <p class="text-[11px] font-semibold text-slate-500">Selecione o dia desejado abaixo</p>
       </div>
+
+      <button onclick="changeMonth(1)" class="p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors flex items-center space-x-1 border border-slate-200 sm:border-0" title="Próximo Mês">
+        <span class="text-xs font-bold hidden sm:inline">Próximo</span>
+        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+      </button>
     </div>
 
-    <div class="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-400 mb-2 uppercase">
-      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+    <!-- Cabeçalho dos Dias da Semana -->
+    <div class="grid grid-cols-7 gap-1 sm:gap-1.5 text-center text-xs font-black text-slate-500 mb-2 uppercase py-1 border-y border-slate-100">
+      <div class="text-rose-500">Dom</div>
+      <div>Seg</div>
+      <div>Ter</div>
+      <div>Qua</div>
+      <div>Qui</div>
+      <div>Sex</div>
+      <div class="text-emerald-700">Sáb</div>
     </div>
 
-    <div class="grid grid-cols-7 gap-1.5 text-center">
+    <!-- Grade dos Dias do Mês -->
+    <div class="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
   `;
 
-  for (let i = 0; i < firstDay; i++) html += `<div class="h-10"></div>`;
+  for (let i = 0; i < firstDay; i++) {
+    html += `<div class="h-11 sm:h-12"></div>`;
+  }
 
   for (let day = 1; day <= daysInMonth; day++) {
     const currentDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isSelected = state.selectedDate === currentDayStr;
     const isToday = currentDayStr === todayStr;
-    const isPast = currentDayStr < todayStr;
+    const dayOfWeek = new Date(year, month, day).getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-    if (isPast) {
-      html += `<div class="h-10 flex items-center justify-center text-xs text-slate-300 font-semibold cursor-not-allowed">${day}</div>`;
-    } else {
-      html += `
-        <button onclick="selectDate('${currentDayStr}')" 
-                class="h-10 w-10 mx-auto rounded-2xl text-xs sm:text-sm font-extrabold transition-all flex items-center justify-center
-                       ${isSelected ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400' : isToday ? 'border-2 border-emerald-600 text-emerald-800 font-black bg-emerald-50/50' : 'text-slate-700 hover:bg-emerald-50'}">
-          ${day}
-        </button>
-      `;
-    }
+    html += `
+      <button onclick="selectDate('${currentDayStr}')" 
+              class="h-11 sm:h-12 w-full rounded-2xl text-xs sm:text-sm font-black transition-all flex flex-col items-center justify-center relative touch-manipulation cursor-pointer
+                     ${isSelected ? 
+                       'bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-300 transform scale-105 z-10' : 
+                       isToday ? 
+                       'border-2 border-emerald-600 text-emerald-900 font-black bg-emerald-50/70 hover:bg-emerald-100 shadow-sm' : 
+                       isWeekend ?
+                       'bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200/80 font-bold' :
+                       'bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-100 font-bold'}">
+        <span>${day}</span>
+        ${isSelected ? '<span class="text-[9px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓</span>' : 
+          isToday ? '<span class="text-[9px] font-extrabold text-emerald-700 leading-none mt-0.5">Hoje</span>' : 
+          isWeekend ? '<span class="w-1 h-1 rounded-full bg-emerald-500 mt-0.5"></span>' : ''}
+      </button>
+    `;
   }
 
   html += `</div>`;
+
+  // Banner Informativo de Confirmação da Data Selecionada e Botão de Avançar
+  html += `
+    <div class="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+      <div class="flex items-center space-x-3 text-left w-full sm:w-auto">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow">
+          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Selecionado:</span>
+          <strong class="text-sm sm:text-base font-black text-emerald-950 block leading-tight">
+            ${formatFullDate(state.selectedDate)}
+          </strong>
+        </div>
+      </div>
+      <button onclick="nextStep()" 
+              class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow flex items-center justify-center space-x-1.5 transition-all">
+        <span>Avançar para Horários</span>
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Atalhos Rápidos de Dias no Mês -->
+    <div class="mt-4 pt-3 border-t border-slate-100">
+      <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center">
+        <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500 mr-1.5"></i>
+        <span>Atalhos de Dias em ${monthNames[month]} (Mês ${month + 1}):</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        ${[1, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, daysInMonth].map(d => {
+          const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const isSel = state.selectedDate === dStr;
+          return `
+            <button onclick="selectDate('${dStr}')" 
+                    class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all
+                           ${isSel ? 'bg-emerald-600 text-white shadow-sm font-black' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+              Dia ${d}
+            </button>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+
   return html;
+}
+
+function setCalendarMonth(monthIdx, yearNum) {
+  const y = yearNum || state.currentMonthDate.getFullYear();
+  state.currentMonthDate = new Date(y, monthIdx, 1);
+  const calendarWidget = document.getElementById('calendarWidget');
+  if (calendarWidget) {
+    calendarWidget.innerHTML = renderCalendarHTML();
+    lucide.createIcons();
+  }
 }
 
 function changeMonth(delta) {
@@ -4080,7 +4201,9 @@ function renderBottomBar() {
   if (state.currentStep === 3 && state.startTime && state.endTime) canProceed = true;
   if (state.currentStep === 4) canProceed = true;
 
-  const btnText = state.currentStep === 4 ? (state.bookingType === 'mensalista' ? 'Confirmar Mensalidade' : 'Confirmar Agendamento') : 'Próxima etapa';
+  const btnText = state.currentStep === 4 ? 
+    (state.bookingType === 'mensalista' ? 'Confirmar Mensalidade' : 'Confirmar Agendamento') : 
+    (state.currentStep === 2 && state.selectedDate ? `Próxima etapa: Horários (${formatDisplayDate(state.selectedDate)})` : 'Próxima etapa');
 
   calculateDuration();
   const isMensal = state.bookingType === 'mensalista';
