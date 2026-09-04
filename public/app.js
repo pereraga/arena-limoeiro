@@ -37,16 +37,8 @@ let state = {
   selectedCourt: null,
   
   // DATA SELECIONADA PRIMEIRO - Otimizado para Mês 8 (Agosto) conforme solicitado
-  selectedDate: (function() {
-    const now = new Date();
-    if (now.getMonth() === 7) return getFormattedDate(now);
-    return '2026-08-08';
-  })(),
-  currentMonthDate: (function() {
-    const now = new Date();
-    if (now.getMonth() === 7) return now;
-    return new Date(2026, 7, 1); // Mês 8 (Agosto)
-  })(),
+  selectedDate: '2026-08-08', // Dia padrão no Mês 8
+  currentMonthDate: new Date(2026, 7, 1), // Mês 8 (Agosto)
   
   // DURAÇÃO E HORÁRIOS SELECIONADOS NA ETAPA 3
   startTime: '19:00',
@@ -835,65 +827,37 @@ function setMonthlyDayOfWeek(day) {
   lucide.createIcons();
 }
 
-// Calendário Visual Interativo do Mês
+// Calendário Visual Interativo Exclusivo do Mês 8 (Agosto)
 function renderCalendarHTML() {
-  const date = state.currentMonthDate;
-  const year = date.getFullYear();
-  const month = date.getMonth();
-
-  const monthNames = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-  ];
+  const year = 2026;
+  const month = 7; // Index 7 = Agosto (Mês 8)
+  state.currentMonthDate = new Date(year, month, 1);
 
   const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInMonth = 31; // Agosto tem 31 dias
   const todayStr = getFormattedDate(new Date());
 
   let html = `
-    <!-- Seletor Rápido de Meses: Agosto (Mês 8), Setembro (Mês 9), Outubro (Mês 10) -->
-    <div class="grid grid-cols-3 gap-2 mb-4 bg-slate-50 p-1.5 rounded-2xl border border-slate-200/80">
-      <button onclick="setCalendarMonth(7, ${year})" 
-              class="py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-1
-                     ${month === 7 ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-        <i data-lucide="calendar" class="w-3.5 h-3.5 ${month === 7 ? 'text-white' : 'text-emerald-600'}"></i>
-        <span>Agosto (Mês 8)</span>
-      </button>
-      <button onclick="setCalendarMonth(8, ${year})" 
-              class="py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-1
-                     ${month === 8 ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-        <i data-lucide="calendar" class="w-3.5 h-3.5 ${month === 8 ? 'text-white' : 'text-emerald-600'}"></i>
-        <span>Setembro (Mês 9)</span>
-      </button>
-      <button onclick="setCalendarMonth(9, ${year})" 
-              class="py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center space-x-1
-                     ${month === 9 ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-white hover:text-slate-900'}">
-        <i data-lucide="calendar" class="w-3.5 h-3.5 ${month === 9 ? 'text-white' : 'text-emerald-600'}"></i>
-        <span>Outubro (Mês 10)</span>
-      </button>
-    </div>
-
-    <!-- Barra de Navegação do Mês com Chevrons -->
-    <div class="calendar-header flex items-center justify-between mb-3 px-1">
-      <button onclick="changeMonth(-1)" class="p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors flex items-center space-x-1 border border-slate-200 sm:border-0" title="Mês Anterior">
-        <i data-lucide="chevron-left" class="w-5 h-5"></i>
-        <span class="text-xs font-bold hidden sm:inline">Anterior</span>
-      </button>
-      
-      <div class="text-center">
-        <h4 class="text-base sm:text-lg font-black text-slate-900 flex items-center justify-center space-x-2">
-          <span>${monthNames[month]} ${year}</span>
-          <span class="text-[11px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
-            Mês ${month + 1}
-          </span>
-        </h4>
-        <p class="text-[11px] font-semibold text-slate-500">Selecione o dia desejado abaixo</p>
+    <!-- Cabeçalho Exclusivo do Mês 8 (Agosto) -->
+    <div class="calendar-header flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100">
+      <div class="flex items-center space-x-2.5">
+        <span class="p-2 sm:p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 shadow-sm">
+          <i data-lucide="calendar" class="w-5 h-5"></i>
+        </span>
+        <div>
+          <h4 class="text-base sm:text-lg font-black text-slate-900 flex items-center space-x-2">
+            <span>Agosto 2026</span>
+            <span class="text-[11px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+              Mês 8
+            </span>
+          </h4>
+          <p class="text-xs text-slate-500">Escolha o dia da sua partida neste mês 8</p>
+        </div>
       </div>
-
-      <button onclick="changeMonth(1)" class="p-2 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors flex items-center space-x-1 border border-slate-200 sm:border-0" title="Próximo Mês">
-        <span class="text-xs font-bold hidden sm:inline">Próximo</span>
-        <i data-lucide="chevron-right" class="w-5 h-5"></i>
-      </button>
+      <div class="bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-xl text-right hidden sm:block">
+        <span class="text-[10px] font-bold text-emerald-700 block uppercase">Calendário</span>
+        <span class="text-xs font-black text-emerald-900">Mês 8 Ativo</span>
+      </div>
     </div>
 
     <!-- Cabeçalho dos Dias da Semana -->
@@ -907,7 +871,7 @@ function renderCalendarHTML() {
       <div class="text-emerald-700">Sáb</div>
     </div>
 
-    <!-- Grade dos Dias do Mês -->
+    <!-- Grade dos 31 Dias de Agosto (Mês 8) -->
     <div class="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
   `;
 
@@ -916,7 +880,7 @@ function renderCalendarHTML() {
   }
 
   for (let day = 1; day <= daysInMonth; day++) {
-    const currentDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const currentDayStr = `${year}-08-${String(day).padStart(2, '0')}`;
     const isSelected = state.selectedDate === currentDayStr;
     const isToday = currentDayStr === todayStr;
     const dayOfWeek = new Date(year, month, day).getDay();
@@ -950,7 +914,7 @@ function renderCalendarHTML() {
           <i data-lucide="calendar-check" class="w-5 h-5"></i>
         </div>
         <div>
-          <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Selecionado:</span>
+          <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido no Mês 8:</span>
           <strong class="text-sm sm:text-base font-black text-emerald-950 block leading-tight">
             ${formatFullDate(state.selectedDate)}
           </strong>
@@ -963,15 +927,15 @@ function renderCalendarHTML() {
       </button>
     </div>
 
-    <!-- Atalhos Rápidos de Dias no Mês -->
+    <!-- Atalhos Rápidos de Dias no Mês 8 -->
     <div class="mt-4 pt-3 border-t border-slate-100">
       <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center">
         <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500 mr-1.5"></i>
-        <span>Atalhos de Dias em ${monthNames[month]} (Mês ${month + 1}):</span>
+        <span>Atalhos Rápidos de Dias em Agosto (Mês 8):</span>
       </div>
       <div class="flex flex-wrap gap-1.5">
-        ${[1, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, daysInMonth].map(d => {
-          const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        ${[1, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, 31].map(d => {
+          const dStr = `2026-08-${String(d).padStart(2, '0')}`;
           const isSel = state.selectedDate === dStr;
           return `
             <button onclick="selectDate('${dStr}')" 
@@ -986,26 +950,6 @@ function renderCalendarHTML() {
   `;
 
   return html;
-}
-
-function setCalendarMonth(monthIdx, yearNum) {
-  const y = yearNum || state.currentMonthDate.getFullYear();
-  state.currentMonthDate = new Date(y, monthIdx, 1);
-  const calendarWidget = document.getElementById('calendarWidget');
-  if (calendarWidget) {
-    calendarWidget.innerHTML = renderCalendarHTML();
-    lucide.createIcons();
-  }
-}
-
-function changeMonth(delta) {
-  const current = state.currentMonthDate;
-  state.currentMonthDate = new Date(current.getFullYear(), current.getMonth() + delta, 1);
-  const calendarWidget = document.getElementById('calendarWidget');
-  if (calendarWidget) {
-    calendarWidget.innerHTML = renderCalendarHTML();
-    lucide.createIcons();
-  }
 }
 
 function selectDate(dateStr) {
