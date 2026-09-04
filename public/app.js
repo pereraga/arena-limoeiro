@@ -1,5 +1,4 @@
 // Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
-let socket;
 let state = {
   currentStep: 1,
   currentMode: 'client',
@@ -92,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
   renderApp();
   requestSchedule();
-  initSocket();
+  initCloudSync();
 });
 
 function loadInitialData() {
@@ -114,106 +113,12 @@ function loadInitialData() {
 }
 
 
-function initSocket() {
-  if (typeof io !== 'undefined') {
-    try {
-      socket = io();
-    } catch(e) {}
-  }
-
-  // Se tiver Supabase vinculado, sincroniza na hora
+function initCloudSync() {
+  // Sistema 100% Cloud Serverless no Vercel integrado ao Supabase
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
   }
-
-  socket.on('init_data', (data) => {
-    state.arenaInfo = data.arenaInfo;
-    state.categories = data.categories;
-    state.courts = data.courts;
-    state.products = data.products || [];
-    state.monthlyMembers = data.monthlyMembers || [];
-    
-    if (!state.selectedCourt && state.courts.length > 0) {
-      state.selectedCourt = state.courts[0];
-    }
-
-    renderApp();
-    requestSchedule();
-  });
-
-  socket.on('schedule_updated', ({ courtId, date }) => {
-    if (state.selectedCourt && state.selectedCourt.id === courtId && state.selectedDate === date) {
-      requestSchedule();
-    }
-  });
-
-  socket.on('courts_reordered', (reorderedCourts) => {
-    state.courts = reorderedCourts;
-    renderStepContent();
-  });
-
-  socket.on('court_added', (court) => {
-    state.courts.push(court);
-    renderStepContent();
-  });
-
-  socket.on('court_updated', (court) => {
-    const idx = state.courts.findIndex(c => c.id === court.id);
-    if (idx !== -1) {
-      state.courts[idx] = court;
-      if (state.selectedCourt && state.selectedCourt.id === court.id) state.selectedCourt = court;
-      renderStepContent();
-    }
-  });
-
-  socket.on('court_deleted', ({ id }) => {
-    state.courts = state.courts.filter(c => c.id !== id);
-    if (state.selectedCourt && state.selectedCourt.id === id) state.selectedCourt = state.courts[0] || null;
-    renderStepContent();
-  });
-
-  socket.on('product_added', (prod) => {
-    state.products.push(prod);
-    renderStepContent();
-  });
-
-  socket.on('product_deleted', ({ id }) => {
-    state.products = state.products.filter(p => p.id !== id);
-    delete state.productCart[id];
-    renderStepContent();
-  });
-
-  socket.on('monthly_member_added', (member) => {
-    state.monthlyMembers.push(member);
-    requestSchedule();
-    if (state.currentMode === 'admin') renderAdminView(document.getElementById('mainContent'));
-  });
-
-  socket.on('schedule_data', ({ courtId, date, schedule }) => {
-    if (state.selectedCourt && state.selectedCourt.id === courtId && state.selectedDate === date) {
-      state.slots = schedule;
-      
-      // Auto-seleciona primeiro horário livre se o atual estiver ocupado
-      const currentSlot = schedule.find(s => s.time === state.startTime);
-      if (!currentSlot || currentSlot.status !== 'available') {
-        const firstAvailable = schedule.find(s => s.status === 'available');
-        if (firstAvailable) {
-          state.startTime = firstAvailable.time;
-          const nextHourMin = timeToMinutes(firstAvailable.time) + 60;
-          state.endTime = minutesToTime(nextHourMin);
-        }
-      }
-      
-      if (state.currentStep === 3) renderStep3Content();
-      if (state.currentMode === 'admin' && state.adminTab === 'schedule') renderAdminMatrix();
-    }
-  });
-
-  socket.on('booking_confirmed', ({ success, booking }) => {
-    if (success) showConfirmationSuccessModal(booking);
-  });
 }
-
 
 function calculateLocalSchedule(courtId, date) {
   const operatingHours = [
@@ -338,14 +243,6 @@ function requestSchedule() {
 
   if (state.currentStep === 3) renderStep3Content();
   if (state.currentMode === 'admin' && state.adminTab === 'schedule') renderAdminMatrix();
-
-  // 2. Se houver socket conectado (ambiente local), emite pedido
-  if (typeof socket !== 'undefined' && socket && socket.connected) {
-    socket.emit('get_schedule', {
-      courtId: state.selectedCourt.id,
-      date: state.selectedDate
-    });
-  }
 }
 
 
@@ -3272,7 +3169,17 @@ function renderAdminMatrix() {
 }
 
 function adminToggleSlot(courtId, date, time) {
-  if (socket) socket.emit('admin_toggle_slot', { courtId, date, time });
+  const key = `${courtId}_${date}_${time}`;
+  let blockedMap = JSON.parse(localStorage.getItem('arena_blocked_slots') || '{}');
+  if (blockedMap[key]) {
+    delete blockedMap[key];
+  } else {
+    blockedMap[key] = { reason: "Manutenção Bloqueada pelo Administrador" };
+  }
+  localStorage.setItem('arena_blocked_slots', JSON.stringify(blockedMap));
+  requestSchedule();
+  renderStepContent();
+  lucide.createIcons();
 }
 async function deleteProduct(id) {
   if (!confirm('Excluir este produto?')) return;
@@ -4039,12 +3946,8 @@ function submitBooking(grandTotal) {
     localBookings.push(bookingPayload);
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
 
-    if (typeof socket !== 'undefined' && socket && socket.connected) {
-      socket.emit('create_booking', bookingPayload);
-    } else {
-      showConfirmationSuccessModal(bookingPayload);
-      requestSchedule();
-    }
+    showConfirmationSuccessModal(bookingPayload);
+    requestSchedule();
   }
 }
 
