@@ -442,7 +442,7 @@ function renderHeader() {
 
   const modeBtnText = document.getElementById('modeBtnText');
   if (modeBtnText) {
-    modeBtnText.innerText = state.currentUser ? `Gestão (${state.currentUser.name.split(' ')[0]})` : "Gestão";
+    modeBtnText.innerText = "Gestão";
   }
 }
 
@@ -452,18 +452,17 @@ function renderStepper() {
 
   if (state.currentMode === 'admin') {
     stepperContainer.innerHTML = `
-      <div class="flex items-center justify-between w-full bg-black/40 px-4 py-2 rounded-xl border border-emerald-500/30">
-        <div class="flex items-center space-x-2 text-xs text-emerald-300">
-          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
-          <span>Painel de Administração: <strong class="text-white">${state.currentUser?.name}</strong> (${state.currentUser?.role})</span>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between w-full bg-black/60 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl border border-emerald-500/30 gap-2">
+        <div class="flex items-center space-x-2 text-xs text-emerald-300 min-w-0">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+          <span class="truncate">Painel: <strong class="text-white">${state.currentUser?.name || 'Administrador'}</strong></span>
         </div>
-        <div class="flex items-center space-x-3">
-          <button onclick="switchToClientView()" class="text-xs text-emerald-300 hover:text-white font-bold flex items-center space-x-1">
+        <div class="flex items-center space-x-2 text-xs self-stretch sm:self-auto justify-end flex-shrink-0">
+          <button onclick="switchToClientView()" class="px-2.5 py-1 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm">
             <i data-lucide="eye" class="w-3.5 h-3.5"></i>
             <span>Ver Tela do Cliente</span>
           </button>
-          <span class="text-emerald-700">|</span>
-          <button onclick="logoutAdmin()" class="text-xs text-rose-400 hover:text-rose-300 font-bold flex items-center space-x-1">
+          <button onclick="logoutAdmin()" class="px-2.5 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm">
             <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
             <span>Sair</span>
           </button>
