@@ -1309,43 +1309,55 @@ function fillLogin(email, pass) {
   if (passInput) passInput.value = pass;
 }
 
-function handleLoginSubmit(event) {
+async function handleLoginSubmit(event) {
   event.preventDefault();
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
   const errorMsg = document.getElementById('loginErrorMessage');
 
-  fetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      state.currentUser = data.user;
-      localStorage.setItem('arena_user', JSON.stringify(data.user));
-      closeModal();
-      state.currentMode = 'admin';
-      renderApp();
+  let authenticatedUser = null;
 
-      if (window._onLoginSuccess) {
-        window._onLoginSuccess();
-        window._onLoginSuccess = null;
-      }
-    } else {
-      if (errorMsg) {
-        errorMsg.innerText = data.message || "Credenciais inválidas.";
-        errorMsg.classList.remove('hidden');
-      }
+  // 1. Tenta verificar no Supabase
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      const { data } = await client
+        .from('admin_users')
+        .select('*')
+        .eq('email', email)
+        .eq('password', password)
+        .maybeSingle();
+
+      if (data) authenticatedUser = data;
+    } catch(e) {}
+  }
+
+  // 2. Fallback de administradores pré-configurados
+  if (!authenticatedUser) {
+    const defaultAdmins = [
+      { id: "admin-1", name: "Administrador Geral", email: "admin@arenalimoeiro.com.br", password: "admin123", role: "Administrador Geral" },
+      { id: "admin-2", name: "Recepção & Atendimento", email: "recepcao@arenalimoeiro.com.br", password: "arena123", role: "Atendente da Recepção" }
+    ];
+    authenticatedUser = defaultAdmins.find(u => u.email === email && u.password === password);
+  }
+
+  if (authenticatedUser) {
+    state.currentUser = authenticatedUser;
+    localStorage.setItem('arena_user', JSON.stringify(authenticatedUser));
+    closeModal();
+    state.currentMode = 'admin';
+    renderApp();
+
+    if (window._onLoginSuccess) {
+      window._onLoginSuccess();
+      window._onLoginSuccess = null;
     }
-  })
-  .catch(() => {
+  } else {
     if (errorMsg) {
-      errorMsg.innerText = "Erro ao conectar com o servidor.";
+      errorMsg.innerText = "E-mail ou senha incorretos.";
       errorMsg.classList.remove('hidden');
     }
-  });
+  }
 }
 
 function logoutAdmin() {
@@ -1827,8 +1839,8 @@ function renderAdminTabContent() {
   `;
 }
 
-function moveCourtOrder(courtId, direction) {
-  const list = [...state.courts].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+async function moveCourtOrder(courtId, direction) {
+  const list = [...state.courts].sort((a, b) => (a.orderIndex || a.order_index || 0) - (b.orderIndex || b.order_index || 0));
   const index = list.findIndex(c => c.id === courtId);
   if (index === -1) return;
 
@@ -1839,39 +1851,46 @@ function moveCourtOrder(courtId, direction) {
   list[index] = list[targetIndex];
   list[targetIndex] = temp;
 
-  const courtIds = list.map(c => c.id);
-
-  fetch('/api/courts/reorder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ courtIds })
-  })
-  .then(res => res.json())
-  .then(data => {
-    state.courts = data.courts;
-    renderStepContent();
+  list.forEach((c, idx) => {
+    c.orderIndex = idx + 1;
+    c.order_index = idx + 1;
   });
+  state.courts = list;
+  renderStepContent();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      for (const c of list) {
+        await client.from('courts').update({ order_index: c.order_index }).eq('id', c.id);
+      }
+    } catch(e) {}
+  }
 }
 
-function reorderFast(type) {
+async function reorderFast(type) {
   let list = [...state.courts];
   if (type === 'most_booked') {
-    list.sort((a, b) => (b.bookingsCount || 0) - (a.bookingsCount || 0));
+    list.sort((a, b) => (b.bookingsCount || b.bookings_count || 0) - (a.bookingsCount || a.bookings_count || 0));
   } else {
     list.sort((a, b) => a.id.localeCompare(b.id));
   }
 
-  const courtIds = list.map(c => c.id);
-  fetch('/api/courts/reorder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ courtIds })
-  })
-  .then(res => res.json())
-  .then(data => {
-    state.courts = data.courts;
-    renderStepContent();
+  list.forEach((c, idx) => {
+    c.orderIndex = idx + 1;
+    c.order_index = idx + 1;
   });
+  state.courts = list;
+  renderStepContent();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      for (const c of list) {
+        await client.from('courts').update({ order_index: c.order_index }).eq('id', c.id);
+      }
+    } catch(e) {}
+  }
 }
 
 function renderAdminMatrix() {
@@ -1946,29 +1965,44 @@ function renderAdminMatrix() {
 function adminToggleSlot(courtId, date, time) {
   if (socket) socket.emit('admin_toggle_slot', { courtId, date, time });
 }
-
-function deleteProduct(id) {
+async function deleteProduct(id) {
   if (!confirm('Excluir este produto?')) return;
-  fetch(`/api/products/${id}`, { method: 'DELETE' });
+  state.products = state.products.filter(p => p.id !== id);
+  renderStepContent();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('products').delete().eq('id', id);
+    } catch(e) {}
+  }
 }
 
-function deleteMonthlyMember(id) {
+async function deleteMonthlyMember(id) {
   if (!confirm('Cancelar este plano mensalista?')) return;
-  fetch(`/api/monthly-members/${id}`, { method: 'DELETE' });
+  state.monthlyMembers = state.monthlyMembers.filter(m => m.id !== id);
+  renderStepContent();
+  requestSchedule();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('monthly_members').delete().eq('id', id);
+    } catch(e) {}
+  }
 }
 
-function deleteAdminUser(id) {
+async function deleteAdminUser(id) {
   if (!confirm('Remover o acesso deste gestor?')) return;
-  fetch(`/api/auth/users/${id}`, { method: 'DELETE' })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        state.adminUsers = state.adminUsers.filter(u => u.id !== id);
-        renderStepContent();
-      } else {
-        alert(data.message || 'Erro ao remover gestor.');
-      }
-    });
+  state.adminUsers = state.adminUsers.filter(u => u.id !== id);
+  renderStepContent();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('admin_users').delete().eq('id', id);
+    } catch(e) {}
+  }
 }
 
 // NOVO RESPONSÁVEL
@@ -2042,39 +2076,47 @@ function openNewAdminUserModal() {
   lucide.createIcons();
 }
 
-function handleNewAdminUserSubmit(event) {
+async function handleNewAdminUserSubmit(event) {
   event.preventDefault();
   const name = document.getElementById('newAdminName').value.trim();
   const email = document.getElementById('newAdminEmail').value.trim();
   const role = document.getElementById('newAdminRole').value;
   const password = document.getElementById('newAdminPassword').value.trim();
 
-  fetch('/api/auth/users', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, email, role, password })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      closeModal();
-      loadAdminUsers();
-      alert(`Usuário ${name} cadastrado com sucesso! E-mail: ${email} | Senha: ${password}`);
-    } else {
-      alert(data.message || 'Erro ao cadastrar usuário.');
-    }
-  });
+  const newUser = {
+    id: 'admin-' + Date.now(),
+    name,
+    email,
+    role,
+    password,
+    created_at: new Date().toISOString()
+  };
+
+  state.adminUsers.push(newUser);
+  closeModal();
+  if (state.currentMode === 'admin' && state.adminTab === 'users') renderStepContent();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('admin_users').insert([newUser]);
+    } catch(e) {}
+  }
+
+  alert(`Usuário ${name} cadastrado com sucesso!\nE-mail: ${email}\nSenha: ${password}`);
 }
 
-function loadAdminUsers() {
-  fetch('/api/auth/users')
-    .then(res => res.json())
-    .then(users => {
-      state.adminUsers = users;
-      if (state.currentMode === 'admin' && state.adminTab === 'users') {
-        renderStepContent();
+async function loadAdminUsers() {
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      const { data } = await client.from('admin_users').select('*');
+      if (data && data.length > 0) {
+        state.adminUsers = data;
+        if (state.currentMode === 'admin' && state.adminTab === 'users') renderStepContent();
       }
-    });
+    } catch(e) {}
+  }
 }
 
 // MODAL DE COMPARTILHAMENTO
@@ -2207,26 +2249,35 @@ function openProductModal() {
   lucide.createIcons();
 }
 
-function handleProductSubmit(event) {
+async function handleProductSubmit(event) {
   event.preventDefault();
   const name = document.getElementById('prodName').value.trim();
   const category = document.getElementById('prodCategory').value;
   const price = parseFloat(document.getElementById('prodPrice').value) || 5.00;
   const unit = document.getElementById('prodUnit').value.trim() || 'unid.';
-  const image = document.getElementById('prodImage').value.trim();
+  const image = document.getElementById('prodImage').value.trim() || 'https://images.unsplash.com/photo-1559839914-17aae19cec71?w=200&auto=format&fit=crop&q=80';
 
-  fetch('/api/products', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, category, price, unit, image, type: 'product' })
-  })
-  .then(res => res.json())
-  .then(newProduct => {
-    closeModal();
-    state.products.push(newProduct);
-    renderStepContent();
-    lucide.createIcons();
-  });
+  const newProduct = {
+    id: 'prod-' + Date.now(),
+    name,
+    category,
+    price,
+    unit,
+    image,
+    type: 'product'
+  };
+
+  state.products.push(newProduct);
+  closeModal();
+  renderStepContent();
+  lucide.createIcons();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('products').insert([newProduct]);
+    } catch(e) {}
+  }
 }
 
 // MODAL DE ESPAÇO / QUADRA
@@ -2341,7 +2392,7 @@ function openCourtModal(courtIdToEdit = null) {
   lucide.createIcons();
 }
 
-function handleCourtFormSubmit(event, courtIdToEdit) {
+async function handleCourtFormSubmit(event, courtIdToEdit) {
   event.preventDefault();
   const name = document.getElementById('courtName').value.trim();
   const category = document.getElementById('courtCategory').value;
@@ -2357,12 +2408,19 @@ function handleCourtFormSubmit(event, courtIdToEdit) {
     society: "Futebol Society", beach: "Beach Tennis & Vôlei", futsal: "Ginásio Poliesportivo", padel: "Padel & Tênis"
   };
 
-  const payload = {
+  const isEditing = !!courtIdToEdit;
+  const id = isEditing ? courtIdToEdit : ('court-' + category + '-' + Date.now());
+
+  const savedCourt = {
+    id,
     name,
     category,
     categoryLabel: categoryLabels[category] || "Esporte",
+    category_label: categoryLabels[category] || "Esporte",
     basePricePerHour: price,
+    base_price_per_hour: price,
     monthlyPrice,
+    monthly_price: monthlyPrice,
     description,
     observation,
     image,
@@ -2374,41 +2432,52 @@ function handleCourtFormSubmit(event, courtIdToEdit) {
     }
   };
 
-  const isEditing = !!courtIdToEdit;
-  const url = isEditing ? `/api/courts/${courtIdToEdit}` : '/api/courts';
-  const method = isEditing ? 'PUT' : 'POST';
+  closeModal();
+  if (isEditing) {
+    const idx = state.courts.findIndex(c => c.id === courtIdToEdit);
+    if (idx !== -1) state.courts[idx] = savedCourt;
+    if (state.selectedCourt && state.selectedCourt.id === courtIdToEdit) state.selectedCourt = savedCourt;
+  } else {
+    state.courts.push(savedCourt);
+    state.selectedCourt = savedCourt;
+  }
+  renderStepContent();
+  lucide.createIcons();
 
-  fetch(url, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  })
-  .then(res => res.json())
-  .then(savedCourt => {
-    closeModal();
-    if (isEditing) {
-      const idx = state.courts.findIndex(c => c.id === courtIdToEdit);
-      if (idx !== -1) state.courts[idx] = savedCourt;
-      if (state.selectedCourt && state.selectedCourt.id === courtIdToEdit) state.selectedCourt = savedCourt;
-    } else {
-      state.courts.push(savedCourt);
-      state.selectedCourt = savedCourt;
-    }
-    renderStepContent();
-    lucide.createIcons();
-  });
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      if (isEditing) {
+        await client.from('courts').update({
+          name, category, category_label: savedCourt.categoryLabel,
+          base_price_per_hour: price, monthly_price: monthlyPrice,
+          description, observation, image, specs: savedCourt.specs
+        }).eq('id', courtIdToEdit);
+      } else {
+        await client.from('courts').insert([{
+          id, name, category, category_label: savedCourt.categoryLabel,
+          base_price_per_hour: price, monthly_price: monthlyPrice,
+          description, observation, image, specs: savedCourt.specs,
+          order_index: state.courts.length
+        }]);
+      }
+    } catch(e) {}
+  }
 }
 
-function deleteCourt(courtId) {
+async function deleteCourt(courtId) {
   if (!confirm('Tem certeza que deseja excluir esta quadra?')) return;
-  fetch(`/api/courts/${courtId}`, { method: 'DELETE' })
-    .then(res => res.json())
-    .then(() => {
-      state.courts = state.courts.filter(c => c.id !== courtId);
-      if (state.selectedCourt && state.selectedCourt.id === courtId) state.selectedCourt = state.courts[0] || null;
-      renderStepContent();
-      lucide.createIcons();
-    });
+  state.courts = state.courts.filter(c => c.id !== courtId);
+  if (state.selectedCourt && state.selectedCourt.id === courtId) state.selectedCourt = state.courts[0] || null;
+  renderStepContent();
+  lucide.createIcons();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('courts').delete().eq('id', courtId);
+    } catch(e) {}
+  }
 }
 
 // CHECKOUT MODAL
@@ -2598,35 +2667,40 @@ function submitBooking(grandTotal) {
   }
 
   if (isMensal) {
-    fetch('/api/monthly-members', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        teamName: name,
-        responsibleName: name,
-        phone,
-        courtId: state.selectedCourt.id,
-        dayOfWeek: state.monthlyDayOfWeek,
-        time: state.startTime,
-        startTime: state.startTime,
-        endTime: state.endTime,
-        monthlyPrice: grandTotal,
-        observation: state.observation
-      })
-    })
-    .then(res => res.json())
-    .then(member => {
-      showConfirmationSuccessModal({
-        id: member.id,
-        customerName: name,
-        customerPhone: phone,
-        courtId: state.selectedCourt.id,
-        date: `Toda ${state.monthlyDayOfWeek}-feira (Mensal)`,
-        time: `${state.startTime} às ${state.endTime}`,
-        totalPrice: grandTotal,
-        isMensalista: true
-      });
+    const newMemberId = 'mensal-' + Date.now();
+    const newMember = {
+      id: newMemberId,
+      team_name: name,
+      teamName: name,
+      responsible_name: name,
+      responsibleName: name,
+      phone,
+      court_id: state.selectedCourt.id,
+      courtId: state.selectedCourt.id,
+      day_of_week: state.monthlyDayOfWeek,
+      dayOfWeek: state.monthlyDayOfWeek,
+      time: state.startTime,
+      start_time: state.startTime,
+      startTime: state.startTime,
+      end_time: state.endTime,
+      endTime: state.endTime,
+      monthly_price: grandTotal,
+      monthlyPrice: grandTotal,
+      status: 'active',
+      observation: state.observation
+    };
+    state.monthlyMembers.push(newMember);
+    showConfirmationSuccessModal({
+      id: newMemberId,
+      customerName: name,
+      customerPhone: phone,
+      courtId: state.selectedCourt.id,
+      date: `Toda ${state.monthlyDayOfWeek}-feira (Mensal)`,
+      time: `${state.startTime} às ${state.endTime}`,
+      totalPrice: grandTotal,
+      isMensalista: true
     });
+    return;
   } else {
     const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
     const bookingPayload = {
@@ -2824,22 +2898,20 @@ function applyCoupon() {
   const code = state.couponCode.toUpperCase().trim();
   if (!code) return;
 
-  fetch('/api/coupons/validate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.valid) {
-      state.appliedCoupon = data.coupon;
-      renderStepContent();
-      lucide.createIcons();
-      alert(`Cupom ${code} aplicado com sucesso!`);
-    } else {
-      alert(data.message || 'Cupom inválido');
-    }
-  });
+  const validCoupons = {
+    'ARENA10': { code: 'ARENA10', discountPercent: 10, description: '10% de desconto na primeira reserva' },
+    'FIMDESEMANA': { code: 'FIMDESEMANA', discountPercent: 15, description: '15% de desconto promocional' },
+    'LIMOEIRO20': { code: 'LIMOEIRO20', discountPercent: 20, description: '20% de desconto para novos times' }
+  };
+
+  if (validCoupons[code]) {
+    state.appliedCoupon = validCoupons[code];
+    renderStepContent();
+    lucide.createIcons();
+    alert(`✓ Cupom ${code} aplicado com sucesso! Desconto de ${validCoupons[code].discountPercent}%`);
+  } else {
+    alert('Cupom inválido ou expirado.');
+  }
 }
 
 function goToStep(step) {
