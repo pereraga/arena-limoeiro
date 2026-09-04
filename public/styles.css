@@ -60,9 +60,9 @@ body {
 }
 
 .court-card.selected, .service-card.selected {
-  border-color: #00a859;
-  background-color: #f0fdf4;
-  box-shadow: 0 0 0 2px #00a859;
+  border: 2.5px solid #00a859 !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 1px #00a859, 0 10px 25px -5px rgba(0, 168, 89, 0.15) !important;
 }
 
 /* Botão Próxima Etapa */

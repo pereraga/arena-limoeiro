@@ -469,18 +469,35 @@ function renderStep1(container) {
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         ${displayCourts.map(court => {
           const isSelected = state.selectedCourt && state.selectedCourt.id === court.id;
-          const displayPrice = state.bookingType === 'mensalista' ? 
-            `R$ ${(court.monthlyPrice || court.basePricePerHour * 3.6).toFixed(2).replace('.', ',')} <span class="text-xs font-medium text-slate-500">/ mês (4 jogos)</span>` :
-            `R$ ${court.basePricePerHour.toFixed(2).replace('.', ',')} <span class="text-xs font-medium text-slate-500">/ hora</span>`;
+          const pricePerHour = parseFloat(court.basePricePerHour || court.base_price_per_hour || 140);
+          const monthlyPrice = parseFloat(court.monthlyPrice || court.monthly_price || (pricePerHour * 3.6));
+          const categoryLabel = court.categoryLabel || court.category_label || "Esporte";
+          const bookingsCount = court.bookingsCount || court.bookings_count || 48;
+          
+          let specs = court.specs || {};
+          if (typeof specs === 'string') {
+            try { specs = JSON.parse(specs); } catch(e) {}
+          }
+          const capacity = specs.capacity || '14 a 16 Jogadores (7x7 / 8x8)';
+          const courtType = specs.type || 'Grama Sintética 60mm Monofilamento (FIFA Quality)';
 
-          const registeredMensalistas = state.monthlyMembers.filter(m => m.courtId === court.id);
+          const defaultMensalistasMap = {
+            'court-society-1': ['Pelada dos Amigos da Terça (Toda Terça 19:00)'],
+            'court-society-2': ['Pelada Noturna (Segunda 20h)', 'Amigos do Society (Quinta 19h)'],
+            'court-beach-1': ['Beach Club Limoeiro (Segunda e Quarta 18h)', 'Galera do Futevôlei (Sábado 08h)'],
+            'court-beach-2': ['Turma do Vôlei de Areia (Domingo 09h)'],
+            'court-gym-1': ['Galera do Futsal Noturno (Quinta 20h)', 'Basquete Limoeiro Team (Sábado 16h)'],
+            'court-padel-1': ['Circuito Padel Limoeiro (Terça e Quinta 20h)']
+          };
+
+          const registeredMensalistas = state.monthlyMembers.filter(m => (m.courtId === court.id || m.court_id === court.id));
           const sampleList = (registeredMensalistas.length > 0) ? 
-            registeredMensalistas.map(m => `${m.teamName} (${m.dayOfWeekLabel.split('-')[0]} ${m.time})`) : 
-            (court.sampleMensalistas || ["Pelada dos Amigos (Terça 19h)", "Galera da Resenha (Quinta 20h)"]);
+            registeredMensalistas.map(m => `${m.team_name || m.teamName} (${(m.day_of_week_label || m.dayOfWeekLabel || 'Semanal')} ${m.time})`) : 
+            (court.sampleMensalistas || court.sample_mensalistas || defaultMensalistasMap[court.id] || ["Pelada dos Amigos (Terça 19h)"]);
 
           return `
             <div onclick="selectCourt('${court.id}')" 
-                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col ${isSelected ? 'selected' : ''} shadow-sm border border-slate-200">
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col ${isSelected ? 'selected ring-2 ring-emerald-500 border-2 border-emerald-500' : 'border border-slate-200'} shadow-sm">
               
               <div class="relative h-48 w-full overflow-hidden bg-slate-900">
                 <img src="${court.image}" alt="${court.name}" 
@@ -491,10 +508,10 @@ function renderStep1(container) {
 
                 <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
                   <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                    ${court.categoryLabel}
+                    ${categoryLabel}
                   </span>
                   ${court.badge ? `
-                    <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md">
+                    <span class="bg-emerald-800/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md flex items-center">
                       ${court.badge}
                     </span>
                   ` : ''}
@@ -503,37 +520,38 @@ function renderStep1(container) {
                 <div class="absolute bottom-2.5 left-3 text-white">
                   <span class="text-[10px] font-bold text-emerald-300 flex items-center">
                     <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
-                    ${court.bookingsCount || 12} agendamentos este mês
+                    ${bookingsCount} agendamentos este mês
                   </span>
                 </div>
               </div>
               
               <div class="p-5 flex-1 flex flex-col justify-between">
                 <div>
-                  <h3 class="text-base sm:text-lg font-extrabold text-slate-900 leading-snug mb-1.5">
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
                     ${court.name}
                   </h3>
                   ${court.description ? `
                     <p class="text-xs text-slate-500 mb-3 line-clamp-2">${court.description}</p>
                   ` : ''}
-                  <p class="text-xs text-slate-500 font-semibold mb-2.5 flex items-center">
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
                     <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
-                    ${court.specs.capacity}
+                    ${capacity}
                   </p>
                   <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-3 line-clamp-1">
-                    ${court.specs.type}
+                    ${courtType}
                   </p>
                 </div>
 
                 <div>
                   <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
                     <div>
-                      <span class="text-[11px] text-slate-400 font-medium">${state.bookingType === 'mensalista' ? 'Plano Mensalista' : 'Valor da Hora'}</span>
-                      <p class="text-lg font-black text-emerald-700 leading-tight">
-                        ${displayPrice}
-                      </p>
+                      <span class="text-[11px] text-slate-400 font-medium block">Valor da Hora</span>
+                      <div class="flex items-baseline">
+                        <strong class="text-xl font-black text-emerald-700 leading-tight">R$ ${pricePerHour.toFixed(2).replace('.', ',')}</strong>
+                        <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                      </div>
                     </div>
-                    <button class="px-4 py-2 rounded-xl text-xs font-extrabold transition-all ${isSelected ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}">
+                    <button class="px-4 py-2 rounded-xl text-xs font-black transition-all ${isSelected ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/50'}">
                       ${isSelected ? 'Selecionado ✓' : 'Selecionar'}
                     </button>
                   </div>
@@ -542,7 +560,7 @@ function renderStep1(container) {
                   <div class="mt-3.5 pt-2.5 border-t border-dashed border-slate-200 bg-amber-50/50 -mx-5 -mb-5 px-4 py-2.5 rounded-b-3xl">
                     <div class="flex items-center space-x-1.5 text-[10px] font-black text-amber-900 uppercase mb-1">
                       <i data-lucide="crown" class="w-3 h-3 text-amber-600"></i>
-                      <span>Mensalistas deste Campo:</span>
+                      <span>MENSALISTAS DESTE CAMPO:</span>
                     </div>
                     <div class="space-y-0.5">
                       ${sampleList.slice(0, 2).map(time => `
