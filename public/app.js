@@ -93,6 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderApp();
   requestSchedule();
   initCloudSync();
+  autoAdvanceFinishedMatches();
+  setInterval(autoAdvanceFinishedMatches, 30000);
 });
 
 function loadInitialData() {
@@ -119,6 +121,57 @@ function initCloudSync() {
   // Sistema 100% Cloud Serverless no Vercel integrado ao Supabase
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
+  }
+}
+
+
+// ROTINA AUTOMÁTICA: Avanço de Partidas e Liberação de Quadra ao Encerrar o Horário
+async function autoAdvanceFinishedMatches() {
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  let hasUpdates = false;
+  const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
+
+  for (const b of (state.bookings || [])) {
+    if (b.status === 'cancelled' || b.status === 'finished') continue;
+
+    // Se for de um dia anterior, finaliza automaticamente
+    if (b.date < todayStr) {
+      b.status = 'finished';
+      hasUpdates = true;
+      if (client) {
+        try { await client.from('bookings').update({ status: 'finished' }).eq('id', b.id); } catch(e) {}
+      }
+      continue;
+    }
+
+    // Se for do dia de hoje e o horário de término já passou
+    if (b.date === todayStr) {
+      const eMin = timeToMinutes(b.end_time || (b.time ? b.time.split(' às ')[1] : ''));
+      if (eMin && currentMinutes >= eMin) {
+        b.status = 'finished';
+        hasUpdates = true;
+        if (client) {
+          try { await client.from('bookings').update({ status: 'finished' }).eq('id', b.id); } catch(e) {}
+        }
+      }
+    }
+  }
+
+  if (hasUpdates) {
+    const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    local.forEach(lb => {
+      const updated = state.bookings.find(x => x.id === lb.id);
+      if (updated) lb.status = updated.status;
+    });
+    localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+
+    if (state.currentMode === 'admin') {
+      renderStepContent();
+    }
+    requestSchedule();
   }
 }
 
@@ -2132,6 +2185,16 @@ function renderCourtsControlTab() {
             return (b.status === 'in_progress' || (currentMin >= sMin && currentMin < eMin && b.status !== 'finished'));
           });
 
+          // Busca a próxima partida agendada para este campo hoje
+          const nextBooking = (state.bookings || [])
+            .filter(b => (b.court_id || b.courtId) === court.id && b.date === todayStr && b.status !== 'cancelled' && b.status !== 'finished')
+            .map(b => ({
+              ...b,
+              sMin: timeToMinutes(b.start_time || (b.time ? b.time.split(' ')[0] : '19:00'))
+            }))
+            .filter(b => b.sMin >= currentMin)
+            .sort((a, b) => a.sMin - b.sMin)[0];
+
           return `
             <div class="bg-white rounded-3xl overflow-hidden border ${isUnderMaint ? 'border-rose-300 ring-2 ring-rose-500/20 shadow-md' : 'border-slate-200 shadow-sm'} flex flex-col justify-between">
               
@@ -2153,14 +2216,18 @@ function renderCourtsControlTab() {
                         <i data-lucide="clock" class="w-3 h-3 mr-1"></i> ${courtMaintToday.length} TREINO(S) RESERVADO(S) HOJE
                       </span>
                     ` : (liveBooking ? `
-                      <span class="bg-amber-500 text-black text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center animate-pulse">
-                        <span class="w-1.5 h-1.5 rounded-full bg-black mr-1"></span> EM JOGO AGORA
+                      <span class="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center animate-pulse">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-950 mr-1"></span> EM JOGO AGORA
+                      </span>
+                    ` : (nextBooking ? `
+                      <span class="bg-blue-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center">
+                        <i data-lucide="clock" class="w-3 h-3 mr-1"></i> PRÓXIMO: ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}
                       </span>
                     ` : `
                       <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center">
                         ✓ DISPONÍVEL
                       </span>
-                    `))}
+                    `)))}
                   </div>
 
                   <div class="absolute bottom-2.5 left-3 text-white">
@@ -3018,7 +3085,6 @@ async function handleSaveMaintenanceBlock(e) {
   const bookingPayload = {
     id: blockId,
     court_id: courtId,
-    courtId: courtId,
     date,
     start_time: startTime,
     end_time: endTime,
@@ -3428,7 +3494,6 @@ async function handleDirectBookingSubmit(e) {
   const bookingPayload = {
     id: newBookingId,
     court_id: courtId,
-    courtId: courtId,
     date,
     time: `${startTime} às ${endTime}`,
     start_time: startTime,
@@ -4224,7 +4289,7 @@ function openCheckoutModal() {
             <p class="text-xl font-black text-slate-950">R$ ${grandTotal.toFixed(2).replace('.', ',')}</p>
           </div>
 
-          <button onclick="submitBooking(${grandTotal})" 
+          <button id="btnConfirmBooking" onclick="submitBooking(${grandTotal})" 
                   class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-extrabold shadow-md shadow-emerald-600/30 flex items-center space-x-2 transition-all">
             <i data-lucide="check-circle" class="w-4 h-4"></i>
             <span>Confirmar e Reservar</span>
@@ -4248,7 +4313,7 @@ function closeModal() {
   modalRoot.innerHTML = '';
 }
 
-function submitBooking(grandTotal) {
+async function submitBooking(grandTotal) {
   const nameInput = document.getElementById('custName');
   const phoneInput = document.getElementById('custPhone');
   const name = nameInput ? nameInput.value.trim() : state.customerName;
@@ -4259,195 +4324,166 @@ function submitBooking(grandTotal) {
     return;
   }
 
+  // Feedback visual instantâneo no botão
+  const confirmBtn = document.getElementById('btnConfirmBooking');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = `<span class="inline-block animate-spin mr-1.5">⏳</span><span>Salvando Reserva...</span>`;
+  }
+
   state.customerName = name;
   state.customerPhone = phone;
   const isMensal = state.bookingType === 'mensalista';
 
-  // ANTI-CHOQUE RIGOROSO: Verifica conflito local imediatamente
+  // 1. ANTI-CHOQUE RIGOROSO: Verifica conflito antes de salvar
   const localCheck = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
   if (localCheck.conflict) {
     alert('⚠️ Choque de Agendamento Evitado!\n\n' + localCheck.reason + '\n\nPor favor, escolha outro horário livre ou outro campo da Arena Limoeiro.');
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i><span>Confirmar e Reservar</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
     requestSchedule();
     closeModal();
     goToStep(3);
     return;
   }
 
-  // Se o Supabase estiver vinculado, valida no banco antes de salvar
+  const courtId = state.selectedCourt.id;
+  const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
+  const newMemberId = 'mensal-' + Date.now();
+
+  // Payload LIMPO estritamente compatível com o schema do Supabase (sem camelCase courtId!)
+  const dbBookingPayload = {
+    id: newBookingId,
+    court_id: courtId,
+    customer_id: null,
+    date: state.selectedDate,
+    start_time: state.startTime,
+    end_time: state.endTime,
+    time: `${state.startTime} às ${state.endTime}`,
+    duration: state.selectedDuration || 60,
+    customer_name: name,
+    customer_phone: phone,
+    total_price: Number(grandTotal) || 0,
+    status: 'confirmed',
+    booking_type: 'avulso',
+    payment_method: state.paymentMethod || 'local',
+    product_cart: state.productCart || {},
+    observation: state.observation || ''
+  };
+
+  const dbMemberPayload = {
+    id: newMemberId,
+    team_name: name,
+    responsible_name: name,
+    phone: phone,
+    customer_id: null,
+    court_id: courtId,
+    day_of_week: state.monthlyDayOfWeek,
+    day_of_week_label: 'Toda ' + state.monthlyDayOfWeek + '-feira',
+    time: state.startTime,
+    start_time: state.startTime,
+    end_time: state.endTime,
+    monthly_price: Number(grandTotal) || 0,
+    status: 'active',
+    observation: state.observation || ''
+  };
+
+  // 2. Salva no Supabase (Nuvem Vercel)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-    (async () => {
-      try {
-        const client = window.ArenaSupabase.getClient();
+    try {
+      const client = window.ArenaSupabase.getClient();
 
-        // Checagem anti-choque em tempo real no Supabase
-        const { data: dbConflicts } = await client
-          .from('bookings')
-          .select('id, start_time, end_time, customer_name, status')
-          .eq('court_id', state.selectedCourt.id)
-          .eq('date', state.selectedDate)
-          .neq('status', 'cancelled');
+      // Checagem anti-choque em tempo real no Supabase
+      const { data: dbConflicts } = await client
+        .from('bookings')
+        .select('id, start_time, end_time, customer_name, status')
+        .eq('court_id', courtId)
+        .eq('date', state.selectedDate)
+        .neq('status', 'cancelled');
 
-        if (dbConflicts && dbConflicts.length > 0) {
-          const reqS = timeToMinutes(state.startTime);
-          const reqE = timeToMinutes(state.endTime);
-          const overlap = dbConflicts.find(b => {
-            const bS = timeToMinutes(b.start_time);
-            const bE = timeToMinutes(b.end_time);
-            return Math.max(reqS, bS) < Math.min(reqE, bE);
-          });
-          if (overlap) {
-            alert('⚠️ Choque de Agendamento Evitado!\n\nEste horário acabou de ser confirmado por outro cliente (' + (overlap.customer_name || 'Reservado') + ').\n\nPor favor, selecione outro horário disponível.');
-            syncDataFromSupabase();
-            requestSchedule();
-            closeModal();
-            goToStep(3);
-            return;
-          }
-        }
-
-        const customer = await window.ArenaSupabase.getOrCreateCustomer(name, phone);
-
-        if (isMensal) {
-          const newMemberId = 'mensal-' + Date.now();
-          const memberPayload = {
-            id: newMemberId,
-            team_name: name,
-            responsible_name: name,
-            phone,
-            customer_id: customer.id,
-            court_id: state.selectedCourt.id,
-            day_of_week: state.monthlyDayOfWeek,
-            day_of_week_label: 'Toda ' + state.monthlyDayOfWeek + '-feira',
-            time: state.startTime,
-            start_time: state.startTime,
-            end_time: state.endTime,
-            monthly_price: grandTotal,
-            status: 'active',
-            observation: state.observation
-          };
-
-          await client.from('monthly_members').insert([memberPayload]);
-          state.monthlyMembers.push(memberPayload);
+      if (dbConflicts && dbConflicts.length > 0) {
+        const reqS = timeToMinutes(state.startTime);
+        const reqE = timeToMinutes(state.endTime);
+        const overlap = dbConflicts.find(b => {
+          const bS = timeToMinutes(b.start_time);
+          const bE = timeToMinutes(b.end_time);
+          return Math.max(reqS, bS) < Math.min(reqE, bE);
+        });
+        if (overlap) {
+          alert('⚠️ Choque de Agendamento Evitado!\n\nEste horário acabou de ser reservado por outro cliente (' + (overlap.customer_name || 'Reservado') + ').\n\nPor favor, selecione outro horário disponível.');
+          syncDataFromSupabase();
           requestSchedule();
-          showConfirmationSuccessModal({
-            id: newMemberId,
-            customerName: name,
-            customerPhone: phone,
-            courtId: state.selectedCourt.id,
-            date: 'Toda ' + state.monthlyDayOfWeek + '-feira (Mensal)',
-            time: state.startTime + ' às ' + state.endTime,
-            totalPrice: grandTotal,
-            isMensalista: true
-          });
-        } else {
-          const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
-          const bookingPayload = {
-            id: newBookingId,
-            court_id: state.selectedCourt.id,
-            courtId: state.selectedCourt.id,
-            customer_id: customer.id,
-            date: state.selectedDate,
-            start_time: state.startTime,
-            end_time: state.endTime,
-            time: state.startTime + ' às ' + state.endTime,
-            duration: state.selectedDuration,
-            customer_name: name,
-            customer_phone: phone,
-            total_price: grandTotal,
-            status: 'confirmed',
-            booking_type: 'avulso',
-            payment_method: state.paymentMethod,
-            product_cart: state.productCart,
-            observation: state.observation
-          };
-
-          await client.from('bookings').insert([bookingPayload]);
-
-          // Atualiza estado local e localStorage imediatamente
-          state.bookings.push(bookingPayload);
-          const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-          localBookings.push(bookingPayload);
-          localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
-
-          requestSchedule();
-          showConfirmationSuccessModal(bookingPayload);
+          closeModal();
+          goToStep(3);
+          return;
         }
-        return;
-      } catch (err) {
-        console.warn('Erro ao salvar no Supabase, prosseguindo com fallback local:', err);
       }
-    })();
-    return;
+
+      // Cria ou busca cliente
+      try {
+        const customer = await window.ArenaSupabase.getOrCreateCustomer(name, phone);
+        if (customer && customer.id) {
+          dbBookingPayload.customer_id = customer.id;
+          dbMemberPayload.customer_id = customer.id;
+        }
+      } catch (custErr) {
+        console.warn('Aviso no cadastro de cliente:', custErr);
+      }
+
+      // Insere no Supabase
+      if (isMensal) {
+        const { error: insErr } = await client.from('monthly_members').insert([dbMemberPayload]);
+        if (insErr) console.warn('Aviso inserção mensalista Supabase:', insErr);
+      } else {
+        const { error: insErr } = await client.from('bookings').insert([dbBookingPayload]);
+        if (insErr) console.warn('Aviso inserção booking Supabase:', insErr);
+      }
+    } catch (err) {
+      console.warn('Erro na conexão com Supabase, salvando localmente:', err);
+    }
   }
 
-  // Fallback Local
+  // 3. Atualiza estado em memória e localStorage com garantia de compatibilidade
+  const unifiedBooking = {
+    ...dbBookingPayload,
+    courtId: courtId,
+    customerName: name,
+    customerPhone: phone,
+    totalPrice: Number(grandTotal) || 0,
+    startTime: state.startTime,
+    endTime: state.endTime,
+    isMensalista: isMensal
+  };
+
   if (isMensal) {
-    const newMemberId = 'mensal-' + Date.now();
-    const newMember = {
-      id: newMemberId,
-      team_name: name,
-      teamName: name,
-      responsible_name: name,
-      responsibleName: name,
-      phone,
-      court_id: state.selectedCourt.id,
-      courtId: state.selectedCourt.id,
-      day_of_week: state.monthlyDayOfWeek,
-      dayOfWeek: state.monthlyDayOfWeek,
-      time: state.startTime,
-      start_time: state.startTime,
-      startTime: state.startTime,
-      end_time: state.endTime,
-      endTime: state.endTime,
-      monthly_price: grandTotal,
-      monthlyPrice: grandTotal,
-      status: 'active',
-      observation: state.observation
-    };
-    state.monthlyMembers.push(newMember);
+    state.monthlyMembers.push(dbMemberPayload);
+  } else {
+    state.bookings.push(unifiedBooking);
+    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    localBookings.push(unifiedBooking);
+    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+  }
+
+  // 4. Finaliza com sucesso
+  requestSchedule();
+  closeModal();
+
+  if (isMensal) {
     showConfirmationSuccessModal({
       id: newMemberId,
       customerName: name,
       customerPhone: phone,
-      courtId: state.selectedCourt.id,
-      date: `Toda ${state.monthlyDayOfWeek}-feira (Mensal)`,
-      time: `${state.startTime} às ${state.endTime}`,
-      totalPrice: grandTotal,
+      courtId: courtId,
+      date: 'Toda ' + state.monthlyDayOfWeek + '-feira (Mensal)',
+      time: state.startTime + ' às ' + state.endTime,
+      totalPrice: Number(grandTotal) || 0,
       isMensalista: true
     });
-    return;
   } else {
-    const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
-    const bookingPayload = {
-      id: newBookingId,
-      courtId: state.selectedCourt.id,
-      court_id: state.selectedCourt.id,
-      date: state.selectedDate,
-      startTime: state.startTime,
-      start_time: state.startTime,
-      endTime: state.endTime,
-      end_time: state.endTime,
-      time: `${state.startTime} às ${state.endTime}`,
-      duration: state.selectedDuration,
-      customerName: name,
-      customer_name: name,
-      customerPhone: phone,
-      customer_phone: phone,
-      observation: state.observation,
-      productCart: state.productCart,
-      totalPrice: grandTotal,
-      paymentMethod: state.paymentMethod,
-      bookingType: 'avulso'
-    };
-
-    // Salva no localStorage (persistência na Vercel)
-    state.bookings.push(bookingPayload);
-    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    localBookings.push(bookingPayload);
-    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
-
-    showConfirmationSuccessModal(bookingPayload);
-    requestSchedule();
+    showConfirmationSuccessModal(unifiedBooking);
   }
 }
 
@@ -4455,10 +4491,17 @@ function showConfirmationSuccessModal(booking) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
-  const court = state.courts.find(c => c.id === booking.courtId);
-  const courtName = court ? court.name : 'Quadra Esportiva';
+  const courtId = booking.court_id || booking.courtId || (state.selectedCourt ? state.selectedCourt.id : '');
+  const court = state.courts.find(c => c.id === courtId);
+  const courtName = court ? court.name : (state.selectedCourt ? state.selectedCourt.name : 'Quadra Esportiva');
 
-  const savedItemsText = Object.entries(state.productCart).map(([id, qty]) => {
+  const custName = booking.customer_name || booking.customerName || state.customerName || 'Cliente';
+  const custPhone = booking.customer_phone || booking.customerPhone || state.customerPhone || '';
+  const price = typeof booking.total_price === 'number' ? booking.total_price : 
+                (typeof booking.totalPrice === 'number' ? booking.totalPrice : 
+                (typeof booking.monthly_price === 'number' ? booking.monthly_price : 0));
+
+  const savedItemsText = Object.entries(state.productCart || {}).map(([id, qty]) => {
     const prod = state.products.find(p => p.id === id);
     return prod ? `${qty}x ${prod.name}` : '';
   }).filter(Boolean).join(', ');
@@ -4486,11 +4529,11 @@ Bora pro jogo!`);
           Código: #${booking.id}
         </h2>
         <p class="text-xs sm:text-sm text-slate-500 mb-6">
-          Comprovante enviado para o WhatsApp <strong class="text-slate-800">${booking.customerPhone}</strong>
+          Comprovante enviado para o WhatsApp <strong class="text-slate-800">${custPhone}</strong>
         </p>
 
         <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-left space-y-2 mb-6 text-xs sm:text-sm">
-          <div class="flex justify-between"><span class="text-slate-500">Responsável:</span><strong class="text-slate-800">${booking.customerName}</strong></div>
+          <div class="flex justify-between"><span class="text-slate-500">Responsável:</span><strong class="text-slate-800">${custName}</strong></div>
           <div class="flex justify-between"><span class="text-slate-500">Espaço:</span><strong class="text-slate-800">${courtName.split(' - ')[0]}</strong></div>
           <div class="flex justify-between"><span class="text-slate-500">Data e Horário:</span><strong class="text-slate-800">${booking.date} (${booking.time})</strong></div>
           ${savedItemsText ? `
@@ -4499,7 +4542,7 @@ Bora pro jogo!`);
               <p class="text-slate-700 font-semibold">${savedItemsText} (Pagar no consumo)</p>
             </div>
           ` : ''}
-          <div class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500 font-bold">Total Pago das Horas:</span><strong class="text-emerald-700 font-black">R$ ${booking.totalPrice.toFixed(2).replace('.', ',')}</strong></div>
+          <div class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500 font-bold">Total Pago das Horas:</span><strong class="text-emerald-700 font-black">R$ ${price.toFixed(2).replace('.', ',')}</strong></div>
         </div>
 
         <div class="space-y-3">
