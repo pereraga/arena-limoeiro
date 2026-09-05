@@ -1,3 +1,34 @@
+function getFormattedDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(totalMinutes) {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function formatPhone(phone) {
+  if (!phone) return '';
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.length === 11) {
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
+  }
+  if (clean.length === 10) {
+    return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
+  }
+  return phone;
+}
+
 // Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
 let state = {
   currentStep: 1,
@@ -13,7 +44,7 @@ let state = {
     orientation: 'portrait'
   },
   adminSubTab: 'spaces',
-  adminFilterDate: '2026-08-08',
+  adminFilterDate: getFormattedDate(new Date()),
   adminFilterCourt: 'all',
   adminFilterStatus: 'all',
   arenaInfo: null,
@@ -35,9 +66,9 @@ let state = {
   searchQuery: '',
   selectedCourt: null,
   
-  // DATA SELECIONADA PRIMEIRO - Otimizado para Mês 8 (Agosto) conforme solicitado
+  // DATA SELECIONADA PRIMEIRO
   selectedDate: null, // Definido apenas ao escolher no calendário
-  currentMonthDate: new Date(2026, 7, 1), // Mês 8 (Agosto)
+  currentMonthDate: new Date(2026, 7, 1),
   
   // DURAÇÃO E HORÁRIOS SELECIONADOS NA ETAPA 3
   startTime: null,
@@ -54,27 +85,9 @@ let state = {
   paymentMethod: 'pix',
   
   slots: [], // Horários do dia com status 'available', 'booked', 'blocked_admin'
-  maintenanceBlocks: JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]')
+  maintenanceBlocks: JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]'),
+  matchDelays: JSON.parse(localStorage.getItem('arena_match_delays') || '{}')
 };
-
-function getFormattedDate(date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
-function timeToMinutes(timeStr) {
-  if (!timeStr) return 0;
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + m;
-}
-
-function minutesToTime(totalMinutes) {
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
 
 // ==============================================================================
 // 🏟️ NORMALIZADOR DE QUADRAS / ESPAÇOS (COMPATIBILIDADE SUPABASE & LOCAL)
@@ -160,7 +173,21 @@ document.addEventListener('DOMContentLoaded', () => {
   initCloudSync();
   autoAdvanceFinishedMatches();
   setInterval(autoAdvanceFinishedMatches, 30000);
+  setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
 });
+
+// BATIMENTO AO VIVO: Atualiza a contagem dos cronômetros sem resetar o scroll da tela
+function liveDashboardHeartbeat() {
+  if (state.currentMode === 'admin' && (state.adminTab || 'live_dashboard') === 'live_dashboard') {
+    const hasOpenModal = document.querySelector('.fixed.inset-0:not(.hidden)');
+    if (!hasOpenModal) {
+      const scrollY = window.scrollY;
+      renderStepContent();
+      window.scrollTo(0, scrollY);
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
 
 function loadInitialData() {
   if (window.ARENA_DEFAULT_DATA) {
@@ -179,7 +206,7 @@ function loadInitialData() {
     }
     state.bookings = cleanedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
-    // Quadra deve ser selecionada explicitamente pelo usuário
+    state.matchDelays = JSON.parse(localStorage.getItem('arena_match_delays') || '{}');
   }
 }
 
@@ -217,7 +244,10 @@ async function autoAdvanceFinishedMatches() {
     // Se for do dia de hoje e o horário de término já passou
     if (b.date === todayStr) {
       const eMin = timeToMinutes(b.end_time || (b.time ? b.time.split(' às ')[1] : ''));
-      if (eMin && currentMinutes >= eMin) {
+      const delay = (state.matchDelays && state.matchDelays[b.id]?.minutes) || 0;
+      // Permite tolerância de 20 minutos além do atraso antes de encerrar silenciosamente,
+      // permitindo que o gestor acompanhe o estouro de tempo ao vivo e acerte os atrasos
+      if (eMin && currentMinutes >= (eMin + delay + 20)) {
         b.status = 'finished';
         hasUpdates = true;
         if (client) {
@@ -1819,6 +1849,216 @@ function setAdminFilterStatus(status) {
   lucide.createIcons();
 }
 
+// ==============================================================================
+// ⏱️ GESTÃO OPERACIONAL DE ATRASOS & PREVENÇÃO DE CHOQUE ENTRE JOGOS
+// ==============================================================================
+function setMatchDelay(matchId, minutes) {
+  if (!state.matchDelays) state.matchDelays = {};
+  const current = state.matchDelays[matchId]?.minutes || 0;
+  const newDelay = Math.max(0, current + minutes);
+  if (newDelay === 0) {
+    delete state.matchDelays[matchId];
+  } else {
+    state.matchDelays[matchId] = {
+      minutes: newDelay,
+      updatedAt: new Date().toISOString(),
+      notifiedNext: false
+    };
+  }
+  localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
+  renderStepContent();
+  lucide.createIcons();
+}
+
+function clearMatchDelay(matchId) {
+  if (!state.matchDelays) state.matchDelays = {};
+  delete state.matchDelays[matchId];
+  localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
+  renderStepContent();
+  lucide.createIcons();
+}
+
+function markNextCustomerNotified(matchId) {
+  if (!state.matchDelays) state.matchDelays = {};
+  if (state.matchDelays[matchId]) {
+    state.matchDelays[matchId].notifiedNext = true;
+    localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
+    renderStepContent();
+    lucide.createIcons();
+  }
+}
+
+function scrollHorizontalCalendar(direction) {
+  const el = document.getElementById('horizontalDaysContainer');
+  if (el) {
+    el.scrollBy({ left: direction * 280, behavior: 'smooth' });
+  }
+}
+
+function triggerCourtAlertModal(courtName, currentTeam, nextTeam, nextTime) {
+  const modalId = 'courtAlertModal';
+  const existing = document.getElementById(modalId);
+  if (existing) existing.remove();
+
+  const modalHtml = `
+    <div id="${modalId}" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-amber-300 text-center space-y-4">
+        <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
+          <i data-lucide="megaphone" class="w-8 h-8 text-amber-600"></i>
+        </div>
+        <div>
+          <span class="text-xs font-black text-amber-700 uppercase tracking-wider bg-amber-50 px-3 py-1 rounded-full border border-amber-200">Aviso Operacional de Quadra</span>
+          <h3 class="text-xl font-black text-slate-900 mt-2">Cobrar Liberação de Quadra</h3>
+          <p class="text-xs text-slate-600 mt-1 font-semibold">📍 ${courtName}</p>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2 text-xs">
+          <div class="flex justify-between">
+            <span class="text-slate-500 font-bold">Time em Campo:</span>
+            <span class="font-black text-slate-900">${currentTeam}</span>
+          </div>
+          <div class="flex justify-between border-t border-slate-200 pt-2">
+            <span class="text-amber-700 font-bold">Próximo Time Aguardando:</span>
+            <span class="font-black text-slate-900">${nextTeam} (${nextTime})</span>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Dirija-se à quadra ou informe o monitor: <strong>"Apitar os últimos lances e liberar o campo para que o próximo time entre no horário sem atrasos."</strong>
+        </p>
+
+        <div class="flex gap-2 pt-2">
+          <button onclick="document.getElementById('${modalId}').remove()" class="flex-1 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black transition-all">
+            Entendido / Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+  lucide.createIcons();
+}
+
+// ==============================================================================
+// 📅 CALENDÁRIO HORIZONTAL DE JOGOS POR DIA
+// ==============================================================================
+function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) {
+  const todayStr = getFormattedDate(new Date());
+  const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+  const weekDaysShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const monthsShort = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+  const todayObj = new Date();
+  const daysList = [];
+
+  // Exibe uma faixa de 21 dias (-3 dias até +17 dias a partir de hoje)
+  for (let i = -3; i <= 17; i++) {
+    const curD = new Date(todayObj);
+    curD.setDate(todayObj.getDate() + i);
+    const dateStr = getFormattedDate(curD);
+    const dOfWeek = weekDaysMap[curD.getDay()];
+    const weekdayName = weekDaysShort[curD.getDay()];
+    const dayNum = String(curD.getDate()).padStart(2, '0');
+    const monthName = monthsShort[curD.getMonth()];
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedDate;
+
+    // Contagem de jogos neste dia:
+    // 1. Reservas avulsas confirmadas na data
+    const dayBookings = allBookings.filter(b => b.date === dateStr && b.status !== 'cancelled');
+    // 2. Horários fixos do dia da semana (sem duplicata)
+    let fixosCount = 0;
+    (monthlyMembers || []).forEach(m => {
+      const d = m.day_of_week || m.dayOfWeek;
+      if (d === dOfWeek && (!m.status || m.status === 'active')) {
+        const startT = m.start_time || m.startTime || m.time || '19:00';
+        const cId = m.court_id || m.courtId;
+        const alreadyHas = dayBookings.some(b => (b.court_id === cId || b.courtId === cId) && (b.start_time === startT || b.startTime === startT));
+        if (!alreadyHas) fixosCount++;
+      }
+    });
+    const totalDayMatches = dayBookings.length + fixosCount;
+
+    daysList.push({
+      dateStr,
+      weekdayName,
+      dayNum,
+      monthName,
+      isToday,
+      isSelected,
+      totalDayMatches
+    });
+  }
+
+  return `
+    <div class="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
+        <div class="flex items-center space-x-2">
+          <span class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+            <i data-lucide="calendar-range" class="w-4 h-4 text-emerald-700"></i>
+          </span>
+          <div>
+            <h4 class="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+              <span>Calendário Horizontal de Partidas</span>
+              <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Ao Vivo</span>
+            </h4>
+            <p class="text-[11px] text-slate-500 font-medium">Navegue pelos dias para ver os jogos, horários, bola rolando e atrasos em tempo real</p>
+          </div>
+        </div>
+
+        <!-- Controles Rápidos de Navegação -->
+        <div class="flex items-center space-x-1.5 self-end sm:self-center">
+          <button type="button" onclick="setAdminFilterDate('${todayStr}')" 
+                  class="px-3 py-1.5 rounded-xl text-xs font-black transition-all ${selectedDate === todayStr ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            ⚡ Hoje
+          </button>
+          <button type="button" onclick="scrollHorizontalCalendar(-1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all" title="Voltar dias">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+          </button>
+          <button type="button" onclick="scrollHorizontalCalendar(1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all" title="Avançar dias">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </button>
+          <div class="relative">
+            <input type="date" value="${selectedDate}" onchange="setAdminFilterDate(this.value)" 
+                   class="p-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer bg-slate-50 hover:bg-white" title="Escolher outra data">
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Rolagem Horizontal de Dias -->
+      <div id="horizontalDaysContainer" class="flex items-center gap-2 overflow-x-auto pb-2 scroll-smooth scrollbar-thin">
+        ${daysList.map(day => `
+          <button type="button" onclick="setAdminFilterDate('${day.dateStr}')" 
+                  class="flex-shrink-0 flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 min-w-[76px] sm:min-w-[85px] text-center ${day.isSelected ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400/50 scale-[1.03]' : (day.isToday ? 'bg-emerald-50/70 border-emerald-300 text-slate-900 hover:border-emerald-500' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50')}">
+            
+            <div class="flex items-center gap-1">
+              <span class="text-[10px] font-black uppercase tracking-wider ${day.isSelected ? 'text-emerald-100' : (day.isToday ? 'text-emerald-700' : 'text-slate-500')}">${day.weekdayName}</span>
+              ${day.isToday ? `<span class="w-1.5 h-1.5 rounded-full ${day.isSelected ? 'bg-white' : 'bg-emerald-500'}"></span>` : ''}
+            </div>
+
+            <span class="text-lg sm:text-xl font-black leading-tight my-0.5 ${day.isSelected ? 'text-white' : 'text-slate-900'}">${day.dayNum}</span>
+
+            <span class="text-[10px] font-semibold ${day.isSelected ? 'text-emerald-100' : 'text-slate-500'}">${day.monthName}</span>
+
+            <div class="mt-1.5 w-full">
+              ${day.totalDayMatches > 0 ? `
+                <span class="block w-full text-center px-1.5 py-0.5 rounded-lg text-[9px] font-black ${day.isSelected ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}">
+                  ⚽ ${day.totalDayMatches} ${day.totalDayMatches === 1 ? 'jogo' : 'jogos'}
+                </span>
+              ` : `
+                <span class="block w-full text-center px-1.5 py-0.5 rounded-lg text-[9px] font-medium ${day.isSelected ? 'text-emerald-200 bg-white/10' : 'text-slate-400 bg-slate-100'}">
+                  Sem jogos
+                </span>
+              `}
+            </div>
+
+          </button>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 // 1. ABA DE MOVIMENTAÇÃO DOS JOGOS (HOJE & AO VIVO)
 function renderLiveDashboardTab() {
   const selectedDate = state.adminFilterDate || getFormattedDate(new Date());
@@ -1831,7 +2071,7 @@ function renderLiveDashboardTab() {
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
-  // Junta reservas avulsas e mensalistas do dia (sem duplicatas por ID)
+  // Junta reservas avulsas e horários fixos do dia (sem duplicatas por ID)
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const bookingMap = new Map();
   [...(state.bookings || []), ...localBookings].forEach(b => {
@@ -1858,6 +2098,7 @@ function renderLiveDashboardTab() {
         total_price: parseFloat(b.total_price || b.totalPrice || 0),
         status: b.status || 'confirmed',
         booking_type: b.booking_type || b.bookingType || 'avulso',
+        isMensalista: false,
         payment_method: b.payment_method || b.paymentMethod || 'pix',
         product_cart: b.product_cart || b.productCart || {},
         observation: b.observation || ''
@@ -1865,19 +2106,20 @@ function renderLiveDashboardTab() {
     }
   });
 
-  // Mensalistas fixos do dia da semana
+  // Horários fixos do dia da semana
   (state.monthlyMembers || []).forEach(m => {
     const day = m.day_of_week || m.dayOfWeek;
     if (day === currentDayOfWeek && (!m.status || m.status === 'active')) {
       const startT = m.start_time || m.startTime || m.time || '19:00';
       const endT = m.end_time || m.endTime || '20:00';
+      const cId = m.court_id || m.courtId;
       
-      // Evita duplicata se já existir booking gerado para o mensalista
-      const alreadyHas = matchesList.some(b => b.court_id === (m.court_id || m.courtId) && b.start_time === startT);
+      // Evita duplicata se já existir booking gerado para o horário fixo
+      const alreadyHas = matchesList.some(b => b.court_id === cId && b.start_time === startT);
       if (!alreadyHas) {
         matchesList.push({
           id: 'monthly-' + m.id,
-          court_id: m.court_id || m.courtId,
+          court_id: cId,
           date: selectedDate,
           customer_name: (m.team_name || m.teamName) + ' (' + (m.responsible_name || m.responsibleName) + ')',
           customer_phone: m.phone || '',
@@ -1886,11 +2128,11 @@ function renderLiveDashboardTab() {
           time: m.time || (startT + ' às ' + endT),
           total_price: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4,
           status: 'confirmed',
-          booking_type: 'mensalista',
+          booking_type: 'fixo',
           isMensalista: true,
-          payment_method: 'mensalidade',
+          payment_method: 'fixo',
           product_cart: {},
-          observation: 'Mensalista semanal fixo'
+          observation: 'Horário Fixo Semanal'
         });
       }
     }
@@ -1903,12 +2145,27 @@ function renderLiveDashboardTab() {
   matchesList.forEach(m => {
     const sMin = timeToMinutes(m.start_time);
     const eMin = timeToMinutes(m.end_time);
+    const delayInfo = state.matchDelays && state.matchDelays[m.id];
+    const delayMin = delayInfo ? (delayInfo.minutes || 0) : 0;
+    const effectiveEndMin = eMin + delayMin;
+
+    m.delayMinutes = delayMin;
+    m.effectiveEndMin = effectiveEndMin;
+    m.effectiveEndTime = minutesToTime(effectiveEndMin);
+    m.durationMin = Math.max(0, eMin - sMin);
 
     if (isSelectedDateToday && m.status !== 'cancelled') {
-      if (m.status === 'in_progress' || (currentMinutes >= sMin && currentMinutes < eMin && m.status !== 'finished')) {
-        m.isLive = true;
-      } else if (currentMinutes >= eMin || m.status === 'finished') {
+      if (m.status === 'finished') {
         m.isPast = true;
+      } else if (m.status === 'in_progress' || (currentMinutes >= sMin && currentMinutes < effectiveEndMin)) {
+        m.isLive = true;
+        m.elapsedMinutes = Math.max(0, currentMinutes - sMin);
+        m.remainingMinutes = Math.max(0, effectiveEndMin - currentMinutes);
+        const totalWithDelay = m.durationMin + delayMin;
+        m.progressPercent = totalWithDelay > 0 ? Math.min(100, Math.round((m.elapsedMinutes / totalWithDelay) * 100)) : 0;
+      } else if (currentMinutes >= effectiveEndMin) {
+        m.isOvertime = true;
+        m.overtimeMinutes = currentMinutes - effectiveEndMin;
       } else {
         m.isUpcoming = true;
       }
@@ -1921,7 +2178,7 @@ function renderLiveDashboardTab() {
 
   // Métricas do Topo
   const totalMatchesToday = matchesList.length;
-  const liveCount = matchesList.filter(m => m.isLive).length;
+  const liveCount = matchesList.filter(m => m.isLive || m.isOvertime).length;
   const totalRevenue = matchesList.reduce((acc, m) => acc + (m.total_price || 0), 0);
   
   // Pedidos de Bar Pendentes
@@ -1940,7 +2197,7 @@ function renderLiveDashboardTab() {
   }
   if (state.adminFilterStatus && state.adminFilterStatus !== 'all') {
     if (state.adminFilterStatus === 'live') {
-      filteredMatches = filteredMatches.filter(m => m.isLive);
+      filteredMatches = filteredMatches.filter(m => m.isLive || m.isOvertime);
     } else if (state.adminFilterStatus === 'upcoming') {
       filteredMatches = filteredMatches.filter(m => m.isUpcoming);
     } else if (state.adminFilterStatus === 'finished') {
@@ -1967,15 +2224,19 @@ function renderLiveDashboardTab() {
         </div>
 
         <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3 sm:space-x-4">
-          <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
-            <span class="relative flex h-3.5 w-3.5">
-              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
-            </span>
+          <div class="w-11 h-11 sm:w-12 sm:h-12 rounded-xl ${liveCount > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'} flex items-center justify-center flex-shrink-0">
+            ${liveCount > 0 ? `
+              <span class="relative flex h-3.5 w-3.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+              </span>
+            ` : `
+              <i data-lucide="play" class="w-5 h-5"></i>
+            `}
           </div>
           <div>
             <span class="text-[11px] font-bold text-slate-500 uppercase block">Ao Vivo Agora</span>
-            <div class="text-xl sm:text-2xl font-black text-emerald-700">${liveCount} <span class="text-xs font-normal text-slate-500">em jogo</span></div>
+            <div class="text-xl sm:text-2xl font-black ${liveCount > 0 ? 'text-emerald-700' : 'text-slate-700'}">${liveCount} <span class="text-xs font-normal text-slate-500">em quadra</span></div>
           </div>
         </div>
 
@@ -2000,44 +2261,33 @@ function renderLiveDashboardTab() {
         </div>
       </div>
 
-      <!-- Barra de Filtros e Controle de Data -->
+      <!-- 📅 CALENDÁRIO HORIZONTAL DE DIAS -->
+      ${renderHorizontalDayCalendar(selectedDate, allBookings, state.monthlyMembers)}
+
+      <!-- Barra de Filtros por Quadra e Status -->
       <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-xs font-black uppercase text-slate-700 mr-1 flex items-center">
-            <i data-lucide="calendar" class="w-4 h-4 text-emerald-600 mr-1"></i> Data:
+            <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1"></i> Filtrar Quadra:
           </span>
-          <button onclick="setAdminFilterDate(getFormattedDate(new Date()))" 
-                  class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedDate === todayStr ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
-            Hoje
-          </button>
-          <button onclick="setAdminFilterDate(getFormattedDate(new Date(Date.now() + 86400000)))" 
-                  class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedDate === getFormattedDate(new Date(Date.now() + 86400000)) ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
-            Amanhã
-          </button>
-          <button onclick="setAdminFilterDate(getFormattedDate(new Date(Date.now() - 86400000)))" 
-                  class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${selectedDate === getFormattedDate(new Date(Date.now() - 86400000)) ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
-            Ontem
-          </button>
-          <input type="date" value="${selectedDate}" onchange="setAdminFilterDate(this.value)" 
-                 class="p-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-          <!-- Filtro por Quadra -->
           <select onchange="setAdminFilterCourt(this.value)" class="p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
             <option value="all" ${state.adminFilterCourt === 'all' ? 'selected' : ''}>🏟️ Todas as Quadras</option>
             ${state.courts.map(c => `<option value="${c.id}" ${state.adminFilterCourt === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
           </select>
+        </div>
 
-          <!-- Filtro por Status -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-black uppercase text-slate-700 mr-1 flex items-center">
+            <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1"></i> Status:
+          </span>
           <select onchange="setAdminFilterStatus(this.value)" class="p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
             <option value="all" ${state.adminFilterStatus === 'all' ? 'selected' : ''}>Todos os Status</option>
-            <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo Agora</option>
-            <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximos Jogos</option>
-            <option value="finished" ${state.adminFilterStatus === 'finished' ? 'selected' : ''}>✅ Finalizados</option>
+            <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo / Em Andamento</option>
+            <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximas Partidas</option>
+            <option value="finished" ${state.adminFilterStatus === 'finished' ? 'selected' : ''}>✅ Finalizadas</option>
           </select>
 
-          <button onclick="openDirectBookingModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+          <button onclick="openDirectBookingModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all ml-auto md:ml-0">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>+ Nova Reserva</span>
           </button>
@@ -2045,13 +2295,18 @@ function renderLiveDashboardTab() {
       </div>
 
       <!-- Feed / Tabela de Partidas -->
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-          <h3 class="text-base font-black text-slate-800 flex items-center">
-            <i data-lucide="list-ordered" class="w-5 h-5 text-emerald-600 mr-2"></i>
-            Partidas Programadas para ${formatDisplayDate(selectedDate)}
-          </h3>
-          <span class="text-xs text-slate-500 font-semibold">${filteredMatches.length} jogos listados</span>
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5 pb-4 border-b border-slate-100">
+          <div>
+            <h3 class="text-base sm:text-lg font-black text-slate-900 flex items-center">
+              <i data-lucide="list-ordered" class="w-5 h-5 text-emerald-600 mr-2"></i>
+              Partidas Programadas para ${formatDisplayDate(selectedDate)}
+            </h3>
+            <p class="text-xs text-slate-500 mt-0.5">Acompanhamento ao vivo, cronômetro automático, gestão de atrasos e prevenção de choques</p>
+          </div>
+          <span class="text-xs text-slate-700 bg-slate-100 px-3 py-1 rounded-full font-bold self-start sm:self-center">
+            ${filteredMatches.length} ${filteredMatches.length === 1 ? 'partida listada' : 'partidas listadas'}
+          </span>
         </div>
 
         ${filteredMatches.length === 0 ? `
@@ -2060,18 +2315,26 @@ function renderLiveDashboardTab() {
               <i data-lucide="calendar" class="w-8 h-8"></i>
             </div>
             <h4 class="text-sm sm:text-base font-black text-slate-800">Nenhum jogo agendado para esta data</h4>
-            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Aproveite para cadastrar uma nova reserva de balcão ou chamada do WhatsApp.</p>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Cadastre uma nova reserva direta ou selecione outro dia no calendário acima.</p>
             <button onclick="openDirectBookingModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span>+ Fazer Reserva Direta Agora</span>
             </button>
           </div>
         ` : `
-          <div class="space-y-3.5">
+          <div class="space-y-4">
             ${filteredMatches.map(match => {
               const court = state.courts.find(c => c.id === match.court_id) || { name: 'Quadra Esportiva', image: '/logo.jpg', categoryLabel: 'Esporte' };
               const cleanPhone = (match.customer_phone || '').replace(/\D/g, '');
-              const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent('Olá ' + match.customer_name + '! Falamos da Arena Limoeiro sobre o seu jogo agendado para hoje (' + match.time + ') na ' + court.name + '.')}`;
+              const formattedPhone = formatPhone(match.customer_phone);
+              const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent('Olá ' + match.customer_name + '! Falamos da Arena Limoeiro sobre o seu jogo agendado para hoje (' + match.time + ') no ' + court.name + '.')}`;
+
+              // Duração formatada
+              const durHours = Math.floor(match.durationMin / 60);
+              const durRemainMin = match.durationMin % 60;
+              const durationText = durHours > 0 
+                ? (durRemainMin > 0 ? `${durHours}h ${durRemainMin}m (${match.durationMin} min)` : `${durHours}h (${match.durationMin} min)`)
+                : `${match.durationMin} min`;
 
               // Análise de Bebidas do Bar
               const cart = match.product_cart || {};
@@ -2090,100 +2353,257 @@ function renderLiveDashboardTab() {
               };
               const currentBarBadge = barStatusBadges[barStatus] || barStatusBadges.waiting;
 
+              // Detecção do Próximo Jogo na Mesma Quadra
+              const nextMatch = matchesList.find(other => 
+                other.id !== match.id &&
+                other.court_id === match.court_id &&
+                other.status !== 'cancelled' &&
+                timeToMinutes(other.start_time) >= timeToMinutes(match.end_time) &&
+                timeToMinutes(other.start_time) <= timeToMinutes(match.end_time) + 30
+              );
+
+              // Mensagem para alertar o próximo time no WhatsApp
+              let nextWhatsappUrl = '';
+              if (nextMatch) {
+                const nextCleanPhone = (nextMatch.customer_phone || '').replace(/\D/g, '');
+                const effectiveDelay = match.delayMinutes > 0 ? match.delayMinutes : (match.overtimeMinutes || 5);
+                const msgAviso = `Olá ${nextMatch.customer_name}! Tudo bem? Falamos da Arena Limoeiro ⚽.\nEstamos acompanhando a quadra ${court.name} para o seu jogo agendado às ${nextMatch.start_time}.\nA partida anterior teve um pequeno atraso de ${effectiveDelay} minutos (previsão de liberação por volta das ${match.effectiveEndTime}).\nEstamos agilizando ao máximo para liberar a quadra o mais rápido possível e garantir que você e sua equipe joguem o tempo completo com total comodidade! Qualquer dúvida é só nos avisar aqui. Nos vemos na Arena! 🏃‍♂️⚽`;
+                nextWhatsappUrl = `https://wa.me/55${nextCleanPhone}?text=${encodeURIComponent(msgAviso)}`;
+              }
+
+              // Card styling dependendo do status
+              let cardBorderClass = 'border-slate-200 bg-white';
+              if (match.isOvertime) {
+                cardBorderClass = 'border-rose-500 bg-rose-50/20 ring-2 ring-rose-500/30';
+              } else if (match.isLive) {
+                cardBorderClass = 'border-emerald-500 bg-emerald-50/20 ring-2 ring-emerald-500/20';
+              } else if (match.delayMinutes > 0) {
+                cardBorderClass = 'border-amber-400 bg-amber-50/20 ring-1 ring-amber-400/30';
+              }
+
               return `
-                <div class="p-4 sm:p-5 rounded-2xl border ${match.isLive ? 'border-emerald-500 bg-emerald-50/20 ring-2 ring-emerald-500/20' : 'border-slate-200 bg-white'} shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all hover:border-slate-300">
+                <div class="p-4 sm:p-5 rounded-3xl border ${cardBorderClass} shadow-sm transition-all hover:border-slate-300 space-y-3.5">
                   
-                  <div class="flex items-start space-x-3.5 flex-1">
-                    <div class="flex flex-col items-center justify-center p-2.5 rounded-xl ${match.isLive ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800'} font-black min-w-[75px] text-center flex-shrink-0">
-                      <span class="text-xs uppercase">${match.start_time}</span>
-                      <span class="text-[10px] font-medium opacity-80">até ${match.end_time}</span>
-                    </div>
+                  <!-- Linha Superior: Horário, Espaço, Tipo e Status -->
+                  <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    
+                    <!-- Bloco de Horário e Local -->
+                    <div class="flex items-start sm:items-center space-x-3">
+                      <div class="flex flex-col items-center justify-center p-2.5 rounded-2xl ${match.isOvertime ? 'bg-rose-600 text-white shadow-md' : (match.isLive ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-800')} font-black min-w-[85px] text-center flex-shrink-0">
+                        <span class="text-xs sm:text-sm uppercase">${match.start_time}</span>
+                        <span class="text-[10px] font-medium opacity-85">até ${match.end_time}</span>
+                      </div>
 
-                    <div class="space-y-1 flex-1">
-                      <div class="flex flex-wrap items-center gap-1.5">
-                        <span class="text-[11px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
-                          🏟️ ${court.name}
-                        </span>
-                        ${match.isMensalista ? `
-                          <span class="text-[10px] font-black text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md flex items-center">
-                            <i data-lucide="crown" class="w-3 h-3 text-amber-600 mr-1"></i> Mensalista
+                      <div class="space-y-1">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                          <span class="text-xs font-black text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
+                            <span>🏟️</span> ${court.name}
                           </span>
-                        ` : `
                           <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                            Avulso
+                            ${court.categoryLabel || 'Esporte'}
                           </span>
-                        `}
-                        ${match.isLive ? `
-                          <span class="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-400 flex items-center animate-pulse">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5"></span> AO VIVO AGORA
+                          <span class="text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <i data-lucide="clock" class="w-3 h-3 text-slate-500"></i>
+                            ${durationText} de jogo
                           </span>
-                        ` : (match.status === 'finished' ? `
-                          <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">✓ Finalizado</span>
-                        ` : `
-                          <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Agendado</span>
-                        `)}
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                          ${match.isMensalista ? `
+                            <span class="text-[11px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
+                              <i data-lucide="crown" class="w-3.5 h-3.5 text-amber-600 mr-1"></i> Horário Fixo Semanal
+                            </span>
+                          ` : `
+                            <span class="text-[11px] font-black text-sky-900 bg-sky-100 border border-sky-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
+                              <i data-lucide="zap" class="w-3.5 h-3.5 text-sky-600 mr-1"></i> Reserva Avulsa
+                            </span>
+                          `}
+
+                          ${match.isOvertime ? `
+                            <span class="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-400 px-2.5 py-0.5 rounded-full flex items-center animate-pulse">
+                              <span class="w-1.5 h-1.5 rounded-full bg-rose-600 mr-1.5"></span> 🚨 TEMPO ESGOTADO (+${match.overtimeMinutes}m)
+                            </span>
+                          ` : (match.isLive ? `
+                            <span class="text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-400 px-2.5 py-0.5 rounded-full flex items-center animate-pulse">
+                              <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5"></span> 🟢 BOLA ROLANDO AO VIVO
+                            </span>
+                          ` : (match.status === 'finished' ? `
+                            <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">✓ Finalizado</span>
+                          ` : `
+                            <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md">Agendado</span>
+                          `))}
+
+                          ${match.delayMinutes > 0 ? `
+                            <span class="text-[10px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center">
+                              ⏱️ +${match.delayMinutes} min atraso (Término: ${match.effectiveEndTime})
+                            </span>
+                          ` : ''}
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Botões de Ação do Jogo -->
+                    <div class="flex items-center space-x-1.5 self-end md:self-center flex-shrink-0">
+                      ${(match.isLive || match.isOvertime) ? `
+                        <button onclick="updateMatchStatus('${match.id}', 'finished')" class="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
+                          <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+                          <span>Finalizar Jogo</span>
+                        </button>
+                      ` : (match.status !== 'finished' ? `
+                        <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
+                          <i data-lucide="play" class="w-4 h-4"></i>
+                          <span>Iniciar Jogo</span>
+                        </button>
+                      ` : '')}
+
+                      <button onclick="openAddBarItemsModal('${match.id}')" class="p-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-xl transition-all" title="Adicionar Bebidas/Produtos">
+                        <i data-lucide="beer" class="w-4 h-4"></i>
+                      </button>
+
+                      <button onclick="handleCancelBooking('${match.id}')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="Cancelar Agendamento">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+
+                  </div>
+
+                  <!-- Detalhes do Cliente e Pagamento -->
+                  <div class="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    <div class="space-y-1">
+                      <div class="flex items-center space-x-2">
+                        <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
+                        <span class="text-sm sm:text-base font-black text-slate-900">${match.customer_name}</span>
                       </div>
 
-                      <h4 class="text-sm sm:text-base font-black text-slate-900 leading-snug">
-                        ${match.customer_name}
-                      </h4>
-
-                      <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                      <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600">
                         ${match.customer_phone ? `
-                          <a href="${whatsappUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1">
+                          <a href="${whatsappUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                             <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
-                            <span>${match.customer_phone} (Chamar no Zap)</span>
+                            <span>${formattedPhone} (Chamar no WhatsApp)</span>
                           </a>
-                        ` : ''}
-                        <span>Valor: <strong class="text-slate-900">R$ ${match.total_price.toFixed(2).replace('.', ',')}</strong></span>
-                      </div>
+                        ` : '<span class="text-slate-400">Sem telefone cadastrado</span>'}
 
-                      <!-- Itens do Bar Reservados -->
-                      ${itemsList.length > 0 ? `
-                        <div class="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2">
-                          <span class="text-[11px] font-bold text-slate-700 flex items-center">
-                            <i data-lucide="beer" class="w-3.5 h-3.5 text-amber-500 mr-1"></i>
-                            ${itemsList.join(', ')}
-                          </span>
-                          <button onclick="cycleBarStatus('${match.id}')" 
-                                  class="text-[10px] font-black px-2 py-0.5 rounded-full border ${currentBarBadge.class} flex items-center space-x-1 hover:opacity-80 transition-all" title="Clique para avançar o status">
-                            <span>${currentBarBadge.label}</span>
-                            <i data-lucide="chevron-right" class="w-2.5 h-2.5"></i>
-                          </button>
-                        </div>
-                      ` : `
-                        <div class="mt-1">
-                          <button onclick="openAddBarItemsModal('${match.id}')" class="text-[11px] font-bold text-emerald-700 hover:underline flex items-center space-x-1">
-                            <i data-lucide="plus" class="w-3 h-3"></i>
-                            <span>+ Reservar Bebidas Geladas / Bar</span>
-                          </button>
-                        </div>
-                      `}
+                        <span class="font-semibold">
+                          Valor a Pagar: <strong class="text-slate-900 font-black text-sm">R$ ${match.total_price.toFixed(2).replace('.', ',')}</strong>
+                          <span class="text-[10px] text-slate-500 uppercase ml-1">(${match.payment_method === 'fixo' ? 'Plano Fixo' : (match.payment_method === 'pix' ? 'PIX' : 'Recepção')})</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Controles de Atraso Operacional -->
+                    <div class="flex flex-wrap items-center gap-1.5 self-start md:self-center">
+                      <span class="text-[10px] font-black uppercase text-slate-500 tracking-wider mr-1">Marcar Atraso:</span>
+                      <button onclick="setMatchDelay('${match.id}', 5)" class="px-2 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold transition-all shadow-2xs" title="Adicionar +5 min de atraso">+5 min</button>
+                      <button onclick="setMatchDelay('${match.id}', 10)" class="px-2 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold transition-all shadow-2xs" title="Adicionar +10 min de atraso">+10 min</button>
+                      <button onclick="setMatchDelay('${match.id}', 15)" class="px-2 py-1 bg-white hover:bg-amber-50 text-amber-800 border border-amber-300 rounded-lg text-xs font-bold transition-all shadow-2xs" title="Adicionar +15 min de atraso">+15 min</button>
+                      ${match.delayMinutes > 0 ? `
+                        <button onclick="clearMatchDelay('${match.id}')" class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-black transition-all" title="Limpar atraso marcado">✕ Limpar</button>
+                      ` : ''}
                     </div>
                   </div>
 
-                  <!-- Botões de Ação do Jogo -->
-                  <div class="flex items-center space-x-2 self-end md:self-center flex-shrink-0">
-                    ${match.isLive ? `
-                      <button onclick="updateMatchStatus('${match.id}', 'finished')" class="px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black shadow flex items-center space-x-1 transition-all">
-                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                        <span>Finalizar</span>
-                      </button>
-                    ` : (match.status !== 'finished' ? `
-                      <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1 transition-all">
-                        <i data-lucide="play" class="w-3.5 h-3.5"></i>
-                        <span>Iniciar Jogo</span>
-                      </button>
-                    ` : '')}
+                  <!-- ⏱️ CRONÔMETRO AO VIVO DINÂMICO (BOLA ROLANDO) -->
+                  ${match.isLive ? `
+                    <div class="bg-emerald-950 text-emerald-100 p-3.5 rounded-2xl border border-emerald-600 shadow-inner">
+                      <div class="flex items-center justify-between text-xs font-black mb-1.5">
+                        <span class="flex items-center text-emerald-300">
+                          <span class="relative flex h-2.5 w-2.5 mr-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                          </span>
+                          ⏱️ BOLA ROLANDO: <strong class="text-white mx-1">${match.elapsedMinutes} min jogados</strong> de ${match.durationMin} min
+                        </span>
+                        <span class="text-emerald-300 bg-emerald-900/80 px-2.5 py-0.5 rounded-full font-black text-[11px]">
+                          Restam ${match.remainingMinutes} min
+                        </span>
+                      </div>
+                      <div class="w-full bg-emerald-900/80 rounded-full h-2.5 overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-400 via-emerald-300 to-teal-200 h-2.5 rounded-full transition-all duration-500" style="width: ${match.progressPercent}%"></div>
+                      </div>
+                    </div>
+                  ` : ''}
 
-                    <button onclick="openAddBarItemsModal('${match.id}')" class="p-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-xl transition-all" title="Adicionar Bebidas/Produtos">
-                      <i data-lucide="beer" class="w-4 h-4"></i>
-                    </button>
+                  <!-- 🚨 ALERTA DE TEMPO ESGOTADO (ESTOURO DE HORÁRIO) -->
+                  ${match.isOvertime ? `
+                    <div class="bg-rose-950 text-rose-100 p-3.5 rounded-2xl border border-rose-500 shadow-md animate-pulse flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div class="flex items-center space-x-2 text-xs font-black text-rose-200">
+                        <i data-lucide="alert-octagon" class="w-5 h-5 text-rose-400 flex-shrink-0"></i>
+                        <span>🚨 TEMPO ESGOTADO: A partida ultrapassou em <strong>+${match.overtimeMinutes} minutos</strong> o horário final!</span>
+                      </div>
+                      <button onclick="updateMatchStatus('${match.id}', 'finished')" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-black shadow flex items-center justify-center space-x-1.5 transition-all flex-shrink-0">
+                        <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                        <span>Liberar Quadra Agora</span>
+                      </button>
+                    </div>
+                  ` : ''}
 
-                    <button onclick="handleCancelBooking('${match.id}')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="Cancelar Agendamento">
-                      <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                  </div>
+                  <!-- ⚠️ SISTEMA DE PREVENÇÃO DE CONFLITO COM O PRÓXIMO JOGO -->
+                  ${nextMatch ? `
+                    <div class="p-3.5 rounded-2xl ${match.delayMinutes > 0 || match.isOvertime ? 'bg-amber-50 border border-amber-300 shadow-xs' : 'bg-slate-50 border border-slate-200'}">
+                      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        
+                        <div class="space-y-0.5">
+                          <div class="flex items-center space-x-1.5 text-xs font-black ${match.delayMinutes > 0 || match.isOvertime ? 'text-amber-900' : 'text-slate-700'}">
+                            <i data-lucide="${match.delayMinutes > 0 || match.isOvertime ? 'alert-triangle' : 'calendar-clock'}" class="w-4 h-4 ${match.delayMinutes > 0 || match.isOvertime ? 'text-amber-600' : 'text-slate-500'}"></i>
+                            <span>Próximo Jogo na Mesma Quadra: <strong>${nextMatch.customer_name}</strong> às <strong>${nextMatch.start_time}</strong> (${nextMatch.isMensalista ? '👑 Fixo' : '⚡ Avulso'})</span>
+                          </div>
+                          ${(match.delayMinutes > 0 || match.isOvertime) ? `
+                            <p class="text-[11px] text-amber-800 font-medium">
+                              Previsão atualizada de liberação da quadra: <strong>${match.effectiveEndTime}</strong> (+${match.delayMinutes || match.overtimeMinutes} min de atraso). Alinhe com o próximo cliente para evitar choques!
+                            </p>
+                          ` : `
+                            <p class="text-[11px] text-slate-500">Jogo na sequência. Garanta o encerramento às ${match.end_time} para o próximo time entrar pontualmente.</p>
+                          `}
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2 self-start sm:self-center flex-shrink-0">
+                          ${(match.delayMinutes > 0 || match.isOvertime) ? `
+                            <a href="${nextWhatsappUrl}" target="_blank" onclick="markNextCustomerNotified('${match.id}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
+                              <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                              <span>📲 Avisar Próximo no WhatsApp</span>
+                            </a>
+                            <button onclick="triggerCourtAlertModal('${court.name}', '${match.customer_name}', '${nextMatch.customer_name}', '${nextMatch.start_time}')" class="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
+                              <i data-lucide="megaphone" class="w-3.5 h-3.5 text-amber-400"></i>
+                              <span>📢 Cobrar Saída</span>
+                            </button>
+                          ` : `
+                            <a href="https://wa.me/55${(nextMatch.customer_phone || '').replace(/\D/g, '')}" target="_blank" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1">
+                              <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                              <span>WhatsApp Próximo Time</span>
+                            </a>
+                          `}
+                        </div>
+
+                      </div>
+                    </div>
+                  ` : ''}
+
+                  <!-- Itens do Bar Reservados -->
+                  ${itemsList.length > 0 ? `
+                    <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-700 flex items-center">
+                          <i data-lucide="beer" class="w-4 h-4 text-amber-500 mr-1.5"></i>
+                          ${itemsList.join(', ')}
+                        </span>
+                        <button onclick="cycleBarStatus('${match.id}')" 
+                                class="text-[10px] font-black px-2.5 py-0.5 rounded-full border ${currentBarBadge.class} flex items-center space-x-1 hover:opacity-80 transition-all" title="Clique para avançar o status">
+                          <span>${currentBarBadge.label}</span>
+                          <i data-lucide="chevron-right" class="w-2.5 h-2.5"></i>
+                        </button>
+                      </div>
+                      <button onclick="openAddBarItemsModal('${match.id}')" class="text-[11px] font-bold text-emerald-700 hover:underline">
+                        + Editar Bebidas
+                      </button>
+                    </div>
+                  ` : `
+                    <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
+                      <button onclick="openAddBarItemsModal('${match.id}')" class="text-[11px] font-bold text-emerald-700 hover:underline flex items-center space-x-1">
+                        <i data-lucide="plus" class="w-3 h-3"></i>
+                        <span>+ Reservar Bebidas Geladas / Bar para esta partida</span>
+                      </button>
+                    </div>
+                  `}
 
                 </div>
               `;
