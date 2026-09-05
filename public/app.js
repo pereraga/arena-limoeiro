@@ -809,15 +809,11 @@ function renderStep1(container) {
                       </div>
                     </div>
                     ${(court.isMaintenance || (specs && specs.status === 'maintenance')) ? `
-                      <button disabled class="px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center space-x-1 cursor-not-allowed">
+                      <span class="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center space-x-1 cursor-not-allowed">
                         <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
                         <span>Em Manutenção</span>
-                      </button>
-                    ` : `
-                      <button class="px-4 py-2 rounded-xl text-xs font-black transition-all ${isSelected ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/50'}">
-                        ${isSelected ? 'Selecionado ✓' : 'Selecionar'}
-                      </button>
-                    `}
+                      </span>
+                    ` : ''}
                   </div>
 
                   <!-- RODAPÉ DE MENSALISTAS -->
@@ -4699,7 +4695,7 @@ function renderBottomBar() {
   const bar = document.getElementById('bottomBar');
   if (!bar) return;
 
-  if (state.currentMode === 'admin') {
+  if (state.currentMode === 'admin' || state.currentStep === 1) {
     bar.classList.add('hidden');
     return;
   }
@@ -4787,12 +4783,7 @@ function selectCourt(courtId) {
   state.startTime = null;
   state.endTime = null;
   
-  renderStepContent();
-  renderBottomBar();
-  renderStepper();
-  if (window.lucide) lucide.createIcons();
-
-  // Avança imediatamente para a Etapa 2 (Data do Jogo) com a quadra bloqueada
+  // Avança imediatamente e direto para a Etapa 2 (Data do Jogo)
   goToStep(2);
 }
 
