@@ -982,18 +982,15 @@ function renderCalendarHTML() {
           <i data-lucide="calendar" class="w-5 h-5"></i>
         </span>
         <div>
-          <h4 class="text-base sm:text-lg font-black text-slate-900 flex items-center space-x-2">
-            <span>Agosto 2026</span>
-            <span class="text-[11px] font-black px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
-              Mês 8
-            </span>
+          <h4 class="text-base sm:text-lg font-black text-slate-900">
+            Agosto 2026
           </h4>
-          <p class="text-xs text-slate-500">Escolha o dia da sua partida neste mês 8</p>
+          <p class="text-xs text-slate-500">Escolha o dia da sua partida</p>
         </div>
       </div>
       <div class="bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-xl text-right hidden sm:block">
         <span class="text-[10px] font-bold text-emerald-700 block uppercase">Calendário</span>
-        <span class="text-xs font-black text-emerald-900">Mês 8 Ativo</span>
+        <span class="text-xs font-black text-emerald-900">Agosto 2026</span>
       </div>
     </div>
 
@@ -1050,18 +1047,18 @@ function renderCalendarHTML() {
         <i data-lucide="calendar-check" class="w-5 h-5"></i>
       </div>
       <div>
-        <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido no Mês 8:</span>
+        <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido:</span>
         <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
           ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
         </strong>
       </div>
     </div>
 
-    <!-- Atalhos Rápidos de Dias no Mês 8 -->
+    <!-- Atalhos Rápidos de Dias em Agosto -->
     <div class="mt-4 pt-3 border-t border-slate-100">
       <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center">
         <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500 mr-1.5"></i>
-        <span>Atalhos Rápidos de Dias em Agosto (Mês 8):</span>
+        <span>Atalhos Rápidos de Dias em Agosto:</span>
       </div>
       <div class="flex flex-wrap gap-1.5">
         ${[1, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, 31].map(d => {
