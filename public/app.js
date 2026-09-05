@@ -1047,25 +1047,18 @@ function renderCalendarHTML() {
 
   html += `</div>`;
 
-  // Banner Informativo de Confirmação da Data Selecionada e Botão de Avançar
+  // Banner Informativo de Confirmação da Data Selecionada
   html += `
-    <div class="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
-      <div class="flex items-center space-x-3 text-left w-full sm:w-auto">
-        <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow">
-          <i data-lucide="calendar-check" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido no Mês 8:</span>
-          <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
-            ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
-          </strong>
-        </div>
+    <div class="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center space-x-3 shadow-sm">
+      <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow">
+        <i data-lucide="calendar-check" class="w-5 h-5"></i>
       </div>
-      <button onclick="nextStep()" ${!state.selectedDate ? 'disabled' : ''}
-              class="w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all ${!state.selectedDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow'}">
-        <span>Avançar para Horários</span>
-        <i data-lucide="arrow-right" class="w-4 h-4"></i>
-      </button>
+      <div>
+        <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido no Mês 8:</span>
+        <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
+          ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
+        </strong>
+      </div>
     </div>
 
     <!-- Atalhos Rápidos de Dias no Mês 8 -->
