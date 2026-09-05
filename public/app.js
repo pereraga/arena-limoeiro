@@ -169,7 +169,7 @@ function loadInitialData() {
     state.categories = d.categories;
     state.courts = (d.initialCourts || []).map(normalizeCourt);
     state.products = d.initialProducts;
-    state.monthlyMembers = d.initialMonthlyMembers;
+    state.monthlyMembers = (d.initialMonthlyMembers || []).filter(m => m && m.id && !['mensal-1', 'mensal-2'].includes(m.id));
     state.adminUsers = d.initialAdmins;
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
@@ -292,7 +292,7 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   if (monthlyConflict) {
     return { 
       conflict: true, 
-      reason: `Este horário já está reservado para o time mensalista fixo: ${(monthlyConflict.team_name || monthlyConflict.teamName)}.` 
+      reason: `Este horário já está reservado para o time com horário fixo: ${(monthlyConflict.team_name || monthlyConflict.teamName)}.` 
     };
   }
 
@@ -734,19 +734,8 @@ function renderStep1(container) {
           const capacity = specs.capacity || '14 a 16 Jogadores (7x7 / 8x8)';
           const courtType = specs.type || 'Grama Sintética 60mm Monofilamento (FIFA Quality)';
 
-          const defaultMensalistasMap = {
-            'court-society-1': ['Pelada dos Amigos da Terça (Toda Terça 19:00)'],
-            'court-society-2': ['Pelada Noturna (Segunda 20h)', 'Amigos do Society (Quinta 19h)'],
-            'court-beach-1': ['Beach Club Limoeiro (Segunda e Quarta 18h)', 'Galera do Futevôlei (Sábado 08h)'],
-            'court-beach-2': ['Turma do Vôlei de Areia (Domingo 09h)'],
-            'court-gym-1': ['Galera do Futsal Noturno (Quinta 20h)', 'Basquete Limoeiro Team (Sábado 16h)'],
-            'court-padel-1': ['Circuito Padel Limoeiro (Terça e Quinta 20h)']
-          };
-
-          const registeredMensalistas = state.monthlyMembers.filter(m => (m.courtId === court.id || m.court_id === court.id));
-          const sampleList = (registeredMensalistas.length > 0) ? 
-            registeredMensalistas.map(m => `${m.team_name || m.teamName} (${(m.day_of_week_label || m.dayOfWeekLabel || 'Semanal')} ${m.time})`) : 
-            (court.sampleMensalistas || court.sample_mensalistas || defaultMensalistasMap[court.id] || ["Pelada dos Amigos (Terça 19h)"]);
+          const registeredFixos = (state.monthlyMembers || []).filter(m => (m.courtId === court.id || m.court_id === court.id));
+          const fixosList = registeredFixos.map(m => `${m.team_name || m.teamName} (${(m.day_of_week_label || m.dayOfWeekLabel || 'Semanal')} ${m.time})`);
 
           return `
             <div onclick="selectCourt('${court.id}')" 
@@ -816,21 +805,23 @@ function renderStep1(container) {
                     ` : ''}
                   </div>
 
-                  <!-- RODAPÉ DE MENSALISTAS -->
-                  <div class="mt-3.5 pt-2.5 border-t border-dashed border-slate-200 bg-amber-50/50 -mx-5 -mb-5 px-4 py-2.5 rounded-b-3xl">
-                    <div class="flex items-center space-x-1.5 text-[10px] font-black text-amber-900 uppercase mb-1">
-                      <i data-lucide="crown" class="w-3 h-3 text-amber-600"></i>
-                      <span>MENSALISTAS DESTE CAMPO:</span>
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  ${fixosList.length > 0 ? `
+                    <div class="mt-3.5 pt-2.5 border-t border-dashed border-slate-200 bg-amber-50/50 -mx-5 -mb-5 px-4 py-2.5 rounded-b-3xl">
+                      <div class="flex items-center space-x-1.5 text-[10px] font-black text-amber-900 uppercase mb-1">
+                        <i data-lucide="crown" class="w-3 h-3 text-amber-600"></i>
+                        <span>HORÁRIOS FIXOS DESTE CAMPO:</span>
+                      </div>
+                      <div class="space-y-0.5">
+                        ${fixosList.slice(0, 3).map(time => `
+                          <div class="text-[11px] font-semibold text-slate-700 flex items-center space-x-1 truncate">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
+                            <span class="truncate">${time}</span>
+                          </div>
+                        `).join('')}
+                      </div>
                     </div>
-                    <div class="space-y-0.5">
-                      ${sampleList.slice(0, 2).map(time => `
-                        <div class="text-[11px] font-semibold text-slate-700 flex items-center space-x-1 truncate">
-                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                          <span class="truncate">${time}</span>
-                        </div>
-                      `).join('')}
-                    </div>
-                  </div>
+                  ` : ''}
                 </div>
 
               </div>
@@ -881,7 +872,7 @@ function renderStep2(container) {
           <div class="flex items-center space-x-3 mb-5">
             <span class="p-2.5 rounded-2xl bg-amber-100 text-amber-800 shadow-sm"><i data-lucide="crown" class="w-6 h-6"></i></span>
             <div>
-              <h3 class="text-base sm:text-lg font-black text-slate-900">Configuração do Dia do Plano Mensalista</h3>
+              <h3 class="text-base sm:text-lg font-black text-slate-900">Configuração do Dia do Horário Fixo</h3>
               <p class="text-xs text-slate-500">Selecione o dia fixo da semana para o seu time jogar toda semana no mês</p>
             </div>
           </div>
@@ -1426,7 +1417,7 @@ function renderStep4(container) {
             <i data-lucide="${isMensal ? 'crown' : 'clock'}" class="w-6 h-6"></i>
           </div>
           <div class="overflow-hidden">
-            <span class="text-[11px] font-bold text-slate-400 block uppercase">${isMensal ? 'Plano Mensalista' : 'Data e Horário'}</span>
+            <span class="text-[11px] font-bold text-slate-400 block uppercase">${isMensal ? 'Horário Fixo Mensal' : 'Data e Horário'}</span>
             <p class="text-xs font-extrabold text-slate-800 leading-tight">
               ${isMensal ? `${weekLabels[state.monthlyDayOfWeek]} às ${state.startTime}` : `${formatDisplayDate(state.selectedDate)}, ${state.startTime} às ${state.endTime}`}
             </p>
@@ -1470,7 +1461,7 @@ function renderStep4(container) {
           <div>
             <h4 class="text-base font-black text-slate-900">${court.name}</h4>
             <p class="text-xs text-slate-500 mt-0.5">
-              ${isMensal ? '👑 Contrato Mensalista (Horário semanal com 4 jogos no mês)' : `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h)`}
+              ${isMensal ? '👑 Contrato de Horário Fixo (Horário semanal com 4 jogos no mês)' : `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h)`}
             </p>
           </div>
           <div class="text-right">
@@ -2677,7 +2668,7 @@ function renderAdminTabContent() {
           Grade Geral & Bloqueios
         </button>
         <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}">
-          Mensalistas (${state.monthlyMembers.length})
+          Horários Fixos (${state.monthlyMembers.length})
         </button>
         <button onclick="setAdminSubTab('products')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeSubTab === 'products' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}">
           Cardápio de Produtos
@@ -2877,8 +2868,8 @@ function renderAdminSubTabContent(tab) {
     return `
       <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-base font-black text-slate-800">Contratos Mensalistas Fixos</h3>
-          <button onclick="openMonthlyModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">+ Novo Mensalista</button>
+          <h3 class="text-base font-black text-slate-800">Contratos de Horários Fixos (Mensalistas)</h3>
+          <button onclick="openMonthlyModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">+ Novo Horário Fixo</button>
         </div>
         <div class="space-y-2">
           ${state.monthlyMembers.map(m => `
@@ -3802,7 +3793,7 @@ async function deleteProduct(id) {
 }
 
 async function deleteMonthlyMember(id) {
-  if (!confirm('Cancelar este plano mensalista?')) return;
+  if (!confirm('Cancelar este contrato de horário fixo?')) return;
   state.monthlyMembers = state.monthlyMembers.filter(m => m.id !== id);
   renderStepContent();
   requestSchedule();
@@ -4329,7 +4320,7 @@ function openCheckoutModal() {
         <div class="arena-header-bg p-5 text-white flex items-center justify-between">
           <div>
             <h3 class="text-lg font-black uppercase tracking-tight">
-              ${isMensal ? 'Confirmação do Plano Mensalista' : 'Identificação e Pagamento'}
+              ${isMensal ? 'Confirmação de Horário Fixo' : 'Identificação e Pagamento'}
             </h3>
             <p class="text-xs text-emerald-300 font-medium">Arena Limoeiro - Complexo Poliesportivo</p>
           </div>
@@ -4340,7 +4331,7 @@ function openCheckoutModal() {
 
         <div class="p-6 overflow-y-auto space-y-4">
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">${isMensal ? 'Nome do Time / Responsável *' : 'Nome Completo do Responsável *'}</label>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">${isMensal ? 'Nome do Time Fixo / Responsável *' : 'Nome Completo do Responsável *'}</label>
             <input type="text" id="custName" value="${state.customerName}" placeholder="Ex: Pelada dos Amigos (Lucas Gabriel)" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
           </div>
@@ -4632,7 +4623,7 @@ Bora pro jogo!`);
         </div>
 
         <span class="bg-emerald-50 text-emerald-800 text-xs font-black px-3 py-1 rounded-full border border-emerald-200">
-          ${booking.isMensalista ? '👑 Plano Mensalista Ativado com Sucesso!' : 'Reserva Confirmada com Sucesso!'}
+          ${booking.isMensalista ? '👑 Horário Fixo Ativado com Sucesso!' : 'Reserva Confirmada com Sucesso!'}
         </span>
 
         <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-3 mb-1">
@@ -4709,7 +4700,7 @@ function renderBottomBar() {
   } else if (state.currentStep === 3) {
     btnText = (state.startTime && state.endTime && canProceed) ? `Avançar: Resumo (${state.startTime} às ${state.endTime}) →` : 'Selecione um Horário Livre';
   } else if (state.currentStep === 4) {
-    btnText = state.bookingType === 'mensalista' ? 'Confirmar Mensalidade' : 'Confirmar Agendamento';
+    btnText = state.bookingType === 'mensalista' ? 'Confirmar Horário Fixo' : 'Confirmar Agendamento';
   }
 
   calculateDuration();

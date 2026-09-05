@@ -50,11 +50,6 @@ const initialCourts = [
     orderIndex: 1,
     description: "Campo de futebol society de alto padrão com dimensões oficiais, grama monofilamento macia e excelente drenagem.",
     observation: "Permitido apenas chuteiras society ou tênis (proibido travas de campo).",
-    sampleMensalistas: [
-      "Pelada dos Amigos (Terça 19h)",
-      "Galera da Firma (Quarta 20h)",
-      "Futebol & Resenha (Sexta 19h)"
-    ],
     specs: {
       type: "Grama Sintética 60mm Monofilamento (FIFA Quality)",
       capacity: "14 a 16 Jogadores (7x7 / 8x8)",
@@ -75,10 +70,6 @@ const initialCourts = [
     orderIndex: 2,
     description: "Espaço 100% coberto e protegido de chuvas e sol forte, com ventilação forçada e amortecimento reforçado.",
     observation: "Espaço perfeito para dias de chuva ou jogos nos horários de pico.",
-    sampleMensalistas: [
-      "Pelada Noturna (Segunda 20h)",
-      "Amigos do Society (Quinta 19h)"
-    ],
     specs: {
       type: "Grama Sintética Bicolor Coberta",
       capacity: "12 a 14 Jogadores (6x6 / 7x7)",
@@ -99,10 +90,6 @@ const initialCourts = [
     orderIndex: 3,
     description: "Quadra com areia fina e lavada que não esquenta o pé, nivelamento a laser e rede com regulagem de altura rápida.",
     observation: "Disponíveis duchas higiênicas logo na saída da quadra.",
-    sampleMensalistas: [
-      "Beach Club Limoeiro (Segunda e Quarta 18h)",
-      "Galera do Futevôlei (Sábado 08h)"
-    ],
     specs: {
       type: "Areia Especial Tratada e Filtrada (Não queima o pé)",
       capacity: "4 a 8 Jogadores",
@@ -123,9 +110,6 @@ const initialCourts = [
     orderIndex: 4,
     description: "Ideal para torneios e jogos entre amigos de Beach Tennis, Vôlei de Praia e Futevôlei.",
     observation: "Consulte o aluguel de raquetes na recepção se necessário.",
-    sampleMensalistas: [
-      "Turma do Vôlei de Areia (Domingo 09h)"
-    ],
     specs: {
       type: "Areia de Quartzo Branca Filtrada",
       capacity: "4 a 8 Jogadores",
@@ -146,10 +130,6 @@ const initialCourts = [
     orderIndex: 5,
     description: "Ginásio coberto de alta absorção com piso modular esportivo, tabelas hidráulicas móveis de basquete e traves de futsal.",
     observation: "Uso obrigatório de tênis com solado flat (não marcante).",
-    sampleMensalistas: [
-      "Galera do Futsal Noturno (Quinta 20h)",
-      "Basquete Limoeiro Team (Sábado 16h)"
-    ],
     specs: {
       type: "Piso Flutuante de Madeira Tratada / Poliuretano",
       capacity: "10 a 20 Jogadores",
@@ -170,9 +150,6 @@ const initialCourts = [
     orderIndex: 6,
     description: "Quadra panorâmica moderna com vidro temperado de 12mm e iluminação anti-reflexo.",
     observation: "Raquetes e bolinhas podem ser alugadas à parte.",
-    sampleMensalistas: [
-      "Dupla de Padel Master (Terça e Quinta 07h)"
-    ],
     specs: {
       type: "Vidro Temperado Panorâmico + Grama Fina",
       capacity: "4 Jogadores (Duplas)",
@@ -248,34 +225,7 @@ const initialProducts = [
   }
 ];
 
-const initialMonthlyMembers = [
-  {
-    id: "mensal-1",
-    teamName: "Pelada dos Amigos da Terça",
-    responsibleName: "Carlos Eduardo",
-    phone: "(81) 99876-1122",
-    courtId: "court-society-1",
-    dayOfWeek: "terca",
-    dayOfWeekLabel: "Toda Terça-feira",
-    time: "19:00",
-    monthlyPrice: 500.00,
-    status: "active",
-    startMonth: "Setembro/2026"
-  },
-  {
-    id: "mensal-2",
-    teamName: "Galera do Futsal Noturno",
-    responsibleName: "Matheus Silveira",
-    phone: "(81) 98844-5566",
-    courtId: "court-gym-1",
-    dayOfWeek: "quinta",
-    dayOfWeekLabel: "Toda Quinta-feira",
-    time: "20:00",
-    monthlyPrice: 460.00,
-    status: "active",
-    startMonth: "Setembro/2026"
-  }
-];
+const initialMonthlyMembers = [];
 
 const initialBookings = [];
 const allBookings = [];
