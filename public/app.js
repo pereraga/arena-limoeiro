@@ -36,12 +36,12 @@ let state = {
   selectedCourt: null,
   
   // DATA SELECIONADA PRIMEIRO - Otimizado para Mês 8 (Agosto) conforme solicitado
-  selectedDate: '2026-08-08', // Dia padrão no Mês 8
+  selectedDate: null, // Definido apenas ao escolher no calendário
   currentMonthDate: new Date(2026, 7, 1), // Mês 8 (Agosto)
   
   // DURAÇÃO E HORÁRIOS SELECIONADOS NA ETAPA 3
-  startTime: '19:00',
-  endTime: '20:00',
+  startTime: null,
+  endTime: null,
   selectedDuration: 60,
   
   productCart: {}, // Produtos guardados para o agendamento (não somam no valor online)
@@ -76,6 +76,71 @@ function minutesToTime(totalMinutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
+// ==============================================================================
+// 🏟️ NORMALIZADOR DE QUADRAS / ESPAÇOS (COMPATIBILIDADE SUPABASE & LOCAL)
+// ==============================================================================
+function normalizeCourt(c) {
+  if (!c) return null;
+  const price = parseFloat(c.basePricePerHour || c.base_price_per_hour || 140);
+  const monthly = parseFloat(c.monthlyPrice || c.monthly_price || (price * 3.6));
+  const catLabel = c.categoryLabel || c.category_label || (
+    c.category === 'society' ? 'Futebol Society' :
+    c.category === 'beach' ? 'Beach Tennis & Vôlei' :
+    c.category === 'futsal' ? 'Ginásio Poliesportivo' :
+    c.category === 'padel' ? 'Padel & Tênis' : 'Esporte'
+  );
+  const bookings = parseInt(c.bookingsCount || c.bookings_count || 0, 10);
+  const order = parseInt(c.orderIndex || c.order_index || 1, 10);
+  let specsObj = c.specs || {};
+  if (typeof specsObj === 'string') {
+    try { specsObj = JSON.parse(specsObj); } catch(e) { specsObj = {}; }
+  }
+  return {
+    ...c,
+    id: c.id,
+    name: c.name || 'Quadra Esportiva',
+    category: c.category || 'society',
+    categoryLabel: catLabel,
+    category_label: catLabel,
+    basePricePerHour: price,
+    base_price_per_hour: price,
+    monthlyPrice: monthly,
+    monthly_price: monthly,
+    bookingsCount: bookings,
+    bookings_count: bookings,
+    orderIndex: order,
+    order_index: order,
+    specs: specsObj,
+    image: c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
+  };
+}
+
+function getCourtHourlyPrice(court) {
+  if (!court) return 140;
+  return parseFloat(court.basePricePerHour || court.base_price_per_hour || 140);
+}
+
+function getCourtMonthlyPrice(court) {
+  if (!court) return 500;
+  return parseFloat(court.monthlyPrice || court.monthly_price || (getCourtHourlyPrice(court) * 3.6));
+}
+
+function canAdvanceFromStep(step) {
+  if (step === 1) {
+    return !!state.selectedCourt;
+  }
+  if (step === 2) {
+    return state.bookingType === 'mensalista' ? !!state.monthlyDayOfWeek : !!state.selectedDate;
+  }
+  if (step === 3) {
+    if (!state.selectedCourt || !state.selectedDate || !state.startTime || !state.endTime) return false;
+    const conflict = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
+    return !conflict.conflict;
+  }
+  return true;
+}
+
+
 function calculateDuration() {
   const startMin = timeToMinutes(state.startTime);
   let endMin = timeToMinutes(state.endTime);
@@ -102,7 +167,7 @@ function loadInitialData() {
     const d = window.ARENA_DEFAULT_DATA;
     state.arenaInfo = d.arenaInfo;
     state.categories = d.categories;
-    state.courts = d.initialCourts;
+    state.courts = (d.initialCourts || []).map(normalizeCourt);
     state.products = d.initialProducts;
     state.monthlyMembers = d.initialMonthlyMembers;
     state.adminUsers = d.initialAdmins;
@@ -114,9 +179,7 @@ function loadInitialData() {
     }
     state.bookings = cleanedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
-    if (!state.selectedCourt && state.courts.length > 0) {
-      state.selectedCourt = state.courts[0];
-    }
+    // Quadra deve ser selecionada explicitamente pelo usuário
   }
 }
 
@@ -399,6 +462,8 @@ function calculateLocalSchedule(courtId, date) {
   });
 }
 
+let isRenderingStep3 = false;
+
 function requestSchedule() {
   if (!state.selectedCourt || !state.selectedDate) return;
 
@@ -406,9 +471,9 @@ function requestSchedule() {
   state.slots = calculateLocalSchedule(state.selectedCourt.id, state.selectedDate);
 
   // Auto-seleciona primeiro horário livre se o atual estiver ocupado ou em manutenção
-  const currentSlot = state.slots.find(s => s.time === state.startTime);
+  const currentSlot = (state.slots || []).find(s => s.time === state.startTime);
   if (!currentSlot || currentSlot.status !== 'available') {
-    const firstAvailable = state.slots.find(s => s.status === 'available');
+    const firstAvailable = (state.slots || []).find(s => s.status === 'available');
     if (firstAvailable) {
       state.startTime = firstAvailable.time;
       const nextHourMin = timeToMinutes(firstAvailable.time) + 60;
@@ -417,7 +482,9 @@ function requestSchedule() {
     }
   }
 
-  if (state.currentStep === 3) renderStep3Content();
+  if (state.currentStep === 3 && !isRenderingStep3 && document.getElementById('step3Container')) {
+    renderStep3Content();
+  }
   if (state.currentMode === 'admin' && state.adminTab === 'schedule') renderAdminMatrix();
 }
 
@@ -856,7 +923,7 @@ function renderStep2(container) {
             </span>
             <h2 class="text-base sm:text-xl font-black mt-1 leading-tight">${court.name}</h2>
             <p class="text-xs text-emerald-300 font-bold mt-0.5">
-              R$ ${court.basePricePerHour.toFixed(2).replace('.', ',')} / hora
+              R$ ${getCourtHourlyPrice(court).toFixed(2).replace('.', ',')} / hora
             </p>
           </div>
         </div>
@@ -879,7 +946,7 @@ function renderStep2(container) {
           </div>
           <div class="bg-emerald-50 border border-emerald-200 text-emerald-900 px-3.5 py-2 rounded-2xl text-xs font-black self-start sm:self-auto flex items-center space-x-2 shadow-sm">
             <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
-            <span>Dia Escolhido: ${formatDisplayDate(state.selectedDate)}</span>
+            <span>Dia Escolhido: ${state.selectedDate ? formatDisplayDate(state.selectedDate) : 'Nenhum dia selecionado'}</span>
           </div>
         </div>
 
@@ -989,13 +1056,13 @@ function renderCalendarHTML() {
         </div>
         <div>
           <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido no Mês 8:</span>
-          <strong class="text-sm sm:text-base font-black text-emerald-950 block leading-tight">
-            ${formatFullDate(state.selectedDate)}
+          <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
+            ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
           </strong>
         </div>
       </div>
-      <button onclick="nextStep()" 
-              class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm shadow flex items-center justify-center space-x-1.5 transition-all">
+      <button onclick="nextStep()" ${!state.selectedDate ? 'disabled' : ''}
+              class="w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all ${!state.selectedDate ? 'bg-slate-300 text-slate-500 cursor-not-allowed pointer-events-none' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow'}">
         <span>Avançar para Horários</span>
         <i data-lucide="arrow-right" class="w-4 h-4"></i>
       </button>
@@ -1028,9 +1095,13 @@ function renderCalendarHTML() {
 
 function selectDate(dateStr) {
   state.selectedDate = dateStr;
+  state.startTime = null;
+  state.endTime = null;
+  requestSchedule();
   renderStepContent();
   renderBottomBar();
-  requestSchedule();
+  renderStepper();
+  if (window.lucide) lucide.createIcons();
 }
 
 // ETAPA 3: HORÁRIO (OCULTANDO HORÁRIOS OCUPADOS PARA NÃO SEREM SELECIONADOS 2X) & BAR
@@ -1048,12 +1119,22 @@ function renderStep3Content() {
     goToStep(1);
     return;
   }
+  if (!state.selectedDate && state.bookingType !== 'mensalista') {
+    goToStep(2);
+    return;
+  }
+
+  isRenderingStep3 = true;
+  try {
+    // Garante horários calculados
+    requestSchedule();
 
   calculateDuration();
-  const hoursFraction = state.selectedDuration / 60;
+  const basePrice = getCourtHourlyPrice(court);
+  const hoursFraction = (state.selectedDuration || 60) / 60;
   const courtFinalPrice = state.bookingType === 'mensalista' ? 
-    (court.monthlyPrice || court.basePricePerHour * 3.6) : 
-    (court.basePricePerHour * hoursFraction);
+    getCourtMonthlyPrice(court) : 
+    (basePrice * hoursFraction);
 
   const durationHours = Math.floor(state.selectedDuration / 60);
   const durationMins = state.selectedDuration % 60;
@@ -1094,7 +1175,7 @@ function renderStep3Content() {
             ${state.bookingType === 'mensalista' ? `Toda ${state.monthlyDayOfWeek}-feira` : formatFullDate(state.selectedDate)}
           </h2>
           <p class="text-xs text-emerald-300 font-bold mt-0.5">
-            ${court.name} • R$ ${court.basePricePerHour.toFixed(2).replace('.', ',')} / hora
+            ${court.name} • R$ ${basePrice.toFixed(2).replace('.', ',')} / hora
           </p>
         </div>
         <button onclick="goToStep(2)" class="text-xs text-emerald-300 hover:text-white underline font-bold flex items-center">
@@ -1186,7 +1267,7 @@ function renderStep3Content() {
                 ⏱️ Tempo Total: <span class="text-emerald-800">${formattedDuration}</span>
               </p>
               <p class="text-xs text-slate-600 mt-0.5">
-                Cálculo: ${hoursFraction}h x R$ ${court.basePricePerHour.toFixed(2)}/h
+                Cálculo: ${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h
               </p>
             </div>
 
@@ -1258,6 +1339,9 @@ function renderStep3Content() {
   `;
 
   lucide.createIcons();
+  } finally {
+    isRenderingStep3 = false;
+  }
 }
 
 function handleTimeChange(val, type) {
@@ -1316,7 +1400,8 @@ function renderStep4(container) {
   const hoursFraction = state.selectedDuration / 60;
   
   // VALOR TOTAL ONLINE: APENAS O VALOR DAS HORAS DE JOGO DA QUADRA!
-  const courtPrice = isMensal ? (court.monthlyPrice || court.basePricePerHour * 3.6) : (court.basePricePerHour * hoursFraction);
+  const basePrice = getCourtHourlyPrice(court);
+  const courtPrice = isMensal ? getCourtMonthlyPrice(court) : (basePrice * hoursFraction);
 
   const savedBarItems = Object.entries(state.productCart || {}).map(([prodId, qty]) => {
     if (prodId.startsWith('_') || typeof qty !== 'number' || qty <= 0) return null;
@@ -1399,7 +1484,7 @@ function renderStep4(container) {
           <div>
             <h4 class="text-base font-black text-slate-900">${court.name}</h4>
             <p class="text-xs text-slate-500 mt-0.5">
-              ${isMensal ? '👑 Contrato Mensalista (Horário semanal com 4 jogos no mês)' : `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${court.basePricePerHour.toFixed(2)}/h)`}
+              ${isMensal ? '👑 Contrato Mensalista (Horário semanal com 4 jogos no mês)' : `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h)`}
             </p>
           </div>
           <div class="text-right">
@@ -4081,14 +4166,14 @@ function openCourtModal(courtIdToEdit = null) {
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Hora Avulsa (R$) *</label>
               <input type="number" step="0.50" id="courtPrice" required 
-                     value="${court ? court.basePricePerHour : '140.00'}" 
+                     value="${court ? getCourtHourlyPrice(court).toFixed(2) : '140.00'}" 
                      class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Mensalista (R$/mês)</label>
               <input type="number" step="1.00" id="courtMonthlyPrice" 
-                     value="${court ? (court.monthlyPrice || court.basePricePerHour * 3.6) : '500.00'}" 
+                     value="${court ? getCourtMonthlyPrice(court).toFixed(2) : '500.00'}" 
                      class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
           </div>
@@ -4239,7 +4324,8 @@ function openCheckoutModal() {
   const isMensal = state.bookingType === 'mensalista';
   const hoursFraction = state.selectedDuration / 60;
   
-  const courtPrice = isMensal ? (court.monthlyPrice || court.basePricePerHour * 3.6) : (court.basePricePerHour * hoursFraction);
+  const basePrice = getCourtHourlyPrice(court);
+  const courtPrice = isMensal ? getCourtMonthlyPrice(court) : (basePrice * hoursFraction);
 
   let discountAmount = 0;
   if (state.appliedCoupon) {
@@ -4604,6 +4690,10 @@ Bora pro jogo!`);
 function resetFlow() {
   closeModal();
   state.currentStep = 1;
+  state.selectedCourt = null;
+  state.selectedDate = null;
+  state.startTime = null;
+  state.endTime = null;
   state.productCart = {};
   state.appliedCoupon = null;
   state.couponCode = '';
@@ -4611,7 +4701,7 @@ function resetFlow() {
   renderApp();
 }
 
-// BARRA INFERIOR
+// BARRA INFERIOR COM TRAVA DE ETAPA
 function renderBottomBar() {
   const bar = document.getElementById('bottomBar');
   if (!bar) return;
@@ -4623,21 +4713,24 @@ function renderBottomBar() {
   bar.classList.remove('hidden');
 
   const court = state.selectedCourt;
-  let canProceed = false;
+  const canProceed = canAdvanceFromStep(state.currentStep);
 
-  if (state.currentStep === 1 && state.selectedCourt) canProceed = true;
-  if (state.currentStep === 2 && state.selectedDate) canProceed = true;
-  if (state.currentStep === 3 && state.startTime && state.endTime) canProceed = true;
-  if (state.currentStep === 4) canProceed = true;
-
-  const btnText = state.currentStep === 4 ? 
-    (state.bookingType === 'mensalista' ? 'Confirmar Mensalidade' : 'Confirmar Agendamento') : 
-    (state.currentStep === 2 && state.selectedDate ? `Próxima etapa: Horários (${formatDisplayDate(state.selectedDate)})` : 'Próxima etapa');
+  let btnText = 'Próxima etapa';
+  if (state.currentStep === 1) {
+    btnText = court ? `Avançar: Data do Jogo (${court.name.split(' - ')[0]}) →` : 'Selecione um Espaço para Continuar';
+  } else if (state.currentStep === 2) {
+    btnText = state.selectedDate ? `Avançar: Horários (${formatDisplayDate(state.selectedDate)}) →` : 'Escolha um Dia no Calendário';
+  } else if (state.currentStep === 3) {
+    btnText = (state.startTime && state.endTime && canProceed) ? `Avançar: Resumo (${state.startTime} às ${state.endTime}) →` : 'Selecione um Horário Livre';
+  } else if (state.currentStep === 4) {
+    btnText = state.bookingType === 'mensalista' ? 'Confirmar Mensalidade' : 'Confirmar Agendamento';
+  }
 
   calculateDuration();
   const isMensal = state.bookingType === 'mensalista';
-  const hoursFraction = state.selectedDuration / 60;
-  const courtPrice = court ? (isMensal ? (court.monthlyPrice || court.basePricePerHour * 3.6) : (court.basePricePerHour * hoursFraction)) : 0;
+  const hoursFraction = (state.selectedDuration || 60) / 60;
+  const basePrice = getCourtHourlyPrice(court);
+  const courtPrice = court ? (isMensal ? getCourtMonthlyPrice(court) : (basePrice * hoursFraction)) : 0;
 
   bar.innerHTML = `
     <div class="max-w-5xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
@@ -4660,13 +4753,14 @@ function renderBottomBar() {
         ` : ''}
 
         <button onclick="nextStep()" ${!canProceed ? 'disabled' : ''} 
-                class="btn-next-step px-5 sm:px-8 py-2.5 sm:py-3.5 text-white rounded-xl font-extrabold text-xs sm:text-base flex items-center space-x-1.5 sm:space-x-2 shadow-md touch-manipulation">
+                class="btn-next-step px-5 sm:px-8 py-2.5 sm:py-3.5 text-white rounded-xl font-extrabold text-xs sm:text-base flex items-center space-x-1.5 sm:space-x-2 shadow-md touch-manipulation transition-all ${!canProceed ? 'opacity-50 cursor-not-allowed pointer-events-none bg-slate-400' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'}">
           <span>${btnText}</span>
           <i data-lucide="chevron-right" class="w-4 h-4"></i>
         </button>
       </div>
     </div>
   `;
+  if (window.lucide) lucide.createIcons();
 }
 
 // Navegações e Ações
@@ -4684,9 +4778,10 @@ function handleSearch(query) {
 
 function selectCourt(courtId) {
   state.productCart = {};
-  const court = state.courts.find(c => c.id === courtId);
-  if (!court) return;
-  const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
+  const rawCourt = state.courts.find(c => c.id === courtId);
+  if (!rawCourt) return;
+  const court = normalizeCourt(rawCourt);
+  const specs = court.specs || {};
   const isMaint = court.isMaintenance === true || court.status === 'maintenance' || specs.status === 'maintenance';
   if (isMaint) {
     const reason = specs.maintenance_reason || court.maintenance_reason || 'Manutenção preventiva';
@@ -4694,10 +4789,18 @@ function selectCourt(courtId) {
     return;
   }
   state.selectedCourt = court;
-  requestSchedule(); // Re-calcula horários com isolamento estrito para este campo
+  // Reseta seleção de data e horários anteriores para esta nova quadra
+  state.selectedDate = null;
+  state.startTime = null;
+  state.endTime = null;
+  
   renderStepContent();
   renderBottomBar();
-  lucide.createIcons();
+  renderStepper();
+  if (window.lucide) lucide.createIcons();
+
+  // Avança imediatamente para a Etapa 2 (Data do Jogo) com a quadra bloqueada
+  goToStep(2);
 }
 
 function applyCoupon() {
@@ -4721,6 +4824,23 @@ function applyCoupon() {
 }
 
 function goToStep(step) {
+  // Impede avançar para etapas futuras se as anteriores não estiverem concluídas
+  if (step > 1 && !state.selectedCourt) {
+    state.currentStep = 1;
+    renderApp();
+    return;
+  }
+  if (step > 2 && !state.selectedDate && state.bookingType !== 'mensalista') {
+    state.currentStep = 2;
+    renderApp();
+    return;
+  }
+  if (step > 3 && (!state.startTime || !state.endTime || !canAdvanceFromStep(3))) {
+    state.currentStep = 3;
+    renderApp();
+    return;
+  }
+
   state.currentStep = step;
   if (step === 3 && state.selectedCourt && state.selectedDate) {
     requestSchedule();
@@ -4730,6 +4850,12 @@ function goToStep(step) {
 }
 
 function nextStep() {
+  if (!canAdvanceFromStep(state.currentStep)) {
+    if (state.currentStep === 1) alert('Por favor, selecione um espaço esportivo para continuar.');
+    else if (state.currentStep === 2) alert('Por favor, selecione uma data no calendário para continuar.');
+    else if (state.currentStep === 3) alert('Por favor, selecione um horário livre para sua partida.');
+    return;
+  }
   if (state.currentStep < 4) {
     goToStep(state.currentStep + 1);
   } else {
@@ -4824,8 +4950,11 @@ async function syncDataFromSupabase() {
   try {
     const { data: dbCourts } = await client.from('courts').select('*').order('order_index', { ascending: true });
     if (dbCourts && dbCourts.length > 0) {
-      state.courts = dbCourts;
-      if (!state.selectedCourt) state.selectedCourt = state.courts[0];
+      state.courts = dbCourts.map(normalizeCourt);
+      if (state.selectedCourt) {
+        const matching = state.courts.find(c => c.id === state.selectedCourt.id);
+        if (matching) state.selectedCourt = matching;
+      }
     }
 
     const { data: dbProducts } = await client.from('products').select('*');
