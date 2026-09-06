@@ -359,9 +359,12 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
 
 function calculateLocalSchedule(courtId, date) {
   const operatingHours = [
-    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
-    "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+    "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+    "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
   ];
 
   const currentCourt = (state.courts || []).find(c => c.id === courtId);
@@ -1155,9 +1158,12 @@ function renderStep3Content() {
 
   // Se não houver horários carregados ainda, gera lista padrão filtrando ocupados
   const fallbackHours = [
-    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
-    "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+    "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+    "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
   ];
 
   const validStartHours = availableHourStrings.length > 0 ? 
@@ -1233,7 +1239,7 @@ function renderStep3Content() {
 
             return (state.slots || []).map(slot => {
               const slotMin = timeToMinutes(slot.time);
-              const slotEndMin = slotMin + 60;
+              const slotEndMin = slotMin + 30;
               const isSelected = slotMin >= selectedStartMin && slotMin < selectedEndMin;
               const isAvail = slot.status === 'available';
               const isMaint = slot.status === 'maintenance';
@@ -1313,15 +1319,15 @@ function renderStep3Content() {
                     class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
               ${(() => {
                 const options = [];
-                for (const durHours of [1, 1.5, 2, 3]) {
+                for (const durHours of [0.5, 1, 1.5, 2, 3]) {
                   const endMin = timeToMinutes(state.startTime) + (durHours * 60);
-                  if (endMin > timeToMinutes("23:00")) continue;
+                  if (endMin > timeToMinutes("23:30")) continue;
                   const endStr = minutesToTime(endMin);
                   const conflictCheck = checkScheduleConflict(court.id, state.selectedDate, state.startTime, endStr);
                   if (conflictCheck.conflict) continue;
                   options.push(`
                     <option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>
-                      ${endStr} (${durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
+                      ${endStr} (${durHours === 0.5 ? '30 min de jogo' : durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
                     </option>
                   `);
                 }
@@ -3939,7 +3945,7 @@ function openDirectBookingModal() {
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Horário de Início *</label>
               <select id="directTimeSelect" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
-                ${["06:00","07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00","23:00"].map(t => `<option value="${t}" ${t === '19:00' ? 'selected' : ''}>${t}</option>`).join('')}
+                ${["06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30"].map(t => `<option value="${t}" ${t === '19:00' ? 'selected' : ''}>${t}</option>`).join('')}
               </select>
             </div>
 
@@ -4181,9 +4187,12 @@ function renderAdminMatrix() {
   if (!container) return;
 
   const operatingHours = [
-    "06:00", "07:00", "08:00", "09:00", "10:00", "11:00",
-    "12:00", "13:00", "14:00", "15:00", "16:00", "17:00",
-    "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"
+        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+    "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+    "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
   ];
 
   let html = `
