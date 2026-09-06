@@ -1190,81 +1190,152 @@ function renderStep3Content() {
         </button>
       </div>
 
-      <!-- SELEÇÃO DE HORÁRIOS LIVRES (OCULTA OCUPADOS PARA NÃO SER SELECIONADO 2X) -->
+      <!-- GRADE DE HORÁRIOS: MOSTRA TODOS (LIVRES + OCUPADOS/EM JOGO) -->
       <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm mb-8">
-        <div class="flex items-center space-x-3 mb-4">
+        <div class="flex items-center space-x-3 mb-2">
           <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
             <i data-lucide="clock" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-base font-black text-slate-900">Horários Disponíveis (Início e Término)</h3>
-            <p class="text-xs text-slate-500">Horários já agendados foram ocultados automaticamente para evitar duplicidade</p>
+            <h3 class="text-base font-black text-slate-900">Horários do Campo — ${court.name}</h3>
+            <p class="text-xs text-slate-500">Toque em um horário <span class="text-emerald-700 font-bold">verde</span> para reservar. Horários em uso ou reservados aparecem bloqueados.</p>
           </div>
         </div>
 
-        ${validStartHours.length === 0 ? `
-          <div class="p-6 bg-rose-50 rounded-2xl border border-rose-200 text-center my-4">
-            <i data-lucide="alert-circle" class="w-8 h-8 text-rose-600 mx-auto mb-2"></i>
-            <h4 class="text-sm font-black text-rose-900">Nenhum horário livre nesta data</h4>
-            <p class="text-xs text-rose-700 mt-1">Todos os horários deste campo já foram agendados para este dia. Por favor, volte e escolha outra data.</p>
-            <button onclick="goToStep(2)" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow">
-              Escolher Outra Data
-            </button>
+        <!-- Legenda -->
+        <div class="flex flex-wrap gap-2 mb-5 mt-3">
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Livre
+          </span>
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-600/10 border border-emerald-500 px-2.5 py-1 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span> Selecionado
+          </span>
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse inline-block"></span> Em Jogo Agora
+          </span>
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Reservado
+          </span>
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Manutenção
+          </span>
+        </div>
+
+        <!-- Grade de horários -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mb-6">
+          ${(() => {
+            const now = new Date();
+            const todayStr = getFormattedDate(now);
+            const nowMin = now.getHours() * 60 + now.getMinutes();
+            const isToday = state.selectedDate === todayStr;
+            const selectedStartMin = timeToMinutes(state.startTime);
+            const selectedEndMin = timeToMinutes(state.endTime);
+
+            return (state.slots || []).map(slot => {
+              const slotMin = timeToMinutes(slot.time);
+              const slotEndMin = slotMin + 60;
+              const isSelected = slotMin >= selectedStartMin && slotMin < selectedEndMin;
+              const isAvail = slot.status === 'available';
+              const isMaint = slot.status === 'maintenance';
+              const isBooked = slot.status === 'booked';
+
+              // Verifica se está rolando agora
+              const isLiveNow = isToday && isBooked && slotMin <= nowMin && slotEndMin > nowMin;
+
+              let cardClass = '';
+              let badge = '';
+              let icon = '';
+              let nameLabel = '';
+              let clickable = '';
+
+              if (isAvail) {
+                if (isSelected) {
+                  cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer';
+                  badge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Selecionado</span>';
+                  icon = '🟢';
+                } else {
+                  cardClass = 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all';
+                  badge = '<span class="text-[10px] font-bold text-emerald-700">Livre ✓</span>';
+                  icon = '🟢';
+                }
+                clickable = `onclick="handleTimeChange('${slot.time}', 'start')"`;
+              } else if (isLiveNow) {
+                cardClass = 'bg-rose-600 border-2 border-rose-700 text-white cursor-not-allowed shadow-md';
+                badge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full animate-pulse">🔴 EM JOGO AGORA</span>';
+                icon = '⚽';
+                nameLabel = slot.customerName ? `<span class="text-[10px] opacity-80 truncate block mt-0.5">${slot.customerName}</span>` : '';
+              } else if (isBooked) {
+                cardClass = 'bg-slate-100 border-2 border-slate-300 text-slate-500 cursor-not-allowed';
+                badge = '<span class="text-[10px] font-bold text-slate-500">Reservado</span>';
+                icon = slot.isMensalista ? '👑' : '🔒';
+                nameLabel = slot.customerName ? `<span class="text-[10px] text-slate-400 truncate block mt-0.5">${slot.isMensalista ? 'Fixo: ' : ''}${slot.customerName}</span>` : '';
+              } else if (isMaint) {
+                cardClass = 'bg-amber-50 border-2 border-amber-300 text-amber-800 cursor-not-allowed';
+                badge = '<span class="text-[10px] font-bold text-amber-700">Manutenção</span>';
+                icon = '🔧';
+                nameLabel = slot.statusLabel ? `<span class="text-[10px] text-amber-600 truncate block mt-0.5">${slot.statusLabel}</span>` : '';
+              }
+
+              return `
+                <div class="p-3 rounded-2xl ${cardClass} select-none" ${clickable}>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-base font-black">${slot.time}</span>
+                    <span class="text-base">${icon}</span>
+                  </div>
+                  ${badge}
+                  ${nameLabel}
+                </div>
+              `;
+            }).join('');
+          })()}
+        </div>
+
+        ${(() => {
+          const availCount = (state.slots || []).filter(s => s.status === 'available').length;
+          if (availCount === 0) return `
+            <div class="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-center">
+              <i data-lucide="alert-circle" class="w-6 h-6 text-rose-600 mx-auto mb-1"></i>
+              <h4 class="text-sm font-black text-rose-900">Nenhum horário livre nesta data</h4>
+              <p class="text-xs text-rose-700 mt-1">Todos os horários deste campo já foram reservados.</p>
+              <button onclick="goToStep(2)" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow">Escolher Outra Data</button>
+            </div>`;
+          return '';
+        })()}
+
+        ${validStartHours.length > 0 ? `
+          <!-- Hora de Término (após selecionar início na grade acima) -->
+          <div class="mt-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
+              <i data-lucide="stop-circle" class="w-3.5 h-3.5 text-rose-600 mr-1.5"></i>
+              Hora de Término — Início selecionado: <span class="text-emerald-700 ml-1">${state.startTime}</span>
+            </label>
+            <select id="endTimeSelect" onchange="handleTimeChange(this.value, 'end')"
+                    class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
+              ${(() => {
+                const options = [];
+                for (const durHours of [1, 1.5, 2, 3]) {
+                  const endMin = timeToMinutes(state.startTime) + (durHours * 60);
+                  if (endMin > timeToMinutes("23:00")) continue;
+                  const endStr = minutesToTime(endMin);
+                  const conflictCheck = checkScheduleConflict(court.id, state.selectedDate, state.startTime, endStr);
+                  if (conflictCheck.conflict) continue;
+                  options.push(`
+                    <option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>
+                      ${endStr} (${durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
+                    </option>
+                  `);
+                }
+                if (options.length === 0) {
+                  const endStr = minutesToTime(timeToMinutes(state.startTime) + 60);
+                  options.push(`<option value="${endStr}">${endStr} (1 hora de jogo)</option>`);
+                }
+                return options.join('');
+              })()}
+            </select>
           </div>
-        ` : `
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-            <!-- Hora de Início (Apenas horários livres) -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
-                <i data-lucide="play-circle" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
-                Hora de Início (Horários Livres):
-              </label>
-              <select id="startTimeSelect" onchange="handleTimeChange(this.value, 'start')" 
-                      class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
-                ${validStartHours.map(h => `
-                  <option value="${h}" ${state.startTime === h ? 'selected' : ''}>${h} (Livre ✓)</option>
-                `).join('')}
-              </select>
-            </div>
 
-            <!-- Hora de Término -->
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
-                <i data-lucide="stop-circle" class="w-3.5 h-3.5 text-rose-600 mr-1.5"></i>
-                Hora de Término (Fim do Jogo):
-              </label>
-              <select id="endTimeSelect" onchange="handleTimeChange(this.value, 'end')" 
-                      class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
-                ${(() => {
-                  const options = [];
-                  for (const durHours of [1, 1.5, 2, 3]) {
-                    const endMin = timeToMinutes(state.startTime) + (durHours * 60);
-                    if (endMin > timeToMinutes("23:00")) continue;
-                    const endStr = minutesToTime(endMin);
-                    
-                    // ANTI-CHOQUE: Só exibe opções de término sem conflito de horário
-                    const conflictCheck = checkScheduleConflict(court.id, state.selectedDate, state.startTime, endStr);
-                    if (conflictCheck.conflict) continue;
-
-                    options.push(`
-                      <option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>
-                        ${endStr} (${durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
-                      </option>
-                    `);
-                  }
-                  if (options.length === 0) {
-                    const endMin = timeToMinutes(state.startTime) + 60;
-                    const endStr = minutesToTime(endMin);
-                    options.push(`<option value="${endStr}">${endStr} (1 hora de jogo)</option>`);
-                  }
-                  return options.join('');
-                })()}
-              </select>
-            </div>
-          </div>
-
-          <!-- Quadro de Cálculo de Tempo e Valor Final -->
-          <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <!-- Resumo do horário selecionado -->
+          <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
             <div>
               <div class="flex items-center space-x-2">
                 <span class="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase">Tempo Reservado</span>
@@ -1277,7 +1348,6 @@ function renderStep3Content() {
                 Cálculo: ${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h
               </p>
             </div>
-
             <div class="text-right bg-white px-5 py-3 rounded-xl border border-emerald-300 shadow-sm w-full sm:w-auto">
               <span class="text-[11px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
               <p class="text-xl sm:text-2xl font-black text-emerald-800">
@@ -1285,7 +1355,7 @@ function renderStep3Content() {
               </p>
             </div>
           </div>
-        `}
+        ` : ''}
       </div>
 
       <!-- BEBIDAS & LANCHES (GUARDAR PARA O AGENDAMENTO SEM SOMAR NO VALOR ONLINE) -->
