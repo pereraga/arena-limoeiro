@@ -5384,25 +5384,64 @@ async function syncDataFromSupabase() {
     renderApp();
     requestSchedule();
 
-    // Ativa sincronização Realtime instantânea para reservas e mensalistas
+    // ✅ Realtime Supabase – Atualização automática sem recarregar a página
     if (!window.supabaseRealtimeActive) {
       window.supabaseRealtimeActive = true;
+
+      // Helper: re-renderiza o painel do gestor preservando o scroll
+      function _realtimeRefreshUI() {
+        requestSchedule();
+        if (state.currentMode === 'admin') {
+          const scrollY = window.scrollY;
+          renderStepContent();
+          window.scrollTo(0, scrollY);
+          if (window.lucide) lucide.createIcons();
+        }
+      }
+
       client.channel('realtime_arena')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, async () => {
-          const { data } = await client.from('bookings').select('*');
-          if (data) {
-            state.bookings = data;
-            requestSchedule();
+        // ──── Agendamentos ────
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, async (payload) => {
+          // Otimistic: adiciona imediatamente ao estado local antes do fetch completo
+          if (payload.new && !state.bookings.find(b => b.id === payload.new.id)) {
+            state.bookings = [...state.bookings, payload.new];
+            _realtimeRefreshUI();
           }
+          // Busca completa para garantir consistência
+          const { data } = await client.from('bookings').select('*');
+          if (data) { state.bookings = data; _realtimeRefreshUI(); }
         })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, async (payload) => {
+          if (payload.new) {
+            state.bookings = state.bookings.map(b => b.id === payload.new.id ? payload.new : b);
+            _realtimeRefreshUI();
+          }
+          const { data } = await client.from('bookings').select('*');
+          if (data) { state.bookings = data; _realtimeRefreshUI(); }
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings' }, async (payload) => {
+          if (payload.old) {
+            state.bookings = state.bookings.filter(b => b.id !== payload.old.id);
+            _realtimeRefreshUI();
+          }
+          const { data } = await client.from('bookings').select('*');
+          if (data) { state.bookings = data; _realtimeRefreshUI(); }
+        })
+        // ──── Mensalistas / Planos Fixos ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_members' }, async () => {
           const { data } = await client.from('monthly_members').select('*');
-          if (data) {
-            state.monthlyMembers = data;
-            requestSchedule();
-          }
+          if (data) { state.monthlyMembers = data; _realtimeRefreshUI(); }
         })
-        .subscribe();
+        // ──── Quadras (caso o gestor altere uma quadra em outra aba) ────
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'courts' }, async () => {
+          const { data } = await client.from('courts').select('*').order('order_index', { ascending: true });
+          if (data) { state.courts = data.map(normalizeCourt); _realtimeRefreshUI(); }
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Arena Limoeiro – Realtime ativo. Agendamentos atualizados automaticamente.');
+          }
+        });
     }
   } catch (err) {
     console.warn('Erro na sincronização Supabase:', err);
