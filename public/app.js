@@ -1139,7 +1139,37 @@ function renderStep3Content() {
     // Garante horários calculados
     requestSchedule();
 
-  calculateDuration();
+    // Calcula opções válidas de término para o startTime atual (passos de 30min consecutivos livres)
+    const startMin = timeToMinutes(state.startTime);
+    const validEndTimes = [];
+    for (let endMin = startMin + 30; endMin <= 23*60+30; endMin += 30) {
+      const endStr = minutesToTime(endMin);
+      const durMin = endMin - startMin;
+      const slotStartStr = minutesToTime(endMin - 30);
+      const slotBusy = (state.slots || []).find(s => s.time === slotStartStr && s.status !== 'available');
+      if (slotBusy && endMin - 30 > startMin) break;
+      const durH = Math.floor(durMin / 60);
+      const durM = durMin % 60;
+      const durLabel = durH === 0
+        ? `${durMin} min de jogo`
+        : durM === 0
+          ? `${durH}h de jogo`
+          : `${durH}h ${durM}min de jogo`;
+      validEndTimes.push({ value: endStr, label: `${endStr} — ${durLabel}` });
+    }
+    if (validEndTimes.length === 0) {
+      const endStr = minutesToTime(startMin + 30);
+      validEndTimes.push({ value: endStr, label: `${endStr} — 30 min de jogo` });
+    }
+
+    // Valida se state.endTime está na lista de opções válidas
+    const validValues = validEndTimes.map(o => o.value);
+    if (!validValues.includes(state.endTime)) {
+      const pref1h = minutesToTime(startMin + 60);
+      state.endTime = validValues.includes(pref1h) ? pref1h : validValues[0];
+    }
+
+    calculateDuration();
   const basePrice = getCourtHourlyPrice(court);
   const hoursFraction = (state.selectedDuration || 60) / 60;
   const courtFinalPrice = state.bookingType === 'mensalista' ? 
@@ -1240,7 +1270,7 @@ function renderStep3Content() {
             return (state.slots || []).map(slot => {
               const slotMin = timeToMinutes(slot.time);
               const slotEndMin = slotMin + 30;
-              const isSelected = slotMin >= selectedStartMin && slotMin < selectedEndMin;
+              const isSelected = slotMin === selectedStartMin; // apenas o slot de início
               const isAvail = slot.status === 'available';
               const isMaint = slot.status === 'maintenance';
               const isBooked = slot.status === 'booked';
@@ -1316,30 +1346,9 @@ function renderStep3Content() {
             </label>
             <select id="endTimeSelect" onchange="handleTimeChange(this.value, 'end')"
                     class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
-              ${(() => {
-                const options = [];
-                const startMin = timeToMinutes(state.startTime);
-                // Gera todos os slots de 30 em 30 após o início até 23:30
-                for (let endMin = startMin + 30; endMin <= timeToMinutes('23:30'); endMin += 30) {
-                  const endStr = minutesToTime(endMin);
-                  const durMin = endMin - startMin;
-                  const conflictCheck = checkScheduleConflict(court.id, state.selectedDate, state.startTime, endStr);
-                  if (conflictCheck.conflict) break; // para no primeiro conflito (não pode pular)
-                  const durH = Math.floor(durMin / 60);
-                  const durM = durMin % 60;
-                  const durLabel = durH === 0
-                    ? `${durMin} min de jogo`
-                    : durM === 0
-                      ? `${durH}h de jogo`
-                      : `${durH}h ${durM}min de jogo`;
-                  options.push(`<option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>${endStr} — ${durLabel}</option>`);
-                }
-                if (options.length === 0) {
-                  const endStr = minutesToTime(startMin + 60);
-                  options.push(`<option value="${endStr}">${endStr} — 1h de jogo</option>`);
-                }
-                return options.join('');
-              })()}
+              ${validEndTimes.map(opt => `
+                <option value="${opt.value}" ${state.endTime === opt.value ? 'selected' : ''}>${opt.label}</option>
+              `).join('')}
             </select>
           </div>
 
