@@ -1308,32 +1308,35 @@ function renderStep3Content() {
           return '';
         })()}
 
-        ${validStartHours.length > 0 ? `
-          <!-- Hora de Término (após selecionar início na grade acima) -->
+          <!-- Hora de Término — todos os slots de 30min disponíveis após o início -->
           <div class="mt-2">
             <label class="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
               <i data-lucide="stop-circle" class="w-3.5 h-3.5 text-rose-600 mr-1.5"></i>
-              Hora de Término — Início selecionado: <span class="text-emerald-700 ml-1">${state.startTime}</span>
+              Hora de Término — Início: <span class="text-emerald-700 ml-1">${state.startTime}</span>
             </label>
             <select id="endTimeSelect" onchange="handleTimeChange(this.value, 'end')"
                     class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
               ${(() => {
                 const options = [];
-                for (const durHours of [0.5, 1, 1.5, 2, 3]) {
-                  const endMin = timeToMinutes(state.startTime) + (durHours * 60);
-                  if (endMin > timeToMinutes("23:30")) continue;
+                const startMin = timeToMinutes(state.startTime);
+                // Gera todos os slots de 30 em 30 após o início até 23:30
+                for (let endMin = startMin + 30; endMin <= timeToMinutes('23:30'); endMin += 30) {
                   const endStr = minutesToTime(endMin);
+                  const durMin = endMin - startMin;
                   const conflictCheck = checkScheduleConflict(court.id, state.selectedDate, state.startTime, endStr);
-                  if (conflictCheck.conflict) continue;
-                  options.push(`
-                    <option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>
-                      ${endStr} (${durHours === 0.5 ? '30 min de jogo' : durHours === 1 ? '1 hora de jogo' : durHours === 1.5 ? '1h 30min' : durHours + ' horas'})
-                    </option>
-                  `);
+                  if (conflictCheck.conflict) break; // para no primeiro conflito (não pode pular)
+                  const durH = Math.floor(durMin / 60);
+                  const durM = durMin % 60;
+                  const durLabel = durH === 0
+                    ? `${durMin} min de jogo`
+                    : durM === 0
+                      ? `${durH}h de jogo`
+                      : `${durH}h ${durM}min de jogo`;
+                  options.push(`<option value="${endStr}" ${state.endTime === endStr ? 'selected' : ''}>${endStr} — ${durLabel}</option>`);
                 }
                 if (options.length === 0) {
-                  const endStr = minutesToTime(timeToMinutes(state.startTime) + 60);
-                  options.push(`<option value="${endStr}">${endStr} (1 hora de jogo)</option>`);
+                  const endStr = minutesToTime(startMin + 60);
+                  options.push(`<option value="${endStr}">${endStr} — 1h de jogo</option>`);
                 }
                 return options.join('');
               })()}
@@ -1360,9 +1363,8 @@ function renderStep3Content() {
                 R$ ${courtFinalPrice.toFixed(2).replace('.', ',')}
               </p>
             </div>
-          </div>
-        ` : ''}
       </div>
+
 
       <!-- BEBIDAS & LANCHES (GUARDAR PARA O AGENDAMENTO SEM SOMAR NO VALOR ONLINE) -->
       <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm">
@@ -1964,6 +1966,52 @@ function markNextCustomerNotified(matchId) {
   }
 }
 
+// ▶ INICIAR JOGO AGORA (antes do horário agendado)
+// Salva o horário real de início em matchDelays[id].earlyStartAt
+function startMatchNow(matchId) {
+  if (!state.matchDelays) state.matchDelays = {};
+  const now = new Date();
+  const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  if (!state.matchDelays[matchId]) state.matchDelays[matchId] = { minutes: 0 };
+  state.matchDelays[matchId].earlyStartAt = nowStr;
+  state.matchDelays[matchId].earlyStartTs = now.toISOString();
+  localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
+
+  // Atualiza status no Supabase
+  const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
+  if (client) {
+    client.from('bookings').update({ status: 'in_progress', start_time: nowStr }).eq('id', matchId).then(() => {});
+  }
+  // Atualiza estado local
+  const booking = state.bookings.find(b => b.id === matchId);
+  if (booking) { booking.status = 'in_progress'; booking.start_time = nowStr; }
+
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+}
+
+// ⏹ FINALIZAR JOGO MANUALMENTE (a qualquer momento após iniciar)
+function finishMatchManual(matchId) {
+  const now = new Date();
+  const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
+  if (client) {
+    client.from('bookings').update({ status: 'finished', end_time: nowStr }).eq('id', matchId).then(() => {});
+  }
+  const booking = state.bookings.find(b => b.id === matchId);
+  if (booking) { booking.status = 'finished'; booking.end_time = nowStr; }
+
+  // Remove entrada de atraso ao finalizar manualmente
+  if (state.matchDelays && state.matchDelays[matchId]) {
+    delete state.matchDelays[matchId];
+    localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
+  }
+
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+}
+
 function scrollHorizontalCalendar(direction) {
   const el = document.getElementById('horizontalDaysContainer');
   if (el) {
@@ -2219,16 +2267,21 @@ function renderLiveDashboardTab() {
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   matchesList.forEach(m => {
-    const sMin = timeToMinutes(m.start_time);
-    const eMin = timeToMinutes(m.end_time);
     const delayInfo = state.matchDelays && state.matchDelays[m.id];
     const delayMin = delayInfo ? (delayInfo.minutes || 0) : 0;
+    // Horário de início efetivo: earlyStartAt (início antecipado pelo gestor) ou start_time original
+    const earlyStart = delayInfo && delayInfo.earlyStartAt;
+    const effectiveStartStr = earlyStart || m.start_time;
+    const sMin = timeToMinutes(effectiveStartStr);
+    const eMin = timeToMinutes(m.end_time);
     const effectiveEndMin = eMin + delayMin;
 
     m.delayMinutes = delayMin;
     m.effectiveEndMin = effectiveEndMin;
     m.effectiveEndTime = minutesToTime(effectiveEndMin);
     m.durationMin = Math.max(0, eMin - sMin);
+    m.earlyStarted = !!earlyStart;
+    m.effectiveStartStr = effectiveStartStr;
 
     if (isSelectedDateToday && m.status !== 'cancelled') {
       if (m.status === 'finished') {
@@ -2521,16 +2574,27 @@ function renderLiveDashboardTab() {
                     <!-- Botões de Ação do Jogo -->
                     <div class="flex items-center space-x-1.5 self-end md:self-center flex-shrink-0">
                       ${(match.isLive || match.isOvertime) ? `
-                        <button onclick="updateMatchStatus('${match.id}', 'finished')" class="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
+                        <!-- Jogo em andamento: Finalizar Jogo (automático) + Finalizar Agora (manual antecipado) -->
+                        <button onclick="finishMatchManual('${match.id}')" class="px-3 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all" title="Encerrar o jogo agora, neste exato momento">
+                          <i data-lucide="square" class="w-4 h-4"></i>
+                          <span>⏹ Finalizar Agora</span>
+                        </button>
+                        <button onclick="updateMatchStatus('${match.id}', 'finished')" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all" title="Finalizar no horário programado">
                           <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
-                          <span>Finalizar Jogo</span>
+                          <span>Finalizar</span>
+                        </button>
+                      ` : (match.status !== 'finished' && isSelectedDateToday ? `
+                        <!-- Jogo agendado hoje: pode iniciar agora (antecipado) ou aguardar -->
+                        <button onclick="startMatchNow('${match.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all" title="Iniciar o jogo agora, antes do horário agendado">
+                          <i data-lucide="play" class="w-4 h-4"></i>
+                          <span>▶ Iniciar Agora</span>
                         </button>
                       ` : (match.status !== 'finished' ? `
                         <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
                           <i data-lucide="play" class="w-4 h-4"></i>
                           <span>Iniciar Jogo</span>
                         </button>
-                      ` : '')}
+                      ` : ''))}
 
                       <button onclick="openAddBarItemsModal('${match.id}')" class="p-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-xl transition-all" title="Adicionar Bebidas/Produtos">
                         <i data-lucide="beer" class="w-4 h-4"></i>
