@@ -205,7 +205,12 @@ function loadInitialData() {
     state.categories = mergedCats;
     state.courts = (d.initialCourts || []).map(normalizeCourt);
     state.products = d.initialProducts;
-    state.monthlyMembers = (d.initialMonthlyMembers || []).filter(m => m && m.id && !['mensal-1', 'mensal-2'].includes(m.id));
+    const defaultMonthly = d.initialMonthlyMembers || [];
+    const localMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+    const mergedMonthlyMap = new Map();
+    defaultMonthly.forEach(m => { if (m && m.id) mergedMonthlyMap.set(m.id, m); });
+    localMonthly.forEach(m => { if (m && m.id) mergedMonthlyMap.set(m.id, m); });
+    state.monthlyMembers = Array.from(mergedMonthlyMap.values());
     state.adminUsers = d.initialAdmins;
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
@@ -2016,6 +2021,17 @@ function setAdminSubTab(subTab) {
   lucide.createIcons();
 }
 
+
+function navigateAdminFilterDate(offsetDays) {
+  const currentStr = state.adminFilterDate || getFormattedDate(new Date());
+  const [y, m, d] = currentStr.split('-');
+  const curDate = new Date(Number(y), Number(m) - 1, Number(d));
+  curDate.setDate(curDate.getDate() + offsetDays);
+  state.adminFilterDate = getFormattedDate(curDate);
+  renderStepContent();
+  lucide.createIcons();
+}
+
 function setAdminFilterDate(dateStr) {
   state.adminFilterDate = dateStr;
   renderStepContent();
@@ -2178,14 +2194,18 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const weekDaysShort = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const monthsShort = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const monthsFull = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-  const todayObj = new Date();
+  const [sy, sm, sd] = (selectedDate || todayStr).split('-');
+  const baseDateObj = new Date(Number(sy), Number(sm) - 1, Number(sd));
+  const currentMonthYearName = monthsFull[baseDateObj.getMonth()] + ' de ' + baseDateObj.getFullYear();
+
   const daysList = [];
 
-  // Exibe uma faixa de 21 dias (-3 dias até +17 dias a partir de hoje)
+  // Exibe uma faixa dinâmica de 21 dias (-3 dias até +17 dias a partir da data em foco)
   for (let i = -3; i <= 17; i++) {
-    const curD = new Date(todayObj);
-    curD.setDate(todayObj.getDate() + i);
+    const curD = new Date(baseDateObj);
+    curD.setDate(baseDateObj.getDate() + i);
     const dateStr = getFormattedDate(curD);
     const dOfWeek = weekDaysMap[curD.getDay()];
     const weekdayName = weekDaysShort[curD.getDay()];
@@ -2230,7 +2250,8 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
           </span>
           <div>
             <h4 class="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
-              <span>Calendário Horizontal de Partidas</span>
+              <span>Partidas:</span>
+              <span class="text-emerald-700 font-black">${currentMonthYearName}</span>
               <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Ao Vivo</span>
             </h4>
             <p class="text-[11px] text-slate-500 font-medium">Navegue pelos dias para ver os jogos, horários, bola rolando e atrasos em tempo real</p>
@@ -2243,10 +2264,10 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
                   class="px-3 py-1.5 rounded-xl text-xs font-black transition-all ${selectedDate === todayStr ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
             ⚡ Hoje
           </button>
-          <button type="button" onclick="scrollHorizontalCalendar(-1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all" title="Voltar dias">
+          <button type="button" onclick="navigateAdminFilterDate(-1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Dia Anterior">
             <i data-lucide="chevron-left" class="w-4 h-4"></i>
           </button>
-          <button type="button" onclick="scrollHorizontalCalendar(1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all" title="Avançar dias">
+          <button type="button" onclick="navigateAdminFilterDate(1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Próximo Dia">
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </button>
           <div class="relative">
