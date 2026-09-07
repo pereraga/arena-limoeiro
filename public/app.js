@@ -1920,10 +1920,7 @@ function renderAdminView(container) {
             <span class="hidden sm:inline">Atualizar</span>
           </button>
 
-          <button onclick="switchToClientView()" class="px-3.5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs sm:text-sm font-bold shadow flex items-center space-x-1.5 transition-all">
-            <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i>
-            <span>Ver como Cliente</span>
-          </button>
+
 
           <button onclick="logoutAdmin()" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all">
             <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -2880,17 +2877,17 @@ function renderCourtsControlTab() {
         </div>
 
         <div class="flex items-center flex-wrap gap-2">
-          <button onclick="openMaintenanceModal()" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+          <button onclick="openMaintenanceModal()" class="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
             <i data-lucide="clock" class="w-4 h-4"></i>
-            <span>+ Agendar Treino / Manutenção</span>
+            <span>Agendar Treino / Manutenção</span>
           </button>
-          <button onclick="openCategoryModal()" title="Adicionar Nova Categoria / Modalidade" class="px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
-            <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
-            <span>+ Categoria</span>
+          <button onclick="openCategoryModal()" title="Gerenciar ou Cadastrar Categorias" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
+            <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
+            <span>Categoria</span>
           </button>
-          <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>+ Nova Quadra</span>
+          <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
+            <i data-lucide="plus" class="w-4 h-4 text-emerald-200"></i>
+            <span>Nova Quadra</span>
           </button>
         </div>
       </div>
@@ -3400,9 +3397,9 @@ function renderAdminCategoriesTab() {
           </div>
 
           <div class="flex items-center space-x-2">
-            <button onclick="openCategoryModal()" title="Adicionar Nova Categoria / Modalidade" class="px-4 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
-              <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
-              <span>+ Categoria</span>
+            <button onclick="openCategoryModal()" title="Cadastrar Nova Categoria / Modalidade" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
+              <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
+              <span>Categoria</span>
             </button>
           </div>
         </div>
@@ -3675,9 +3672,9 @@ function renderAdminSubTabContent(tab) {
             <p class="text-xs text-slate-500">Configure nomes, valores por hora, planos mensalistas e fotos das quadras</p>
           </div>
           <div class="flex items-center flex-wrap gap-2">
-            <button onclick="openCategoryModal()" title="Cadastrar Nova Modalidade" class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
-              <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
-              <span>+ Categoria</span>
+            <button onclick="openCategoryModal()" title="Gerenciar ou Cadastrar Categorias" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
+              <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
+              <span>Categoria</span>
             </button>
             <button onclick="setAdminSubTab('categories')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
               <i data-lucide="tag" class="w-4 h-4 text-emerald-400"></i>
@@ -3704,9 +3701,9 @@ function renderAdminSubTabContent(tab) {
           `).join('')}
           <button onclick="openCategoryModal()" 
                   title="Adicionar Nova Categoria / Modalidade"
-                  class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
-            <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
-            <span>+ Categoria</span>
+                  class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow">
+            <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-200"></i>
+            <span>Categoria</span>
           </button>
         </div>
 
