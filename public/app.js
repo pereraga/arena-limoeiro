@@ -1950,6 +1950,11 @@ function renderAdminView(container) {
           <span>🏟️ Controle de Quadras & Manutenção (${state.courts.length})</span>
         </button>
 
+        <button onclick="setAdminSubTab('categories')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 whitespace-nowrap ${(currentTab === 'settings' && state.adminSubTab === 'categories') ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}">
+          <i data-lucide="tag" class="w-4 h-4 text-emerald-400"></i>
+          <span>🏷️ Categorias de Espaços (${(state.categories || []).filter(c => c.id !== 'all').length})</span>
+        </button>
+
         <button onclick="setAdminTab('bar_control')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 whitespace-nowrap ${currentTab === 'bar_control' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}">
           <i data-lucide="beer" class="w-4 h-4 text-amber-300"></i>
           <span>🥤 Bar, Bebidas & Comidas</span>
@@ -1960,7 +1965,7 @@ function renderAdminView(container) {
           <span>⚡ Fazer Reserva Direta</span>
         </button>
 
-        <button onclick="setAdminTab('settings')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 whitespace-nowrap ${currentTab === 'settings' || ['spaces','positions','schedule','monthly','products','users','customers','database'].includes(currentTab) ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}">
+        <button onclick="setAdminTab('settings')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 whitespace-nowrap ${currentTab === 'settings' && state.adminSubTab !== 'categories' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}">
           <i data-lucide="settings" class="w-4 h-4"></i>
           <span>⚙️ Cadastros & Ajustes</span>
         </button>
@@ -1980,7 +1985,15 @@ function renderAdminView(container) {
 }
 
 function setAdminTab(tab) {
-  state.adminTab = tab;
+  if (tab === 'categories') {
+    state.adminTab = 'settings';
+    state.adminSubTab = 'categories';
+  } else {
+    state.adminTab = tab;
+    if (tab === 'settings' && state.adminSubTab === 'categories') {
+      state.adminSubTab = 'spaces';
+    }
+  }
   renderStepContent();
   lucide.createIcons();
 }
@@ -3298,7 +3311,7 @@ function renderAdminTabContent() {
   }
 
   // Se for 'settings' ou uma das abas técnicas legadas:
-  const activeSubTab = state.adminSubTab || (['spaces','positions','schedule','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
+  const activeSubTab = state.adminSubTab || (['spaces','categories','positions','schedule','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
 
   return `
     <div class="space-y-6">
@@ -3307,6 +3320,9 @@ function renderAdminTabContent() {
       <div class="flex items-center space-x-2 border-b border-slate-200 pb-2 overflow-x-auto scrollbar-none">
         <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}">
           Espaços / Quadras
+        </button>
+        <button onclick="setAdminSubTab('categories')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeSubTab === 'categories' ? 'bg-emerald-700 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}">
+          🏷️ Categorias & Modalidades (${(state.categories || []).filter(c => c.id !== 'all').length})
         </button>
         <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-slate-100'}">
           Posições dos Jogos
@@ -3340,7 +3356,207 @@ function renderAdminTabContent() {
   `;
 }
 
+
+// ====================================================
+// ABA DEDICADA DE GESTÃO DE CATEGORIAS NO PAINEL ADMIN
+// ====================================================
+function renderAdminCategoriesTab() {
+  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
+  const categories = (state.categories || []).filter(c => c.id !== 'all');
+  const customCount = categories.filter(c => !defaultCategoryIds.includes(c.id)).length;
+
+  const iconOptions = [
+    { id: 'activity', name: 'Atividade Geral' },
+    { id: 'trophy', name: 'Troféu / Torneio' },
+    { id: 'target', name: 'Alvo / Precisão' },
+    { id: 'zap', name: 'Energia / Dinâmico' },
+    { id: 'flame', name: 'Fogo / Intenso' },
+    { id: 'compass', name: 'Treino / Fitness' },
+    { id: 'medal', name: 'Medalha / Esporte' },
+    { id: 'shield', name: 'Escudo / Defesa' },
+    { id: 'flag', name: 'Bandeira / Competição' },
+    { id: 'heart', name: 'Saúde & Lazer' }
+  ];
+
+  return `
+    <div class="space-y-6">
+      
+      <!-- Cabeçalho da Aba de Categorias -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center space-x-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shrink-0">
+              <i data-lucide="tag" class="w-6 h-6 text-emerald-300"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gestão de Modalidades</span>
+                <span class="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">${categories.length} modalidades ativas</span>
+              </div>
+              <h3 class="text-xl font-black text-slate-900 mt-1">Categorias e Modalidades dos Espaços</h3>
+              <p class="text-xs text-slate-500">Crie, renomeie ou exclua modalidades esportivas. Elas aparecem na barra de filtros da tela inicial e organizam o cadastro de quadras da Arena.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <button onclick="openCategoryModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>+ Nova Categoria (Modal)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Estatísticas Rápidas -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-100">
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+            <p class="text-[11px] font-bold text-slate-500 uppercase">Total de Categorias</p>
+            <p class="text-xl font-black text-slate-900 mt-0.5">${categories.length}</p>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
+            <p class="text-[11px] font-bold text-emerald-700 uppercase">Padrão do Sistema</p>
+            <p class="text-xl font-black text-emerald-900 mt-0.5">4</p>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+            <p class="text-[11px] font-bold text-amber-700 uppercase">Criadas por Você</p>
+            <p class="text-xl font-black text-amber-900 mt-0.5">${customCount}</p>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80">
+            <p class="text-[11px] font-bold text-blue-700 uppercase">Quadras Vinculadas</p>
+            <p class="text-xl font-black text-blue-900 mt-0.5">${state.courts.length}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid com Formulário de Cadastro Rápido & Lista de Categorias -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Formulário Integrado de Criação de Categoria -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center space-x-2 mb-4 pb-3 border-b border-slate-100">
+              <span class="p-1.5 rounded-xl bg-emerald-100 text-emerald-800"><i data-lucide="plus" class="w-4 h-4"></i></span>
+              <h4 class="text-sm font-black text-slate-900 uppercase tracking-wide">Cadastrar Nova Categoria</h4>
+            </div>
+            <p class="text-xs text-slate-500 mb-4">Insira o nome da nova modalidade que deseja disponibilizar na Arena Limoeiro:</p>
+
+            <form id="adminCategoryForm" onsubmit="handleCategoryFormSubmit(event, false)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome da Modalidade *</label>
+                <input type="text" id="newCategoryName" required 
+                       placeholder="Ex: Futevôlei, Basquete 3x3, Pickleball, Crossfit, Natação..." 
+                       class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ícone Representativo</label>
+                <select id="newCategoryIcon" class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-medium">
+                  ${iconOptions.map(ico => `
+                    <option value="${ico.id}">${ico.name} (${ico.id})</option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div class="pt-2">
+                <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all">
+                  <i data-lucide="check" class="w-4 h-4"></i>
+                  <span>Adicionar Categoria ao Sistema</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500">
+            <span class="font-bold text-slate-700">💡 Dica Operacional:</span> Ao criar uma categoria, ela fica imediatamente disponível na barra de filtros da tela do cliente e na opção de modalidade ao cadastrar ou editar espaços e quadras.
+          </div>
+        </div>
+
+        <!-- Tabela / Cards de Todas as Categorias -->
+        <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+            <div>
+              <h4 class="text-sm font-black text-slate-900 uppercase tracking-wide">Modalidades Cadastradas</h4>
+              <p class="text-xs text-slate-500">Quadras vinculadas e opções de gerenciamento</p>
+            </div>
+            <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+              ${categories.length} no total
+            </span>
+          </div>
+
+          <div class="space-y-3">
+            ${categories.map(cat => {
+              const isDefault = defaultCategoryIds.includes(cat.id);
+              const linkedCourts = state.courts.filter(c => c.category === cat.id);
+
+              return `
+                <div class="p-4 rounded-2xl border border-slate-200 hover:border-emerald-300 bg-white hover:bg-slate-50/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                  <div class="flex items-center space-x-3 min-w-0">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                      <i data-lucide="${cat.icon || 'tag'}" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <div class="flex items-center space-x-2">
+                        <h5 class="text-sm font-black text-slate-900 truncate">${cat.name}</h5>
+                        ${isDefault ? 
+                          `<span class="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">Padrão</span>` : 
+                          `<span class="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">Personalizada</span>`
+                        }
+                      </div>
+                      <p class="text-xs text-slate-400 font-mono mt-0.5">Identificador: <span class="text-slate-600">${cat.id}</span></p>
+
+                      <!-- Quadras Vinculadas -->
+                      <div class="flex items-center flex-wrap gap-1.5 mt-2">
+                        ${linkedCourts.length > 0 ? 
+                          linkedCourts.map(c => `
+                            <span class="inline-flex items-center space-x-1 text-[10px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md">
+                              <span>🏟️</span>
+                              <span>${c.name}</span>
+                            </span>
+                          `).join('') :
+                          `<span class="text-[11px] text-amber-600 italic">Nenhuma quadra vinculada ainda</span>`
+                        }
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center space-x-2 self-end sm:self-center shrink-0">
+                    <button onclick="openCourtWithCategory('${cat.id}')" 
+                            title="Cadastrar nova quadra nesta categoria"
+                            class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black rounded-xl flex items-center space-x-1 transition-all">
+                      <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                      <span>+ Nova Quadra</span>
+                    </button>
+
+                    ${!isDefault ? `
+                      <button onclick="deleteCategory('${cat.id}', false)" 
+                              title="Excluir Categoria"
+                              class="p-2 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-xl transition-all border border-transparent hover:border-rose-200">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+function openCourtWithCategory(catId) {
+  openCourtModal();
+  setTimeout(() => {
+    const select = document.getElementById('courtCategory');
+    if (select) select.value = catId;
+  }, 60);
+}
+
 function renderAdminSubTabContent(tab) {
+  if (tab === 'categories') {
+    return renderAdminCategoriesTab();
+  }
   if (tab === 'database') {
     const cfg = window.ArenaSupabase ? window.ArenaSupabase.getConfig() : { url: 'https://brmclyukjfijommbxhks.supabase.co', anonKey: '', connected: false };
     const prefillUrl = cfg.url || 'https://brmclyukjfijommbxhks.supabase.co';
