@@ -194,7 +194,15 @@ function loadInitialData() {
   if (window.ARENA_DEFAULT_DATA) {
     const d = window.ARENA_DEFAULT_DATA;
     state.arenaInfo = d.arenaInfo;
-    state.categories = d.categories;
+    const defaultCats = d.categories || [];
+    const localCats = JSON.parse(localStorage.getItem('arena_categories') || '[]');
+    const mergedCats = [...defaultCats];
+    localCats.forEach(lc => {
+      if (lc && lc.id && !mergedCats.some(c => c.id === lc.id)) {
+        mergedCats.push(lc);
+      }
+    });
+    state.categories = mergedCats;
     state.courts = (d.initialCourts || []).map(normalizeCourt);
     state.products = d.initialProducts;
     state.monthlyMembers = (d.initialMonthlyMembers || []).filter(m => m && m.id && !['mensal-1', 'mensal-2'].includes(m.id));
@@ -748,10 +756,16 @@ function renderStep1(container) {
                          ${state.selectedCategory === cat.id ? 
                            'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 
                            'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}">
-            <i data-lucide="${cat.icon}" class="w-3.5 h-3.5"></i>
+            <i data-lucide="${cat.icon || 'tag'}" class="w-3.5 h-3.5"></i>
             <span>${cat.name}</span>
           </button>
         `).join('')}
+        <button onclick="openCategoryModal()" 
+                title="Adicionar Nova Categoria / Modalidade"
+                class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500/70 text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100 hover:border-emerald-600 hover:shadow-sm">
+          <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
+          <span>+ Categoria</span>
+        </button>
       </div>
 
       <!-- Grid de Quadras / Espaços -->
@@ -2854,7 +2868,11 @@ function renderCourtsControlTab() {
         <div class="flex items-center flex-wrap gap-2">
           <button onclick="openMaintenanceModal()" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
             <i data-lucide="clock" class="w-4 h-4"></i>
-            <span>+ Agendar Treino / Manutenção (com Horário)</span>
+            <span>+ Agendar Treino / Manutenção</span>
+          </button>
+          <button onclick="openCategoryModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+            <i data-lucide="folder-plus" class="w-4 h-4 text-emerald-400"></i>
+            <span>+ Categorias</span>
           </button>
           <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
             <i data-lucide="plus" class="w-4 h-4"></i>
@@ -3439,10 +3457,16 @@ function renderAdminSubTabContent(tab) {
             <h3 class="text-base font-black text-slate-800">Espaços e Quadras Disponíveis</h3>
             <p class="text-xs text-slate-500">Configure nomes, valores por hora, planos mensalistas e fotos das quadras</p>
           </div>
-          <button onclick="openCourtModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>+ Cadastrar Novo Espaço</span>
-          </button>
+          <div class="flex items-center space-x-2">
+            <button onclick="openCategoryModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
+              <i data-lucide="folder-plus" class="w-4 h-4 text-emerald-400"></i>
+              <span>+ Gerenciar Categorias</span>
+            </button>
+            <button onclick="openCourtModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>+ Cadastrar Novo Espaço</span>
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -4763,12 +4787,17 @@ function openCourtModal(courtIdToEdit = null) {
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Modalidade *</label>
-              <select id="courtCategory" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white">
-                <option value="society" ${court && court.category === 'society' ? 'selected' : ''}>Futebol Society</option>
-                <option value="beach" ${court && court.category === 'beach' ? 'selected' : ''}>Beach Tennis & Vôlei</option>
-                <option value="futsal" ${court && court.category === 'futsal' ? 'selected' : ''}>Ginásio Poliesportivo</option>
-                <option value="padel" ${court && court.category === 'padel' ? 'selected' : ''}>Padel & Tênis</option>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-bold text-slate-700 uppercase">Modalidade *</label>
+                <button type="button" onclick="openCategoryModal(true)" class="text-[11px] font-black text-emerald-600 hover:text-emerald-700 hover:underline flex items-center space-x-1">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                  <span>+ Nova Categoria</span>
+                </button>
+              </div>
+              <select id="courtCategory" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-semibold">
+                ${(state.categories || []).filter(c => c.id !== 'all').map(cat => `
+                  <option value="${cat.id}" ${court && court.category === cat.id ? 'selected' : ''}>${cat.name}</option>
+                `).join('')}
               </select>
             </div>
 
@@ -4853,6 +4882,8 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
   const categoryLabels = {
     society: "Futebol Society", beach: "Beach Tennis & Vôlei", futsal: "Ginásio Poliesportivo", padel: "Padel & Tênis"
   };
+  const foundCat = (state.categories || []).find(c => c.id === category);
+  const resolvedCategoryLabel = foundCat ? foundCat.name : (categoryLabels[category] || "Esporte");
 
   const isEditing = !!courtIdToEdit;
   const id = isEditing ? courtIdToEdit : ('court-' + category + '-' + Date.now());
@@ -4861,8 +4892,8 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     id,
     name,
     category,
-    categoryLabel: categoryLabels[category] || "Esporte",
-    category_label: categoryLabels[category] || "Esporte",
+    categoryLabel: resolvedCategoryLabel,
+    category_label: resolvedCategoryLabel,
     basePricePerHour: price,
     base_price_per_hour: price,
     monthlyPrice,
@@ -4925,6 +4956,233 @@ async function deleteCourt(courtId) {
     } catch(e) {}
   }
 }
+
+// ==========================================
+// GERENCIADOR DE CATEGORIAS / MODALIDADES
+// ==========================================
+function openCategoryModal(returnToCourtModal = false) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
+  const categoriesList = state.categories || [];
+
+  // Icon options for quick pick
+  const iconOptions = [
+    { id: 'activity', name: 'Atividade Geral' },
+    { id: 'trophy', name: 'Troféu / Competição' },
+    { id: 'target', name: 'Alvo / Mira' },
+    { id: 'zap', name: 'Energia / Dinâmico' },
+    { id: 'flame', name: 'Fogo / Intenso' },
+    { id: 'compass', name: 'Orientação / Treino' },
+    { id: 'medal', name: 'Medalha' },
+    { id: 'shield', name: 'Escudo / Defesa' },
+    { id: 'flag', name: 'Bandeira' },
+    { id: 'heart', name: 'Saúde & Bem-estar' }
+  ];
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+      <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] animate-fade-in">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="p-2 bg-white/10 rounded-xl">
+              <i data-lucide="tag" class="w-6 h-6 text-emerald-400"></i>
+            </div>
+            <div>
+              <h3 class="text-lg font-black uppercase tracking-tight">
+                Categorias & Modalidades
+              </h3>
+              <p class="text-xs text-emerald-300 font-medium">Adicione ou gerencie as modalidades disponíveis na Arena</p>
+            </div>
+          </div>
+          <button onclick="${returnToCourtModal ? 'openCourtModal()' : 'closeModal()'}" class="text-emerald-300 hover:text-white p-1">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto space-y-6">
+          <!-- Categorias Cadastradas -->
+          <div>
+            <h4 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-2.5">Modalidades Existentes</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${categoriesList.filter(c => c.id !== 'all').map(cat => {
+                const isDefault = defaultCategoryIds.includes(cat.id);
+                return `
+                  <div class="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all">
+                    <div class="flex items-center space-x-2.5 min-w-0">
+                      <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+                        <i data-lucide="${cat.icon || 'tag'}" class="w-4 h-4"></i>
+                      </div>
+                      <span class="text-xs font-bold text-slate-800 truncate">${cat.name}</span>
+                    </div>
+                    <div>
+                      ${isDefault ? 
+                        `<span class="text-[10px] font-bold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">Padrão</span>` : 
+                        `<button onclick="deleteCategory('${cat.id}', ${returnToCourtModal})" title="Excluir Categoria" class="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                          </button>`
+                      }
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Formulário de Nova Categoria -->
+          <div class="pt-4 border-t border-slate-200">
+            <h4 class="text-xs font-black text-emerald-800 uppercase tracking-wider mb-3 flex items-center space-x-1.5">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i>
+              <span>Adicionar Nova Modalidade</span>
+            </h4>
+
+            <form id="categoryForm" onsubmit="handleCategoryFormSubmit(event, ${returnToCourtModal})" class="space-y-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome da Modalidade / Esporte *</label>
+                <input type="text" id="newCategoryName" required 
+                       placeholder="Ex: Futevôlei & Areia, Basquete 3x3, Pickleball, Crossfit..." 
+                       class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ícone Representativo</label>
+                <select id="newCategoryIcon" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-medium">
+                  ${iconOptions.map(ico => `
+                    <option value="${ico.id}">${ico.name} (${ico.id})</option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div class="pt-2 flex items-center justify-end space-x-3">
+                <button type="button" onclick="${returnToCourtModal ? 'openCourtModal()' : 'closeModal()'}" 
+                        class="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-all">
+                  ${returnToCourtModal ? 'Voltar para Quadra' : 'Cancelar'}
+                </button>
+                <button type="submit" 
+                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg shadow-emerald-600/30 flex items-center space-x-1.5 transition-all">
+                  <i data-lucide="check" class="w-4 h-4"></i>
+                  <span>Salvar Categoria</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  lucide.createIcons();
+  setTimeout(() => {
+    const input = document.getElementById('newCategoryName');
+    if (input) input.focus();
+  }, 100);
+}
+
+function handleCategoryFormSubmit(event, returnToCourtModal = false) {
+  event.preventDefault();
+  const nameInput = document.getElementById('newCategoryName');
+  const iconInput = document.getElementById('newCategoryIcon');
+  if (!nameInput) return;
+
+  const name = nameInput.value.trim();
+  const icon = (iconInput && iconInput.value) || 'activity';
+
+  if (!name) {
+    if (typeof showNotification === 'function') {
+      showNotification('Digite o nome da modalidade/categoria.', 'warning');
+    }
+    return;
+  }
+
+  // Gera slug amigável
+  const baseSlug = name.toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '') || 'esporte';
+
+  let slug = baseSlug;
+  let counter = 1;
+  while (state.categories.some(c => c.id === slug)) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
+  const newCat = {
+    id: slug,
+    name: name,
+    icon: icon
+  };
+
+  state.categories.push(newCat);
+
+  // Salva categorias customizadas no localStorage
+  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
+  const customCategories = state.categories.filter(c => !defaultCategoryIds.includes(c.id));
+  try {
+    localStorage.setItem('arena_categories', JSON.stringify(customCategories));
+  } catch(e) {
+    console.warn('Erro ao salvar arena_categories no localStorage:', e);
+  }
+
+  if (typeof showNotification === 'function') {
+    showNotification(`Categoria "${name}" criada com sucesso!`, 'success');
+  }
+
+  if (returnToCourtModal) {
+    openCourtModal();
+    // Seleciona a recém criada
+    setTimeout(() => {
+      const select = document.getElementById('courtCategory');
+      if (select) select.value = slug;
+    }, 50);
+  } else {
+    closeModal();
+    if (state.currentStep === 1) {
+      renderStepContent();
+    } else if (state.currentStep === 'admin') {
+      renderStepContent();
+    }
+  }
+
+  lucide.createIcons();
+}
+
+function deleteCategory(catId, returnToCourtModal = false) {
+  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
+  if (defaultCategoryIds.includes(catId)) {
+    if (typeof showNotification === 'function') {
+      showNotification('Categorias padrão do sistema não podem ser excluídas.', 'warning');
+    }
+    return;
+  }
+
+  const cat = state.categories.find(c => c.id === catId);
+  const catName = cat ? cat.name : catId;
+
+  if (!confirm(`Deseja realmente excluir a categoria "${catName}"?`)) return;
+
+  state.categories = state.categories.filter(c => c.id !== catId);
+  if (state.selectedCategory === catId) {
+    state.selectedCategory = 'all';
+  }
+
+  const customCategories = state.categories.filter(c => !defaultCategoryIds.includes(c.id));
+  try {
+    localStorage.setItem('arena_categories', JSON.stringify(customCategories));
+  } catch(e) {}
+
+  if (typeof showNotification === 'function') {
+    showNotification(`Categoria "${catName}" removida.`, 'info');
+  }
+
+  openCategoryModal(returnToCourtModal);
+  if (state.currentStep === 1) {
+    renderStepContent();
+  }
+  lucide.createIcons();
+}
+
 
 // CHECKOUT MODAL
 function openCheckoutModal() {
