@@ -1236,7 +1236,7 @@ function renderStep3Content() {
           </div>
           <div>
             <h3 class="text-base font-black text-slate-900">Horários do Campo — ${court.name}</h3>
-            <p class="text-xs text-slate-500">Toque em um horário para iniciar e toque nos seguintes para aumentar o tempo de jogo (30 min, 1h, 1h30, etc.).</p>
+            <p class="text-xs text-slate-500">Toque no horário de início e no horário de término para definir o tempo de jogo (ex: 17:00 até 18:00 = 1 hora).</p>
           </div>
         </div>
 
@@ -1285,8 +1285,20 @@ function renderStep3Content() {
 
               if (isAvail) {
                 if (isSelected) {
+                  const isStart = state.startTime === slot.time;
+                  const isEnd = state.endTime === slot.time;
+                  let slotBadge = '';
+                  if (isStart && isEnd) {
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Horário</span>';
+                  } else if (isStart) {
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (' + slot.time + ')</span>';
+                  } else if (isEnd) {
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Término (' + slot.time + ')</span>';
+                  } else {
+                    slotBadge = '<span class="text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded-full">✓ No Jogo</span>';
+                  }
                   cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer transform scale-[1.02] transition-all';
-                  badge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Selecionado</span>';
+                  badge = slotBadge;
                   icon = '🟢';
                 } else {
                   cardClass = 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all';
@@ -1440,7 +1452,12 @@ function syncSelectedSlotsState() {
   const sorted = [...state.selectedSlots].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
   state.selectedSlots = sorted;
   state.startTime = sorted[0];
-  state.endTime = minutesToTime(timeToMinutes(sorted[sorted.length - 1]) + 30);
+  if (sorted.length === 1) {
+    state.endTime = minutesToTime(timeToMinutes(sorted[0]) + 30);
+  } else {
+    // Quando selecionado ex: 17:00, 17:30 e 18:00, o término é 18:00 (duração exata de 1 hora)
+    state.endTime = sorted[sorted.length - 1];
+  }
   calculateDuration();
 }
 
@@ -1454,9 +1471,31 @@ function handleSlotClick(time) {
 
   const clickedMin = timeToMinutes(time);
 
-  // 1. Se nada está selecionado: seleciona exclusivamente este slot
+  // Helper para verificar se todos os slots de um intervalo contínuo estão disponíveis
+  function getAvailableRange(fromMin, toMin) {
+    const range = [];
+    for (let m = fromMin; m <= toMin; m += 30) {
+      const tStr = minutesToTime(m);
+      const sObj = (state.slots || []).find(s => s.time === tStr);
+      if (!sObj || sObj.status !== 'available') return null;
+      range.push(tStr);
+    }
+    return range;
+  }
+
+  // 1. Se nada está selecionado: seleciona 1 hora padrão (ex: 17:00 às 18:00 -> slots 17:00, 17:30, 18:00)
   if (state.selectedSlots.length === 0) {
-    state.selectedSlots = [time];
+    const oneHourRange = getAvailableRange(clickedMin, clickedMin + 60);
+    if (oneHourRange && oneHourRange.length === 3) {
+      state.selectedSlots = oneHourRange;
+    } else {
+      const thirtyMinRange = getAvailableRange(clickedMin, clickedMin + 30);
+      if (thirtyMinRange && thirtyMinRange.length === 2) {
+        state.selectedSlots = thirtyMinRange;
+      } else {
+        state.selectedSlots = [time];
+      }
+    }
     syncSelectedSlotsState();
     renderStep3Content();
     renderBottomBar();
@@ -1466,19 +1505,25 @@ function handleSlotClick(time) {
 
   const sorted = [...state.selectedSlots].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
   const startMin = timeToMinutes(sorted[0]);
-  const lastSlotMin = timeToMinutes(sorted[sorted.length - 1]);
-  const endMin = lastSlotMin + 30;
+  const endMin = timeToMinutes(sorted[sorted.length - 1]);
 
-  // 2. Clicou em um horário que já está selecionado -> desmarcação
-  if (state.selectedSlots.includes(time)) {
-    if (state.selectedSlots.length === 1) {
-      state.selectedSlots = [];
-    } else if (clickedMin === lastSlotMin) {
-      state.selectedSlots = state.selectedSlots.filter(t => t !== time);
-    } else if (clickedMin === startMin) {
-      state.selectedSlots = state.selectedSlots.filter(t => t !== time);
+  // 2. Clicou no próprio horário de início: limpa seleção
+  if (clickedMin === startMin) {
+    state.selectedSlots = [];
+    syncSelectedSlotsState();
+    renderStep3Content();
+    renderBottomBar();
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  // 3. Clicou no horário de término atual:
+  // Se tem mais de 2 slots (ex: 17:00, 17:30, 18:00), recua para o anterior (17:00 às 17:30)
+  if (clickedMin === endMin) {
+    if (sorted.length > 2) {
+      state.selectedSlots = sorted.slice(0, -1);
     } else {
-      state.selectedSlots = sorted.filter(t => timeToMinutes(t) <= clickedMin);
+      state.selectedSlots = [sorted[0]];
     }
     syncSelectedSlotsState();
     renderStep3Content();
@@ -1487,9 +1532,10 @@ function handleSlotClick(time) {
     return;
   }
 
-  // 3. Clicou no horário imediatamente seguinte (ex: tinha 08:00, clicou 08:30) -> adiciona
-  if (clickedMin === endMin) {
-    state.selectedSlots.push(time);
+  // 4. Clicou em um horário intermediário já selecionado (ex: clicou em 17:30 tendo 17:00 às 19:00):
+  // Ajusta o término para esse horário clicado
+  if (clickedMin > startMin && clickedMin < endMin) {
+    state.selectedSlots = sorted.filter(t => timeToMinutes(t) <= clickedMin);
     syncSelectedSlotsState();
     renderStep3Content();
     renderBottomBar();
@@ -1497,19 +1543,47 @@ function handleSlotClick(time) {
     return;
   }
 
-  // 4. Clicou no horário imediatamente anterior (ex: tinha 08:00, clicou 07:30) -> adiciona no início
-  if (clickedMin === startMin - 30) {
-    state.selectedSlots.unshift(time);
-    syncSelectedSlotsState();
-    renderStep3Content();
-    renderBottomBar();
-    if (window.lucide) lucide.createIcons();
-    return;
+  // 5. Clicou em um horário posterior ao término (ex: tinha 17:00 às 18:00 e clicou 18:30 ou 19:00):
+  // Expande o intervalo do Início até o novo Término
+  if (clickedMin > endMin) {
+    const extendedRange = getAvailableRange(startMin, clickedMin);
+    if (extendedRange) {
+      state.selectedSlots = extendedRange;
+      syncSelectedSlotsState();
+      renderStep3Content();
+      renderBottomBar();
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
   }
 
-  // 5. Clicou em qualquer horário NÃO adjacente (ex: estava em 06:00 e clicou em 08:00, ou estava em 08:00 e clicou em 14:00)
-  // SELECIONA INDIVIDUALMENTE APENAS ESSE NOVO HORÁRIO (NUNCA PUXA OS DO MEIO!)
-  state.selectedSlots = [time];
+  // 6. Clicou em um horário anterior ao início (ex: tinha 17:00 às 18:00 e clicou 16:00 ou 16:30):
+  // Expande o Início para trás até o Término atual
+  if (clickedMin < startMin) {
+    const earlierRange = getAvailableRange(clickedMin, endMin);
+    if (earlierRange) {
+      state.selectedSlots = earlierRange;
+      syncSelectedSlotsState();
+      renderStep3Content();
+      renderBottomBar();
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+  }
+
+  // 7. Não foi possível estender continuamente (ex: horário ocupado no meio):
+  // Inicia nova seleção a partir deste novo horário clicado
+  const oneHourRange = getAvailableRange(clickedMin, clickedMin + 60);
+  if (oneHourRange && oneHourRange.length === 3) {
+    state.selectedSlots = oneHourRange;
+  } else {
+    const thirtyMinRange = getAvailableRange(clickedMin, clickedMin + 30);
+    if (thirtyMinRange && thirtyMinRange.length === 2) {
+      state.selectedSlots = thirtyMinRange;
+    } else {
+      state.selectedSlots = [time];
+    }
+  }
   syncSelectedSlotsState();
   renderStep3Content();
   renderBottomBar();
