@@ -1952,14 +1952,14 @@ function renderAdminView(container) {
           </span>
         </button>
 
-        <button onclick="setAdminSubTab('categories')" 
+        <button onclick="setAdminTab('categories')" 
                 class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
-                       ${(currentTab === 'settings' && state.adminSubTab === 'categories') ? 
+                       ${currentTab === 'categories' ? 
                          'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                          'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="tag" class="w-4 h-4 ${(currentTab === 'settings' && state.adminSubTab === 'categories') ? 'text-white' : 'text-emerald-600'}"></i>
+          <i data-lucide="tag" class="w-4 h-4 ${currentTab === 'categories' ? 'text-white' : 'text-emerald-600'}"></i>
           <span>Categorias de Espaços</span>
-          <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${(currentTab === 'settings' && state.adminSubTab === 'categories') ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+          <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'categories' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
             ${(state.categories || []).filter(c => c.id !== 'all').length}
           </span>
         </button>
@@ -1975,10 +1975,10 @@ function renderAdminView(container) {
 
         <button onclick="setAdminTab('settings')" 
                 class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
-                       ${(currentTab === 'settings' && state.adminSubTab !== 'categories') ? 
+                       ${currentTab === 'settings' ? 
                          'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                          'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="settings" class="w-4 h-4 ${(currentTab === 'settings' && state.adminSubTab !== 'categories') ? 'text-white' : 'text-slate-600'}"></i>
+          <i data-lucide="settings" class="w-4 h-4 ${currentTab === 'settings' ? 'text-white' : 'text-slate-600'}"></i>
           <span>Cadastros & Ajustes</span>
         </button>
       </div>
@@ -1997,15 +1997,7 @@ function renderAdminView(container) {
 }
 
 function setAdminTab(tab) {
-  if (tab === 'categories') {
-    state.adminTab = 'settings';
-    state.adminSubTab = 'categories';
-  } else {
-    state.adminTab = tab;
-    if (tab === 'settings' && state.adminSubTab === 'categories') {
-      state.adminSubTab = 'spaces';
-    }
-  }
+  state.adminTab = tab;
   renderStepContent();
   lucide.createIcons();
 }
@@ -3325,6 +3317,10 @@ function renderAdminTabContent() {
     return renderCourtsControlTab();
   }
 
+  if (currentTab === 'categories') {
+    return renderAdminCategoriesTab();
+  }
+
   if (currentTab === 'bar_control') {
     return renderBarControlTab();
   }
@@ -3340,9 +3336,7 @@ function renderAdminTabContent() {
         <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
           Espaços / Quadras
         </button>
-        <button onclick="setAdminSubTab('categories')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'categories' ? 'bg-emerald-700 text-white shadow font-black border border-emerald-700' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Categorias & Modalidades (${(state.categories || []).filter(c => c.id !== 'all').length})
-        </button>
+
         <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
           Posições dos Jogos
         </button>
@@ -3697,7 +3691,7 @@ function renderAdminSubTabContent(tab) {
               <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
               <span>Categoria</span>
             </button>
-            <button onclick="setAdminSubTab('categories')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
+            <button onclick="setAdminTab('categories')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
               <i data-lucide="tag" class="w-4 h-4 text-emerald-400"></i>
               <span>Gerenciar Categorias</span>
             </button>
