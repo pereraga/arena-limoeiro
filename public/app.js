@@ -1951,10 +1951,7 @@ function renderAdminView(container) {
           <span>🥤 Bar, Bebidas & Comidas</span>
         </button>
 
-        <button onclick="openDirectBookingModal()" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 whitespace-nowrap text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-all">
-          <i data-lucide="calendar-plus" class="w-4 h-4 text-emerald-600"></i>
-          <span>⚡ Fazer Reserva Direta</span>
-        </button>
+
 
         <button onclick="setAdminTab('settings')" class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 whitespace-nowrap ${currentTab === 'settings' && state.adminSubTab !== 'categories' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100'}">
           <i data-lucide="settings" class="w-4 h-4"></i>

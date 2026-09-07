@@ -20,7 +20,7 @@
 - **Repositorio GitHub**: https://github.com/pereraga/arenalimoeiro.git (remote origin push)
 - **Stack**: HTML + JS puro (sem bundler) + Supabase + Vercel
 - **Arquivo principal**: `public/app.js`
-- **Versao atual**: v4.4.1
+- **Versao atual**: v4.4.2
 
 ## Nomenclatura
 - "Mensalista" foi substituido por "Fixo" / "Horario Fixo Semanal" em toda a interface.
