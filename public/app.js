@@ -760,12 +760,6 @@ function renderStep1(container) {
             <span>${cat.name}</span>
           </button>
         `).join('')}
-        <button onclick="openCategoryModal()" 
-                title="Adicionar Nova Categoria / Modalidade"
-                class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500/70 text-emerald-700 bg-emerald-50/70 hover:bg-emerald-100 hover:border-emerald-600 hover:shadow-sm">
-          <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
-          <span>+ Categoria</span>
-        </button>
       </div>
 
       <!-- Grid de Quadras / Espaços -->
@@ -1998,6 +1992,13 @@ function setAdminTab(tab) {
   lucide.createIcons();
 }
 
+
+function setAdminCategoryFilter(catId) {
+  state.adminCategoryFilter = catId;
+  renderStepContent();
+  lucide.createIcons();
+}
+
 function setAdminSubTab(subTab) {
   state.adminSubTab = subTab;
   state.adminTab = 'settings';
@@ -2883,9 +2884,9 @@ function renderCourtsControlTab() {
             <i data-lucide="clock" class="w-4 h-4"></i>
             <span>+ Agendar Treino / Manutenção</span>
           </button>
-          <button onclick="openCategoryModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
-            <i data-lucide="folder-plus" class="w-4 h-4 text-emerald-400"></i>
-            <span>+ Categorias</span>
+          <button onclick="openCategoryModal()" title="Adicionar Nova Categoria / Modalidade" class="px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
+            <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
+            <span>+ Categoria</span>
           </button>
           <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
             <i data-lucide="plus" class="w-4 h-4"></i>
@@ -3399,9 +3400,9 @@ function renderAdminCategoriesTab() {
           </div>
 
           <div class="flex items-center space-x-2">
-            <button onclick="openCategoryModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all">
-              <i data-lucide="plus-circle" class="w-4 h-4"></i>
-              <span>+ Nova Categoria (Modal)</span>
+            <button onclick="openCategoryModal()" title="Adicionar Nova Categoria / Modalidade" class="px-4 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
+              <span>+ Categoria</span>
             </button>
           </div>
         </div>
@@ -3668,25 +3669,49 @@ function renderAdminSubTabContent(tab) {
   if (tab === 'spaces') {
     return `
       <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h3 class="text-base font-black text-slate-800">Espaços e Quadras Disponíveis</h3>
             <p class="text-xs text-slate-500">Configure nomes, valores por hora, planos mensalistas e fotos das quadras</p>
           </div>
-          <div class="flex items-center space-x-2">
-            <button onclick="openCategoryModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
-              <i data-lucide="folder-plus" class="w-4 h-4 text-emerald-400"></i>
-              <span>+ Gerenciar Categorias</span>
+          <div class="flex items-center flex-wrap gap-2">
+            <button onclick="openCategoryModal()" title="Cadastrar Nova Modalidade" class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
+              <span>+ Categoria</span>
             </button>
-            <button onclick="openCourtModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
+            <button onclick="setAdminSubTab('categories')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
+              <i data-lucide="tag" class="w-4 h-4 text-emerald-400"></i>
+              <span>Gerenciar Categorias</span>
+            </button>
+            <button onclick="openCourtModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span>+ Cadastrar Novo Espaço</span>
             </button>
           </div>
         </div>
 
+        <!-- Filtros de Categoria com botão + Categoria na Gestão -->
+        <div class="flex items-center space-x-2 overflow-x-auto scrollbar-none mb-6 pb-2 border-b border-slate-100">
+          ${(state.categories || []).map(cat => `
+            <button onclick="setAdminCategoryFilter('${cat.id}')" 
+                    class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1.5 whitespace-nowrap transition-all
+                           ${(state.adminCategoryFilter || 'all') === cat.id ? 
+                             'bg-emerald-700 text-white shadow' : 
+                             'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'}">
+              <i data-lucide="${cat.icon || 'tag'}" class="w-3.5 h-3.5"></i>
+              <span>${cat.name}</span>
+            </button>
+          `).join('')}
+          <button onclick="openCategoryModal()" 
+                  title="Adicionar Nova Categoria / Modalidade"
+                  class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all border-2 border-dashed border-emerald-500 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 hover:border-emerald-600 shadow-sm">
+            <i data-lucide="plus" class="w-4 h-4 text-emerald-600"></i>
+            <span>+ Categoria</span>
+          </button>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          ${state.courts.map(court => `
+          ${(state.adminCategoryFilter && state.adminCategoryFilter !== 'all' ? state.courts.filter(c => c.category === state.adminCategoryFilter) : state.courts).map(court => `
             <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
               <div>
                 <img src="${court.image}" class="h-40 w-full object-cover">
