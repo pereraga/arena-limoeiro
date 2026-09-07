@@ -158,7 +158,7 @@ function calculateDuration() {
   const startMin = timeToMinutes(state.startTime);
   let endMin = timeToMinutes(state.endTime);
   if (endMin <= startMin) {
-    endMin = startMin + 60;
+    endMin = startMin + 30;
     state.endTime = minutesToTime(endMin);
   }
   state.selectedDuration = endMin - startMin;
@@ -509,8 +509,10 @@ function requestSchedule() {
     const firstAvailable = (state.slots || []).find(s => s.status === 'available');
     if (firstAvailable) {
       state.startTime = firstAvailable.time;
-      const nextHourMin = timeToMinutes(firstAvailable.time) + 60;
-      state.endTime = minutesToTime(nextHourMin);
+      const firstMin = timeToMinutes(firstAvailable.time);
+      const nextSlot = (state.slots || []).find(s => s.time === minutesToTime(firstMin + 30));
+      const dur = (nextSlot && nextSlot.status === 'available') ? 60 : 30;
+      state.endTime = minutesToTime(firstMin + dur);
       calculateDuration();
     }
   }
@@ -1139,34 +1141,19 @@ function renderStep3Content() {
     // Garante horários calculados
     requestSchedule();
 
-    // Calcula opções válidas de término para o startTime atual (passos de 30min consecutivos livres)
-    const startMin = timeToMinutes(state.startTime);
-    const validEndTimes = [];
-    for (let endMin = startMin + 30; endMin <= 23*60+30; endMin += 30) {
-      const endStr = minutesToTime(endMin);
-      const durMin = endMin - startMin;
-      const slotStartStr = minutesToTime(endMin - 30);
-      const slotBusy = (state.slots || []).find(s => s.time === slotStartStr && s.status !== 'available');
-      if (slotBusy && endMin - 30 > startMin) break;
-      const durH = Math.floor(durMin / 60);
-      const durM = durMin % 60;
-      const durLabel = durH === 0
-        ? `${durMin} min de jogo`
-        : durM === 0
-          ? `${durH}h de jogo`
-          : `${durH}h ${durM}min de jogo`;
-      validEndTimes.push({ value: endStr, label: `${endStr} — ${durLabel}` });
-    }
-    if (validEndTimes.length === 0) {
-      const endStr = minutesToTime(startMin + 30);
-      validEndTimes.push({ value: endStr, label: `${endStr} — 30 min de jogo` });
-    }
-
-    // Valida se state.endTime está na lista de opções válidas
-    const validValues = validEndTimes.map(o => o.value);
-    if (!validValues.includes(state.endTime)) {
-      const pref1h = minutesToTime(startMin + 60);
-      state.endTime = validValues.includes(pref1h) ? pref1h : validValues[0];
+    if (state.startTime) {
+      const startMin = timeToMinutes(state.startTime);
+      let endMin = state.endTime ? timeToMinutes(state.endTime) : startMin + 30;
+      if (endMin <= startMin) endMin = startMin + 30;
+      // Garante que a seleção não atravesse nenhum horário ocupado
+      let safeEndMin = startMin + 30;
+      for (let m = startMin + 30; m <= endMin; m += 30) {
+        const slotStartStr = minutesToTime(m - 30);
+        const slotBusy = (state.slots || []).find(s => s.time === slotStartStr && s.status !== 'available');
+        if (slotBusy && m - 30 > startMin) break;
+        safeEndMin = m;
+      }
+      state.endTime = minutesToTime(safeEndMin);
     }
 
     calculateDuration();
@@ -1234,7 +1221,7 @@ function renderStep3Content() {
           </div>
           <div>
             <h3 class="text-base font-black text-slate-900">Horários do Campo — ${court.name}</h3>
-            <p class="text-xs text-slate-500">Toque em um horário <span class="text-emerald-700 font-bold">verde</span> para reservar. Horários em uso ou reservados aparecem bloqueados.</p>
+            <p class="text-xs text-slate-500">Toque em um horário para iniciar e toque nos seguintes para aumentar o tempo de jogo (30 min, 1h, 1h30, etc.).</p>
           </div>
         </div>
 
@@ -1264,13 +1251,13 @@ function renderStep3Content() {
             const todayStr = getFormattedDate(now);
             const nowMin = now.getHours() * 60 + now.getMinutes();
             const isToday = state.selectedDate === todayStr;
-            const selectedStartMin = timeToMinutes(state.startTime);
-            const selectedEndMin = timeToMinutes(state.endTime);
+            const selectedStartMin = state.startTime ? timeToMinutes(state.startTime) : null;
+            const selectedEndMin = state.endTime ? timeToMinutes(state.endTime) : null;
 
             return (state.slots || []).map(slot => {
               const slotMin = timeToMinutes(slot.time);
               const slotEndMin = slotMin + 30;
-              const isSelected = slotMin === selectedStartMin; // apenas o slot de início
+              const isSelected = selectedStartMin !== null && selectedEndMin !== null && slotMin >= selectedStartMin && slotMin < selectedEndMin;
               const isAvail = slot.status === 'available';
               const isMaint = slot.status === 'maintenance';
               const isBooked = slot.status === 'booked';
@@ -1286,7 +1273,7 @@ function renderStep3Content() {
 
               if (isAvail) {
                 if (isSelected) {
-                  cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer';
+                  cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer transform scale-[1.02] transition-all';
                   badge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Selecionado</span>';
                   icon = '🟢';
                 } else {
@@ -1294,7 +1281,7 @@ function renderStep3Content() {
                   badge = '<span class="text-[10px] font-bold text-emerald-700">Livre ✓</span>';
                   icon = '🟢';
                 }
-                clickable = `onclick="handleTimeChange('${slot.time}', 'start')"`;
+                clickable = `onclick="handleSlotClick('${slot.time}')"`;
               } else if (isLiveNow) {
                 cardClass = 'bg-rose-600 border-2 border-rose-700 text-white cursor-not-allowed shadow-md';
                 badge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full animate-pulse">🔴 EM JOGO AGORA</span>';
@@ -1337,20 +1324,6 @@ function renderStep3Content() {
             </div>`;
           return '';
         })()}
-
-          <!-- Hora de Término — todos os slots de 30min disponíveis após o início -->
-          <div class="mt-2">
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-2 flex items-center">
-              <i data-lucide="stop-circle" class="w-3.5 h-3.5 text-rose-600 mr-1.5"></i>
-              Hora de Término — Início: <span class="text-emerald-700 ml-1">${state.startTime}</span>
-            </label>
-            <select id="endTimeSelect" onchange="handleTimeChange(this.value, 'end')"
-                    class="w-full p-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-black text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600">
-              ${validEndTimes.map(opt => `
-                <option value="${opt.value}" ${state.endTime === opt.value ? 'selected' : ''}>${opt.label}</option>
-              `).join('')}
-            </select>
-          </div>
 
           <!-- Resumo do horário selecionado -->
           <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
@@ -1438,17 +1411,90 @@ function renderStep3Content() {
   }
 }
 
+function handleSlotClick(time) {
+  const clickedMin = timeToMinutes(time);
+  const slot = (state.slots || []).find(s => s.time === time);
+  if (!slot || slot.status !== 'available') return;
+
+  // Se não houver horário selecionado ainda
+  if (!state.startTime || !state.endTime) {
+    state.startTime = time;
+    state.endTime = minutesToTime(clickedMin + 30);
+    calculateDuration();
+    renderStep3Content();
+    renderBottomBar();
+    lucide.createIcons();
+    return;
+  }
+
+  const startMin = timeToMinutes(state.startTime);
+  const endMin = timeToMinutes(state.endTime);
+
+  // 1. Clicou em um slot já selecionado (dentro do intervalo)
+  if (clickedMin >= startMin && clickedMin < endMin) {
+    const totalSlots = (endMin - startMin) / 30;
+    if (totalSlots > 1) {
+      if (clickedMin === endMin - 30) {
+        // Clicou no último slot selecionado: desmarca ele (reduz 30min)
+        state.endTime = minutesToTime(clickedMin);
+      } else if (clickedMin === startMin) {
+        // Clicou no primeiro slot: reduz para apenas este primeiro slot (30min)
+        state.endTime = minutesToTime(startMin + 30);
+      } else {
+        // Clicou no meio: encurta o término até este slot selecionado
+        state.endTime = minutesToTime(clickedMin + 30);
+      }
+    }
+  } 
+  // 2. Clicou em um slot posterior à seleção atual
+  else if (clickedMin >= endMin) {
+    // Se for até 4 horas depois (máximo 8 slots consecutivos) e tudo livre:
+    if (clickedMin - startMin <= 4 * 60) {
+      let allFree = true;
+      for (let m = startMin; m <= clickedMin; m += 30) {
+        const s = (state.slots || []).find(x => x.time === minutesToTime(m));
+        if (!s || s.status !== 'available') {
+          allFree = false;
+          break;
+        }
+      }
+      if (allFree) {
+        state.endTime = minutesToTime(clickedMin + 30);
+        calculateDuration();
+        renderStep3Content();
+        renderBottomBar();
+        lucide.createIcons();
+        return;
+      }
+    }
+    // Senão (muito longe ou há horário ocupado no caminho): inicia nova seleção neste horário
+    state.startTime = time;
+    state.endTime = minutesToTime(clickedMin + 30);
+  } 
+  // 3. Clicou em um slot anterior à seleção atual
+  else if (clickedMin < startMin) {
+    if (clickedMin === startMin - 30) {
+      // Slot imediatamente anterior: expande o início para trás
+      state.startTime = time;
+    } else {
+      // Novo início neste horário
+      state.startTime = time;
+      state.endTime = minutesToTime(clickedMin + 30);
+    }
+  }
+
+  calculateDuration();
+  renderStep3Content();
+  renderBottomBar();
+  lucide.createIcons();
+}
+
 function handleTimeChange(val, type) {
   if (type === 'start') {
-    state.startTime = val;
-    const startMin = timeToMinutes(val);
-    const endMin = timeToMinutes(state.endTime);
-    if (endMin <= startMin) {
-      state.endTime = minutesToTime(startMin + 60);
-    }
-  } else {
-    state.endTime = val;
+    handleSlotClick(val);
+    return;
   }
+  state.endTime = val;
   calculateDuration();
   renderStep3Content();
   renderBottomBar();
