@@ -198,18 +198,19 @@ function loadInitialData() {
     const defaultCats = d.categories || [];
     const localCats = JSON.parse(localStorage.getItem('arena_categories') || 'null');
     if (Array.isArray(localCats) && localCats.length > 0) {
-      const catMap = new Map();
-      defaultCats.forEach(c => catMap.set(c.id, { ...c }));
-      localCats.forEach(lc => {
-        if (lc && lc.id) {
-          catMap.set(lc.id, { ...(catMap.get(lc.id) || {}), ...lc });
-        }
-      });
-      state.categories = Array.from(catMap.values());
+      state.categories = localCats;
+      if (!state.categories.some(c => c.id === 'all')) {
+        state.categories.unshift({ id: 'all', name: 'Todos os Espaços', icon: 'layout-grid' });
+      }
     } else {
       state.categories = [...defaultCats];
     }
-    state.courts = (d.initialCourts || []).map(normalizeCourt);
+    const localCourts = JSON.parse(localStorage.getItem('arena_local_courts') || 'null');
+    if (Array.isArray(localCourts) && localCourts.length > 0) {
+      state.courts = localCourts.map(normalizeCourt);
+    } else {
+      state.courts = (d.initialCourts || []).map(normalizeCourt);
+    }
     state.products = d.initialProducts;
     const defaultMonthly = d.initialMonthlyMembers || [];
     const localMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
@@ -3523,9 +3524,8 @@ function renderAdminTabContent() {
 // ABA DEDICADA DE GESTÃO DE CATEGORIAS NO PAINEL ADMIN
 // ====================================================
 function renderAdminCategoriesTab() {
-  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
   const categories = (state.categories || []).filter(c => c.id !== 'all');
-  const customCount = categories.filter(c => !defaultCategoryIds.includes(c.id)).length;
+  const usedCount = categories.filter(cat => (state.courts || []).some(c => c.category === cat.id)).length;
 
   const iconOptions = [
     { id: 'activity', name: 'Atividade Geral' },
@@ -3571,20 +3571,22 @@ function renderAdminCategoriesTab() {
         <!-- Estatísticas Rápidas -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-100">
           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
-            <p class="text-[11px] font-bold text-slate-500 uppercase">Total de Categorias</p>
+            <p class="text-[11px] font-bold text-slate-500 uppercase">Total de Modalidades</p>
             <p class="text-xl font-black text-slate-900 mt-0.5">${categories.length}</p>
           </div>
           <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/80">
-            <p class="text-[11px] font-bold text-emerald-700 uppercase">Padrão do Sistema</p>
-            <p class="text-xl font-black text-emerald-900 mt-0.5">4</p>
-          </div>
-          <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80">
-            <p class="text-[11px] font-bold text-amber-700 uppercase">Criadas por Você</p>
-            <p class="text-xl font-black text-amber-900 mt-0.5">${customCount}</p>
+            <p class="text-[11px] font-bold text-emerald-700 uppercase">Modalidades em Uso</p>
+            <p class="text-xl font-black text-emerald-900 mt-0.5">${usedCount}</p>
           </div>
           <div class="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80">
             <p class="text-[11px] font-bold text-blue-700 uppercase">Quadras Vinculadas</p>
             <p class="text-xl font-black text-blue-900 mt-0.5">${state.courts.length}</p>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80">
+            <p class="text-[11px] font-bold text-amber-700 uppercase">Configuração</p>
+            <p class="text-xs font-black text-amber-900 mt-1.5 flex items-center space-x-1">
+              <span>⚡</span><span>100% Editável</span>
+            </p>
           </div>
         </div>
       </div>
@@ -3646,7 +3648,6 @@ function renderAdminCategoriesTab() {
 
           <div class="space-y-3">
             ${categories.map(cat => {
-              const isDefault = defaultCategoryIds.includes(cat.id);
               const linkedCourts = state.courts.filter(c => c.category === cat.id);
 
               return `
@@ -3658,12 +3659,8 @@ function renderAdminCategoriesTab() {
                     <div class="min-w-0">
                       <div class="flex items-center space-x-2">
                         <h5 class="text-sm font-black text-slate-900 truncate">${cat.name}</h5>
-                        ${isDefault ? 
-                          `<span class="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">Padrão</span>` : 
-                          `<span class="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded uppercase">Personalizada</span>`
-                        }
                       </div>
-                      <p class="text-xs text-slate-400 font-mono mt-0.5">Identificador: <span class="text-slate-600">${cat.id}</span></p>
+                      <p class="text-xs text-slate-400 font-mono mt-0.5">Identificador: <span class="text-slate-800 font-bold bg-slate-100 px-1.5 py-0.5 rounded">${cat.id}</span></p>
 
                       <!-- Quadras Vinculadas -->
                       <div class="flex items-center flex-wrap gap-1.5 mt-2">
@@ -3681,28 +3678,26 @@ function renderAdminCategoriesTab() {
                   </div>
 
                   <div class="flex items-center space-x-2 self-end sm:self-center shrink-0">
-                    <!-- Botão para Editar Nome da Modalidade -->
+                    <!-- Botão para Editar Modalidade (Nome e Identificador) -->
                     <button onclick="openEditCategoryModal('${cat.id}')" 
-                            title="Editar nome desta modalidade"
+                            title="Editar modalidade (nome e identificador)"
                             class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-black rounded-xl flex items-center space-x-1 transition-all cursor-pointer shadow-xs">
                       <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-600"></i>
-                      <span>Editar Nome</span>
+                      <span>Editar</span>
                     </button>
 
                     <button onclick="openCourtWithCategory('${cat.id}')" 
                             title="Cadastrar nova quadra nesta categoria"
-                            class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black rounded-xl flex items-center space-x-1 transition-all">
+                            class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black rounded-xl flex items-center space-x-1 transition-all cursor-pointer">
                       <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                       <span>Nova Quadra</span>
                     </button>
 
-                    ${!isDefault ? `
-                      <button onclick="deleteCategory('${cat.id}', false)" 
-                              title="Excluir Categoria"
-                              class="p-2 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-xl transition-all border border-transparent hover:border-rose-200">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                      </button>
-                    ` : ''}
+                    <button onclick="deleteCategory('${cat.id}', false)" 
+                            title="Excluir Categoria"
+                            class="p-2 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded-xl transition-all border border-transparent hover:border-rose-200 cursor-pointer">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
                   </div>
                 </div>
               `;
@@ -5406,7 +5401,7 @@ function openEditCategoryModal(catId) {
               <h3 class="text-base sm:text-lg font-black uppercase tracking-tight">
                 Editar Modalidade
               </h3>
-              <p class="text-xs text-emerald-300 font-medium">Modifique o nome da categoria no sistema</p>
+              <p class="text-xs text-emerald-300 font-medium">Modifique o nome ou identificador no sistema</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
@@ -5422,7 +5417,18 @@ function openEditCategoryModal(catId) {
             <input type="text" id="editCategoryNameInput" required value="${cat.name}" 
                    placeholder="Ex: Futebol Society, Beach Tennis, Futsal, etc."
                    class="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-            <p class="text-[11px] text-slate-500 mt-1">Este nome será exibido imediatamente na barra de filtros da tela inicial e em todas as quadras vinculadas.</p>
+            <p class="text-[11px] text-slate-500 mt-1">Este nome é exibido na barra de filtros da tela inicial e no cabeçalho das quadras.</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+              <span>Identificador Técnico (ID / Slug) *</span>
+              <span class="text-[10px] text-slate-400 font-normal lowercase">letras, números e traços</span>
+            </label>
+            <input type="text" id="editCategoryIdInput" required value="${cat.id}" 
+                   placeholder="Ex: society, beach, futsal, padel"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <p class="text-[11px] text-slate-500 mt-1">Código do sistema. Ao alterar este identificador, todas as quadras vinculadas a ele serão sincronizadas automaticamente.</p>
           </div>
 
           <div>
@@ -5438,7 +5444,7 @@ function openEditCategoryModal(catId) {
 
           <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 font-semibold flex items-center space-x-2">
             <span>💾</span>
-            <span>A alteração é gravada no banco e permanece salva mesmo ao atualizar a página.</span>
+            <span>Alterações salvas permanentemente no sistema e sincronizadas com as quadras.</span>
           </div>
 
           <div class="flex items-center space-x-2 pt-2">
@@ -5447,7 +5453,7 @@ function openEditCategoryModal(catId) {
             </button>
             <button type="submit" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Salvar Nome</span>
+              <span>Salvar Alterações</span>
             </button>
           </div>
         </form>
@@ -5458,36 +5464,73 @@ function openEditCategoryModal(catId) {
   if (window.lucide) lucide.createIcons();
 }
 
-async function handleEditCategorySubmit(event, catId) {
+async function handleEditCategorySubmit(event, oldCatId) {
   event.preventDefault();
   const nameInput = document.getElementById('editCategoryNameInput');
+  const idInput = document.getElementById('editCategoryIdInput');
   const iconInput = document.getElementById('editCategoryIconInput');
-  if (!nameInput) return;
+  if (!nameInput || !idInput) return;
 
   const newName = nameInput.value.trim();
+  let rawNewId = idInput.value.trim();
   const newIcon = (iconInput && iconInput.value) || 'activity';
 
   if (!newName) {
-    alert('Por favor, informe o novo nome da modalidade.');
+    alert('Por favor, informe o nome da modalidade.');
     return;
   }
 
-  // 1. Atualiza na lista de categorias do estado
-  const cat = (state.categories || []).find(c => c.id === catId);
+  // Sanitizar o novo identificador
+  let newId = rawNewId.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]/g, '-')
+    .replace(/(^-|-$)+/g, '');
+
+  if (!newId) {
+    alert('Por favor, informe um identificador válido (apenas letras, números e traços).');
+    return;
+  }
+
+  // Impedir usar 'all' como id se for outra categoria
+  if (oldCatId !== 'all' && newId === 'all') {
+    alert('O identificador "all" é reservado para o filtro geral.');
+    return;
+  }
+
+  // Se o id mudou, verificar se já existe outra categoria com esse id
+  if (newId !== oldCatId && (state.categories || []).some(c => c.id === newId)) {
+    alert(`Já existe outra categoria com o identificador "${newId}". Escolha um identificador diferente.`);
+    return;
+  }
+
+  // 1. Atualizar na lista de categorias do estado
+  const cat = (state.categories || []).find(c => c.id === oldCatId);
   if (cat) {
+    cat.id = newId;
     cat.name = newName;
     cat.icon = newIcon;
   }
 
-  // 2. Atualiza em todas as quadras vinculadas no estado
+  // 2. Atualizar em todas as quadras vinculadas no estado
+  let updatedCourtsCount = 0;
   (state.courts || []).forEach(court => {
-    if (court.category === catId) {
+    if (court.category === oldCatId) {
+      court.category = newId;
+      court.categoryLabel = newName;
+      court.category_label = newName;
+      updatedCourtsCount++;
+    } else if (court.category === newId) {
       court.categoryLabel = newName;
       court.category_label = newName;
     }
   });
 
-  // 3. Salva permanentemente em localStorage (NÃO SOME AO ATUALIZAR)
+  // 3. Atualizar selectedCategory se estava na antiga
+  if (state.selectedCategory === oldCatId) {
+    state.selectedCategory = newId;
+  }
+
+  // 4. Salvar permanentemente em localStorage
   try {
     localStorage.setItem('arena_categories', JSON.stringify(state.categories));
     localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
@@ -5495,11 +5538,15 @@ async function handleEditCategorySubmit(event, catId) {
     console.warn('Erro ao salvar no localStorage:', e);
   }
 
-  // 4. Se o Supabase estiver conectado, atualiza os rótulos de quadras no banco de dados
+  // 5. Se o Supabase estiver conectado, atualizar no banco
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      await client.from('courts').update({ category_label: newName }).eq('category', catId);
+      if (newId !== oldCatId) {
+        await client.from('courts').update({ category: newId, category_label: newName }).eq('category', oldCatId);
+      } else {
+        await client.from('courts').update({ category_label: newName }).eq('category', oldCatId);
+      }
     } catch(err) {
       console.warn('Aviso sincronizacao categoria no Supabase:', err);
     }
@@ -5507,21 +5554,22 @@ async function handleEditCategorySubmit(event, catId) {
 
   closeModal();
 
-  // 5. Re-renderiza a tela ativa para refletir instantaneamente a modificação
+  // 6. Re-renderizar telas ativas
   renderStepContent();
   if (typeof renderNavbar === 'function') renderNavbar();
   if (window.lucide) lucide.createIcons();
 
   if (typeof showNotification === 'function') {
-    showNotification(`Modalidade "${newName}" atualizada com sucesso!`, 'success');
+    const msg = updatedCourtsCount > 0 
+      ? `Modalidade "${newName}" (ID: ${newId}) atualizada! ${updatedCourtsCount} quadra(s) sincronizada(s).`
+      : `Modalidade "${newName}" (ID: ${newId}) atualizada com sucesso!`;
+    showNotification(msg, 'success');
   }
 }
 
 function openCategoryModal(returnToCourtModal = false) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
-
-  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
   const categoriesList = state.categories || [];
 
   // Icon options for quick pick
@@ -5564,25 +5612,24 @@ function openCategoryModal(returnToCourtModal = false) {
             <h4 class="text-xs font-black text-slate-500 uppercase tracking-wider mb-2.5">Modalidades Existentes</h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               ${categoriesList.filter(c => c.id !== 'all').map(cat => {
-                const isDefault = defaultCategoryIds.includes(cat.id);
                 return `
                   <div class="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all">
                     <div class="flex items-center space-x-2.5 min-w-0">
                       <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
                         <i data-lucide="${cat.icon || 'tag'}" class="w-4 h-4"></i>
                       </div>
-                      <span class="text-xs font-bold text-slate-800 truncate">${cat.name}</span>
+                      <div class="min-w-0">
+                        <span class="text-xs font-bold text-slate-800 truncate block">${cat.name}</span>
+                        <span class="text-[10px] font-mono text-slate-500">${cat.id}</span>
+                      </div>
                     </div>
                     <div class="flex items-center space-x-1">
                       <button onclick="openEditCategoryModal('${cat.id}')" title="Editar Modalidade" class="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors cursor-pointer">
                         <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                       </button>
-                      ${isDefault ? 
-                        `<span class="text-[10px] font-bold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">Padrão</span>` : 
-                        `<button onclick="deleteCategory('${cat.id}', ${returnToCourtModal})" title="Excluir Categoria" class="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer">
-                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                          </button>`
-                      }
+                      <button onclick="deleteCategory('${cat.id}', ${returnToCourtModal})" title="Excluir Categoria" class="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      </button>
                     </div>
                   </div>
                 `;
@@ -5676,11 +5723,9 @@ function handleCategoryFormSubmit(event, returnToCourtModal = false) {
 
   state.categories.push(newCat);
 
-  // Salva categorias customizadas no localStorage
-  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
-  const customCategories = state.categories.filter(c => !defaultCategoryIds.includes(c.id));
+  // Salva todas as categorias no localStorage
   try {
-    localStorage.setItem('arena_categories', JSON.stringify(customCategories));
+    localStorage.setItem('arena_categories', JSON.stringify(state.categories));
   } catch(e) {
     console.warn('Erro ao salvar arena_categories no localStorage:', e);
   }
@@ -5709,38 +5754,45 @@ function handleCategoryFormSubmit(event, returnToCourtModal = false) {
 }
 
 function deleteCategory(catId, returnToCourtModal = false) {
-  const defaultCategoryIds = ['all', 'society', 'beach', 'futsal', 'padel'];
-  if (defaultCategoryIds.includes(catId)) {
+  if (catId === 'all') {
     if (typeof showNotification === 'function') {
-      showNotification('Categorias padrão do sistema não podem ser excluídas.', 'warning');
+      showNotification('A categoria principal "Todos" não pode ser removida.', 'warning');
     }
     return;
   }
 
-  const cat = state.categories.find(c => c.id === catId);
+  const cat = (state.categories || []).find(c => c.id === catId);
   const catName = cat ? cat.name : catId;
 
-  if (!confirm(`Deseja realmente excluir a categoria "${catName}"?`)) return;
+  const linkedCourts = (state.courts || []).filter(c => c.category === catId);
+  let confirmMsg = `Deseja realmente excluir a modalidade "${catName}"?`;
+  if (linkedCourts.length > 0) {
+    confirmMsg = `Atenção: existem ${linkedCourts.length} quadra(s) vinculada(s) à modalidade "${catName}". Deseja realmente excluí-la?`;
+  }
 
-  state.categories = state.categories.filter(c => c.id !== catId);
+  if (!confirm(confirmMsg)) return;
+
+  state.categories = (state.categories || []).filter(c => c.id !== catId);
   if (state.selectedCategory === catId) {
     state.selectedCategory = 'all';
   }
 
-  const customCategories = state.categories.filter(c => !defaultCategoryIds.includes(c.id));
   try {
-    localStorage.setItem('arena_categories', JSON.stringify(customCategories));
+    localStorage.setItem('arena_categories', JSON.stringify(state.categories));
   } catch(e) {}
 
   if (typeof showNotification === 'function') {
-    showNotification(`Categoria "${catName}" removida.`, 'info');
+    showNotification(`Modalidade "${catName}" removida com sucesso.`, 'info');
   }
 
-  openCategoryModal(returnToCourtModal);
-  if (state.currentStep === 1) {
+  if (returnToCourtModal) {
+    openCategoryModal(returnToCourtModal);
+  } else {
+    closeModal();
     renderStepContent();
+    if (typeof renderNavbar === 'function') renderNavbar();
   }
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 }
 
 
