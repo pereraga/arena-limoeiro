@@ -68,7 +68,7 @@ let state = {
   
   // DATA SELECIONADA PRIMEIRO
   selectedDate: null, // Definido apenas ao escolher no calendário
-  currentMonthDate: new Date(2026, 7, 1),
+  currentMonthDate: new Date(),
   
   // DURAÇÃO E HORÁRIOS SELECIONADOS NA ETAPA 3
   startTime: null,
@@ -1004,33 +1004,76 @@ function setMonthlyDayOfWeek(day) {
   lucide.createIcons();
 }
 
-// Calendário Visual Interativo Exclusivo do Mês 8 (Agosto)
+// ==============================================================================
+// 📅 CALENDÁRIO VISUAL DINÂMICO VINCULADO AO BANCO DE DADOS (SUPABASE & DIÁRIO)
+// ==============================================================================
 function renderCalendarHTML() {
-  const year = 2026;
-  const month = 7; // Index 7 = Agosto (Mês 8)
-  state.currentMonthDate = new Date(year, month, 1);
+  if (!state.currentMonthDate) {
+    state.currentMonthDate = new Date();
+  }
+  const year = state.currentMonthDate.getFullYear();
+  const month = state.currentMonthDate.getMonth(); // 0 a 11
+
+  const monthsFull = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const currentMonthYearName = monthsFull[month] + ' de ' + year;
 
   const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = 31; // Agosto tem 31 dias
-  const todayStr = getFormattedDate(new Date());
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+
+  // Consulta reservas no banco de dados e local (sincronizadas em tempo real)
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const bookingMap = new Map();
+  [...(state.bookings || []), ...localBookings].forEach(b => {
+    if (b && b.id) bookingMap.set(b.id, b);
+  });
+  const allBookings = Array.from(bookingMap.values());
+
+  const selectedCourtId = state.selectedCourt ? state.selectedCourt.id : null;
+  const isDbConnected = window.ArenaSupabase && window.ArenaSupabase.isReady();
 
   let html = `
-    <!-- Cabeçalho Exclusivo do Mês 8 (Agosto) -->
-    <div class="calendar-header flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100">
+    <!-- Cabeçalho Dinâmico do Mês com Navegação -->
+    <div class="calendar-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3.5 border-b border-slate-100">
       <div class="flex items-center space-x-2.5">
-        <span class="p-2 sm:p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 shadow-sm">
+        <span class="p-2 sm:p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 shadow-sm flex items-center justify-center">
           <i data-lucide="calendar" class="w-5 h-5"></i>
         </span>
         <div>
-          <h4 class="text-base sm:text-lg font-black text-slate-900">
-            Agosto 2026
+          <h4 class="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+            <span>${currentMonthYearName}</span>
+            <span class="text-[10px] font-bold ${isDbConnected ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-slate-100 border-slate-200'} px-2 py-0.5 rounded-full border">
+              ${isDbConnected ? '🟢 Banco de Dados Conectado' : '✓ Base de Dados Atualizada'}
+            </span>
           </h4>
-          <p class="text-xs text-slate-500">Escolha o dia da sua partida</p>
+          <p class="text-xs text-slate-500">Escolha o dia da partida para consultar os horários livres</p>
         </div>
       </div>
-      <div class="bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-xl text-right hidden sm:block">
-        <span class="text-[10px] font-bold text-emerald-700 block uppercase">Calendário</span>
-        <span class="text-xs font-black text-emerald-900">Agosto 2026</span>
+
+      <!-- Controles de Navegação de Mês -->
+      <div class="flex items-center space-x-1.5 self-end sm:self-center">
+        <button type="button" onclick="goToTodayCalendar()" 
+                class="px-3 py-1.5 rounded-xl text-xs font-black transition-all bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200" title="Ir para o dia de hoje">
+          ⚡ Hoje
+        </button>
+        <button type="button" onclick="changeCalendarMonth(-1)" 
+                class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" 
+                title="Mês Anterior">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </button>
+        <button type="button" onclick="changeCalendarMonth(1)" 
+                class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" 
+                title="Próximo Mês">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+        <input type="month" value="${year}-${String(month + 1).padStart(2, '0')}" 
+               onchange="handleMonthInputChange(this.value)" 
+               class="p-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer bg-slate-50 hover:bg-white" 
+               title="Escolher outro mês/ano">
       </div>
     </div>
 
@@ -1045,20 +1088,45 @@ function renderCalendarHTML() {
       <div class="text-emerald-700">Sáb</div>
     </div>
 
-    <!-- Grade dos 31 Dias de Agosto (Mês 8) -->
+    <!-- Grade Dinâmica dos Dias do Mês Selecionado -->
     <div class="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
   `;
 
+  // Espaços em branco antes do primeiro dia do mês
   for (let i = 0; i < firstDay; i++) {
     html += `<div class="h-11 sm:h-12"></div>`;
   }
 
+  const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+
   for (let day = 1; day <= daysInMonth; day++) {
-    const currentDayStr = `${year}-08-${String(day).padStart(2, '0')}`;
+    const currentDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isSelected = state.selectedDate === currentDayStr;
     const isToday = currentDayStr === todayStr;
-    const dayOfWeek = new Date(year, month, day).getDay();
+    const isPast = currentDayStr < todayStr;
+    const dayDate = new Date(year, month, day);
+    const dayOfWeek = dayDate.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const dOfWeek = weekDaysMap[dayOfWeek];
+
+    // Consulta no banco de dados os agendamentos deste dia
+    const dayBookings = allBookings.filter(b => {
+      const bCourt = b.court_id || b.courtId;
+      return (!selectedCourtId || bCourt === selectedCourtId) && b.date === currentDayStr && b.status !== 'cancelled';
+    });
+
+    let fixosCount = 0;
+    (state.monthlyMembers || []).forEach(m => {
+      const mCourt = m.court_id || m.courtId;
+      const d = m.day_of_week || m.dayOfWeek;
+      if ((!selectedCourtId || mCourt === selectedCourtId) && d === dOfWeek && (!m.status || m.status === 'active')) {
+        const startT = m.start_time || m.startTime || m.time || '19:00';
+        const alreadyHas = dayBookings.some(b => (b.start_time === startT || b.startTime === startT));
+        if (!alreadyHas) fixosCount++;
+      }
+    });
+
+    const totalDayMatches = dayBookings.length + fixosCount;
 
     html += `
       <button onclick="selectDate('${currentDayStr}')" 
@@ -1066,13 +1134,16 @@ function renderCalendarHTML() {
                      ${isSelected ? 
                        'bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-300 transform scale-105 z-10' : 
                        isToday ? 
-                       'border-2 border-emerald-600 text-emerald-900 font-black bg-emerald-50/70 hover:bg-emerald-100 shadow-sm' : 
+                       'border-2 border-emerald-600 text-emerald-900 font-black bg-emerald-50/80 hover:bg-emerald-100 shadow-sm' : 
+                       isPast ?
+                       'bg-slate-50/70 text-slate-400 hover:bg-slate-100 border border-slate-100' :
                        isWeekend ?
                        'bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200/80 font-bold' :
                        'bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-100 font-bold'}">
         <span>${day}</span>
-        ${isSelected ? '<span class="text-[9px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓</span>' : 
-          isToday ? '<span class="text-[9px] font-extrabold text-emerald-700 leading-none mt-0.5">Hoje</span>' : 
+        ${isSelected ? '<span class="text-[8px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓ Escolhido</span>' : 
+          isToday ? '<span class="text-[8px] font-extrabold text-emerald-700 leading-none mt-0.5">Hoje</span>' : 
+          totalDayMatches > 0 ? `<span class="text-[8px] font-black leading-none mt-0.5 ${isWeekend ? 'text-emerald-700' : 'text-slate-500'}">⚽ ${totalDayMatches}</span>` :
           isWeekend ? '<span class="w-1 h-1 rounded-full bg-emerald-500 mt-0.5"></span>' : ''}
       </button>
     `;
@@ -1087,31 +1158,65 @@ function renderCalendarHTML() {
         <i data-lucide="calendar-check" class="w-5 h-5"></i>
       </div>
       <div>
-        <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido:</span>
+        <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Data Selecionada no Banco de Dados:</span>
         <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
           ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
         </strong>
       </div>
     </div>
 
-    <!-- Atalhos Rápidos de Dias em Agosto -->
+    <!-- Atalhos Rápidos Dinâmicos do Mês -->
     <div class="mt-4 pt-3 border-t border-slate-100">
       <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center">
         <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500 mr-1.5"></i>
-        <span>Atalhos Rápidos de Dias em Agosto:</span>
+        <span>Atalhos Rápidos em ${monthsFull[month]}:</span>
       </div>
       <div class="flex flex-wrap gap-1.5">
-        ${[1, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, 31].map(d => {
-          const dStr = `2026-08-${String(d).padStart(2, '0')}`;
-          const isSel = state.selectedDate === dStr;
-          return `
-            <button onclick="selectDate('${dStr}')" 
-                    class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all
-                           ${isSel ? 'bg-emerald-600 text-white shadow-sm font-black' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
-              Dia ${d}
-            </button>
-          `;
-        }).join('')}
+  `;
+
+  const shortcuts = [];
+  if (year === now.getFullYear() && month === now.getMonth()) {
+    shortcuts.push({ label: '⚡ Hoje (' + String(now.getDate()).padStart(2, '0') + ')', dateStr: todayStr });
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+    if (tomorrow.getMonth() === month) {
+      shortcuts.push({ label: 'Amanhã (' + String(tomorrow.getDate()).padStart(2, '0') + ')', dateStr: getFormattedDate(tomorrow) });
+    }
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const testDate = new Date(year, month, d);
+    if (testDate.getDay() === 6 || testDate.getDay() === 0) { // Sáb ou Dom
+      const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (dStr >= todayStr || year !== now.getFullYear() || month !== now.getMonth()) {
+        const dowLabel = testDate.getDay() === 6 ? 'Sáb' : 'Dom';
+        shortcuts.push({ label: `${dowLabel} ${d}`, dateStr: dStr });
+        if (shortcuts.length >= 7) break;
+      }
+    }
+  }
+
+  if (shortcuts.length < 5) {
+    [1, 5, 10, 15, 20, 25, daysInMonth].forEach(d => {
+      const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (!shortcuts.some(s => s.dateStr === dStr)) {
+        shortcuts.push({ label: `Dia ${d}`, dateStr: dStr });
+      }
+    });
+  }
+
+  html += shortcuts.map(sc => {
+    const isSel = state.selectedDate === sc.dateStr;
+    return `
+      <button onclick="selectDate('${sc.dateStr}')" 
+              class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all
+                     ${isSel ? 'bg-emerald-600 text-white shadow-sm font-black' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+        ${sc.label}
+      </button>
+    `;
+  }).join('');
+
+  html += `
       </div>
     </div>
   `;
@@ -1119,8 +1224,34 @@ function renderCalendarHTML() {
   return html;
 }
 
+function changeCalendarMonth(delta) {
+  if (!state.currentMonthDate) state.currentMonthDate = new Date();
+  const d = new Date(state.currentMonthDate.getFullYear(), state.currentMonthDate.getMonth() + delta, 1);
+  state.currentMonthDate = d;
+  renderStepContent();
+  lucide.createIcons();
+}
+
+function handleMonthInputChange(val) {
+  if (!val) return;
+  const [y, m] = val.split('-').map(Number);
+  state.currentMonthDate = new Date(y, m - 1, 1);
+  renderStepContent();
+  lucide.createIcons();
+}
+
+function goToTodayCalendar() {
+  const now = new Date();
+  state.currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  selectDate(getFormattedDate(now));
+}
+
 function selectDate(dateStr) {
   state.selectedDate = dateStr;
+  if (dateStr) {
+    const [y, m] = dateStr.split('-').map(Number);
+    state.currentMonthDate = new Date(y, m - 1, 1);
+  }
   state.startTime = null;
   state.endTime = null;
   state.selectedSlots = [];
@@ -6054,6 +6185,13 @@ function goToStep(step) {
   }
 
   state.currentStep = step;
+  if (step === 2) {
+    if (!state.currentMonthDate) state.currentMonthDate = new Date();
+    if (!state.selectedDate) state.selectedDate = getFormattedDate(new Date());
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      syncDataFromSupabase();
+    }
+  }
   if (step === 3 && state.selectedCourt && state.selectedDate) {
     requestSchedule();
   }
