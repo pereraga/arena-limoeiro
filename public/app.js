@@ -3527,19 +3527,6 @@ function renderAdminCategoriesTab() {
   const categories = (state.categories || []).filter(c => c.id !== 'all');
   const usedCount = categories.filter(cat => (state.courts || []).some(c => c.category === cat.id)).length;
 
-  const iconOptions = [
-    { id: 'activity', name: 'Atividade Geral' },
-    { id: 'trophy', name: 'Troféu / Torneio' },
-    { id: 'target', name: 'Alvo / Precisão' },
-    { id: 'zap', name: 'Energia / Dinâmico' },
-    { id: 'flame', name: 'Fogo / Intenso' },
-    { id: 'compass', name: 'Treino / Fitness' },
-    { id: 'medal', name: 'Medalha / Esporte' },
-    { id: 'shield', name: 'Escudo / Defesa' },
-    { id: 'flag', name: 'Bandeira / Competição' },
-    { id: 'heart', name: 'Saúde & Lazer' }
-  ];
-
   return `
     <div class="space-y-6">
       
@@ -3561,9 +3548,9 @@ function renderAdminCategoriesTab() {
           </div>
 
           <div class="flex items-center space-x-2">
-            <button onclick="openCategoryModal()" title="Cadastrar Nova Categoria / Modalidade" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
-              <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
-              <span>Categoria</span>
+            <button onclick="openCategoryModal()" title="Cadastrar Nova Modalidade" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap cursor-pointer">
+              <i data-lucide="plus" class="w-4 h-4 text-emerald-200"></i>
+              <span>Nova Modalidade</span>
             </button>
           </div>
         </div>
@@ -3591,55 +3578,12 @@ function renderAdminCategoriesTab() {
         </div>
       </div>
 
-      <!-- Grid com Formulário de Cadastro Rápido & Lista de Categorias -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <!-- Formulário Integrado de Criação de Categoria -->
-        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+      <!-- Tabela / Cards de Todas as Categorias -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
           <div>
-            <div class="flex items-center space-x-2 mb-4 pb-3 border-b border-slate-100">
-              <span class="p-1.5 rounded-xl bg-emerald-100 text-emerald-800"><i data-lucide="plus" class="w-4 h-4"></i></span>
-              <h4 class="text-sm font-black text-slate-900 uppercase tracking-wide">Cadastrar Nova Categoria</h4>
-            </div>
-            <p class="text-xs text-slate-500 mb-4">Insira o nome da nova modalidade que deseja disponibilizar na Arena Limoeiro:</p>
-
-            <form id="adminCategoryForm" onsubmit="handleCategoryFormSubmit(event, false)" class="space-y-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome da Modalidade *</label>
-                <input type="text" id="newCategoryName" required 
-                       placeholder="Ex: Futevôlei, Basquete 3x3, Pickleball, Crossfit, Natação..." 
-                       class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Ícone Representativo</label>
-                <select id="newCategoryIcon" class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-medium">
-                  ${iconOptions.map(ico => `
-                    <option value="${ico.id}">${ico.name} (${ico.id})</option>
-                  `).join('')}
-                </select>
-              </div>
-
-              <div class="pt-2">
-                <button type="submit" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2 transition-all">
-                  <i data-lucide="check" class="w-4 h-4"></i>
-                  <span>Adicionar Categoria ao Sistema</span>
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div class="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500">
-            <span class="font-bold text-slate-700">💡 Dica Operacional:</span> Ao criar uma categoria, ela fica imediatamente disponível na barra de filtros da tela do cliente e na opção de modalidade ao cadastrar ou editar espaços e quadras.
-          </div>
-        </div>
-
-        <!-- Tabela / Cards de Todas as Categorias -->
-        <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-          <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-            <div>
-              <h4 class="text-sm font-black text-slate-900 uppercase tracking-wide">Modalidades Cadastradas</h4>
-              <p class="text-xs text-slate-500">Quadras vinculadas e opções de gerenciamento</p>
+            <h4 class="text-sm font-black text-slate-900 uppercase tracking-wide">Modalidades Cadastradas</h4>
+            <p class="text-xs text-slate-500">Quadras vinculadas e opções de gerenciamento</p>
             </div>
             <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
               ${categories.length} no total
@@ -3704,7 +3648,6 @@ function renderAdminCategoriesTab() {
             }).join('')}
           </div>
         </div>
-      </div>
 
     </div>
   `;
