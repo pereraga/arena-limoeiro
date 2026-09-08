@@ -206,7 +206,7 @@ function loadInitialData() {
       state.categories = [...defaultCats];
     }
     const localCourts = JSON.parse(localStorage.getItem('arena_local_courts') || 'null');
-    if (Array.isArray(localCourts) && localCourts.length > 0) {
+    if (localCourts !== null && Array.isArray(localCourts)) {
       state.courts = localCourts.map(normalizeCourt);
     } else {
       state.courts = (d.initialCourts || []).map(normalizeCourt);
@@ -379,8 +379,8 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
 }
 
 function calculateLocalSchedule(courtId, date) {
-  const operatingHours = [
-        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+  const allHours = [
+    "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
     "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
     "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
@@ -390,6 +390,17 @@ function calculateLocalSchedule(courtId, date) {
 
   const currentCourt = (state.courts || []).find(c => c.id === courtId);
   const courtSpecs = currentCourt ? (typeof currentCourt.specs === 'string' ? JSON.parse(currentCourt.specs || '{}') : (currentCourt.specs || {})) : {};
+
+  let operatingHours = allHours;
+  if (courtSpecs.opening_time && courtSpecs.closing_time) {
+    const sMin = timeToMinutes(courtSpecs.opening_time);
+    const eMin = timeToMinutes(courtSpecs.closing_time);
+    const filtered = allHours.filter(t => {
+      const tMin = timeToMinutes(t);
+      return tMin >= sMin && tMin <= eMin;
+    });
+    if (filtered.length > 0) operatingHours = filtered;
+  }
   const isUnderMaintenance = currentCourt && (
     currentCourt.isMaintenance === true ||
     currentCourt.status === 'maintenance' ||
@@ -3095,7 +3106,8 @@ function renderCourtsControlTab() {
                   <img src="${court.image}" class="w-full h-full object-cover">
                   <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
 
-                  <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                  <!-- Badges de Categoria e Status -->
+                  <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 pr-20">
                     <span class="bg-black/80 text-emerald-400 text-[10px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
                       ${court.categoryLabel || court.category_label || 'Esporte'}
                     </span>
@@ -3120,6 +3132,20 @@ function renderCourtsControlTab() {
                         ✓ DISPONÍVEL
                       </span>
                     `)))}
+                  </div>
+
+                  <!-- Ações Rápidas no Canto Superior Direito da Imagem -->
+                  <div class="absolute top-3 right-3 flex items-center space-x-1.5 z-10">
+                    <button onclick="openCourtModal('${court.id}')" 
+                            title="Editar valores, horas, descrição e foto desta quadra"
+                            class="p-2 bg-white/95 hover:bg-white text-slate-800 hover:text-amber-600 rounded-xl shadow-md backdrop-blur-sm transition-all cursor-pointer">
+                      <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button onclick="deleteCourt('${court.id}')" 
+                            title="Remover esta quadra do sistema"
+                            class="p-2 bg-white/95 hover:bg-rose-50 text-rose-600 hover:text-rose-700 rounded-xl shadow-md backdrop-blur-sm transition-all cursor-pointer">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
                   </div>
 
                   <div class="absolute bottom-2.5 left-3 text-white">
@@ -3166,18 +3192,36 @@ function renderCourtsControlTab() {
                   `))}
 
                   <div class="text-xs text-slate-600 space-y-1.5 pt-1">
-                    <p class="flex items-center"><i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5"></i> Piso: ${specs.surface || specs.type || 'Oficial de Alto Desempenho'}</p>
-                    <p class="flex items-center"><i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5"></i> ${specs.capacity || '14 a 16 Jogadores'}</p>
-                    <p class="flex items-center"><i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-slate-400 mr-1.5"></i> R$ ${(court.basePricePerHour || court.base_price_per_hour || 140).toFixed(2).replace('.', ',')}/hora</p>
+                    <p class="flex items-center"><i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Piso: ${specs.surface || specs.type || 'Oficial de Alto Desempenho'}</span></p>
+                    <p class="flex items-center"><i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>${specs.capacity || '14 a 16 Jogadores'}</span></p>
+                    <p class="flex items-center font-bold text-slate-900"><i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> <span>R$ ${(court.basePricePerHour || court.base_price_per_hour || 140).toFixed(2).replace('.', ',')}/hora <span class="text-slate-400 font-normal">(R$ ${(court.monthlyPrice || court.monthly_price || 500).toFixed(2).replace('.', ',')}/mês)</span></span></p>
+                    <p class="flex items-center text-slate-500 font-medium"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Horários: ${specs.opening_time || '06:00'} às ${specs.closing_time || '23:00'}</span></p>
                   </div>
                 </div>
               </div>
 
               <!-- Botões de Ação por Campo -->
               <div class="p-5 pt-0 space-y-2">
+                <!-- LINHA DE EDIÇÃO E REMOÇÃO DA QUADRA -->
+                <div class="flex items-center space-x-2">
+                  <button onclick="openCourtModal('${court.id}')" 
+                          title="Modificar valores, horas, descrição e foto desta quadra"
+                          class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
+                    <i data-lucide="edit-3" class="w-4 h-4"></i>
+                    <span>Editar Quadra</span>
+                  </button>
+
+                  <button onclick="deleteCourt('${court.id}')" 
+                          title="Remover esta quadra do sistema"
+                          class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200 font-black text-xs rounded-xl shadow-xs flex items-center justify-center space-x-1 transition-all cursor-pointer">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline text-[11px]">Excluir</span>
+                  </button>
+                </div>
+
                 <button onclick="openMaintenanceModal('${court.id}')" 
-                        class="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all">
-                  <i data-lucide="clock" class="w-4 h-4 text-rose-600"></i>
+                        class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-rose-600"></i>
                   <span>Agendar Treino / Manutenção (com Horário)</span>
                 </button>
 
@@ -5099,50 +5143,74 @@ async function handleProductSubmit(event) {
 }
 
 // MODAL DE ESPAÇO / QUADRA
+function setCourtFormImage(url) {
+  const input = document.getElementById('courtImage');
+  if (input) {
+    input.value = url;
+    const preview = document.getElementById('courtImagePreview');
+    if (preview) preview.src = url;
+  }
+}
+
 function openCourtModal(courtIdToEdit = null) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
   const isEditing = !!courtIdToEdit;
-  const court = isEditing ? state.courts.find(c => c.id === courtIdToEdit) : null;
+  const court = isEditing ? (state.courts || []).find(c => c.id === courtIdToEdit) : null;
+  const specs = court ? (typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {})) : {};
+
+  const currentOpenTime = specs.opening_time || '06:00';
+  const currentCloseTime = specs.closing_time || '23:00';
+  const currentImage = court ? court.image : 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
+
+  const defaultHoursList = [
+    "06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
+    "12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30",
+    "18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30","00:00"
+  ];
 
   modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-      <div class="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] animate-fade-in">
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
         <div class="arena-header-bg p-5 text-white flex items-center justify-between">
           <div class="flex items-center space-x-2.5">
-            <i data-lucide="${isEditing ? 'edit' : 'plus-circle'}" class="w-6 h-6 text-emerald-400"></i>
+            <div class="p-2 ${isEditing ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'} rounded-xl border border-white/10">
+              <i data-lucide="${isEditing ? 'edit-3' : 'plus-circle'}" class="w-6 h-6"></i>
+            </div>
             <div>
               <h3 class="text-lg font-black uppercase tracking-tight">
-                ${isEditing ? 'Editar Espaço de Jogo' : 'Cadastrar Novo Espaço de Jogo'}
+                ${isEditing ? 'Editar Espaço / Quadra' : 'Cadastrar Novo Espaço de Jogo'}
               </h3>
-              <p class="text-xs text-emerald-300 font-medium">Defina os detalhes, hora por jogo e observações do espaço</p>
+              <p class="text-xs text-emerald-200 font-medium">Modifique valores, horários, descrição, capacidade e fotos</p>
             </div>
           </div>
-          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1">
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
 
         <form id="courtForm" onsubmit="handleCourtFormSubmit(event, '${courtIdToEdit || ''}')" class="p-6 overflow-y-auto space-y-4">
+          
+          <!-- Nome da Quadra -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Espaço / Quadra *</label>
             <input type="text" id="courtName" required 
                    value="${court ? court.name : ''}" 
-                   placeholder="Ex: Campo Society 03 - Gramado Sintético Master" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                   placeholder="Ex: FUT 5, Campo Society 01, Arena Beach 02, etc." 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
           </div>
 
+          <!-- Modalidade e Valores -->
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <div class="flex items-center justify-between mb-1">
                 <label class="block text-xs font-bold text-slate-700 uppercase">Modalidade *</label>
-                <button type="button" onclick="openCategoryModal(true)" class="text-[11px] font-black text-emerald-600 hover:text-emerald-700 hover:underline flex items-center space-x-1">
-                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-                  <span>+ Nova Categoria</span>
+                <button type="button" onclick="openCategoryModal(true)" class="text-[11px] font-black text-emerald-600 hover:text-emerald-700 hover:underline flex items-center space-x-0.5">
+                  <span>+ Criar</span>
                 </button>
               </div>
-              <select id="courtCategory" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-semibold">
+              <select id="courtCategory" required class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800">
                 ${(state.categories || []).filter(c => c.id !== 'all').map(cat => `
                   <option value="${cat.id}" ${court && court.category === cat.id ? 'selected' : ''}>${cat.name}</option>
                 `).join('')}
@@ -5153,7 +5221,7 @@ function openCourtModal(courtIdToEdit = null) {
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Hora Avulsa (R$) *</label>
               <input type="number" step="0.50" id="courtPrice" required 
                      value="${court ? getCourtHourlyPrice(court).toFixed(2) : '140.00'}" 
-                     class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                     class="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
 
             <div>
@@ -5164,55 +5232,126 @@ function openCourtModal(courtIdToEdit = null) {
             </div>
           </div>
 
+          <!-- Horários de Funcionamento (Horas de Início e Fim) -->
+          <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+            <div class="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-wide">
+              <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
+              <span>Horários de Funcionamento da Quadra (Horas)</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Abertura / Início dos Jogos</label>
+                <select id="courtOpeningTime" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-bold text-slate-800">
+                  ${defaultHoursList.slice(0, 20).map(h => `
+                    <option value="${h}" ${currentOpenTime === h ? 'selected' : ''}>${h}</option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Término / Fim dos Jogos</label>
+                <select id="courtClosingTime" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-bold text-slate-800">
+                  ${defaultHoursList.slice(12).map(h => `
+                    <option value="${h}" ${currentCloseTime === h ? 'selected' : ''}>${h}</option>
+                  `).join('')}
+                </select>
+              </div>
+            </div>
+            <p class="text-[10px] text-slate-500 italic">Clientes só poderão agendar partidas dentro dessa faixa de horário nesta quadra.</p>
+          </div>
+
+          <!-- Capacidade e Tipo de Piso -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Capacidade de Jogadores</label>
               <input type="text" id="courtCapacity" 
-                     value="${court && court.specs ? court.specs.capacity : '14 a 16 Jogadores (7x7)'}" 
+                     value="${specs.capacity || (court ? court.capacity : '10 a 14 Jogadores') || '10 a 14 Jogadores'}" 
+                     placeholder="Ex: 10 a 12 Jogadores (5x5), 14 a 16 (7x7)..."
                      class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Piso / Estrutura</label>
               <input type="text" id="courtType" 
-                     value="${court && court.specs ? court.specs.type : 'Grama Sintética 60mm Monofilamento'}" 
+                     value="${specs.surface || specs.type || (court ? court.type : 'Grama Sintética 60mm') || 'Grama Sintética 60mm'}" 
+                     placeholder="Ex: Grama Sintética 60mm, Areia Filtrada, Piso Rápido..."
                      class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
           </div>
 
+          <!-- Descrição e Observações -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descrição do Espaço</label>
             <textarea id="courtDescription" rows="2" 
-                      placeholder="Descreva as qualidades da iluminação, cobertura e conforto..." 
+                      placeholder="Descreva as qualidades da quadra, iluminação, cobertura, vestiários e conforto..." 
                       class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">${court ? (court.description || '') : ''}</textarea>
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações / Regras</label>
             <textarea id="courtObservation" rows="2" 
-                      placeholder="Ex: Obrigatório uso de chuteiras society..." 
+                      placeholder="Ex: Proibido travas de campo, permitido apenas chuteiras society ou tênis..." 
                       class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">${court ? (court.observation || '') : ''}</textarea>
           </div>
 
+          <!-- Foto da Quadra -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Foto da Quadra (URL)</label>
-            <input type="url" id="courtImage" 
-                   value="${court ? court.image : 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 uppercase">Foto da Quadra (URL ou Atalhos Rápidos)</label>
+              <span class="text-[10px] text-slate-400">Clique para aplicar foto rápida:</span>
+            </div>
+            
+            <div class="flex flex-wrap gap-1.5 mb-2">
+              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                ⚽ Futebol Society
+              </button>
+              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                🏐 Beach Tennis
+              </button>
+              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                🏀 Ginásio / Futsal
+              </button>
+              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                🎾 Padel / Raquete
+              </button>
+            </div>
+
+            <div class="flex items-center space-x-3">
+              <input type="url" id="courtImage" 
+                     value="${currentImage}" 
+                     placeholder="https://..."
+                     onchange="const p=document.getElementById('courtImagePreview'); if(p) p.src=this.value;"
+                     class="flex-1 p-3 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono">
+              <img id="courtImagePreview" src="${currentImage}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100">
+            </div>
           </div>
 
-          <div class="pt-4 border-t border-slate-100 flex items-center justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs">Cancelar</button>
-            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-extrabold text-xs shadow-md">
-              ${isEditing ? 'Salvar Alterações' : 'Criar Espaço'}
-            </button>
+          <!-- Rodapé com Salvar e Excluir -->
+          <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+            ${isEditing ? `
+              <button type="button" onclick="deleteCourt('${courtIdToEdit}', true)" 
+                      class="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-black text-xs rounded-xl flex items-center space-x-1.5 transition-all border border-rose-200 cursor-pointer">
+                <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
+                <span>Excluir Quadra</span>
+              </button>
+            ` : '<div></div>'}
+
+            <div class="flex items-center space-x-3">
+              <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-all cursor-pointer">
+                Cancelar
+              </button>
+              <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs sm:text-sm shadow-md shadow-emerald-600/30 flex items-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>${isEditing ? 'Salvar Alterações' : 'Criar Espaço'}</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
     </div>
   `;
 
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 }
 
 async function handleCourtFormSubmit(event, courtIdToEdit) {
@@ -5226,6 +5365,8 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
   const description = document.getElementById('courtDescription').value.trim();
   const observation = document.getElementById('courtObservation').value.trim();
   const image = document.getElementById('courtImage').value.trim();
+  const openingTime = document.getElementById('courtOpeningTime')?.value || '06:00';
+  const closingTime = document.getElementById('courtClosingTime')?.value || '23:00';
 
   const categoryLabels = {
     society: "Futebol Society", beach: "Beach Tennis & Vôlei", futsal: "Ginásio Poliesportivo", padel: "Padel & Tênis"
@@ -5235,6 +5376,9 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
 
   const isEditing = !!courtIdToEdit;
   const id = isEditing ? courtIdToEdit : ('court-' + category + '-' + Date.now());
+
+  const existingCourt = isEditing ? (state.courts || []).find(c => c.id === courtIdToEdit) : null;
+  const existingSpecs = existingCourt && existingCourt.specs ? (typeof existingCourt.specs === 'string' ? JSON.parse(existingCourt.specs || '{}') : existingCourt.specs) : {};
 
   const savedCourt = {
     id,
@@ -5248,16 +5392,21 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     monthly_price: monthlyPrice,
     description,
     observation,
-    image,
+    image: image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80',
     specs: {
+      ...existingSpecs,
       type: type || "Piso Esportivo",
+      surface: type || "Piso Esportivo",
       capacity: capacity || "10 a 16 Jogadores",
-      features: ["Iluminação LED", "Vestiários"],
-      status: "Disponível"
+      opening_time: openingTime,
+      closing_time: closingTime,
+      features: existingSpecs.features || ["Iluminação LED", "Vestiários"],
+      status: existingSpecs.status || "Disponível"
     }
   };
 
   closeModal();
+
   if (isEditing) {
     const idx = state.courts.findIndex(c => c.id === courtIdToEdit);
     if (idx !== -1) state.courts[idx] = savedCourt;
@@ -5266,50 +5415,98 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     state.courts.push(savedCourt);
     state.selectedCourt = savedCourt;
   }
+
+  // Persistir em localStorage
+  try {
+    localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+  } catch(e) {
+    console.warn('Erro ao salvar no localStorage:', e);
+  }
+
   renderStepContent();
-  lucide.createIcons();
+  if (typeof renderNavbar === 'function') renderNavbar();
+  if (window.lucide) lucide.createIcons();
+
+  if (typeof showNotification === 'function') {
+    showNotification(isEditing ? `Quadra "${name}" atualizada com sucesso!` : `Quadra "${name}" criada com sucesso!`, 'success');
+  }
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
       if (isEditing) {
         await client.from('courts').update({
-          name, category, category_label: savedCourt.categoryLabel,
-          base_price_per_hour: price, monthly_price: monthlyPrice,
-          description, observation, image, specs: savedCourt.specs
+          name, 
+          category, 
+          category_label: savedCourt.categoryLabel,
+          base_price_per_hour: price, 
+          monthly_price: monthlyPrice,
+          description, 
+          observation, 
+          image: savedCourt.image, 
+          specs: savedCourt.specs
         }).eq('id', courtIdToEdit);
       } else {
         await client.from('courts').insert([{
-          id, name, category, category_label: savedCourt.categoryLabel,
-          base_price_per_hour: price, monthly_price: monthlyPrice,
-          description, observation, image, specs: savedCourt.specs,
+          id, 
+          name, 
+          category, 
+          category_label: savedCourt.categoryLabel,
+          base_price_per_hour: price, 
+          monthly_price: monthlyPrice,
+          description, 
+          observation, 
+          image: savedCourt.image, 
+          specs: savedCourt.specs,
           order_index: state.courts.length
         }]);
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Erro ao salvar quadra no Supabase:', e);
+    }
   }
 }
 
-async function deleteCourt(courtId) {
-  if (!confirm('Tem certeza que deseja excluir esta quadra?')) return;
+async function deleteCourt(courtId, fromModal = false) {
+  const court = (state.courts || []).find(c => c.id === courtId);
+  const courtName = court ? court.name : 'esta quadra';
+
+  if (!confirm(`Tem certeza que deseja excluir permanentemente a quadra "${courtName}"?\nEsta ação removerá a quadra e não poderá ser desfeita.`)) return;
+
   state.courts = state.courts.filter(c => c.id !== courtId);
-  if (state.selectedCourt && state.selectedCourt.id === courtId) state.selectedCourt = state.courts[0] || null;
+  if (state.selectedCourt && state.selectedCourt.id === courtId) {
+    state.selectedCourt = state.courts[0] || null;
+  }
+
+  // Persistir em localStorage
+  try {
+    localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+  } catch(e) {
+    console.warn('Erro ao salvar quadras no localStorage:', e);
+  }
+
+  if (fromModal || document.getElementById('modalRoot')?.innerHTML) {
+    closeModal();
+  }
+
   renderStepContent();
-  lucide.createIcons();
+  if (typeof renderNavbar === 'function') renderNavbar();
+  if (window.lucide) lucide.createIcons();
+
+  if (typeof showNotification === 'function') {
+    showNotification(`Quadra "${courtName}" excluída com sucesso!`, 'success');
+  }
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
       await client.from('courts').delete().eq('id', courtId);
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Erro ao deletar quadra no Supabase:', e);
+    }
   }
 }
 
-// ==========================================
-// GERENCIADOR DE CATEGORIAS / MODALIDADES
-// ==========================================
-
-// ==============================================================================
 // 🏷️ EDIÇÃO E PERSISTÊNCIA DE MODALIDADES / CATEGORIAS (TELA INICIAL & PAINEL)
 // ==============================================================================
 function openEditCategoryModal(catId) {
