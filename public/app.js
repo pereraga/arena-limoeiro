@@ -97,7 +97,8 @@ function normalizeCourt(c) {
   if (!c) return null;
   const price = parseFloat(c.basePricePerHour || c.base_price_per_hour || 140);
   const monthly = parseFloat(c.monthlyPrice || c.monthly_price || (price * 3.6));
-  const catLabel = c.categoryLabel || c.category_label || (
+  const foundCat = (state.categories || []).find(cat => cat.id === c.category);
+  const catLabel = (foundCat ? foundCat.name : null) || c.categoryLabel || c.category_label || (
     c.category === 'society' ? 'Futebol Society' :
     c.category === 'beach' ? 'Beach Tennis & Vôlei' :
     c.category === 'futsal' ? 'Ginásio Poliesportivo' :
@@ -195,14 +196,19 @@ function loadInitialData() {
     const d = window.ARENA_DEFAULT_DATA;
     state.arenaInfo = d.arenaInfo;
     const defaultCats = d.categories || [];
-    const localCats = JSON.parse(localStorage.getItem('arena_categories') || '[]');
-    const mergedCats = [...defaultCats];
-    localCats.forEach(lc => {
-      if (lc && lc.id && !mergedCats.some(c => c.id === lc.id)) {
-        mergedCats.push(lc);
-      }
-    });
-    state.categories = mergedCats;
+    const localCats = JSON.parse(localStorage.getItem('arena_categories') || 'null');
+    if (Array.isArray(localCats) && localCats.length > 0) {
+      const catMap = new Map();
+      defaultCats.forEach(c => catMap.set(c.id, { ...c }));
+      localCats.forEach(lc => {
+        if (lc && lc.id) {
+          catMap.set(lc.id, { ...(catMap.get(lc.id) || {}), ...lc });
+        }
+      });
+      state.categories = Array.from(catMap.values());
+    } else {
+      state.categories = [...defaultCats];
+    }
     state.courts = (d.initialCourts || []).map(normalizeCourt);
     state.products = d.initialProducts;
     const defaultMonthly = d.initialMonthlyMembers || [];
@@ -3675,11 +3681,19 @@ function renderAdminCategoriesTab() {
                   </div>
 
                   <div class="flex items-center space-x-2 self-end sm:self-center shrink-0">
+                    <!-- Botão para Editar Nome da Modalidade -->
+                    <button onclick="openEditCategoryModal('${cat.id}')" 
+                            title="Editar nome desta modalidade"
+                            class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs font-black rounded-xl flex items-center space-x-1 transition-all cursor-pointer shadow-xs">
+                      <i data-lucide="edit-3" class="w-3.5 h-3.5 text-amber-600"></i>
+                      <span>Editar Nome</span>
+                    </button>
+
                     <button onclick="openCourtWithCategory('${cat.id}')" 
                             title="Cadastrar nova quadra nesta categoria"
                             class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-black rounded-xl flex items-center space-x-1 transition-all">
                       <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                      <span>+ Nova Quadra</span>
+                      <span>Nova Quadra</span>
                     </button>
 
                     ${!isDefault ? `
@@ -5356,6 +5370,153 @@ async function deleteCourt(courtId) {
 // ==========================================
 // GERENCIADOR DE CATEGORIAS / MODALIDADES
 // ==========================================
+
+// ==============================================================================
+// 🏷️ EDIÇÃO E PERSISTÊNCIA DE MODALIDADES / CATEGORIAS (TELA INICIAL & PAINEL)
+// ==============================================================================
+function openEditCategoryModal(catId) {
+  const cat = (state.categories || []).find(c => c.id === catId);
+  if (!cat) return;
+
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const iconOptions = [
+    { id: 'trophy', name: '🏆 Troféu / Competição' },
+    { id: 'sun', name: '☀️ Sol / Beach & Areia' },
+    { id: 'activity', name: '⚡ Atividade / Ginásio' },
+    { id: 'flame', name: '🔥 Fogo / Padel & Raquete' },
+    { id: 'target', name: '🎯 Alvo / Treino' },
+    { id: 'zap', name: '⚡ Energia / Dinâmico' },
+    { id: 'medal', name: '🏅 Medalha' },
+    { id: 'heart', name: '❤️ Saúde & Bem-estar' },
+    { id: 'shield', name: '🛡️ Escudo / Torneio' },
+    { id: 'flag', name: '🚩 Bandeira' }
+  ];
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="p-2 bg-amber-500/20 text-amber-300 rounded-xl border border-amber-400/30">
+              <i data-lucide="edit-3" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base sm:text-lg font-black uppercase tracking-tight">
+                Editar Modalidade
+              </h3>
+              <p class="text-xs text-emerald-300 font-medium">Modifique o nome da categoria no sistema</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleEditCategorySubmit(event, '${cat.id}')" class="p-5 sm:p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Nome da Modalidade / Categoria *
+            </label>
+            <input type="text" id="editCategoryNameInput" required value="${cat.name}" 
+                   placeholder="Ex: Futebol Society, Beach Tennis, Futsal, etc."
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <p class="text-[11px] text-slate-500 mt-1">Este nome será exibido imediatamente na barra de filtros da tela inicial e em todas as quadras vinculadas.</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Ícone Representativo
+            </label>
+            <select id="editCategoryIconInput" class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 bg-white">
+              ${iconOptions.map(ico => `
+                <option value="${ico.id}" ${(cat.icon || 'activity') === ico.id ? 'selected' : ''}>${ico.name}</option>
+              `).join('')}
+            </select>
+          </div>
+
+          <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 font-semibold flex items-center space-x-2">
+            <span>💾</span>
+            <span>A alteração é gravada no banco e permanece salva mesmo ao atualizar a página.</span>
+          </div>
+
+          <div class="flex items-center space-x-2 pt-2">
+            <button type="button" onclick="closeModal()" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md shadow-emerald-600/30 flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Salvar Nome</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handleEditCategorySubmit(event, catId) {
+  event.preventDefault();
+  const nameInput = document.getElementById('editCategoryNameInput');
+  const iconInput = document.getElementById('editCategoryIconInput');
+  if (!nameInput) return;
+
+  const newName = nameInput.value.trim();
+  const newIcon = (iconInput && iconInput.value) || 'activity';
+
+  if (!newName) {
+    alert('Por favor, informe o novo nome da modalidade.');
+    return;
+  }
+
+  // 1. Atualiza na lista de categorias do estado
+  const cat = (state.categories || []).find(c => c.id === catId);
+  if (cat) {
+    cat.name = newName;
+    cat.icon = newIcon;
+  }
+
+  // 2. Atualiza em todas as quadras vinculadas no estado
+  (state.courts || []).forEach(court => {
+    if (court.category === catId) {
+      court.categoryLabel = newName;
+      court.category_label = newName;
+    }
+  });
+
+  // 3. Salva permanentemente em localStorage (NÃO SOME AO ATUALIZAR)
+  try {
+    localStorage.setItem('arena_categories', JSON.stringify(state.categories));
+    localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+  } catch(e) {
+    console.warn('Erro ao salvar no localStorage:', e);
+  }
+
+  // 4. Se o Supabase estiver conectado, atualiza os rótulos de quadras no banco de dados
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('courts').update({ category_label: newName }).eq('category', catId);
+    } catch(err) {
+      console.warn('Aviso sincronizacao categoria no Supabase:', err);
+    }
+  }
+
+  closeModal();
+
+  // 5. Re-renderiza a tela ativa para refletir instantaneamente a modificação
+  renderStepContent();
+  if (typeof renderNavbar === 'function') renderNavbar();
+  if (window.lucide) lucide.createIcons();
+
+  if (typeof showNotification === 'function') {
+    showNotification(`Modalidade "${newName}" atualizada com sucesso!`, 'success');
+  }
+}
+
 function openCategoryModal(returnToCourtModal = false) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
@@ -5412,11 +5573,14 @@ function openCategoryModal(returnToCourtModal = false) {
                       </div>
                       <span class="text-xs font-bold text-slate-800 truncate">${cat.name}</span>
                     </div>
-                    <div>
+                    <div class="flex items-center space-x-1">
+                      <button onclick="openEditCategoryModal('${cat.id}')" title="Editar Modalidade" class="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors cursor-pointer">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                      </button>
                       ${isDefault ? 
                         `<span class="text-[10px] font-bold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded">Padrão</span>` : 
-                        `<button onclick="deleteCategory('${cat.id}', ${returnToCourtModal})" title="Excluir Categoria" class="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors">
-                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        `<button onclick="deleteCategory('${cat.id}', ${returnToCourtModal})" title="Excluir Categoria" class="p-1.5 text-rose-500 hover:bg-rose-100 rounded-lg transition-colors cursor-pointer">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                           </button>`
                       }
                     </div>
