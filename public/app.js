@@ -3681,7 +3681,7 @@ function renderAdminTabContent() {
   }
 
   // Se for 'settings' ou uma das abas técnicas legadas:
-  const activeSubTab = state.adminSubTab || (['spaces','categories','positions','schedule','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
+  const activeSubTab = state.adminSubTab || (['spaces','categories','positions','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
 
   return `
     <div class="space-y-6">
@@ -3694,9 +3694,6 @@ function renderAdminTabContent() {
 
         <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
           Posições dos Jogos
-        </button>
-        <button onclick="setAdminSubTab('schedule')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'schedule' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Grade Geral & Bloqueios
         </button>
         <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
           Horários Fixos (${state.monthlyMembers.length})
@@ -4031,12 +4028,16 @@ function renderAdminSubTabContent(tab) {
                       `}
                     </td>
                     <td class="py-3 text-right whitespace-nowrap">
-                      <button onclick="openCustomerModal('${cust.phone}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg mr-2 transition-all">
+                      <button onclick="openCustomerModal('${cust.phone}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg mr-1.5 transition-all">
                         Ficha / Editar
                       </button>
-                      <a href="https://wa.me/55${cleanPhone}" target="_blank" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] rounded-lg transition-all">
+                      <a href="https://wa.me/55${cleanPhone}" target="_blank" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] rounded-lg mr-1.5 transition-all">
                         WhatsApp
                       </a>
+                      <button onclick="deleteCustomer('${cust.id || cust.phone}', '${encodeURIComponent(cust.name || '')}', '${cust.phone}')" class="inline-flex items-center px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[11px] rounded-lg transition-all" title="Remover atleta da base">
+                        <i data-lucide="trash-2" class="w-3 h-3 mr-1 text-rose-500"></i>
+                        <span>Excluir</span>
+                      </button>
                     </td>
                   </tr>
                 `;
@@ -6849,6 +6850,63 @@ async function saveCustomerFromAdminModal(event, existingId) {
   if (typeof showNotification === 'function') showNotification('Ficha do atleta salva com sucesso!', 'success');
 }
 
+async function deleteCustomer(targetIdOrPhone, encodedName, phone) {
+  const customerName = decodeURIComponent(encodedName || 'Atleta');
+  if (!confirm(`Deseja realmente excluir o atleta "${customerName}" da base de cadastro?\n\nEsta ação removerá o atleta do banco de dados.`)) {
+    return;
+  }
+
+  const clean = String(phone || targetIdOrPhone || '').replace(/\D/g, '');
+
+  // 1. Remove do Supabase
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      if (targetIdOrPhone && targetIdOrPhone.startsWith('cust-')) {
+        await client.from('customers').delete().eq('id', targetIdOrPhone);
+      }
+      if (clean) {
+        await client.from('customers').delete().eq('phone', clean);
+        await client.from('customers').delete().eq('phone', formatPhone(clean));
+        if (clean.length >= 8) {
+          await client.from('customers').delete().ilike('phone', `%${clean.slice(-8)}%`);
+        }
+      }
+    } catch (err) {
+      console.warn('Aviso ao excluir cliente do Supabase:', err);
+    }
+  }
+
+  // 2. Remove da memória local do estado
+  if (state.supabaseCustomers) {
+    state.supabaseCustomers = state.supabaseCustomers.filter(c => {
+      const cClean = (c.phone || '').replace(/\D/g, '');
+      const matchId = targetIdOrPhone && c.id === targetIdOrPhone;
+      const matchPhone = clean && (cClean === clean || (cClean.length >= 8 && clean.length >= 8 && cClean.endsWith(clean.slice(-8))));
+      return !matchId && !matchPhone;
+    });
+  }
+
+  // 3. Remove do localStorage
+  try {
+    let localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+    localCusts = localCusts.filter(c => {
+      const cClean = (c.phone || '').replace(/\D/g, '');
+      const matchId = targetIdOrPhone && c.id === targetIdOrPhone;
+      const matchPhone = clean && (cClean === clean || (cClean.length >= 8 && clean.length >= 8 && cClean.endsWith(clean.slice(-8))));
+      return !matchId && !matchPhone;
+    });
+    localStorage.setItem('arena_customers', JSON.stringify(localCusts));
+  } catch (e) {}
+
+  if (typeof showNotification === 'function') {
+    showNotification(`Atleta "${customerName}" excluído com sucesso!`, 'info');
+  }
+
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+}
+
 // MODAL DE IDENTIFICAÇÃO E CONFIRMAÇÃO DO PELADEIRO (SEM PIX)
 function openCheckoutModal() {
   const court = state.selectedCourt;
@@ -7618,32 +7676,8 @@ async function loadSupabaseCustomers() {
       const { data, error } = await client.from('customers').select('*').order('created_at', { ascending: false });
       if (data && !error) {
         state.supabaseCustomers = data;
-        // Consolida com o localStorage para que o preenchimento seja imediato
         try {
-          const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
-          const map = new Map();
-          data.forEach(c => {
-            const clean = (c.phone || '').replace(/\D/g, '');
-            if (clean) map.set(clean, c);
-          });
-          local.forEach(c => {
-            const clean = (c.phone || '').replace(/\D/g, '');
-            if (clean) {
-              if (!map.has(clean)) {
-                map.set(clean, c);
-              } else {
-                const current = map.get(clean);
-                map.set(clean, {
-                  ...current,
-                  cpf: current.cpf || c.cpf,
-                  emergency_contact: current.emergency_contact || c.emergency_contact,
-                  health_notes: current.health_notes || c.health_notes,
-                  birth_date: current.birth_date || c.birth_date
-                });
-              }
-            }
-          });
-          localStorage.setItem('arena_customers', JSON.stringify(Array.from(map.values())));
+          localStorage.setItem('arena_customers', JSON.stringify(data));
         } catch(e) {}
 
         if (state.currentMode === 'admin' && state.adminTab === 'customers') renderStepContent();
