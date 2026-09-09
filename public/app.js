@@ -126,18 +126,55 @@ function normalizeCourt(c) {
     orderIndex: order,
     order_index: order,
     specs: specsObj,
+    discountPricePerHour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
+    discount_price_per_hour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
+    discountStartTime: specsObj.discount_start_time || c.discountStartTime || '09:00',
+    discountEndTime: specsObj.discount_end_time || c.discountEndTime || '16:00',
     image: c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
   };
 }
 
-function getCourtHourlyPrice(court) {
+function getCourtNormalHourlyPrice(court) {
   if (!court) return 140;
   return parseFloat(court.basePricePerHour || court.base_price_per_hour || 140);
 }
 
+function getCourtDiscountInfo(court) {
+  if (!court) return { hasDiscount: false, discountPrice: 0, startHour: '09:00', endHour: '16:00' };
+  const specs = court.specs ? (typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : court.specs) : {};
+  const discountPrice = parseFloat(court.discountPricePerHour || court.discount_price_per_hour || specs.discount_price_per_hour || 0);
+  const startHour = specs.discount_start_time || court.discountStartTime || court.discount_start_time || '09:00';
+  const endHour = specs.discount_end_time || court.discountEndTime || court.discount_end_time || '16:00';
+  const hasDiscount = discountPrice > 0;
+  return { hasDiscount, discountPrice, startHour, endHour };
+}
+
+function isCourtDiscountTime(court, time) {
+  if (!court || !time) return false;
+  const { hasDiscount, startHour, endHour } = getCourtDiscountInfo(court);
+  if (!hasDiscount) return false;
+
+  const tMin = timeToMinutes(time);
+  const sMin = timeToMinutes(startHour);
+  const eMin = timeToMinutes(endHour);
+
+  return tMin >= sMin && tMin <= eMin;
+}
+
+function getCourtHourlyPrice(court, time = null) {
+  if (!court) return 140;
+  const normalPrice = getCourtNormalHourlyPrice(court);
+  const checkTime = time || (typeof state !== 'undefined' ? state.startTime : null);
+  if (checkTime && isCourtDiscountTime(court, checkTime)) {
+    const { discountPrice } = getCourtDiscountInfo(court);
+    if (discountPrice > 0) return discountPrice;
+  }
+  return normalPrice;
+}
+
 function getCourtMonthlyPrice(court) {
   if (!court) return 500;
-  return parseFloat(court.monthlyPrice || court.monthly_price || (getCourtHourlyPrice(court) * 3.6));
+  return parseFloat(court.monthlyPrice || court.monthly_price || (getCourtNormalHourlyPrice(court) * 3.6));
 }
 
 function canAdvanceFromStep(step) {
@@ -856,20 +893,43 @@ function renderStep1(container) {
                 </div>
 
                 <div>
-                  <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <div>
-                      <span class="text-[11px] text-slate-400 font-medium block">Valor da Hora</span>
-                      <div class="flex items-baseline">
-                        <strong class="text-xl font-black text-emerald-700 leading-tight">R$ ${pricePerHour.toFixed(2).replace('.', ',')}</strong>
-                        <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ ${pricePerHour.toFixed(2).replace('.', ',')}</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
                       </div>
+                      ${(court.isMaintenance || (specs && specs.status === 'maintenance')) ? `
+                        <span class="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center space-x-1 cursor-not-allowed">
+                          <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                          <span>Em Manutenção</span>
+                        </span>
+                      ` : ''}
                     </div>
-                    ${(court.isMaintenance || (specs && specs.status === 'maintenance')) ? `
-                      <span class="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 flex items-center space-x-1 cursor-not-allowed">
-                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
-                        <span>Em Manutenção</span>
-                      </span>
-                    ` : ''}
+
+                    ${(() => {
+                      const dInfo = getCourtDiscountInfo(court);
+                      if (dInfo.hasDiscount) {
+                        return `
+                          <div class="mt-2.5 p-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-300 rounded-xl flex items-center justify-between">
+                            <div class="flex items-center space-x-1.5">
+                              <span class="text-sm">🔥</span>
+                              <div>
+                                <span class="text-[10px] font-black uppercase text-amber-900 block leading-none">Desconto de Horário</span>
+                                <span class="text-[11px] font-bold text-amber-800">${dInfo.startHour} às ${dInfo.endHour}</span>
+                              </div>
+                            </div>
+                            <span class="text-xs font-black text-amber-900 bg-white px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                              R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
+                            </span>
+                          </div>
+                        `;
+                      }
+                      return '';
+                    })()}
                   </div>
 
                   <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
@@ -976,8 +1036,16 @@ function renderStep2(container) {
               Campo Selecionado
             </span>
             <h2 class="text-base sm:text-xl font-black mt-1 leading-tight">${court.name}</h2>
-            <p class="text-xs text-emerald-300 font-bold mt-0.5">
-              R$ ${getCourtHourlyPrice(court).toFixed(2).replace('.', ',')} / hora
+            <p class="text-xs text-emerald-300 font-bold mt-1 flex items-center flex-wrap gap-2">
+              <span>R$ ${getCourtNormalHourlyPrice(court).toFixed(2).replace('.', ',')} / hora (Normal)</span>
+              ${(() => {
+                const dInfo = getCourtDiscountInfo(court);
+                return dInfo.hasDiscount ? `
+                  <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center shadow-xs">
+                    🔥 ${dInfo.startHour} às ${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
+                  </span>
+                ` : '';
+              })()}
             </p>
           </div>
         </div>
@@ -1285,8 +1353,16 @@ function renderStep3Content() {
           <h2 class="text-base sm:text-xl font-black mt-1">
             ${state.bookingType === 'mensalista' ? `Toda ${state.monthlyDayOfWeek}-feira` : formatFullDate(state.selectedDate)}
           </h2>
-          <p class="text-xs text-emerald-300 font-bold mt-0.5">
-            ${court.name} • R$ ${basePrice.toFixed(2).replace('.', ',')} / hora
+          <p class="text-xs text-emerald-300 font-bold mt-1 flex items-center flex-wrap gap-2">
+            <span>${court.name} • R$ ${getCourtNormalHourlyPrice(court).toFixed(2).replace('.', ',')}/h (Normal)</span>
+            ${(() => {
+              const dInfo = getCourtDiscountInfo(court);
+              return dInfo.hasDiscount ? `
+                <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center shadow-xs">
+                  🔥 ${dInfo.startHour} às ${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
+                </span>
+              ` : '';
+            })()}
           </p>
         </div>
         <button onclick="goToStep(2)" class="text-xs text-emerald-300 hover:text-white underline font-bold flex items-center">
@@ -1305,6 +1381,27 @@ function renderStep3Content() {
             <p class="text-xs text-slate-500">Toque no horário de início e no horário de término para definir o tempo de jogo (ex: 17:00 até 18:00 = 1 hora).</p>
           </div>
         </div>
+
+        ${(() => {
+          const dInfo = getCourtDiscountInfo(court);
+          if (dInfo.hasDiscount) {
+            return `
+              <div class="my-4 p-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl shadow-md flex items-center justify-between gap-3">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                  <span class="p-2 bg-white/20 rounded-xl text-lg shrink-0">🔥</span>
+                  <div>
+                    <p class="text-xs font-black uppercase tracking-wider">Horário com Desconto Especial!</p>
+                    <p class="text-[11px] opacity-95">Das <strong>${dInfo.startHour}</strong> às <strong>${dInfo.endHour}</strong> o valor cai de <span class="line-through opacity-80">R$ ${getCourtNormalHourlyPrice(court).toFixed(2).replace('.', ',')}</span> para apenas <strong class="text-white text-xs bg-black/30 px-1.5 py-0.5 rounded">R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/hora</strong>!</p>
+                  </div>
+                </div>
+                <span class="hidden sm:inline-block px-3 py-1 bg-white text-orange-600 font-black text-xs rounded-xl shadow-xs shrink-0">
+                  Desconto Ativo
+                </span>
+              </div>
+            `;
+          }
+          return '';
+        })()}
 
         <!-- Legenda -->
         <div class="flex flex-wrap gap-2 mb-5 mt-3">
@@ -1349,15 +1446,18 @@ function renderStep3Content() {
               let nameLabel = '';
               let clickable = '';
 
+              const dInfo = getCourtDiscountInfo(court);
+              const isDiscountSlot = dInfo.hasDiscount && isCourtDiscountTime(court, slot.time);
+
               if (isAvail) {
                 if (isSelected) {
                   const isStart = state.startTime === slot.time;
                   const isEnd = state.endTime === slot.time;
                   let slotBadge = '';
                   if (isStart && isEnd) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Horário</span>';
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Horário' + (isDiscountSlot ? ' 🔥' : '') + '</span>';
                   } else if (isStart) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (' + slot.time + ')</span>';
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (' + slot.time + ')' + (isDiscountSlot ? ' 🔥' : '') + '</span>';
                   } else if (isEnd) {
                     slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Término (' + slot.time + ')</span>';
                   } else {
@@ -1365,11 +1465,17 @@ function renderStep3Content() {
                   }
                   cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer transform scale-[1.02] transition-all';
                   badge = slotBadge;
-                  icon = '🟢';
+                  icon = isDiscountSlot ? '🔥' : '🟢';
                 } else {
-                  cardClass = 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all';
-                  badge = '<span class="text-[10px] font-bold text-emerald-700">Livre ✓</span>';
-                  icon = '🟢';
+                  if (isDiscountSlot) {
+                    cardClass = 'bg-amber-50/90 border-2 border-amber-400 text-amber-950 hover:bg-amber-100 hover:border-amber-500 cursor-pointer transition-all shadow-xs';
+                    badge = '<span class="text-[10px] font-black text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded-md">🔥 R$ ' + dInfo.discountPrice.toFixed(0) + '/h (Desconto)</span>';
+                    icon = '🔥';
+                  } else {
+                    cardClass = 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all';
+                    badge = '<span class="text-[10px] font-bold text-emerald-700">Livre ✓</span>';
+                    icon = '🟢';
+                  }
                 }
                 clickable = `onclick="handleSlotClick('${slot.time}')"`;
               } else if (isLiveNow) {
@@ -1416,31 +1522,47 @@ function renderStep3Content() {
         })()}
 
           <!-- Resumo do horário selecionado -->
-          ${state.startTime && state.endTime ? `
-          <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase">Tempo Reservado</span>
-                <span class="text-xs text-emerald-950 font-black">${state.startTime} às ${state.endTime}</span>
+          ${state.startTime && state.endTime ? (() => {
+            const isDiscApplied = isCourtDiscountTime(court, state.startTime);
+            const effectivePrice = getCourtHourlyPrice(court, state.startTime);
+            const normalPrice = getCourtNormalHourlyPrice(court);
+
+            return `
+              <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+                <div>
+                  <div class="flex items-center space-x-2 flex-wrap gap-1">
+                    <span class="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase">Tempo Reservado</span>
+                    <span class="text-xs text-emerald-950 font-black">${state.startTime} às ${state.endTime}</span>
+                    ${isDiscApplied ? `
+                      <span class="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase flex items-center shadow-xs">
+                        🔥 Desconto Aplicado (09h às 16h)
+                      </span>
+                    ` : ''}
+                  </div>
+                  <p class="text-base sm:text-lg font-black text-slate-900 mt-1">
+                    ⏱️ Tempo Total: <span class="text-emerald-800">${formattedDuration}</span>
+                  </p>
+                  <p class="text-xs text-slate-600 mt-0.5">
+                    ${isDiscApplied ? `
+                      Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h <span class="line-through text-slate-400 text-[11px]">R$ ${normalPrice.toFixed(2)}</span> (Desconto Especial de Horário)
+                    ` : `
+                      Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h
+                    `}
+                  </p>
+                </div>
+                <div class="text-right bg-white px-5 py-3 rounded-xl border border-emerald-300 shadow-sm w-full sm:w-auto">
+                  <span class="text-[11px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
+                  <p class="text-xl sm:text-2xl font-black text-emerald-800">
+                    R$ ${courtFinalPrice.toFixed(2).replace('.', ',')}
+                  </p>
+                </div>
               </div>
-              <p class="text-base sm:text-lg font-black text-slate-900 mt-1">
-                ⏱️ Tempo Total: <span class="text-emerald-800">${formattedDuration}</span>
-              </p>
-              <p class="text-xs text-slate-600 mt-0.5">
-                Cálculo: ${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h
-              </p>
-            </div>
-            <div class="text-right bg-white px-5 py-3 rounded-xl border border-emerald-300 shadow-sm w-full sm:w-auto">
-              <span class="text-[11px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
-              <p class="text-xl sm:text-2xl font-black text-emerald-800">
-                R$ ${courtFinalPrice.toFixed(2).replace('.', ',')}
-              </p>
-            </div>
-          </div>
-          ` : `
+            `;
+          })() : `
           <div class="p-4 bg-emerald-50/70 border-2 border-dashed border-emerald-300 rounded-2xl text-center text-emerald-900 text-xs font-bold mt-4 flex items-center justify-center space-x-2">
             <span class="text-base">👉</span>
             <span>Toque em um horário verde acima para iniciar a sua reserva</span>
+          </div>
           `}
       </div>
 
@@ -1791,7 +1913,12 @@ function renderStep4(container) {
           <div>
             <h4 class="text-base font-black text-slate-900">${court.name}</h4>
             <p class="text-xs text-slate-500 mt-0.5">
-              ${isMensal ? '👑 Contrato de Horário Fixo (Horário semanal com 4 jogos no mês)' : `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h)`}
+              ${isMensal ? '👑 Contrato de Horário Fixo (Horário semanal com 4 jogos no mês)' : 
+                (isCourtDiscountTime(court, state.startTime) ? 
+                  `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h) <span class="text-amber-900 font-black bg-amber-100 border border-amber-300 px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 mt-1 sm:mt-0">🔥 Desconto de Horário (${getCourtDiscountInfo(court).startHour} às ${getCourtDiscountInfo(court).endHour})</span>` : 
+                  `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h)`
+                )
+              }
             </p>
           </div>
           <div class="text-right">
@@ -3194,7 +3321,13 @@ function renderCourtsControlTab() {
                   <div class="text-xs text-slate-600 space-y-1.5 pt-1">
                     <p class="flex items-center"><i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Piso: ${specs.surface || specs.type || 'Oficial de Alto Desempenho'}</span></p>
                     <p class="flex items-center"><i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>${specs.capacity || '14 a 16 Jogadores'}</span></p>
-                    <p class="flex items-center font-bold text-slate-900"><i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> <span>R$ ${(court.basePricePerHour || court.base_price_per_hour || 140).toFixed(2).replace('.', ',')}/hora <span class="text-slate-400 font-normal">(R$ ${(court.monthlyPrice || court.monthly_price || 500).toFixed(2).replace('.', ',')}/mês)</span></span></p>
+                    <p class="flex items-center font-bold text-slate-900"><i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> <span>R$ ${(court.basePricePerHour || court.base_price_per_hour || 140).toFixed(2).replace('.', ',')}/hora (Normal)</span></p>
+                    ${specs.discount_price_per_hour && parseFloat(specs.discount_price_per_hour) > 0 ? `
+                      <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200">
+                        <span class="mr-1">🔥</span> 
+                        <span>${specs.discount_start_time || '09:00'} às ${specs.discount_end_time || '16:00'}: R$ ${parseFloat(specs.discount_price_per_hour).toFixed(2).replace('.', ',')}/h (Desconto)</span>
+                      </p>
+                    ` : ''}
                     <p class="flex items-center text-slate-500 font-medium"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Horários: ${specs.opening_time || '06:00'} às ${specs.closing_time || '23:00'}</span></p>
                   </div>
                 </div>
@@ -3853,13 +3986,26 @@ function renderAdminSubTabContent(tab) {
                   <span class="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase">${court.categoryLabel || 'Esporte'}</span>
                   <h4 class="text-base font-black text-slate-900 mt-1">${court.name}</h4>
                   <p class="text-xs text-slate-500 line-clamp-2 mt-1">${court.description || 'Sem descrição'}</p>
-                  <p class="text-sm font-black text-emerald-700 mt-2">R$ ${(court.basePricePerHour || court.base_price_per_hour || 140).toFixed(2).replace('.', ',')}/h</p>
+                  <div class="mt-2 flex items-center justify-between flex-wrap gap-1">
+                    <span class="text-sm font-black text-emerald-700">R$ ${(court.basePricePerHour || court.base_price_per_hour || 140).toFixed(2).replace('.', ',')}/h (Normal)</span>
+                    ${(() => {
+                      const dInfo = getCourtDiscountInfo(court);
+                      return dInfo.hasDiscount ? `
+                        <span class="text-[10px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded-md">
+                          🔥 ${dInfo.startHour}-${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
+                        </span>
+                      ` : '';
+                    })()}
+                  </div>
                 </div>
               </div>
               <div class="p-4 pt-0 flex space-x-2">
                 <button onclick="openCourtModal('${court.id}')" class="flex-1 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-1">
                   <i data-lucide="edit" class="w-3.5 h-3.5 text-emerald-400"></i>
                   <span>Editar</span>
+                </button>
+                <button onclick="deleteCourt('${court.id}')" title="Excluir Quadra" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl flex items-center justify-center transition-all">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
               </div>
             </div>
@@ -5203,7 +5349,7 @@ function openCourtModal(courtIdToEdit = null) {
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Hora Avulsa (R$) *</label>
               <input type="number" step="0.50" id="courtPrice" required 
-                     value="${court ? getCourtHourlyPrice(court).toFixed(2) : '140.00'}" 
+                     value="${court ? getCourtNormalHourlyPrice(court).toFixed(2) : '140.00'}" 
                      class="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
 
@@ -5215,11 +5361,11 @@ function openCourtModal(courtIdToEdit = null) {
             </div>
           </div>
 
-          <!-- Horários de Funcionamento (Horas de Início e Fim) -->
+          <!-- Horários de Funcionamento da Quadra -->
           <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
             <div class="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-wide">
               <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
-              <span>Horários de Funcionamento da Quadra (Horas)</span>
+              <span>Horários de Funcionamento (Horas Normais 06:00 às 22:00 / 23:00)</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
@@ -5240,7 +5386,51 @@ function openCourtModal(courtIdToEdit = null) {
                 </select>
               </div>
             </div>
-            <p class="text-[10px] text-slate-500 italic">Clientes só poderão agendar partidas dentro dessa faixa de horário nesta quadra.</p>
+            <p class="text-[10px] text-slate-500 italic">Horário integral de funcionamento no qual vigora o valor cheio por hora.</p>
+          </div>
+
+          <!-- DESCONTO DE HORÁRIO PROMOCIONAL (09:00 ÀS 16:00) -->
+          <div class="p-4 bg-amber-50/80 border-2 border-amber-300 rounded-2xl space-y-3">
+            <div class="flex items-center space-x-2">
+              <span class="p-1.5 bg-amber-500 text-white rounded-lg text-sm">🔥</span>
+              <div>
+                <h4 class="text-xs font-black text-amber-950 uppercase tracking-wide">Desconto por Horário (09h às 16h)</h4>
+                <p class="text-[11px] text-amber-800">Coloque o valor com desconto que será exibido na tela para os clientes</p>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div>
+                <label class="block text-[11px] font-black text-amber-950 uppercase mb-1">Valor com Desconto (R$/h)</label>
+                <input type="number" step="0.50" id="courtDiscountPrice" 
+                       value="${specs.discount_price_per_hour || (court ? court.discountPricePerHour : '') || ''}" 
+                       placeholder="Ex: 50.00 ou 60.00" 
+                       class="w-full p-2.5 border border-amber-300 bg-white rounded-xl text-sm font-black text-amber-900 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Início do Desconto</label>
+                <select id="courtDiscountStart" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-bold text-slate-800">
+                  ${defaultHoursList.slice(0, 24).map(h => `
+                    <option value="${h}" ${(specs.discount_start_time || '09:00') === h ? 'selected' : ''}>${h}</option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Fim do Desconto</label>
+                <select id="courtDiscountEnd" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-bold text-slate-800">
+                  ${defaultHoursList.slice(6, 30).map(h => `
+                    <option value="${h}" ${(specs.discount_end_time || '16:00') === h ? 'selected' : ''}>${h}</option>
+                  `).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="p-2.5 bg-white/90 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start space-x-2">
+              <span class="font-bold shrink-0">💡 Como funciona:</span>
+              <span>Nos horários normais (06h às 22h) vale o valor cheio. Das <strong>09h às 16h</strong>, os clientes verão o valor com desconto destacado com a tag de promoção na tela e pagarão o valor promocional!</span>
+            </div>
           </div>
 
           <!-- Capacidade e Tipo de Piso -->
@@ -5350,6 +5540,9 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
   const image = document.getElementById('courtImage').value.trim();
   const openingTime = document.getElementById('courtOpeningTime')?.value || '06:00';
   const closingTime = document.getElementById('courtClosingTime')?.value || '23:00';
+  const discountPrice = parseFloat(document.getElementById('courtDiscountPrice')?.value) || 0;
+  const discountStart = document.getElementById('courtDiscountStart')?.value || '09:00';
+  const discountEnd = document.getElementById('courtDiscountEnd')?.value || '16:00';
 
   const categoryLabels = {
     society: "Futebol Society", beach: "Beach Tennis & Vôlei", futsal: "Ginásio Poliesportivo", padel: "Padel & Tênis"
@@ -5383,9 +5576,16 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
       capacity: capacity || "10 a 16 Jogadores",
       opening_time: openingTime,
       closing_time: closingTime,
+      discount_price_per_hour: discountPrice,
+      discount_start_time: discountStart,
+      discount_end_time: discountEnd,
       features: existingSpecs.features || ["Iluminação LED", "Vestiários"],
       status: existingSpecs.status || "Disponível"
-    }
+    },
+    discountPricePerHour: discountPrice,
+    discount_price_per_hour: discountPrice,
+    discountStartTime: discountStart,
+    discountEndTime: discountEnd
   };
 
   closeModal();
@@ -6348,7 +6548,7 @@ function renderBottomBar() {
       <div class="flex items-center space-x-2 sm:space-x-4">
         ${court && state.currentStep >= 3 ? `
           <div class="text-right">
-            <span class="text-[10px] sm:text-[11px] text-slate-400 block font-bold leading-tight">${isMensal ? 'Mensal' : 'Total Horas'}</span>
+            <span class="text-[10px] sm:text-[11px] text-slate-400 block font-bold leading-tight">${isMensal ? 'Mensal' : (isCourtDiscountTime(court, state.startTime) ? '🔥 Total c/ Desconto' : 'Total Horas')}</span>
             <span class="text-sm sm:text-base font-black text-emerald-900 leading-tight">
               R$ ${courtPrice.toFixed(2).replace('.', ',')}
             </span>

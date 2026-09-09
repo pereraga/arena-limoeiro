@@ -54,8 +54,15 @@ const initialCourts = [
       type: "Grama Sintética 60mm Monofilamento (FIFA Quality)",
       capacity: "14 a 16 Jogadores (7x7 / 8x8)",
       features: ["Iluminação LED 800W Pro", "Placar Eletrônico Digital", "Vestiários com Ducha Quente", "Churrasqueira Anexa"],
-      status: "Disponível"
-    }
+      status: "Disponível",
+      discount_price_per_hour: 80.00,
+      discount_start_time: "09:00",
+      discount_end_time: "16:00"
+    },
+    discountPricePerHour: 80.00,
+    discount_price_per_hour: 80.00,
+    discountStartTime: "09:00",
+    discountEndTime: "16:00"
   },
   {
     id: "court-society-2",
@@ -94,8 +101,15 @@ const initialCourts = [
       type: "Areia Especial Tratada e Filtrada (Não queima o pé)",
       capacity: "4 a 8 Jogadores",
       features: ["Rede Oficial Regulável", "Iluminação Noturna sem Ofuscamento", "Duchas ao Lado", "Kiosk Bar Próximo"],
-      status: "Disponível"
-    }
+      status: "Disponível",
+      discount_price_per_hour: 60.00,
+      discount_start_time: "09:00",
+      discount_end_time: "16:00"
+    },
+    discountPricePerHour: 60.00,
+    discount_price_per_hour: 60.00,
+    discountStartTime: "09:00",
+    discountEndTime: "16:00"
   },
   {
     id: "court-beach-2",
