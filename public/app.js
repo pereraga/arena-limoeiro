@@ -326,6 +326,8 @@ async function autoAdvanceFinishedMatches() {
       renderStepContent();
     }
     requestSchedule();
+  } else if (state.currentStep === 3) {
+    requestSchedule();
   }
 }
 
@@ -335,6 +337,21 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   const eMin = timeToMinutes(endTime);
   if (sMin >= eMin) {
     return { conflict: true, reason: 'O horário de término deve ser posterior ao horário de início.' };
+  }
+
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (date < todayStr) {
+    return { conflict: true, reason: 'Não é possível agendar partidas em datas anteriores.' };
+  }
+
+  if (date === todayStr && sMin <= currentMinutes) {
+    return { 
+      conflict: true, 
+      reason: `O horário selecionado (${startTime}) já se encerrou no dia de hoje. Por favor, selecione um horário futuro a partir de agora.` 
+    };
   }
 
   const court = (state.courts || []).find(c => c.id === courtId);
@@ -460,6 +477,12 @@ function calculateLocalSchedule(courtId, date) {
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const isDateToday = date === todayStr;
+  const isDatePast = date < todayStr;
+
   // 1. Janelas de Manutenção / Treinos Reservados por Horário
   const localMaint = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
   const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
@@ -474,6 +497,7 @@ function calculateLocalSchedule(courtId, date) {
 
   return operatingHours.map(time => {
     const slotMin = timeToMinutes(time);
+    const isSlotPast = isDatePast || (isDateToday && slotMin <= currentMinutes);
 
     // Checagem 1: Manutenção por janela de horário neste campo
     const maintBlock = allMaint.find(mb => {
@@ -490,6 +514,7 @@ function calculateLocalSchedule(courtId, date) {
         status: "maintenance",
         statusLabel: maintBlock.reason || "Treino Reservado / Manutenção",
         isMaintenance: true,
+        isPast: isSlotPast,
         customerName: maintBlock.reason || "Treino Reservado",
         isAvailable: false
       };
@@ -519,6 +544,7 @@ function calculateLocalSchedule(courtId, date) {
         status: "booked",
         statusLabel: "Mensalista Fixo",
         isMensalista: true,
+        isPast: isSlotPast,
         customerName: (monthlyHolder.team_name || monthlyHolder.teamName) + " (" + (monthlyHolder.responsible_name || monthlyHolder.responsibleName) + ")",
         isAvailable: false
       };
@@ -549,7 +575,19 @@ function calculateLocalSchedule(courtId, date) {
         statusLabel: isM ? (booking.observation || "Treino Reservado / Manutenção") : "Reservado",
         isMaintenance: isM,
         isMensalista: booking.bookingType === 'mensalista' || booking.booking_type === 'mensalista',
+        isPast: isSlotPast,
         customerName: booking.customer_name || booking.customerName || (isM ? "Treino Reservado" : "Cliente"),
+        isAvailable: false
+      };
+    }
+
+    // Checagem 4: Bloqueio automático de horários que já passaram hoje ou em datas anteriores
+    if (isSlotPast) {
+      return {
+        time,
+        status: "past",
+        statusLabel: "Horário Encerrado",
+        isPast: true,
         isAvailable: false
       };
     }
@@ -1175,8 +1213,19 @@ function renderCalendarHTML() {
     const currentDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isSelected = state.selectedDate === currentDayStr;
     const isToday = currentDayStr === todayStr;
+    const isPastDay = currentDayStr < todayStr;
     const dayOfWeek = new Date(year, month, day).getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+    if (isPastDay) {
+      html += `
+        <button disabled 
+                class="h-11 sm:h-12 w-full rounded-2xl text-xs sm:text-sm font-bold text-slate-300 bg-slate-50/60 border border-slate-100 flex flex-col items-center justify-center cursor-not-allowed opacity-40 select-none">
+          <span>${day}</span>
+        </button>
+      `;
+      continue;
+    }
 
     html += `
       <button onclick="selectDate('${currentDayStr}')" 
@@ -1221,6 +1270,7 @@ function renderCalendarHTML() {
       <div class="flex flex-wrap gap-1.5">
         ${[1, 5, 8, 10, 12, 15, 18, 20, 22, 25, 28, daysInMonth].filter((v, i, a) => a.indexOf(v) === i && v <= daysInMonth).map(d => {
           const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          if (dStr < todayStr) return '';
           const isSel = state.selectedDate === dStr;
           return `
             <button onclick="selectDate('${dStr}')" 
@@ -1260,6 +1310,12 @@ function goToTodayCalendar() {
 }
 
 function selectDate(dateStr) {
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+  if (dateStr && dateStr < todayStr) {
+    alert('Não é possível selecionar uma data que já passou.');
+    return;
+  }
   state.selectedDate = dateStr;
   if (dateStr) {
     const [y, m] = dateStr.split('-').map(Number);
@@ -1342,10 +1398,16 @@ function renderStep3Content() {
     "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
   ];
 
+  const nowStep3 = new Date();
+  const todayStrStep3 = getFormattedDate(nowStep3);
+  const nowMinStep3 = nowStep3.getHours() * 60 + nowStep3.getMinutes();
+  const isSelectedDateToday = state.selectedDate === todayStrStep3;
+
   const validStartHours = availableHourStrings.length > 0 ? 
     availableHourStrings : 
     fallbackHours.filter(h => {
-      const slot = state.slots.find(s => s.time === h);
+      if (isSelectedDateToday && timeToMinutes(h) <= nowMinStep3) return false;
+      const slot = (state.slots || []).find(s => s.time === h);
       return !slot || slot.status === 'available';
     });
 
@@ -1430,6 +1492,9 @@ function renderStep3Content() {
           <span class="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
             <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Manutenção
           </span>
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Encerrado
+          </span>
         </div>
 
         <!-- Grade de horários -->
@@ -1446,6 +1511,7 @@ function renderStep3Content() {
               const isAvail = slot.status === 'available';
               const isMaint = slot.status === 'maintenance';
               const isBooked = slot.status === 'booked';
+              const isPast = slot.status === 'past' || slot.isPast;
 
               // Verifica se está rolando agora
               const isLiveNow = isToday && isBooked && slotMin <= nowMin && slotEndMin > nowMin;
@@ -1503,6 +1569,11 @@ function renderStep3Content() {
                 badge = '<span class="text-[10px] font-bold text-amber-700">Manutenção</span>';
                 icon = '🔧';
                 nameLabel = slot.statusLabel ? `<span class="text-[10px] text-amber-600 truncate block mt-0.5">${slot.statusLabel}</span>` : '';
+              } else if (isPast) {
+                cardClass = 'bg-slate-100/70 border-2 border-slate-200 text-slate-400 cursor-not-allowed opacity-60';
+                badge = '<span class="text-[10px] font-bold text-slate-400">Encerrado ⏰</span>';
+                icon = '⏳';
+                nameLabel = '<span class="text-[10px] text-slate-400 truncate block mt-0.5">Horário já passou</span>';
               }
 
               return `
@@ -1525,7 +1596,7 @@ function renderStep3Content() {
             <div class="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-center">
               <i data-lucide="alert-circle" class="w-6 h-6 text-rose-600 mx-auto mb-1"></i>
               <h4 class="text-sm font-black text-rose-900">Nenhum horário livre nesta data</h4>
-              <p class="text-xs text-rose-700 mt-1">Todos os horários deste campo já foram reservados.</p>
+              <p class="text-xs text-rose-700 mt-1">Todos os horários deste campo já foram reservados ou já se encerraram no dia de hoje.</p>
               <button onclick="goToStep(2)" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow">Escolher Outra Data</button>
             </div>`;
           return '';
@@ -5023,6 +5094,15 @@ function renderAdminMatrix() {
               <td class="p-2 text-center border-l border-slate-100 bg-slate-100 text-slate-600">
                 <span class="font-bold block">Bloqueado</span>
                 <button onclick="adminToggleSlot('${c.id}', '${state.selectedDate}', '${hour}')" class="text-[10px] text-emerald-700 underline">Desbloquear</button>
+              </td>
+            `;
+          }
+
+          if (slot && slot.status === 'past') {
+            return `
+              <td class="p-2 text-center border-l border-slate-100 bg-slate-50/70 text-slate-400">
+                <span class="font-bold text-[11px] block text-slate-400">Encerrado ⏰</span>
+                <span class="text-[10px] text-slate-400 block font-medium">Horário Passado</span>
               </td>
             `;
           }
