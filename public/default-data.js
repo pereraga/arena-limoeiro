@@ -12,7 +12,7 @@ const arenaInfo = {
 const initialAdmins = [
   {
     id: "admin-1",
-    name: "Administrador Geral",
+    name: "Gabriel Alves",
     email: "admin@arenalimoeiro.com.br",
     password: "admin123",
     role: "Administrador Geral",
@@ -23,7 +23,7 @@ const initialAdmins = [
     name: "Recepção & Atendimento",
     email: "recepcao@arenalimoeiro.com.br",
     password: "arena123",
-    role: "Atendente da Recepção",
+    role: "Gerente do Sistema",
     createdAt: "01/09/2026"
   }
 ];
