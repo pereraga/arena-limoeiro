@@ -6289,8 +6289,8 @@ function parseCustomerFromObservation(obs) {
 function findCustomerByPhone(phone) {
   if (!phone) return null;
   const clean = String(phone).replace(/\D/g, '');
-  if (clean.length < 6) return null;
-  const last8 = clean.length >= 8 ? clean.slice(-8) : null;
+  if (clean.length < 10) return null;
+  const last8 = clean.slice(-8);
   const last9 = clean.length >= 9 ? clean.slice(-9) : null;
 
   function matchInList(list, extractors) {
@@ -6317,16 +6317,6 @@ function findCustomerByPhone(phone) {
         const p = extractors.phone(item);
         const cClean = (p || '').replace(/\D/g, '');
         if (cClean && cClean.length >= 8 && (cClean.endsWith(last8) || clean.endsWith(cClean.slice(-8)))) {
-          return extractors.format(item);
-        }
-      }
-    }
-    // 4. Substring caso um contenha o outro
-    if (clean.length >= 6) {
-      for (const item of list) {
-        const p = extractors.phone(item);
-        const cClean = (p || '').replace(/\D/g, '');
-        if (cClean && cClean.length >= 6 && (cClean.includes(clean) || clean.includes(cClean))) {
           return extractors.format(item);
         }
       }
@@ -6452,15 +6442,16 @@ async function handleCustomerPhoneInput(input) {
   const container = document.getElementById('customerDynamicArea');
   if (!container) return;
 
-  // 1. Se já localiza na memória ou cache local (mesmo com menos dígitos, ex: 6 dígitos)
-  let customer = findCustomerByPhone(clean);
-  if (customer) {
-    renderCustomerDynamicArea(customer, formatted);
-    return;
-  }
+  // SÓ MOSTRA IDENTIFICAÇÃO OU CADASTRO QUANDO DIGITAR TODOS OS NÚMEROS (11 DÍGITOS)
+  if (clean.length >= 11) {
+    // 1. Busca imediata na memória e cache local
+    let customer = findCustomerByPhone(clean);
+    if (customer) {
+      renderCustomerDynamicArea(customer, formatted);
+      return;
+    }
 
-  // 2. Se tem pelo menos 8 dígitos, faz consulta no Supabase
-  if (clean.length >= 8) {
+    // 2. Busca assíncrona no banco Supabase
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       container.innerHTML = `
         <div class="p-4 bg-emerald-50/70 border border-emerald-300 rounded-2xl text-center text-xs text-emerald-900 flex items-center justify-center space-x-2 animate-pulse">
@@ -6518,13 +6509,15 @@ async function handleCustomerPhoneInput(input) {
 
     renderCustomerDynamicArea(customer, formatted);
   } else {
+    // Enquanto faltar números, mantém desabilitado e não revela identificação nem cadastro
+    state.checkoutCustomer = null;
     container.innerHTML = `
       <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
         <i data-lucide="phone-call" class="w-6 h-6 text-slate-400 mx-auto mb-1"></i>
-        <span>Digite seu número de WhatsApp com DDD para consultar seu cadastro.</span>
+        <span>Digite todos os números do seu WhatsApp com DDD (11 dígitos) para identificar seu cadastro.</span>
       </div>
     `;
-    updateConfirmButtonState(false);
+    updateConfirmButtonState(false, 'Informe seu WhatsApp Acima');
   }
   if (window.lucide) lucide.createIcons();
 }
@@ -7004,9 +6997,9 @@ function openCheckoutModal() {
 
   if (window.lucide) lucide.createIcons();
 
-  // Se já tinha telefone preenchido, faz a verificação imediata
+  // Se já tinha telefone preenchido com todos os números, faz a verificação imediata
   const phoneEl = document.getElementById('custPhone');
-  if (phoneEl && (phoneEl.value.replace(/\D/g, '').length >= 8 || initialCustomer)) {
+  if (phoneEl && phoneEl.value.replace(/\D/g, '').length >= 11) {
     handleCustomerPhoneInput(phoneEl);
   } else {
     const dynamic = document.getElementById('customerDynamicArea');
@@ -7014,18 +7007,19 @@ function openCheckoutModal() {
       dynamic.innerHTML = `
         <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
           <i data-lucide="phone-call" class="w-6 h-6 text-slate-400 mx-auto mb-1"></i>
-          <span>Digite seu número de WhatsApp com DDD acima para consultar seu cadastro.</span>
+          <span>Digite todos os números do seu WhatsApp com DDD (11 dígitos) para identificar seu cadastro.</span>
         </div>
       `;
       if (window.lucide) lucide.createIcons();
     }
+    updateConfirmButtonState(false, 'Informe seu WhatsApp Acima');
   }
 
   // Garante sincronização em background com a base remota do Supabase
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     loadSupabaseCustomers().then(() => {
       const p = document.getElementById('custPhone');
-      if (p && p.value && p.value.replace(/\D/g, '').length >= 8) {
+      if (p && p.value && p.value.replace(/\D/g, '').length >= 11) {
         handleCustomerPhoneInput(p);
       }
     }).catch(() => {});
@@ -7043,8 +7037,8 @@ async function submitBooking(grandTotal) {
   const phone = phoneInput ? phoneInput.value.trim() : state.customerPhone;
   const cleanPhone = (phone || '').replace(/\D/g, '');
 
-  if (cleanPhone.length < 10) {
-    alert('Por favor, informe seu número de WhatsApp / Telefone completo com DDD.');
+  if (cleanPhone.length < 11) {
+    alert('Por favor, informe todos os dígitos do seu WhatsApp com DDD (11 dígitos) para agendar.');
     phoneInput?.focus();
     return;
   }
