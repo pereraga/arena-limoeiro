@@ -3202,23 +3202,6 @@ function renderCourtsControlTab() {
 
               <!-- Botões de Ação por Campo -->
               <div class="p-5 pt-0 space-y-2">
-                <!-- LINHA DE EDIÇÃO E REMOÇÃO DA QUADRA -->
-                <div class="flex items-center space-x-2">
-                  <button onclick="openCourtModal('${court.id}')" 
-                          title="Modificar valores, horas, descrição e foto desta quadra"
-                          class="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md shadow-amber-500/20 flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
-                    <i data-lucide="edit-3" class="w-4 h-4"></i>
-                    <span>Editar Quadra</span>
-                  </button>
-
-                  <button onclick="deleteCourt('${court.id}')" 
-                          title="Remover esta quadra do sistema"
-                          class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200 font-black text-xs rounded-xl shadow-xs flex items-center justify-center space-x-1 transition-all cursor-pointer">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    <span class="hidden sm:inline text-[11px]">Excluir</span>
-                  </button>
-                </div>
-
                 <button onclick="openMaintenanceModal('${court.id}')" 
                         class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all">
                   <i data-lucide="clock" class="w-3.5 h-3.5 text-rose-600"></i>
