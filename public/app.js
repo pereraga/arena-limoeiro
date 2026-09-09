@@ -6511,18 +6511,17 @@ function handleCPFInput(input) {
   }
 }
 
+function getFirstAndSecondName(fullName) {
+  if (!fullName) return 'Atleta';
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 2) return parts.join(' ');
+  return parts.slice(0, 2).join(' ');
+}
+
 function toggleEditCustomerDetails() {
-  const readOnly = document.getElementById('customerReadOnlyDetails');
   const editable = document.getElementById('customerEditableDetails');
-  if (readOnly && editable) {
-    const isEditing = !editable.classList.contains('hidden');
-    if (isEditing) {
-      editable.classList.add('hidden');
-      readOnly.classList.remove('hidden');
-    } else {
-      editable.classList.remove('hidden');
-      readOnly.classList.add('hidden');
-    }
+  if (editable) {
+    editable.classList.toggle('hidden');
     if (window.lucide) lucide.createIcons();
   }
 }
@@ -6547,75 +6546,36 @@ function renderCustomerDynamicArea(customer, phoneStr) {
 
   if (customer) {
     state.checkoutCustomer = customer;
+    const shortName = getFirstAndSecondName(customer.name);
+
     container.innerHTML = `
-      <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-400 space-y-3 shadow-xs animate-fade-in">
-        <div class="flex items-center justify-between pb-2.5 border-b border-emerald-200">
-          <div class="flex items-center space-x-2.5">
-            <span class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow">
+      <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/70 p-4 sm:p-5 rounded-2xl border-2 border-emerald-500 space-y-3 shadow-xs animate-fade-in">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3 min-w-0">
+            <span class="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
               ✓
             </span>
-            <div>
-              <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">Peladeiro Cadastrado no Sistema</span>
-              <h4 class="text-base font-black text-slate-900">${customer.name}</h4>
+            <div class="min-w-0">
+              <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider bg-emerald-200/70 px-2 py-0.5 rounded-full inline-block mb-0.5">
+                Peladeiro Cadastrado no Sistema
+              </span>
+              <h4 class="text-base sm:text-lg font-black text-slate-900 truncate">${shortName}</h4>
             </div>
           </div>
-          <button type="button" onclick="toggleEditCustomerDetails()" class="px-2.5 py-1 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs flex items-center gap-1 transition-all">
+          <button type="button" onclick="toggleEditCustomerDetails()" class="px-2.5 py-1.5 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs flex items-center gap-1 transition-all shrink-0">
             <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Atualizar Dados</span>
+            <span>Alterar Nome</span>
           </button>
         </div>
 
-        <div id="customerReadOnlyDetails" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
-          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">Nome do Atleta:</span> <strong class="text-slate-900">${customer.name}</strong></p>
-          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">CPF:</span> <strong class="font-mono text-slate-900">${customer.cpf ? formatCPF(customer.cpf) : 'Não cadastrado'}</strong></p>
-          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">E-mail:</span> <strong class="text-slate-900">${customer.email || 'Não cadastrado'}</strong></p>
-          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">Data de Nascimento:</span> <strong class="text-slate-900">${customer.birth_date || '-'}</strong></p>
-          <p class="sm:col-span-2"><span class="text-slate-400 font-bold block text-[10px] uppercase">Contato de Emergência:</span> <strong class="text-slate-900">${customer.emergency_contact || '-'}</strong></p>
-          <p class="sm:col-span-2">
-            <span class="text-slate-400 font-bold block text-[10px] uppercase">Aviso de Saúde Pré-existente:</span>
-            ${customer.health_notes && customer.health_notes !== 'Nenhuma restrição informada' && customer.health_notes.trim().toLowerCase() !== 'nenhum' ? `
-              <span class="inline-flex items-center px-2 py-0.5 mt-0.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                ⚠️ ${customer.health_notes}
-              </span>
-            ` : '<strong class="text-emerald-800 font-semibold">Nenhuma restrição informada</strong>'}
-          </p>
+        <div class="p-3 bg-white/90 rounded-xl border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2">
+          <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+          <span>Cliente verificado na base! Horário liberado para confirmação imediata.</span>
         </div>
 
-        <div id="customerEditableDetails" class="hidden space-y-3 pt-2 border-t border-emerald-200">
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
-            <input type="text" id="custName" value="${customer.name}" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF *</label>
-              <input type="text" id="custCPF" value="${customer.cpf ? formatCPF(customer.cpf) : ''}" maxlength="14" oninput="handleCPFInput(this); autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 bg-white">
-              <span id="cpfStatusMsg" class="text-[10px]"></span>
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail para Envio Automático *</label>
-              <input type="email" id="custEmail" value="${customer.email || ''}" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
-            </div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data de Nascimento</label>
-              <input type="date" id="custBirthDate" value="${customer.birth_date || ''}" onchange="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
-            </div>
-            <div>
-              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Contato de Emergência</label>
-              <input type="text" id="custEmergency" value="${customer.emergency_contact || ''}" oninput="autoSaveCustomerDraft()" placeholder="Nome e Telefone" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
-            </div>
-          </div>
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Aviso de Saúde Pré-existente / Ficha Médica</label>
-            <textarea id="custHealthNotes" rows="2" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white" placeholder="Hipertensão, lesão no joelho, alergias, etc.">${customer.health_notes || ''}</textarea>
-          </div>
-        </div>
-
-        <div class="p-2.5 bg-emerald-600/10 rounded-xl text-[11px] font-bold text-emerald-950 flex items-center gap-1.5">
-          <i data-lucide="check" class="w-4 h-4 text-emerald-700 shrink-0"></i>
-          <span>Dados do atleta identificados! Clique abaixo para confirmar seu agendamento.</span>
+        <div id="customerEditableDetails" class="hidden space-y-2 pt-2 border-t border-emerald-200">
+          <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo para a Reserva</label>
+          <input type="text" id="custName" value="${customer.name}" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
         </div>
       </div>
     `;
@@ -6989,8 +6949,9 @@ async function submitBooking(grandTotal) {
   let emergency = '';
   let healthNotes = '';
 
-  if (existingCust && !isEditing) {
-    name = existingCust.name;
+  if (existingCust) {
+    const nameInput = document.getElementById('custName');
+    name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : existingCust.name;
     cpf = existingCust.cpf || '';
     email = existingCust.email || '';
     birthDate = existingCust.birth_date || '';
