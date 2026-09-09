@@ -6288,22 +6288,64 @@ function parseCustomerFromObservation(obs) {
 function findCustomerByPhone(phone) {
   if (!phone) return null;
   const clean = String(phone).replace(/\D/g, '');
-  if (clean.length < 8) return null;
+  if (clean.length < 6) return null;
+  const last8 = clean.length >= 8 ? clean.slice(-8) : null;
+  const last9 = clean.length >= 9 ? clean.slice(-9) : null;
+
+  function matchInList(list, extractors) {
+    if (!list || !list.length) return null;
+    // 1. Match exato apenas dos números
+    for (const item of list) {
+      const p = extractors.phone(item);
+      const cClean = (p || '').replace(/\D/g, '');
+      if (cClean && cClean === clean) return extractors.format(item);
+    }
+    // 2. Match pelos últimos 9 dígitos (cobre variações com e sem nono dígito e DDDs)
+    if (last9) {
+      for (const item of list) {
+        const p = extractors.phone(item);
+        const cClean = (p || '').replace(/\D/g, '');
+        if (cClean && cClean.length >= 9 && (cClean.endsWith(last9) || clean.endsWith(cClean.slice(-9)))) {
+          return extractors.format(item);
+        }
+      }
+    }
+    // 3. Match pelos últimos 8 dígitos (identificador único da linha de telefone)
+    if (last8) {
+      for (const item of list) {
+        const p = extractors.phone(item);
+        const cClean = (p || '').replace(/\D/g, '');
+        if (cClean && cClean.length >= 8 && (cClean.endsWith(last8) || clean.endsWith(cClean.slice(-8)))) {
+          return extractors.format(item);
+        }
+      }
+    }
+    // 4. Substring caso um contenha o outro
+    if (clean.length >= 6) {
+      for (const item of list) {
+        const p = extractors.phone(item);
+        const cClean = (p || '').replace(/\D/g, '');
+        if (cClean && cClean.length >= 6 && (cClean.includes(clean) || clean.includes(cClean))) {
+          return extractors.format(item);
+        }
+      }
+    }
+    return null;
+  }
 
   // 1. Procura em state.supabaseCustomers
-  const list = state.supabaseCustomers || [];
-  let found = list.find(c => {
-    const cClean = (c.phone || '').replace(/\D/g, '');
-    return cClean === clean || (cClean.length >= 8 && clean.length >= 8 && (cClean.endsWith(clean.slice(-8)) || clean.endsWith(cClean.slice(-8))));
+  let found = matchInList(state.supabaseCustomers || [], {
+    phone: c => c.phone,
+    format: c => c
   });
   if (found) return found;
 
   // 2. Procura no localStorage (arena_customers)
   try {
     const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
-    found = local.find(c => {
-      const cClean = (c.phone || '').replace(/\D/g, '');
-      return cClean === clean || (cClean.length >= 8 && clean.length >= 8 && (cClean.endsWith(clean.slice(-8)) || clean.endsWith(cClean.slice(-8))));
+    found = matchInList(local, {
+      phone: c => c.phone,
+      format: c => c
     });
     if (found) return found;
   } catch(e) {}
@@ -6312,40 +6354,41 @@ function findCustomerByPhone(phone) {
   let localBookings = [];
   try { localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]'); } catch(e) {}
   const allBookings = [...(state.bookings || []), ...localBookings];
-  const bMatch = allBookings.find(b => {
-    const bClean = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
-    return bClean === clean || (bClean.length >= 8 && clean.length >= 8 && (bClean.endsWith(clean.slice(-8)) || clean.endsWith(bClean.slice(-8))));
+  found = matchInList(allBookings, {
+    phone: b => b.customer_phone || b.customerPhone,
+    format: b => {
+      const parsedObs = parseCustomerFromObservation(b.observation || '');
+      return {
+        id: b.customer_id || b.customerId || ('cust-' + Date.now()),
+        name: b.customer_name || b.customerName,
+        phone: b.customer_phone || b.customerPhone,
+        email: b.customer_email || b.customerEmail || '',
+        cpf: b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || '',
+        birth_date: b.birth_date || b.birthDate || '',
+        emergency_contact: b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || '',
+        health_notes: b.health_notes || b.healthNotes || parsedObs.health_notes || ''
+      };
+    }
   });
-  if (bMatch) {
-    const parsedObs = parseCustomerFromObservation(bMatch.observation || '');
-    return {
-      name: bMatch.customer_name || bMatch.customerName,
-      phone: bMatch.customer_phone || bMatch.customerPhone,
-      email: bMatch.customer_email || bMatch.customerEmail || '',
-      cpf: bMatch.customer_cpf || bMatch.customerCpf || bMatch.customerCPF || parsedObs.cpf || '',
-      birth_date: bMatch.birth_date || bMatch.birthDate || '',
-      emergency_contact: bMatch.emergency_contact || bMatch.emergencyContact || parsedObs.emergency_contact || '',
-      health_notes: bMatch.health_notes || bMatch.healthNotes || parsedObs.health_notes || ''
-    };
-  }
+  if (found) return found;
 
   // 4. Procura nos contratos de mensalistas
-  const mMatch = (state.monthlyMembers || []).find(m => {
-    const mClean = (m.phone || '').replace(/\D/g, '');
-    return mClean === clean || (mClean.length >= 8 && clean.length >= 8 && (mClean.endsWith(clean.slice(-8)) || clean.endsWith(mClean.slice(-8))));
+  found = matchInList(state.monthlyMembers || [], {
+    phone: m => m.phone,
+    format: m => {
+      const parsedObs = parseCustomerFromObservation(m.observation || '');
+      return {
+        name: m.responsible_name || m.responsibleName || m.team_name,
+        phone: m.phone,
+        email: m.email || '',
+        cpf: m.cpf || parsedObs.cpf || '',
+        birth_date: m.birth_date || '',
+        emergency_contact: m.emergency_contact || parsedObs.emergency_contact || '',
+        health_notes: m.health_notes || parsedObs.health_notes || ''
+      };
+    }
   });
-  if (mMatch) {
-    const parsedObs = parseCustomerFromObservation(mMatch.observation || '');
-    return {
-      name: mMatch.responsible_name || mMatch.responsibleName || mMatch.team_name,
-      phone: mMatch.phone,
-      email: mMatch.email || '',
-      cpf: mMatch.cpf || parsedObs.cpf || '',
-      birth_date: mMatch.birth_date || '',
-      emergency_contact: mMatch.emergency_contact || parsedObs.emergency_contact || '',
-      health_notes: mMatch.health_notes || parsedObs.health_notes || ''
-    };
-  }
+  if (found) return found;
 
   return null;
 }
@@ -6354,7 +6397,7 @@ function autoSaveCustomerDraft() {
   const phoneInput = document.getElementById('custPhone');
   const phone = phoneInput ? phoneInput.value.trim() : (state.customerPhone || '');
   const cleanPhone = phone.replace(/\D/g, '');
-  if (cleanPhone.length < 10) return;
+  if (cleanPhone.length < 8) return;
 
   const nameInput = document.getElementById('custName');
   const cpfInput = document.getElementById('custCPF');
@@ -6408,15 +6451,15 @@ async function handleCustomerPhoneInput(input) {
   const container = document.getElementById('customerDynamicArea');
   if (!container) return;
 
-  if (clean.length >= 10) {
-    // 1. Busca imediata na memória e cache local
-    let customer = findCustomerByPhone(clean);
-    if (customer) {
-      renderCustomerDynamicArea(customer, formatted);
-      return;
-    }
+  // 1. Se já localiza na memória ou cache local (mesmo com menos dígitos, ex: 6 dígitos)
+  let customer = findCustomerByPhone(clean);
+  if (customer) {
+    renderCustomerDynamicArea(customer, formatted);
+    return;
+  }
 
-    // 2. Busca assíncrona no banco Supabase
+  // 2. Se tem pelo menos 8 dígitos, faz consulta no Supabase
+  if (clean.length >= 8) {
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       container.innerHTML = `
         <div class="p-4 bg-emerald-50/70 border border-emerald-300 rounded-2xl text-center text-xs text-emerald-900 flex items-center justify-center space-x-2 animate-pulse">
@@ -6426,48 +6469,46 @@ async function handleCustomerPhoneInput(input) {
       `;
       try {
         const client = window.ArenaSupabase.getClient();
-        const { data: dbCust } = await client
+
+        // 2a. Busca em tempo real da lista atualizada de clientes
+        const { data: allCusts } = await client
           .from('customers')
           .select('*')
-          .or(`phone.eq.${formatted},phone.eq.${clean},phone.ilike.%${clean.slice(-8)}%`)
-          .limit(1)
-          .maybeSingle();
+          .order('created_at', { ascending: false });
 
-        if (dbCust) {
-          customer = dbCust;
+        if (allCusts && allCusts.length > 0) {
+          state.supabaseCustomers = allCusts;
+          customer = findCustomerByPhone(clean);
+          if (customer) {
+            renderCustomerDynamicArea(customer, formatted);
+            return;
+          }
+        }
+
+        // 2b. Busca nos agendamentos anteriores pelo sufixo do telefone
+        const last8 = clean.slice(-8);
+        const { data: prevBookings } = await client
+          .from('bookings')
+          .select('*')
+          .ilike('customer_phone', `%${last8}%`)
+          .order('date', { ascending: false })
+          .limit(3);
+
+        if (prevBookings && prevBookings.length > 0) {
+          const prevBooking = prevBookings[0];
+          const pObs = parseCustomerFromObservation(prevBooking.observation || '');
+          customer = {
+            id: prevBooking.customer_id || ('cust-' + Date.now()),
+            name: prevBooking.customer_name,
+            phone: prevBooking.customer_phone,
+            email: prevBooking.customer_email || '',
+            cpf: prevBooking.customer_cpf || pObs.cpf || '',
+            birth_date: prevBooking.birth_date || '',
+            emergency_contact: prevBooking.emergency_contact || pObs.emergency_contact || '',
+            health_notes: prevBooking.health_notes || pObs.health_notes || ''
+          };
           if (!state.supabaseCustomers) state.supabaseCustomers = [];
-          if (!state.supabaseCustomers.find(c => c.id === dbCust.id)) {
-            state.supabaseCustomers.unshift(dbCust);
-          }
-          try {
-            const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
-            if (!local.find(c => (c.phone || '').replace(/\D/g, '') === clean)) {
-              local.unshift(dbCust);
-              localStorage.setItem('arena_customers', JSON.stringify(local));
-            }
-          } catch(e) {}
-        } else {
-          const { data: prevBooking } = await client
-            .from('bookings')
-            .select('*')
-            .or(`customer_phone.eq.${formatted},customer_phone.eq.${clean},customer_phone.ilike.%${clean.slice(-8)}%`)
-            .order('date', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (prevBooking) {
-            const pObs = parseCustomerFromObservation(prevBooking.observation || '');
-            customer = {
-              id: prevBooking.customer_id || ('cust-' + Date.now()),
-              name: prevBooking.customer_name,
-              phone: prevBooking.customer_phone,
-              email: prevBooking.customer_email || '',
-              cpf: prevBooking.customer_cpf || pObs.cpf || '',
-              birth_date: prevBooking.birth_date || '',
-              emergency_contact: prevBooking.emergency_contact || pObs.emergency_contact || '',
-              health_notes: prevBooking.health_notes || pObs.health_notes || ''
-            };
-          }
+          state.supabaseCustomers.unshift(customer);
         }
       } catch (err) {
         console.warn('Erro na consulta de atleta:', err);
@@ -6479,7 +6520,7 @@ async function handleCustomerPhoneInput(input) {
     container.innerHTML = `
       <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
         <i data-lucide="phone-call" class="w-6 h-6 text-slate-400 mx-auto mb-1"></i>
-        <span>Digite seu número de WhatsApp completo com DDD para consultar seu cadastro.</span>
+        <span>Digite seu número de WhatsApp com DDD para consultar seu cadastro.</span>
       </div>
     `;
     updateConfirmButtonState(false);
@@ -6905,20 +6946,31 @@ function openCheckoutModal() {
 
   if (window.lucide) lucide.createIcons();
 
-  // Se já tinha telefone, faz a busca instantânea
-  if (initialPhone && initialPhone.replace(/\D/g, '').length >= 10) {
-    renderCustomerDynamicArea(initialCustomer, initialPhone);
+  // Se já tinha telefone preenchido, faz a verificação imediata
+  const phoneEl = document.getElementById('custPhone');
+  if (phoneEl && (phoneEl.value.replace(/\D/g, '').length >= 8 || initialCustomer)) {
+    handleCustomerPhoneInput(phoneEl);
   } else {
     const dynamic = document.getElementById('customerDynamicArea');
     if (dynamic) {
       dynamic.innerHTML = `
         <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
           <i data-lucide="phone-call" class="w-6 h-6 text-slate-400 mx-auto mb-1"></i>
-          <span>Digite seu número de WhatsApp completo com DDD acima para consultar seu cadastro.</span>
+          <span>Digite seu número de WhatsApp com DDD acima para consultar seu cadastro.</span>
         </div>
       `;
       if (window.lucide) lucide.createIcons();
     }
+  }
+
+  // Garante sincronização em background com a base remota do Supabase
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    loadSupabaseCustomers().then(() => {
+      const p = document.getElementById('custPhone');
+      if (p && p.value && p.value.replace(/\D/g, '').length >= 8) {
+        handleCustomerPhoneInput(p);
+      }
+    }).catch(() => {});
   }
 }
 
