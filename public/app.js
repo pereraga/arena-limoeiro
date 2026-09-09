@@ -3227,10 +3227,6 @@ function renderCourtsControlTab() {
             <i data-lucide="clock" class="w-4 h-4"></i>
             <span>Agendar Treino / Manutenção</span>
           </button>
-          <button onclick="openCategoryModal()" title="Gerenciar ou Cadastrar Categorias" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
-            <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
-            <span>Categoria</span>
-          </button>
           <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
             <i data-lucide="plus" class="w-4 h-4 text-emerald-200"></i>
             <span>Nova Quadra</span>
@@ -4058,10 +4054,6 @@ function renderAdminSubTabContent(tab) {
             <p class="text-xs text-slate-500">Configure nomes, valores por hora, planos mensalistas e fotos das quadras</p>
           </div>
           <div class="flex items-center flex-wrap gap-2">
-            <button onclick="openCategoryModal()" title="Gerenciar ou Cadastrar Categorias" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
-              <i data-lucide="tag" class="w-4 h-4 text-emerald-200"></i>
-              <span>Categoria</span>
-            </button>
             <button onclick="setAdminTab('categories')" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow">
               <i data-lucide="tag" class="w-4 h-4 text-emerald-400"></i>
               <span>Gerenciar Categorias</span>
@@ -4073,7 +4065,7 @@ function renderAdminSubTabContent(tab) {
           </div>
         </div>
 
-        <!-- Filtros de Categoria com botão + Categoria na Gestão -->
+        <!-- Filtros de Categoria na Gestão -->
         <div class="flex items-center space-x-2 overflow-x-auto scrollbar-none mb-6 pb-2 border-b border-slate-100">
           ${(state.categories || []).map(cat => `
             <button onclick="setAdminCategoryFilter('${cat.id}')" 
@@ -4085,12 +4077,6 @@ function renderAdminSubTabContent(tab) {
               <span>${cat.name}</span>
             </button>
           `).join('')}
-          <button onclick="openCategoryModal()" 
-                  title="Adicionar Nova Categoria / Modalidade"
-                  class="px-3.5 py-2 rounded-xl text-xs font-black flex items-center space-x-1.5 whitespace-nowrap transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow">
-            <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-200"></i>
-            <span>Categoria</span>
-          </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -6585,32 +6571,21 @@ function renderCustomerDynamicArea(customer, phoneStr) {
 
     container.innerHTML = `
       <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/70 p-4 sm:p-5 rounded-2xl border-2 border-emerald-500 space-y-3 shadow-xs animate-fade-in">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-3 min-w-0">
-            <span class="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
-              ✓
+        <div class="flex items-center space-x-3 min-w-0">
+          <span class="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
+            ✓
+          </span>
+          <div class="min-w-0">
+            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider bg-emerald-200/70 px-2 py-0.5 rounded-full inline-block mb-0.5">
+              Peladeiro Cadastrado no Sistema
             </span>
-            <div class="min-w-0">
-              <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider bg-emerald-200/70 px-2 py-0.5 rounded-full inline-block mb-0.5">
-                Peladeiro Cadastrado no Sistema
-              </span>
-              <h4 class="text-base sm:text-lg font-black text-slate-900 truncate">${shortName}</h4>
-            </div>
+            <h4 class="text-base sm:text-lg font-black text-slate-900 truncate">${shortName}</h4>
           </div>
-          <button type="button" onclick="toggleEditCustomerDetails()" class="px-2.5 py-1.5 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs flex items-center gap-1 transition-all shrink-0">
-            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Alterar Nome</span>
-          </button>
         </div>
 
         <div class="p-3 bg-white/90 rounded-xl border border-emerald-200 text-xs text-emerald-950 flex items-center gap-2">
           <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0"></i>
           <span>Cliente verificado na base! Horário liberado para confirmação imediata.</span>
-        </div>
-
-        <div id="customerEditableDetails" class="hidden space-y-2 pt-2 border-t border-emerald-200">
-          <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo para a Reserva</label>
-          <input type="text" id="custName" value="${customer.name}" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
         </div>
       </div>
     `;
