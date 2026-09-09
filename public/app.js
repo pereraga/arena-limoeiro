@@ -2138,32 +2138,20 @@ function openLoginModal(onSuccessCallback = null) {
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">E-mail do Administrador *</label>
             <input type="email" id="loginEmail" required placeholder="admin@arenalimoeiro.com.br" 
-                   value="admin@arenalimoeiro.com.br"
+                   value="" autocomplete="username"
                    class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha de Acesso *</label>
-            <input type="password" id="loginPassword" required placeholder="Digite sua senha" 
-                   value="admin123"
+            <input type="password" id="loginPassword" required placeholder="••••••••" 
+                   value="" autocomplete="current-password"
                    class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
-          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
-            <span class="font-bold text-slate-700 block">Credenciais pré-configuradas no sistema:</span>
-            <div class="flex items-center justify-between">
-              <span>👑 <strong>admin@arenalimoeiro.com.br</strong> (admin123)</span>
-              <button type="button" onclick="fillLogin('admin@arenalimoeiro.com.br', 'admin123')" class="text-emerald-700 hover:underline font-bold">Usar</button>
-            </div>
-            <div class="flex items-center justify-between">
-              <span>🏢 <strong>recepcao@arenalimoeiro.com.br</strong> (arena123)</span>
-              <button type="button" onclick="fillLogin('recepcao@arenalimoeiro.com.br', 'arena123')" class="text-emerald-700 hover:underline font-bold">Usar</button>
-            </div>
-          </div>
-
           <div class="pt-2 flex items-center justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
-            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md">Entrar na Administração</button>
+            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
+            <button type="submit" id="btnLoginSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Entrar na Administração</button>
           </div>
         </form>
       </div>
@@ -2174,18 +2162,27 @@ function openLoginModal(onSuccessCallback = null) {
   lucide.createIcons();
 }
 
-function fillLogin(email, pass) {
-  const emailInput = document.getElementById('loginEmail');
-  const passInput = document.getElementById('loginPassword');
-  if (emailInput) emailInput.value = email;
-  if (passInput) passInput.value = pass;
-}
-
 async function handleLoginSubmit(event) {
   event.preventDefault();
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value.trim();
+  const emailInput = document.getElementById('loginEmail');
+  const passwordInput = document.getElementById('loginPassword');
+  const email = (emailInput ? emailInput.value : '').trim();
+  const password = (passwordInput ? passwordInput.value : '').trim();
   const errorMsg = document.getElementById('loginErrorMessage');
+  const submitBtn = document.getElementById('btnLoginSubmit');
+
+  if (!email || !password) {
+    if (errorMsg) {
+      errorMsg.innerText = "Por favor, preencha o e-mail e a senha de acesso.";
+      errorMsg.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Verificando credenciais...";
+  }
 
   let authenticatedUser = null;
 
@@ -2193,24 +2190,24 @@ async function handleLoginSubmit(event) {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      const { data } = await client
+      const { data, error } = await client
         .from('admin_users')
         .select('*')
         .eq('email', email)
         .eq('password', password)
         .maybeSingle();
 
-      if (data) authenticatedUser = data;
+      if (data && !error) authenticatedUser = data;
     } catch(e) {}
   }
 
-  // 2. Fallback de administradores pré-configurados
+  // 2. Fallback de administradores pré-configurados caso banco não responda
   if (!authenticatedUser) {
     const defaultAdmins = [
       { id: "admin-1", name: "Administrador Geral", email: "admin@arenalimoeiro.com.br", password: "admin123", role: "Administrador Geral" },
       { id: "admin-2", name: "Recepção & Atendimento", email: "recepcao@arenalimoeiro.com.br", password: "arena123", role: "Atendente da Recepção" }
     ];
-    authenticatedUser = defaultAdmins.find(u => u.email === email && u.password === password);
+    authenticatedUser = defaultAdmins.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
   }
 
   if (authenticatedUser) {
@@ -2225,9 +2222,17 @@ async function handleLoginSubmit(event) {
       window._onLoginSuccess = null;
     }
   } else {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Entrar na Administração";
+    }
     if (errorMsg) {
-      errorMsg.innerText = "E-mail ou senha incorretos.";
+      errorMsg.innerText = "E-mail ou senha incorretos. Acesso restrito a administradores.";
       errorMsg.classList.remove('hidden');
+    }
+    if (passwordInput) {
+      passwordInput.value = '';
+      passwordInput.focus();
     }
   }
 }
@@ -4818,7 +4823,7 @@ function openDirectBookingModal() {
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Telefone WhatsApp *</label>
-              <input type="tel" id="directCustomerPhone" required placeholder="(88) 99999-9999" 
+              <input type="tel" id="directCustomerPhone" required placeholder="(**) *****-****" 
                      class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
             </div>
           </div>
@@ -6774,7 +6779,7 @@ function openCustomerModal(targetPhoneOrId = null) {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">WhatsApp / Telefone *</label>
-              <input type="tel" id="adminCustPhone" required value="${existing ? formatPhone(existing.phone) : ''}" placeholder="(81) 98888-8888" maxlength="15" oninput="this.value = formatPhone(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+              <input type="tel" id="adminCustPhone" required value="${existing ? formatPhone(existing.phone) : ''}" placeholder="(**) *****-****" maxlength="15" oninput="this.value = formatPhone(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
             </div>
             <div>
               <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">CPF (com validação) *</label>
@@ -7007,7 +7012,7 @@ function openCheckoutModal() {
             <div class="relative">
               <input type="tel" id="custPhone" 
                      value="${initialPhone}" 
-                     placeholder="(81) 98765-4321" 
+                     placeholder="(**) *****-****" 
                      maxlength="15" 
                      oninput="handleCustomerPhoneInput(this)" 
                      class="w-full p-3.5 pl-4 border-2 border-emerald-500 rounded-xl text-base font-black text-slate-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none bg-white tracking-wide shadow-xs">
