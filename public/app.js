@@ -887,9 +887,41 @@ function renderStep1(container) {
                     <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
                     ${capacity}
                   </p>
-                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-3 line-clamp-1">
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
                     ${courtType}
                   </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: ${specs.surface || specs.type || courtType || 'Grama Sintética 60mm'}</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>${specs.capacity || capacity || '10 a 14 Jogadores'}</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ ${pricePerHour.toFixed(2).replace('.', ',')}/hora (Normal)</span>
+                    </p>
+                    ${(() => {
+                      const dInfo = getCourtDiscountInfo(court);
+                      if (dInfo.hasDiscount) {
+                        return `
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>${dInfo.startHour} às ${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h (Desconto)</span>
+                          </p>
+                        `;
+                      }
+                      return '';
+                    })()}
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: ${specs.opening_time || court.openingTime || '06:00'} às ${specs.closing_time || court.closingTime || '23:00'}</span>
+                    </p>
+                  </div>
                 </div>
 
                 <div>
