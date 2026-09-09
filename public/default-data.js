@@ -23,7 +23,7 @@ const initialAdmins = [
     name: "Recepção & Atendimento",
     email: "recepcao@arenalimoeiro.com.br",
     password: "arena123",
-    role: "Gerente do Sistema",
+    role: "Recepção & Atendimento",
     createdAt: "01/09/2026"
   }
 ];

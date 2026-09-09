@@ -2223,7 +2223,7 @@ async function handleLoginSubmit(event) {
   if (!authenticatedUser) {
     const defaultAdmins = (typeof initialAdmins !== 'undefined' && initialAdmins) ? initialAdmins : [
       { id: "admin-1", name: "Gabriel Alves", email: "admin@arenalimoeiro.com.br", password: "admin123", role: "Administrador Geral" },
-      { id: "admin-2", name: "Recepção & Atendimento", email: "recepcao@arenalimoeiro.com.br", password: "arena123", role: "Gerente do Sistema" }
+      { id: "admin-2", name: "Recepção & Atendimento", email: "recepcao@arenalimoeiro.com.br", password: "arena123", role: "Recepção & Atendimento" }
     ];
     authenticatedUser = defaultAdmins.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
   }
@@ -2266,13 +2266,24 @@ function logoutAdmin() {
   renderApp();
 }
 
-// PAINEL DO ADMINISTRADOR
+function isReceptionUser() {
+  const role = (state.currentUser?.role || '').toLowerCase();
+  const name = (state.currentUser?.name || '').toLowerCase();
+  const email = (state.currentUser?.email || '').toLowerCase();
+  return role.includes('recep') || name.includes('recep') || email.includes('recep');
+}
+
+// PAINEL DO ADMINISTRADOR / RECEPÇÃO
 function renderAdminView(container) {
+  const isRecep = isReceptionUser();
+  if (isRecep && state.adminTab !== 'live_dashboard' && state.adminTab !== 'bar_control') {
+    state.adminTab = 'live_dashboard';
+  }
   const currentTab = state.adminTab || 'live_dashboard';
   const displayName = (state.currentUser?.name && state.currentUser.name !== 'Administrador Geral') 
     ? state.currentUser.name 
     : (state.currentUser?.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser?.name || 'Gabriel Alves'));
-  const displayRole = state.currentUser?.role || 'Administrador Geral';
+  const displayRole = isRecep ? 'Recepção & Atendimento' : (state.currentUser?.role || 'Administrador Geral');
 
   container.innerHTML = `
     <div class="max-w-7xl mx-auto px-4 py-6 sm:py-8">
@@ -2280,16 +2291,24 @@ function renderAdminView(container) {
       <!-- Cabeçalho do Painel de Controle Operacional -->
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
         <div class="flex items-center space-x-3 sm:space-x-4">
-          <div class="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md flex-shrink-0">
-            <i data-lucide="shield-check" class="w-7 h-7 text-emerald-300"></i>
+          <div class="w-12 h-12 rounded-2xl ${isRecep ? 'bg-emerald-600' : 'bg-emerald-700'} text-white flex items-center justify-center shadow-md flex-shrink-0">
+            <i data-lucide="${isRecep ? 'user-check' : 'shield-check'}" class="w-7 h-7 text-emerald-300"></i>
           </div>
           <div>
             <div class="flex items-center space-x-2">
-              <span class="bg-emerald-600 text-white text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Painel Operacional</span>
+              <span class="bg-emerald-600 text-white text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                ${isRecep ? 'Painel de Recepção' : 'Painel Operacional'}
+              </span>
               <span class="bg-slate-100 text-slate-800 text-[11px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full">👤 ${displayName} • ${displayRole}</span>
             </div>
-            <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-1">Painel de Controle da Arena Limoeiro</h2>
-            <p class="text-xs text-slate-500">Controle de movimentação de jogos, manutenção de quadras, fila do bar e reservas diretas.</p>
+            <h2 class="text-xl sm:text-2xl font-black text-slate-900 mt-1">
+              ${isRecep ? 'Recepção & Atendimento da Arena Limoeiro' : 'Painel de Controle da Arena Limoeiro'}
+            </h2>
+            <p class="text-xs text-slate-500">
+              ${isRecep 
+                ? 'Visualização e liberação de jogos, finalização de partidas, registro de comanda e entrega de pedidos do bar.' 
+                : 'Controle de movimentação de jogos, manutenção de quadras, fila do bar e reservas diretas.'}
+            </p>
           </div>
         </div>
 
@@ -2303,8 +2322,6 @@ function renderAdminView(container) {
             <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600"></i>
             <span class="hidden sm:inline">Atualizar</span>
           </button>
-
-
 
           <button onclick="logoutAdmin()" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all">
             <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -2324,29 +2341,31 @@ function renderAdminView(container) {
           <span>Movimentação dos Jogos</span>
         </button>
 
-        <button onclick="setAdminTab('courts_control')" 
-                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
-                       ${currentTab === 'courts_control' ? 
-                         'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
-                         'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="layout-grid" class="w-4 h-4 ${currentTab === 'courts_control' ? 'text-white' : 'text-emerald-600'}"></i>
-          <span>Controle de Quadras</span>
-          <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'courts_control' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
-            ${state.courts.length}
-          </span>
-        </button>
+        ${!isRecep ? `
+          <button onclick="setAdminTab('courts_control')" 
+                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                         ${currentTab === 'courts_control' ? 
+                           'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
+                           'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <i data-lucide="layout-grid" class="w-4 h-4 ${currentTab === 'courts_control' ? 'text-white' : 'text-emerald-600'}"></i>
+            <span>Controle de Quadras</span>
+            <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'courts_control' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+              ${state.courts.length}
+            </span>
+          </button>
 
-        <button onclick="setAdminTab('categories')" 
-                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
-                       ${currentTab === 'categories' ? 
-                         'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
-                         'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="tag" class="w-4 h-4 ${currentTab === 'categories' ? 'text-white' : 'text-emerald-600'}"></i>
-          <span>Categorias de Espaços</span>
-          <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'categories' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
-            ${(state.categories || []).filter(c => c.id !== 'all').length}
-          </span>
-        </button>
+          <button onclick="setAdminTab('categories')" 
+                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                         ${currentTab === 'categories' ? 
+                           'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
+                           'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <i data-lucide="tag" class="w-4 h-4 ${currentTab === 'categories' ? 'text-white' : 'text-emerald-600'}"></i>
+            <span>Categorias de Espaços</span>
+            <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'categories' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+              ${(state.categories || []).filter(c => c.id !== 'all').length}
+            </span>
+          </button>
+        ` : ''}
 
         <button onclick="setAdminTab('bar_control')" 
                 class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
@@ -2357,14 +2376,16 @@ function renderAdminView(container) {
           <span>Bar & Lanchonete</span>
         </button>
 
-        <button onclick="setAdminTab('settings')" 
-                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
-                       ${currentTab === 'settings' ? 
-                         'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
-                         'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="settings" class="w-4 h-4 ${currentTab === 'settings' ? 'text-white' : 'text-slate-600'}"></i>
-          <span>Cadastros & Ajustes</span>
-        </button>
+        ${!isRecep ? `
+          <button onclick="setAdminTab('settings')" 
+                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                         ${currentTab === 'settings' ? 
+                           'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
+                           'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <i data-lucide="settings" class="w-4 h-4 ${currentTab === 'settings' ? 'text-white' : 'text-slate-600'}"></i>
+            <span>Cadastros & Ajustes</span>
+          </button>
+        ` : ''}
       </div>
 
       <div id="adminTabContent">
@@ -2497,12 +2518,35 @@ function finishMatchManual(matchId) {
   const now = new Date();
   const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
+  const booking = (state.bookings || []).find(b => b.id === matchId);
+  if (booking) {
+    booking.status = 'finished';
+    booking.end_time = nowStr;
+
+    // Se houver pedidos do bar vinculados a este jogo, atualiza automaticamente como entregue!
+    if (booking.product_cart && typeof booking.product_cart === 'object') {
+      const pKeys = Object.keys(booking.product_cart).filter(k => !k.startsWith('_'));
+      if (pKeys.some(k => booking.product_cart[k] > 0)) {
+        booking.product_cart._status = 'delivered';
+        booking.bar_status = 'delivered';
+      }
+    }
+  }
+
+  // Atualiza no localStorage
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const idx = localBookings.findIndex(b => b.id === matchId);
+  if (idx !== -1 && booking) {
+    localBookings[idx] = booking;
+    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+  }
+
   const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
   if (client) {
-    client.from('bookings').update({ status: 'finished', end_time: nowStr }).eq('id', matchId).then(() => {});
+    const payload = { status: 'finished', end_time: nowStr };
+    if (booking && booking.product_cart) payload.product_cart = booking.product_cart;
+    client.from('bookings').update(payload).eq('id', matchId).then(() => {});
   }
-  const booking = state.bookings.find(b => b.id === matchId);
-  if (booking) { booking.status = 'finished'; booking.end_time = nowStr; }
 
   // Remove entrada de atraso ao finalizar manualmente
   if (state.matchDelays && state.matchDelays[matchId]) {
@@ -2692,6 +2736,7 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
 
 // 1. ABA DE MOVIMENTAÇÃO DOS JOGOS (HOJE & AO VIVO)
 function renderLiveDashboardTab() {
+  const isRecep = isReceptionUser();
   const selectedDate = state.adminFilterDate || getFormattedDate(new Date());
   const todayStr = getFormattedDate(new Date());
   const isSelectedDateToday = selectedDate === todayStr;
@@ -3001,9 +3046,10 @@ function renderLiveDashboardTab() {
 
               const barStatus = cart._status || match.bar_status || 'waiting';
               const barStatusBadges = {
-                waiting: { label: 'Aguardando Separação', class: 'bg-amber-100 text-amber-800 border-amber-300', icon: 'clock' },
-                chilling: { label: 'Gelando no Freezer', class: 'bg-cyan-100 text-cyan-800 border-cyan-300', icon: 'thermometer-snowflake' },
-                delivered: { label: 'Entregue na Quadra', class: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: 'check-circle' }
+                waiting: { label: 'Aguardando', class: 'bg-amber-100 text-amber-800 border-amber-300', icon: 'clock' },
+                separated: { label: 'Separado', class: 'bg-blue-100 text-blue-800 border-blue-300', icon: 'package' },
+                chilling: { label: 'No Freezer', class: 'bg-cyan-100 text-cyan-800 border-cyan-300', icon: 'thermometer-snowflake' },
+                delivered: { label: 'Entregue', class: 'bg-emerald-100 text-emerald-800 border-emerald-300', icon: 'check-circle' }
               };
               const currentBarBadge = barStatusBadges[barStatus] || barStatusBadges.waiting;
 
@@ -3097,37 +3143,37 @@ function renderLiveDashboardTab() {
                     </div>
 
                     <!-- Botões de Ação do Jogo -->
-                    <div class="flex items-center space-x-1.5 self-end md:self-center flex-shrink-0">
+                    <div class="flex items-center space-x-1.5 self-end md:self-center flex-shrink-0 flex-wrap">
                       ${(match.isLive || match.isOvertime) ? `
-                        <!-- Jogo em andamento: Finalizar Jogo (automático) + Finalizar Agora (manual antecipado) -->
-                        <button onclick="finishMatchManual('${match.id}')" class="px-3 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all" title="Encerrar o jogo agora, neste exato momento">
+                        <!-- Jogo em andamento: Finalizar Jogo (atualiza bar para entregue automaticamente) -->
+                        <button onclick="finishMatchManual('${match.id}')" class="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Finalizar o jogo agora (atualiza o bar para entregue se houver pedidos)">
                           <i data-lucide="square" class="w-4 h-4"></i>
-                          <span>⏹ Finalizar Agora</span>
-                        </button>
-                        <button onclick="updateMatchStatus('${match.id}', 'finished')" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all" title="Finalizar no horário programado">
-                          <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
-                          <span>Finalizar</span>
+                          <span>⏹ Finalizar Jogo</span>
                         </button>
                       ` : (match.status !== 'finished' && isSelectedDateToday ? `
-                        <!-- Jogo agendado hoje: pode iniciar agora (antecipado) ou aguardar -->
-                        <button onclick="startMatchNow('${match.id}')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all" title="Iniciar o jogo agora, antes do horário agendado">
+                        <!-- Jogo agendado hoje: Liberar Entrada / Iniciar Jogo -->
+                        <button onclick="startMatchNow('${match.id}')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Liberar entrada e iniciar jogo agora">
                           <i data-lucide="play" class="w-4 h-4"></i>
-                          <span>▶ Iniciar Agora</span>
+                          <span>▶ Liberar Jogo</span>
                         </button>
                       ` : (match.status !== 'finished' ? `
-                        <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center space-x-1.5 transition-all">
+                        <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
                           <i data-lucide="play" class="w-4 h-4"></i>
-                          <span>Iniciar Jogo</span>
+                          <span>▶ Liberar Jogo</span>
                         </button>
                       ` : ''))}
 
-                      <button onclick="openAddBarItemsModal('${match.id}')" class="p-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-xl transition-all" title="Adicionar Bebidas/Produtos">
-                        <i data-lucide="beer" class="w-4 h-4"></i>
+                      <!-- Botão de Comanda do Bar -->
+                      <button onclick="openAddBarItemsModal('${match.id}')" class="px-3 py-2 text-slate-800 hover:text-emerald-800 bg-slate-100 hover:bg-emerald-50 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Adicionar / Registrar Consumo do Bar para este jogo">
+                        <i data-lucide="beer" class="w-4 h-4 text-amber-500"></i>
+                        <span>+ Comanda Bar</span>
                       </button>
 
-                      <button onclick="handleCancelBooking('${match.id}')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="Cancelar Agendamento">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                      </button>
+                      ${!isRecep ? `
+                        <button onclick="handleCancelBooking('${match.id}')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer" title="Cancelar Agendamento">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      ` : ''}
                     </div>
 
                   </div>
@@ -3262,27 +3308,46 @@ function renderLiveDashboardTab() {
 
                   <!-- Itens do Bar Reservados -->
                   ${itemsList.length > 0 ? `
-                    <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-                      <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold text-slate-700 flex items-center">
-                          <i data-lucide="beer" class="w-4 h-4 text-amber-500 mr-1.5"></i>
-                          ${itemsList.join(', ')}
+                    <div class="pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs font-bold text-slate-800 flex items-center">
+                          <i data-lucide="beer" class="w-4 h-4 text-amber-500 mr-1.5 flex-shrink-0"></i>
+                          <span><strong>Bebidas/Bar:</strong> ${itemsList.join(', ')}</span>
                         </span>
-                        <button onclick="cycleBarStatus('${match.id}')" 
-                                class="text-[10px] font-black px-2.5 py-0.5 rounded-full border ${currentBarBadge.class} flex items-center space-x-1 hover:opacity-80 transition-all" title="Clique para avançar o status">
+                        <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full border ${currentBarBadge.class} flex items-center gap-1">
+                          <i data-lucide="${currentBarBadge.icon}" class="w-3 h-3"></i>
                           <span>${currentBarBadge.label}</span>
-                          <i data-lucide="chevron-right" class="w-2.5 h-2.5"></i>
+                        </span>
+                      </div>
+
+                      <div class="flex items-center gap-1 flex-wrap">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase mr-1">Status:</span>
+                        <button onclick="updateBarStatus('${match.id}', 'waiting')" 
+                                class="px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${barStatus === 'waiting' ? 'bg-amber-100 border-amber-400 text-amber-900 font-black shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'}" title="Marcar como Aguardando">
+                          ⏳ Pendente
+                        </button>
+                        <button onclick="updateBarStatus('${match.id}', 'separated')" 
+                                class="px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${barStatus === 'separated' ? 'bg-blue-600 border-blue-600 text-white font-black shadow-xs' : 'bg-white hover:bg-blue-50 text-blue-800 border-blue-200'}" title="Marcar como Separado">
+                          📦 Separado
+                        </button>
+                        <button onclick="updateBarStatus('${match.id}', 'chilling')" 
+                                class="px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${barStatus === 'chilling' ? 'bg-cyan-600 border-cyan-600 text-white font-black shadow-xs' : 'bg-white hover:bg-cyan-50 text-cyan-800 border-cyan-200'}" title="Marcar como Colocado no Freezer">
+                          ❄️ No Freezer
+                        </button>
+                        <button onclick="updateBarStatus('${match.id}', 'delivered')" 
+                                class="px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${barStatus === 'delivered' ? 'bg-emerald-600 border-emerald-600 text-white font-black shadow-xs' : 'bg-white hover:bg-emerald-50 text-emerald-800 border-emerald-200'}" title="Marcar como Entregue na Quadra">
+                          ✓ Entregue
+                        </button>
+                        <button onclick="openAddBarItemsModal('${match.id}')" class="px-2 py-1 text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 cursor-pointer ml-1">
+                          + Itens
                         </button>
                       </div>
-                      <button onclick="openAddBarItemsModal('${match.id}')" class="text-[11px] font-bold text-emerald-700 hover:underline">
-                        + Editar Bebidas
-                      </button>
                     </div>
                   ` : `
-                    <div class="pt-1 border-t border-slate-100 flex items-center justify-between">
-                      <button onclick="openAddBarItemsModal('${match.id}')" class="text-[11px] font-bold text-emerald-700 hover:underline flex items-center space-x-1">
-                        <i data-lucide="plus" class="w-3 h-3"></i>
-                        <span>+ Reservar Bebidas Geladas / Bar para esta partida</span>
+                    <div class="pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                      <button onclick="openAddBarItemsModal('${match.id}')" class="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center space-x-1.5 cursor-pointer">
+                        <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                        <span>+ Registrar Consumo / Bebidas do Bar para este jogo</span>
                       </button>
                     </div>
                   `}
@@ -3604,6 +3669,8 @@ function renderBarControlTab() {
     return Object.keys(cart).filter(k => !k.startsWith('_')).some(k => cart[k] > 0);
   });
 
+  const isRecep = isReceptionUser();
+
   return `
     <div class="space-y-6">
       
@@ -3617,12 +3684,14 @@ function renderBarControlTab() {
           <p class="text-xs text-slate-500 mt-1">Gerencie a separação de baldes de cerveja, gelo, água e petiscos para serem entregues gelados nas quadras.</p>
         </div>
 
+        ${!isRecep ? `
         <div class="flex items-center space-x-2">
-          <button onclick="openProductModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+          <button onclick="openProductModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
             <i data-lucide="plus" class="w-4 h-4"></i>
             <span>+ Novo Produto / Bebida</span>
           </button>
         </div>
+        ` : ''}
       </div>
 
       <!-- Fila de Pedidos para os Jogos -->
@@ -3689,26 +3758,30 @@ function renderBarControlTab() {
                     </div>
                   </div>
 
-                  <!-- Workflow em 3 etapas de Entrega -->
+                  <!-- Workflow em 4 etapas de Separação / Freezer / Entrega -->
                   <div>
                     <span class="text-[10px] font-black uppercase text-slate-500 block mb-1.5">Status de Separação / Entrega:</span>
-                    <div class="grid grid-cols-3 gap-1.5 text-center">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
                       <button onclick="updateBarStatus('${order.id}', 'waiting')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all ${currentStatus === 'waiting' ? 'bg-amber-100 border-amber-400 text-amber-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
-                        ⏳ Separação
+                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'waiting' ? 'bg-amber-100 border-amber-400 text-amber-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                        ⏳ Pendente
+                      </button>
+                      <button onclick="updateBarStatus('${order.id}', 'separated')" 
+                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'separated' ? 'bg-purple-100 border-purple-400 text-purple-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                        📦 Separado
                       </button>
                       <button onclick="updateBarStatus('${order.id}', 'chilling')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all ${currentStatus === 'chilling' ? 'bg-cyan-100 border-cyan-400 text-cyan-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'chilling' ? 'bg-cyan-100 border-cyan-400 text-cyan-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
                         ❄️ No Freezer
                       </button>
                       <button onclick="updateBarStatus('${order.id}', 'delivered')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all ${currentStatus === 'delivered' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'delivered' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
                         ✓ Entregue
                       </button>
                     </div>
 
                     <div class="mt-2.5 flex justify-end">
-                      <button onclick="openAddBarItemsModal('${order.id}')" class="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1">
+                      <button onclick="openAddBarItemsModal('${order.id}')" class="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1 cursor-pointer">
                         <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                         <span>+ Adicionar Mais Itens</span>
                       </button>
@@ -3729,10 +3802,12 @@ function renderBarControlTab() {
             <h4 class="text-sm font-black uppercase text-slate-800">Cardápio de Bebidas & Produtos Cadastrados (${state.products.length})</h4>
             <p class="text-xs text-slate-500">Itens disponíveis para os clientes comprarem na hora do agendamento ou consumirem na quadra.</p>
           </div>
-          <button onclick="openProductModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow">
+          ${!isRecep ? `
+          <button onclick="openProductModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow cursor-pointer">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
             <span>+ Adicionar</span>
           </button>
+          ` : ''}
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -3746,9 +3821,11 @@ function renderBarControlTab() {
                   <p class="text-sm font-black text-slate-900 mt-1">R$ ${p.price.toFixed(2).replace('.', ',')}</p>
                 </div>
               </div>
-              <button onclick="deleteProduct('${p.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg">
+              ${!isRecep ? `
+              <button onclick="deleteProduct('${p.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg cursor-pointer" title="Remover produto">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
               </button>
+              ` : ''}
             </div>
           `).join('')}
         </div>
@@ -4671,10 +4748,31 @@ async function updateMatchStatus(matchId, status) {
   const b = (state.bookings || []).find(x => x.id === matchId);
   if (b) {
     b.status = status;
+
+    // Ao finalizar partida, se tiver produtos no bar e não estiver entregue, atualiza automaticamente para entregue!
+    if (status === 'finished') {
+      if (b.product_cart && typeof b.product_cart === 'object') {
+        const pKeys = Object.keys(b.product_cart).filter(k => !k.startsWith('_'));
+        if (pKeys.some(k => b.product_cart[k] > 0)) {
+          b.product_cart._status = 'delivered';
+          b.bar_status = 'delivered';
+        }
+      }
+    }
+
+    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    const idx = localBookings.findIndex(x => x.id === matchId);
+    if (idx !== -1) {
+      localBookings[idx] = b;
+      localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+    }
+
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       try {
         const client = window.ArenaSupabase.getClient();
-        await client.from('bookings').update({ status }).eq('id', matchId);
+        const payload = { status };
+        if (b.product_cart) payload.product_cart = b.product_cart;
+        await client.from('bookings').update(payload).eq('id', matchId);
       } catch(e) {}
     }
   }
@@ -4682,13 +4780,20 @@ async function updateMatchStatus(matchId, status) {
   lucide.createIcons();
 }
 
-// Atualizar status do bar (waiting -> chilling -> delivered)
+// Atualizar status do bar (waiting -> separated -> chilling -> delivered)
 async function updateBarStatus(bookingId, newStatus) {
   const b = (state.bookings || []).find(x => x.id === bookingId);
   if (b) {
     if (!b.product_cart || typeof b.product_cart !== 'object') b.product_cart = {};
     b.product_cart._status = newStatus;
     b.bar_status = newStatus;
+
+    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    const idx = localBookings.findIndex(x => x.id === bookingId);
+    if (idx !== -1) {
+      localBookings[idx] = b;
+      localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+    }
 
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       try {
@@ -4705,7 +4810,7 @@ function cycleBarStatus(bookingId) {
   const b = (state.bookings || []).find(x => x.id === bookingId);
   if (!b) return;
   const current = (b.product_cart && b.product_cart._status) || b.bar_status || 'waiting';
-  const next = current === 'waiting' ? 'chilling' : (current === 'chilling' ? 'delivered' : 'waiting');
+  const next = current === 'waiting' ? 'separated' : (current === 'separated' ? 'chilling' : (current === 'chilling' ? 'delivered' : 'waiting'));
   updateBarStatus(bookingId, next);
 }
 
@@ -5421,10 +5526,11 @@ function openNewAdminUserModal() {
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
             <select id="newAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
+              <option value="Recepção & Atendimento">Recepção & Atendimento (Visualiza e opera jogos, comanda e bar)</option>
               <option value="Gerente do Sistema" selected>Gerente do Sistema (Modifica tudo, exceto Supabase e Acessos)</option>
               <option value="Administrador Geral">Administrador Geral (Acesso Total e Irrestrito)</option>
             </select>
-            <p class="text-[11px] text-slate-500 mt-1">O <strong>Gerente do Sistema</strong> pode gerenciar quadras, preços, produtos do bar, reservas e clientes, sem acesso técnico ao banco Supabase.</p>
+            <p class="text-[11px] text-slate-500 mt-1"><strong>Recepção:</strong> visualiza jogos, libera/inicia, finaliza e anota pedidos do bar. <strong>Gerente:</strong> altera tudo na arena sem mexer no Supabase.</p>
           </div>
 
           <!-- Gerador e Customização Livre de E-mail e Senha -->
@@ -5525,6 +5631,7 @@ function openEditAdminUserModal(id) {
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
             <select id="editAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600" ${isMaster ? 'disabled' : ''}>
+              <option value="Recepção & Atendimento" ${user.role === 'Recepção & Atendimento' || (user.role && user.role.toLowerCase().includes('recep')) ? 'selected' : ''}>Recepção & Atendimento (Visualiza e opera jogos, comanda e bar)</option>
               <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Modifica tudo, exceto Supabase e Acessos)</option>
               <option value="Administrador Geral" ${user.role === 'Administrador Geral' ? 'selected' : ''}>Administrador Geral (Acesso Total e Irrestrito)</option>
             </select>
