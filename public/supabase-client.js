@@ -77,10 +77,10 @@
       }
     },
 
-    // Buscar ou Criar Cliente na tabela 'customers'
-    async getOrCreateCustomer(name, phone, email = '') {
+    // Buscar ou Criar Cliente na tabela 'customers' com suporte a ficha completa
+    async getOrCreateCustomer(name, phone, email = '', extraData = {}) {
       const client = this.getClient();
-      if (!client) return { id: 'cust-local-' + Date.now(), name, phone, email };
+      if (!client) return { id: 'cust-local-' + Date.now(), name, phone, email, ...extraData };
 
       try {
         // Tenta encontrar por telefone
@@ -90,20 +90,43 @@
           .eq('phone', phone)
           .maybeSingle();
 
-        if (existing) return existing;
+        if (existing) {
+          if (name && name !== existing.name) {
+            try {
+              await client.from('customers').update({ name, email: email || existing.email }).eq('id', existing.id);
+            } catch(e) {}
+          }
+          return { ...existing, ...extraData };
+        }
 
         const newId = 'cust-' + Date.now();
-        const { data: created, error } = await client
-          .from('customers')
-          .insert([{ id: newId, name, phone, email }])
-          .select()
-          .single();
+        const payload = { id: newId, name, phone, email };
+        if (extraData.cpf) payload.cpf = extraData.cpf;
+        if (extraData.birth_date) payload.birth_date = extraData.birth_date;
+        if (extraData.emergency_contact) payload.emergency_contact = extraData.emergency_contact;
+        if (extraData.health_notes) payload.health_notes = extraData.health_notes;
 
-        if (error) throw error;
-        return created;
+        let created = null;
+        try {
+          const { data, error } = await client
+            .from('customers')
+            .insert([payload])
+            .select()
+            .single();
+          if (!error) created = data;
+        } catch(colErr) {
+          const { data, error } = await client
+            .from('customers')
+            .insert([{ id: newId, name, phone, email }])
+            .select()
+            .single();
+          if (!error) created = data;
+        }
+
+        return created || { id: newId, name, phone, email, ...extraData };
       } catch (err) {
         console.error('Erro no cadastro do cliente:', err);
-        return { id: 'cust-' + Date.now(), name, phone, email };
+        return { id: 'cust-' + Date.now(), name, phone, email, ...extraData };
       }
     }
   };

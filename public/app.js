@@ -17,17 +17,16 @@ function minutesToTime(totalMinutes) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function formatPhone(phone) {
-  if (!phone) return '';
-  const clean = String(phone).replace(/\D/g, '');
-  if (clean.length === 11) {
-    return `(${clean.slice(0, 2)}) ${clean.slice(2, 7)}-${clean.slice(7)}`;
-  }
-  if (clean.length === 10) {
-    return `(${clean.slice(0, 2)}) ${clean.slice(2, 6)}-${clean.slice(6)}`;
-  }
-  return phone;
+function formatPhone(val) {
+  if (!val) return '';
+  const num = String(val).replace(/\D/g, '').slice(0, 11);
+  if (num.length === 0) return '';
+  if (num.length <= 2) return '(' + num;
+  if (num.length <= 6) return '(' + num.slice(0, 2) + ') ' + num.slice(2);
+  if (num.length <= 10) return '(' + num.slice(0, 2) + ') ' + num.slice(2, 6) + '-' + num.slice(6);
+  return '(' + num.slice(0, 2) + ') ' + num.slice(2, 7) + '-' + num.slice(7, 11);
 }
+
 
 // Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
 let state = {
@@ -3900,43 +3899,113 @@ function renderAdminSubTabContent(tab) {
   }
 
   if (tab === 'customers') {
+    let localCusts = [];
+    try { localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]'); } catch (e) {}
+
+    const mapByPhone = new Map();
+    (state.supabaseCustomers || []).forEach(c => {
+      if (c && c.phone) {
+        const clean = c.phone.replace(/\D/g, '');
+        mapByPhone.set(clean, { ...c });
+      }
+    });
+    localCusts.forEach(c => {
+      if (c && c.phone) {
+        const clean = c.phone.replace(/\D/g, '');
+        if (mapByPhone.has(clean)) {
+          const existing = mapByPhone.get(clean);
+          mapByPhone.set(clean, {
+            ...existing,
+            cpf: existing.cpf || c.cpf,
+            emergency_contact: existing.emergency_contact || c.emergency_contact,
+            health_notes: existing.health_notes || c.health_notes,
+            birth_date: existing.birth_date || c.birth_date,
+            email: existing.email || c.email
+          });
+        } else {
+          mapByPhone.set(clean, { ...c });
+        }
+      }
+    });
+
+    const allCustomers = Array.from(mapByPhone.values());
+
     return `
       <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h3 class="text-base font-black text-slate-800 flex items-center">
               <i data-lucide="contact" class="w-5 h-5 text-emerald-600 mr-2"></i>
-              Base de Clientes Cadastrados
+              Base de Clientes & Fichas de Atletas
             </h3>
-            <p class="text-xs text-slate-500">Clientes que realizaram reservas avulsas ou são mensalistas na Arena Limoeiro.</p>
+            <p class="text-xs text-slate-500">Histórico de atletas com cadastro inteligente, CPF, contato de emergência e alertas médicos.</p>
           </div>
-          <button onclick="openCustomerModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>+ Novo Cliente</span>
+          <button onclick="openCustomerModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+            <span>+ Cadastrar Cliente</span>
           </button>
         </div>
 
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs">
             <thead>
-              <tr class="border-b border-slate-200 text-slate-400 uppercase font-black">
-                <th class="pb-3">Nome</th>
-                <th class="pb-3">Telefone / WhatsApp</th>
-                <th class="pb-3">E-mail</th>
+              <tr class="border-b border-slate-200 text-slate-400 uppercase font-black text-[10px]">
+                <th class="pb-3">Atleta / Peladeiro</th>
+                <th class="pb-3">CPF</th>
+                <th class="pb-3">WhatsApp</th>
+                <th class="pb-3">Contato de Emergência</th>
+                <th class="pb-3">Aviso de Saúde</th>
                 <th class="pb-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-              ${(state.supabaseCustomers || []).map(cust => `
-                <tr class="hover:bg-slate-50 transition-all">
-                  <td class="py-3 font-bold text-slate-900">${cust.name}</td>
-                  <td class="py-3 font-mono text-slate-700">${cust.phone}</td>
-                  <td class="py-3 text-slate-500">${cust.email || '-'}</td>
-                  <td class="py-3 text-right">
-                    <a href="https://wa.me/55${(cust.phone || '').replace(/\D/g, '')}" target="_blank" class="text-emerald-600 hover:text-emerald-800 font-bold mr-3">WhatsApp</a>
-                  </td>
+              ${allCustomers.length === 0 ? `
+                <tr>
+                  <td colspan="6" class="py-8 text-center text-slate-400 font-medium">Nenhum cliente cadastrado ainda.</td>
                 </tr>
-              `).join('')}
+              ` : allCustomers.map(cust => {
+                const hasHealthAlert = cust.health_notes && cust.health_notes !== 'Nenhuma restrição informada' && cust.health_notes.trim().toLowerCase() !== 'nenhum';
+                const cleanPhone = (cust.phone || '').replace(/\D/g, '');
+                return `
+                  <tr class="hover:bg-slate-50 transition-all">
+                    <td class="py-3">
+                      <div class="font-bold text-slate-900">${cust.name}</div>
+                      <div class="text-[11px] text-slate-400">${cust.email || 'Sem e-mail'}</div>
+                    </td>
+                    <td class="py-3 font-mono text-slate-700 font-semibold">${cust.cpf ? formatCPF(cust.cpf) : '<span class="text-slate-300 italic">Não informado</span>'}</td>
+                    <td class="py-3 font-mono text-slate-700 font-bold">${formatPhone(cust.phone)}</td>
+                    <td class="py-3 text-slate-700 font-medium">
+                      ${cust.emergency_contact ? `
+                        <span class="inline-flex items-center gap-1 text-slate-800">
+                          <i data-lucide="phone-call" class="w-3 h-3 text-rose-500 shrink-0"></i>
+                          <span>${cust.emergency_contact}</span>
+                        </span>
+                      ` : '<span class="text-slate-300 italic">-</span>'}
+                    </td>
+                    <td class="py-3 max-w-[200px]">
+                      ${hasHealthAlert ? `
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-2xs" title="${cust.health_notes}">
+                          <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600 shrink-0"></i>
+                          <span class="truncate max-w-[150px]">${cust.health_notes}</span>
+                        </span>
+                      ` : `
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i>
+                          <span>Sem restrições</span>
+                        </span>
+                      `}
+                    </td>
+                    <td class="py-3 text-right whitespace-nowrap">
+                      <button onclick="openCustomerModal('${cust.phone}')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded-lg mr-2 transition-all">
+                        Ficha / Editar
+                      </button>
+                      <a href="https://wa.me/55${cleanPhone}" target="_blank" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] rounded-lg transition-all">
+                        WhatsApp
+                      </a>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -6130,7 +6199,475 @@ function deleteCategory(catId, returnToCourtModal = false) {
 }
 
 
-// CHECKOUT MODAL
+// ==============================================================================
+// 📋 VALIDAÇÃO DE CPF & IDENTIFICAÇÃO INTELIGENTE DE ATLETA / PELADEIRO
+// ==============================================================================
+
+function validateCPF(cpf) {
+  if (!cpf) return false;
+  const clean = String(cpf).replace(/\D/g, '');
+  if (clean.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(clean)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(clean.charAt(i), 10) * (10 - i);
+  }
+  let rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(clean.charAt(9), 10)) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(clean.charAt(i), 10) * (11 - i);
+  }
+  rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(clean.charAt(10), 10)) return false;
+
+  return true;
+}
+
+function formatCPF(val) {
+  if (!val) return '';
+  const num = String(val).replace(/\D/g, '').slice(0, 11);
+  if (num.length <= 3) return num;
+  if (num.length <= 6) return num.slice(0, 3) + '.' + num.slice(3);
+  if (num.length <= 9) return num.slice(0, 3) + '.' + num.slice(3, 6) + '.' + num.slice(6);
+  return num.slice(0, 3) + '.' + num.slice(3, 6) + '.' + num.slice(6, 9) + '-' + num.slice(9, 11);
+}
+
+
+function findCustomerByPhone(phone) {
+  if (!phone) return null;
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.length < 8) return null;
+
+  // 1. Procura em state.supabaseCustomers
+  const list = state.supabaseCustomers || [];
+  let found = list.find(c => {
+    const cClean = (c.phone || '').replace(/\D/g, '');
+    return cClean === clean || (cClean.length >= 8 && clean.length >= 8 && (cClean.endsWith(clean.slice(-8)) || clean.endsWith(cClean.slice(-8))));
+  });
+  if (found) return found;
+
+  // 2. Procura no localStorage (arena_customers)
+  try {
+    const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+    found = local.find(c => {
+      const cClean = (c.phone || '').replace(/\D/g, '');
+      return cClean === clean || (cClean.length >= 8 && clean.length >= 8 && (cClean.endsWith(clean.slice(-8)) || clean.endsWith(cClean.slice(-8))));
+    });
+    if (found) return found;
+  } catch(e) {}
+
+  // 3. Procura no histórico de reservas
+  const allBookings = [...(state.bookings || [])];
+  const bMatch = allBookings.find(b => {
+    const bClean = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+    return bClean === clean || (bClean.length >= 8 && clean.length >= 8 && (bClean.endsWith(clean.slice(-8)) || clean.endsWith(bClean.slice(-8))));
+  });
+  if (bMatch) {
+    return {
+      name: bMatch.customer_name || bMatch.customerName,
+      phone: bMatch.customer_phone || bMatch.customerPhone,
+      email: bMatch.customer_email || bMatch.customerEmail || '',
+      cpf: bMatch.customer_cpf || bMatch.customerCpf || '',
+      birth_date: bMatch.birth_date || bMatch.birthDate || '',
+      emergency_contact: bMatch.emergency_contact || bMatch.emergencyContact || '',
+      health_notes: bMatch.health_notes || bMatch.healthNotes || ''
+    };
+  }
+
+  return null;
+}
+
+function handleCustomerPhoneInput(input) {
+  const formatted = formatPhone(input.value);
+  input.value = formatted;
+  state.customerPhone = formatted;
+  const clean = formatted.replace(/\D/g, '');
+  
+  const container = document.getElementById('customerDynamicArea');
+  if (!container) return;
+
+  if (clean.length >= 10) {
+    const customer = findCustomerByPhone(clean);
+    renderCustomerDynamicArea(customer, formatted);
+  } else {
+    container.innerHTML = `
+      <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
+        <i data-lucide="phone-call" class="w-6 h-6 text-slate-400 mx-auto mb-1"></i>
+        <span>Digite seu número de WhatsApp completo com DDD para consultar seu cadastro.</span>
+      </div>
+    `;
+    updateConfirmButtonState(false);
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function handleCPFInput(input) {
+  input.value = formatCPF(input.value);
+  const clean = input.value.replace(/\D/g, '');
+  const indicator = document.getElementById('cpfStatusMsg');
+  if (!indicator) return;
+
+  if (clean.length === 11) {
+    const isValid = validateCPF(input.value);
+    if (isValid) {
+      indicator.className = 'text-[11px] font-bold text-emerald-700 mt-1 flex items-center gap-1';
+      indicator.innerHTML = '<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i> ✓ CPF Válido com cálculo correto!';
+    } else {
+      indicator.className = 'text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1';
+      indicator.innerHTML = '<i data-lucide="alert-circle" class="w-3.5 h-3.5 text-rose-600"></i> ❌ CPF Inválido (cálculo de dígitos incorreto)';
+    }
+    if (window.lucide) lucide.createIcons();
+  } else if (clean.length > 0) {
+    indicator.className = 'text-[11px] font-semibold text-slate-400 mt-1';
+    indicator.textContent = 'Digite os 11 dígitos do CPF para validar';
+  } else {
+    indicator.textContent = '';
+  }
+}
+
+function toggleEditCustomerDetails() {
+  const readOnly = document.getElementById('customerReadOnlyDetails');
+  const editable = document.getElementById('customerEditableDetails');
+  if (readOnly && editable) {
+    const isEditing = !editable.classList.contains('hidden');
+    if (isEditing) {
+      editable.classList.add('hidden');
+      readOnly.classList.remove('hidden');
+    } else {
+      editable.classList.remove('hidden');
+      readOnly.classList.add('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+function updateConfirmButtonState(enabled, text) {
+  const btn = document.getElementById('btnConfirmBooking');
+  if (!btn) return;
+  btn.disabled = !enabled;
+  if (!enabled) {
+    btn.className = 'px-6 py-3 bg-slate-200 text-slate-400 cursor-not-allowed rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 transition-all';
+    btn.innerHTML = `<span>Informe seu WhatsApp Acima</span>`;
+  } else {
+    btn.className = 'px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer rounded-xl text-xs sm:text-sm font-black shadow-md shadow-emerald-600/30 flex items-center space-x-2 transition-all';
+    btn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i><span>${text || 'Confirmar e Reservar'}</span>`;
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderCustomerDynamicArea(customer, phoneStr) {
+  const container = document.getElementById('customerDynamicArea');
+  if (!container) return;
+
+  if (customer) {
+    state.checkoutCustomer = customer;
+    container.innerHTML = `
+      <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-400 space-y-3 shadow-xs animate-fade-in">
+        <div class="flex items-center justify-between pb-2.5 border-b border-emerald-200">
+          <div class="flex items-center space-x-2.5">
+            <span class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow">
+              ✓
+            </span>
+            <div>
+              <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider block">Peladeiro Cadastrado no Sistema</span>
+              <h4 class="text-base font-black text-slate-900">${customer.name}</h4>
+            </div>
+          </div>
+          <button type="button" onclick="toggleEditCustomerDetails()" class="px-2.5 py-1 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-lg text-xs font-bold shadow-xs flex items-center gap-1 transition-all">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Atualizar Dados</span>
+          </button>
+        </div>
+
+        <div id="customerReadOnlyDetails" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">Nome do Atleta:</span> <strong class="text-slate-900">${customer.name}</strong></p>
+          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">CPF:</span> <strong class="font-mono text-slate-900">${customer.cpf || 'Não cadastrado'}</strong></p>
+          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">E-mail:</span> <strong class="text-slate-900">${customer.email || 'Não cadastrado'}</strong></p>
+          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">Data de Nascimento:</span> <strong class="text-slate-900">${customer.birth_date || '-'}</strong></p>
+          <p class="sm:col-span-2"><span class="text-slate-400 font-bold block text-[10px] uppercase">Contato de Emergência:</span> <strong class="text-slate-900">${customer.emergency_contact || '-'}</strong></p>
+          <p class="sm:col-span-2">
+            <span class="text-slate-400 font-bold block text-[10px] uppercase">Aviso de Saúde Pré-existente:</span>
+            ${customer.health_notes && customer.health_notes !== 'Nenhuma restrição informada' ? `
+              <span class="inline-flex items-center px-2 py-0.5 mt-0.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                ⚠️ ${customer.health_notes}
+              </span>
+            ` : '<strong class="text-emerald-800 font-semibold">Nenhuma restrição informada</strong>'}
+          </p>
+        </div>
+
+        <div id="customerEditableDetails" class="hidden space-y-3 pt-2 border-t border-emerald-200">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
+            <input type="text" id="custName" value="${customer.name}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF *</label>
+              <input type="text" id="custCPF" value="${customer.cpf || ''}" maxlength="14" oninput="handleCPFInput(this)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 bg-white">
+              <span id="cpfStatusMsg" class="text-[10px]"></span>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail para Envio Automático *</label>
+              <input type="email" id="custEmail" value="${customer.email || ''}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data de Nascimento</label>
+              <input type="date" id="custBirthDate" value="${customer.birth_date || ''}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Contato de Emergência</label>
+              <input type="text" id="custEmergency" value="${customer.emergency_contact || ''}" placeholder="Nome e Telefone" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Aviso de Saúde Pré-existente / Ficha Médica</label>
+            <textarea id="custHealthNotes" rows="2" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white" placeholder="Hipertensão, lesão no joelho, alergias, etc.">${customer.health_notes || ''}</textarea>
+          </div>
+        </div>
+
+        <div class="p-2.5 bg-emerald-600/10 rounded-xl text-[11px] font-bold text-emerald-950 flex items-center gap-1.5">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-700 shrink-0"></i>
+          <span>Cadastro verificado na base! Clique abaixo para confirmar seu agendamento.</span>
+        </div>
+      </div>
+    `;
+    updateConfirmButtonState(true, 'Confirmar Agendamento');
+  } else {
+    state.checkoutCustomer = null;
+    container.innerHTML = `
+      <div class="bg-gradient-to-br from-amber-50/80 to-orange-50/50 p-4 sm:p-5 rounded-2xl border-2 border-amber-300 space-y-3.5 shadow-xs animate-fade-in">
+        <div class="flex items-start space-x-2.5 pb-2.5 border-b border-amber-200">
+          <span class="p-2 bg-amber-500 text-white rounded-xl text-base shrink-0 shadow-xs">⚽</span>
+          <div>
+            <h4 class="text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wide">Primeiro Agendamento deste Número!</h4>
+            <p class="text-[11px] text-amber-900 mt-0.5">Preencha sua ficha de atleta da Arena Limoeiro para registrar no banco de dados.</p>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Nome Completo do Responsável / Peladeiro *</label>
+          <input type="text" id="custName" required placeholder="Ex: Lucas Gabriel da Silva" 
+                 class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">CPF (com validação oficial) *</label>
+            <input type="text" id="custCPF" required placeholder="000.000.000-00" maxlength="14" oninput="handleCPFInput(this)" 
+                   class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+            <span id="cpfStatusMsg" class="text-[10px] font-semibold text-slate-400 block mt-0.5"></span>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Data de Nascimento *</label>
+            <input type="date" id="custBirthDate" required 
+                   class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">E-mail para Envio Automático *</label>
+          <input type="email" id="custEmail" required placeholder="seuemail@exemplo.com" 
+                 class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          <p class="text-[10px] text-slate-500 mt-0.5">A Arena enviará comprovantes e lembretes automáticos para este e-mail.</p>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Contato de Emergência do Peladeiro *</label>
+          <input type="text" id="custEmergency" required placeholder="Ex: Maria (Esposa) - (81) 98888-7777" 
+                 class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          <p class="text-[10px] text-slate-500 mt-0.5">Nome e telefone para contato imediato caso necessário.</p>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Aviso de Saúde Pré-existente / Ficha Médica</label>
+          <textarea id="custHealthNotes" rows="2" placeholder="Ex: Hipertensão, problema cardíaco, recuperação de lesão no joelho, alergias, etc. (Deixe em branco ou digite 'Nenhum' caso não possua)" 
+                    class="w-full p-2.5 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white"></textarea>
+          <p class="text-[10px] text-amber-900 italic mt-0.5 font-medium">⚠️ Informação médica de segurança para primeiros socorros em caso de queda ou desmaio durante o jogo.</p>
+        </div>
+      </div>
+    `;
+    updateConfirmButtonState(true, 'Salvar Cadastro e Confirmar Agendamento');
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+function openCustomerModal(targetPhoneOrId = null) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  let existing = null;
+  if (targetPhoneOrId) {
+    existing = findCustomerByPhone(targetPhoneOrId);
+    if (!existing && state.supabaseCustomers) {
+      existing = state.supabaseCustomers.find(c => c.id === targetPhoneOrId || c.phone === targetPhoneOrId);
+    }
+  }
+
+  const isEditing = !!existing;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="p-2 ${isEditing ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'} rounded-xl border border-white/10">
+              <i data-lucide="${isEditing ? 'user-check' : 'user-plus'}" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-tight">
+                ${isEditing ? 'Ficha de Atleta / Cliente' : 'Novo Cliente / Atleta'}
+              </h3>
+              <p class="text-xs text-emerald-200">Arena Limoeiro - Gestão de Atletas</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-xl transition-all cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="saveCustomerFromAdminModal(event, '${existing ? (existing.id || '') : ''}')" class="p-5 sm:p-6 overflow-y-auto space-y-4 flex-1">
+          <div>
+            <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Nome Completo do Atleta *</label>
+            <input type="text" id="adminCustName" required value="${existing ? existing.name : ''}" placeholder="Ex: Roberto Carlos Silva" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">WhatsApp / Telefone *</label>
+              <input type="tel" id="adminCustPhone" required value="${existing ? formatPhone(existing.phone) : ''}" placeholder="(81) 98888-8888" maxlength="15" oninput="this.value = formatPhone(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+            </div>
+            <div>
+              <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">CPF (com validação) *</label>
+              <input type="text" id="adminCustCPF" required value="${existing && existing.cpf ? formatCPF(existing.cpf) : ''}" placeholder="000.000.000-00" maxlength="14" oninput="this.value = formatCPF(this.value)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">E-mail</label>
+              <input type="email" id="adminCustEmail" value="${existing ? (existing.email || '') : ''}" placeholder="atleta@email.com" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+            </div>
+            <div>
+              <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Data de Nascimento</label>
+              <input type="date" id="adminCustBirthDate" value="${existing ? (existing.birth_date || '') : ''}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Contato de Emergência</label>
+            <input type="text" id="adminCustEmergency" value="${existing ? (existing.emergency_contact || '') : ''}" placeholder="Ex: Esposa Mariana - (81) 99999-0000" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-black text-slate-800 uppercase mb-1 flex items-center justify-between">
+              <span>Aviso de Saúde Pré-existente / Cuidados Médicos</span>
+              <span class="text-[10px] text-amber-700 font-bold lowercase">segurança do atleta</span>
+            </label>
+            <textarea id="adminCustHealth" rows="2" placeholder="Ex: Hipertensão, histórico de lesão no menisco, arritmia, desmaio, etc." class="w-full p-2.5 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">${existing ? (existing.health_notes || '') : ''}</textarea>
+            <p class="text-[10px] text-slate-400 mt-0.5">Visível para a equipe de socorro e primeiros socorros da Arena Limoeiro.</p>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all">
+              Cancelar
+            </button>
+            <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-md hover:shadow-lg transition-all flex items-center space-x-1.5">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>${isEditing ? 'Salvar Alterações' : 'Cadastrar Atleta'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function saveCustomerFromAdminModal(event, existingId) {
+  event.preventDefault();
+  const name = (document.getElementById('adminCustName')?.value || '').trim();
+  const phone = (document.getElementById('adminCustPhone')?.value || '').trim();
+  const cpf = (document.getElementById('adminCustCPF')?.value || '').trim();
+  const email = (document.getElementById('adminCustEmail')?.value || '').trim();
+  const birth_date = (document.getElementById('adminCustBirthDate')?.value || '').trim();
+  const emergency_contact = (document.getElementById('adminCustEmergency')?.value || '').trim();
+  const health_notes = (document.getElementById('adminCustHealth')?.value || '').trim();
+
+  if (!name) {
+    if (typeof showNotification === 'function') showNotification('Informe o nome do atleta.', 'error');
+    return;
+  }
+  if (!phone || phone.replace(/\D/g, '').length < 10) {
+    if (typeof showNotification === 'function') showNotification('Informe um telefone/WhatsApp válido.', 'error');
+    return;
+  }
+  if (cpf && !validateCPF(cpf)) {
+    if (typeof showNotification === 'function') showNotification('CPF inválido! Por favor verifique os dígitos.', 'error');
+    return;
+  }
+
+  const cleanPhone = phone.replace(/\D/g, '');
+  const customerData = {
+    name,
+    phone,
+    cpf,
+    email,
+    birth_date,
+    emergency_contact,
+    health_notes: health_notes || 'Nenhuma restrição informada'
+  };
+
+  try {
+    let localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+    const idx = localCusts.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone || (existingId && c.id === existingId));
+    if (idx >= 0) {
+      localCusts[idx] = { ...localCusts[idx], ...customerData };
+    } else {
+      localCusts.push({ id: existingId || ('cust_' + Date.now()), ...customerData });
+    }
+    localStorage.setItem('arena_customers', JSON.stringify(localCusts));
+  } catch (e) {
+    console.error('Erro ao salvar cliente local:', e);
+  }
+
+  try {
+    if (window.ArenaSupabase && window.ArenaSupabase.getOrCreateCustomer) {
+      await window.ArenaSupabase.getOrCreateCustomer(name, phone, email, {
+        cpf,
+        birth_date,
+        emergency_contact,
+        health_notes: customerData.health_notes
+      });
+    }
+  } catch (err) {
+    console.warn('Erro ao sincronizar cliente no Supabase:', err);
+  }
+
+  if (state.supabaseCustomers) {
+    const sIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone || (existingId && c.id === existingId));
+    if (sIdx >= 0) {
+      state.supabaseCustomers[sIdx] = { ...state.supabaseCustomers[sIdx], ...customerData };
+    } else {
+      state.supabaseCustomers.push({ id: existingId || ('cust_' + Date.now()), ...customerData });
+    }
+  }
+
+  closeModal();
+  renderStepContent();
+  if (typeof showNotification === 'function') showNotification('Ficha do atleta salva com sucesso!', 'success');
+}
+
+// MODAL DE IDENTIFICAÇÃO E CONFIRMAÇÃO DO PELADEIRO (SEM PIX)
 function openCheckoutModal() {
   const court = state.selectedCourt;
   calculateDuration();
@@ -6150,82 +6687,98 @@ function openCheckoutModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
+  const initialPhone = formatPhone(state.customerPhone || '');
+  const initialCustomer = findCustomerByPhone(initialPhone);
+
   modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        
+        <!-- Cabeçalho do Modal -->
         <div class="arena-header-bg p-5 text-white flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-black uppercase tracking-tight">
-              ${isMensal ? 'Confirmação de Horário Fixo' : 'Identificação e Pagamento'}
+            <h3 class="text-base sm:text-lg font-black uppercase tracking-tight flex items-center gap-2">
+              <i data-lucide="user-check" class="w-5 h-5 text-emerald-300"></i>
+              <span>${isMensal ? 'Identificação do Mensalista' : 'Identificação do Peladeiro'}</span>
             </h3>
-            <p class="text-xs text-emerald-300 font-medium">Arena Limoeiro - Complexo Poliesportivo</p>
+            <p class="text-xs text-emerald-200 font-medium">Arena Limoeiro - Complexo Poliesportivo</p>
           </div>
-          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1">
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-xl transition-all cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
 
-        <div class="p-6 overflow-y-auto space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">${isMensal ? 'Nome do Time Fixo / Responsável *' : 'Nome Completo do Responsável *'}</label>
-            <input type="text" id="custName" value="${state.customerName}" placeholder="Ex: Pelada dos Amigos (Lucas Gabriel)" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        <div class="p-5 sm:p-6 overflow-y-auto space-y-4">
+          
+          <!-- Pergunta Principal: Qual é o seu número? -->
+          <div class="p-4 bg-emerald-50/70 border-2 border-emerald-300 rounded-2xl">
+            <label class="block text-xs font-black text-emerald-950 uppercase mb-1.5 flex items-center gap-1.5">
+              <i data-lucide="phone" class="w-4 h-4 text-emerald-700"></i>
+              <span>Qual é o seu número de WhatsApp / Telefone? *</span>
+            </label>
+            <div class="relative">
+              <input type="tel" id="custPhone" 
+                     value="${initialPhone}" 
+                     placeholder="(81) 98765-4321" 
+                     maxlength="15" 
+                     oninput="handleCustomerPhoneInput(this)" 
+                     class="w-full p-3.5 pl-4 border-2 border-emerald-500 rounded-xl text-base font-black text-slate-900 focus:ring-4 focus:ring-emerald-500/20 focus:outline-none bg-white tracking-wide shadow-xs">
+            </div>
+            <p class="text-[11px] text-emerald-900 mt-1.5 flex items-center font-medium">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1 text-emerald-700 shrink-0"></i>
+              Pelo seu número, identificamos seu cadastro automaticamente na base de dados.
+            </p>
           </div>
 
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp para Notificações *</label>
-            <input type="tel" id="custPhone" value="${state.customerPhone}" placeholder="Ex: (81) 98765-4321" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-          </div>
+          <!-- Área Dinâmica: Cadastro Identificado ou Formulário de Primeiro Agendamento -->
+          <div id="customerDynamicArea"></div>
 
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-2">Forma de Pagamento</label>
-            <div class="grid grid-cols-2 gap-3">
-              <label onclick="setPaymentMethod('pix')" class="p-3 border-2 rounded-xl flex items-center space-x-2.5 cursor-pointer ${state.paymentMethod === 'pix' ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200'}">
-                <input type="radio" name="paymethod" value="pix" ${state.paymentMethod === 'pix' ? 'checked' : ''} class="text-emerald-600">
-                <span class="text-xs font-bold text-slate-800">⚡ PIX Instantâneo</span>
-              </label>
-
-              <label onclick="setPaymentMethod('local')" class="p-3 border-2 rounded-xl flex items-center space-x-2.5 cursor-pointer ${state.paymentMethod === 'local' ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200'}">
-                <input type="radio" name="paymethod" value="local" ${state.paymentMethod === 'local' ? 'checked' : ''} class="text-emerald-600">
-                <span class="text-xs font-bold text-slate-800">🏢 Pagar na Recepção</span>
-              </label>
+          <!-- Resumo da Partida Selecionada -->
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
+            <div>
+              <span class="font-black text-slate-900 block">${court.name.split(' - ')[0]}</span>
+              <span>${isMensal ? `Toda ${state.monthlyDayOfWeek}-feira` : formatDisplayDate(state.selectedDate)} • ${state.startTime} às ${state.endTime}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 block font-bold uppercase">Total do Campo</span>
+              <strong class="text-sm font-black text-emerald-800">R$ ${grandTotal.toFixed(2).replace('.', ',')}</strong>
             </div>
           </div>
-
-          ${state.paymentMethod === 'pix' ? `
-            <div class="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-200 text-center">
-              <span class="text-xs font-extrabold text-emerald-950 block mb-2">Pague via PIX Copia e Cola / QR Code</span>
-              <div class="w-36 h-36 mx-auto bg-white p-2 rounded-xl border border-emerald-300 shadow-sm flex items-center justify-center">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=00020126580014br.gov.bcb.pix0136arena-limoeiro-pix520400005303986540${grandTotal.toFixed(2)}5802BR" class="w-full h-full object-contain">
-              </div>
-              <p class="text-[11px] text-slate-600 mt-2">Chave PIX: <code class="font-mono bg-white px-2 py-0.5 rounded text-emerald-800 font-bold border border-emerald-200">contato@arenalimoeiro.com.br</code></p>
-            </div>
-          ` : ''}
         </div>
 
-        <div class="p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <!-- Rodapé com Confirmação Imediata -->
+        <div class="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
           <div>
-            <span class="text-[11px] text-slate-400 block font-bold">Total a Pagar Agora</span>
-            <p class="text-xl font-black text-slate-950">R$ ${grandTotal.toFixed(2).replace('.', ',')}</p>
+            <span class="text-[10px] text-slate-400 block font-bold uppercase">Valor da Reserva</span>
+            <p class="text-lg sm:text-xl font-black text-slate-950">R$ ${grandTotal.toFixed(2).replace('.', ',')}</p>
           </div>
 
           <button id="btnConfirmBooking" onclick="submitBooking(${grandTotal})" 
-                  class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-extrabold shadow-md shadow-emerald-600/30 flex items-center space-x-2 transition-all">
-            <i data-lucide="check-circle" class="w-4 h-4"></i>
-            <span>Confirmar e Reservar</span>
+                  class="px-5 sm:px-6 py-3 bg-slate-300 text-slate-500 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 transition-all cursor-not-allowed" disabled>
+            <span>Informe seu WhatsApp</span>
           </button>
         </div>
       </div>
     </div>
   `;
 
-  lucide.createIcons();
-}
+  if (window.lucide) lucide.createIcons();
 
-function setPaymentMethod(method) {
-  state.paymentMethod = method;
-  openCheckoutModal();
+  // Se já tinha telefone, faz a busca instantânea
+  if (initialPhone && initialPhone.replace(/\D/g, '').length >= 10) {
+    renderCustomerDynamicArea(initialCustomer, initialPhone);
+  } else {
+    const dynamic = document.getElementById('customerDynamicArea');
+    if (dynamic) {
+      dynamic.innerHTML = `
+        <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center text-xs text-slate-500">
+          <i data-lucide="phone-call" class="w-6 h-6 text-slate-400 mx-auto mb-1"></i>
+          <span>Digite seu número de WhatsApp completo com DDD acima para consultar seu cadastro.</span>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+    }
+  }
 }
 
 function closeModal() {
@@ -6235,26 +6788,87 @@ function closeModal() {
 }
 
 async function submitBooking(grandTotal) {
-  const nameInput = document.getElementById('custName');
   const phoneInput = document.getElementById('custPhone');
-  const name = nameInput ? nameInput.value.trim() : state.customerName;
   const phone = phoneInput ? phoneInput.value.trim() : state.customerPhone;
+  const cleanPhone = (phone || '').replace(/\D/g, '');
 
-  if (!name || !phone) {
-    alert('Por favor, informe seu nome e telefone.');
+  if (cleanPhone.length < 10) {
+    alert('Por favor, informe seu número de WhatsApp / Telefone completo com DDD.');
+    phoneInput?.focus();
     return;
   }
 
-  // Feedback visual instantâneo no botão
+  const existingCust = state.checkoutCustomer;
+  const isEditing = document.getElementById('customerEditableDetails') && !document.getElementById('customerEditableDetails').classList.contains('hidden');
+
+  let name = '';
+  let cpf = '';
+  let email = '';
+  let birthDate = '';
+  let emergency = '';
+  let healthNotes = '';
+
+  if (existingCust && !isEditing) {
+    name = existingCust.name;
+    cpf = existingCust.cpf || '';
+    email = existingCust.email || '';
+    birthDate = existingCust.birth_date || '';
+    emergency = existingCust.emergency_contact || '';
+    healthNotes = existingCust.health_notes || '';
+  } else {
+    const nameInput = document.getElementById('custName');
+    const cpfInput = document.getElementById('custCPF');
+    const emailInput = document.getElementById('custEmail');
+    const birthInput = document.getElementById('custBirthDate');
+    const emergInput = document.getElementById('custEmergency');
+    const healthInput = document.getElementById('custHealthNotes');
+
+    name = nameInput ? nameInput.value.trim() : '';
+    cpf = cpfInput ? cpfInput.value.trim() : '';
+    email = emailInput ? emailInput.value.trim() : '';
+    birthDate = birthInput ? birthInput.value : '';
+    emergency = emergInput ? emergInput.value.trim() : '';
+    healthNotes = healthInput ? healthInput.value.trim() : '';
+
+    if (!name || name.length < 3) {
+      alert('Por favor, informe o seu Nome Completo.');
+      nameInput?.focus();
+      return;
+    }
+
+    if (!cpf || !validateCPF(cpf)) {
+      alert('⚠️ CPF Inválido!\n\nO CPF digitado não passou no cálculo oficial dos dígitos verificadores.\nPor favor, verifique os números digitados.');
+      cpfInput?.focus();
+      return;
+    }
+
+    if (!birthDate) {
+      alert('Por favor, informe a sua Data de Nascimento.');
+      birthInput?.focus();
+      return;
+    }
+
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      alert('Por favor, informe um E-mail válido para envio automático de comprovantes e avisos da Arena.');
+      emailInput?.focus();
+      return;
+    }
+
+    if (!emergency || emergency.length < 3) {
+      alert('Por favor, informe um Contato de Emergência (Nome e Telefone de um familiar ou amigo).');
+      emergInput?.focus();
+      return;
+    }
+  }
+
   const confirmBtn = document.getElementById('btnConfirmBooking');
   if (confirmBtn) {
     confirmBtn.disabled = true;
-    confirmBtn.innerHTML = `<span class="inline-block animate-spin mr-1.5">⏳</span><span>Salvando Reserva...</span>`;
+    confirmBtn.innerHTML = `<span class="inline-block animate-spin mr-1.5">⏳</span><span>Confirmando Agendamento...</span>`;
   }
 
   state.customerName = name;
-  state.customerPhone = phone;
-  const isMensal = state.bookingType === 'mensalista';
+  state.customerPhone = formatPhone(phone);
 
   // 1. ANTI-CHOQUE RIGOROSO: Verifica conflito antes de salvar
   const localCheck = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
@@ -6271,12 +6885,40 @@ async function submitBooking(grandTotal) {
     return;
   }
 
+  // 2. Salva ou atualiza os dados completos do cliente
+  const customerRecord = {
+    id: existingCust ? existingCust.id : ('cust-' + Date.now()),
+    name,
+    phone: formatPhone(phone),
+    email: email || '',
+    cpf: formatCPF(cpf),
+    birth_date: birthDate || '',
+    emergency_contact: emergency || '',
+    health_notes: healthNotes || 'Nenhuma restrição informada',
+    created_at: existingCust ? (existingCust.created_at || new Date().toISOString()) : new Date().toISOString()
+  };
+
+  if (!state.supabaseCustomers) state.supabaseCustomers = [];
+  const existingIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone);
+  if (existingIdx >= 0) {
+    state.supabaseCustomers[existingIdx] = { ...state.supabaseCustomers[existingIdx], ...customerRecord };
+  } else {
+    state.supabaseCustomers.unshift(customerRecord);
+  }
+
+  try {
+    const localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+    const lIdx = localCusts.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone);
+    if (lIdx >= 0) localCusts[lIdx] = { ...localCusts[lIdx], ...customerRecord };
+    else localCusts.unshift(customerRecord);
+    localStorage.setItem('arena_customers', JSON.stringify(localCusts));
+  } catch(e) {}
+
   const courtId = state.selectedCourt.id;
   const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
   const newMemberId = 'mensal-' + Date.now();
+  const isMensal = state.bookingType === 'mensalista';
 
-  // Payload LIMPO estritamente compatível com o schema do Supabase (sem camelCase courtId!)
-  // Sanitiza o carrinho do bar para salvar estritamente itens selecionados (sem zeros ou unidades fantasmas)
   const cleanProductCart = {};
   if (state.productCart && typeof state.productCart === 'object') {
     Object.entries(state.productCart).forEach(([k, v]) => {
@@ -6289,31 +6931,35 @@ async function submitBooking(grandTotal) {
     }
   }
 
+  const healthObs = healthNotes ? `[Saúde: ${healthNotes}]` : '';
+  const emergencyObs = emergency ? `[Emergência: ${emergency}]` : '';
+  const fullObservation = [state.observation, healthObs, emergencyObs].filter(Boolean).join(' | ');
+
   const dbBookingPayload = {
     id: newBookingId,
     court_id: courtId,
-    customer_id: null,
+    customer_id: customerRecord.id,
     date: state.selectedDate,
     start_time: state.startTime,
     end_time: state.endTime,
     time: `${state.startTime} às ${state.endTime}`,
     duration: state.selectedDuration || 60,
     customer_name: name,
-    customer_phone: phone,
+    customer_phone: formatPhone(phone),
     total_price: Number(grandTotal) || 0,
     status: 'confirmed',
     booking_type: 'avulso',
-    payment_method: state.paymentMethod || 'local',
+    payment_method: 'local',
     product_cart: cleanProductCart,
-    observation: state.observation || ''
+    observation: fullObservation
   };
 
   const dbMemberPayload = {
     id: newMemberId,
     team_name: name,
     responsible_name: name,
-    phone: phone,
-    customer_id: null,
+    phone: formatPhone(phone),
+    customer_id: customerRecord.id,
     court_id: courtId,
     day_of_week: state.monthlyDayOfWeek,
     day_of_week_label: 'Toda ' + state.monthlyDayOfWeek + '-feira',
@@ -6322,10 +6968,10 @@ async function submitBooking(grandTotal) {
     end_time: state.endTime,
     monthly_price: Number(grandTotal) || 0,
     status: 'active',
-    observation: state.observation || ''
+    observation: fullObservation
   };
 
-  // 2. Salva no Supabase (Nuvem Vercel)
+  // 3. Salva no Supabase (Nuvem Vercel)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
@@ -6356,15 +7002,18 @@ async function submitBooking(grandTotal) {
         }
       }
 
-      // Cria ou busca cliente
+      // Cria ou atualiza cliente no Supabase
       try {
-        const customer = await window.ArenaSupabase.getOrCreateCustomer(name, phone);
-        if (customer && customer.id) {
-          dbBookingPayload.customer_id = customer.id;
-          dbMemberPayload.customer_id = customer.id;
+        if (window.ArenaSupabase.getOrCreateCustomer) {
+          await window.ArenaSupabase.getOrCreateCustomer(name, formatPhone(phone), email, {
+            cpf: formatCPF(cpf),
+            birth_date: birthDate,
+            emergency_contact: emergency,
+            health_notes: healthNotes
+          });
         }
       } catch (custErr) {
-        console.warn('Aviso no cadastro de cliente:', custErr);
+        console.warn('Aviso no cadastro de cliente Supabase:', custErr);
       }
 
       // Insere no Supabase
@@ -6380,12 +7029,16 @@ async function submitBooking(grandTotal) {
     }
   }
 
-  // 3. Atualiza estado em memória e localStorage com garantia de compatibilidade
+  // 4. Atualiza estado em memória e localStorage com garantia de compatibilidade
   const unifiedBooking = {
     ...dbBookingPayload,
     courtId: courtId,
     customerName: name,
-    customerPhone: phone,
+    customerPhone: formatPhone(phone),
+    customerEmail: email,
+    customerCPF: formatCPF(cpf),
+    emergencyContact: emergency,
+    healthNotes: healthNotes,
     totalPrice: Number(grandTotal) || 0,
     startTime: state.startTime,
     endTime: state.endTime,
@@ -6401,7 +7054,7 @@ async function submitBooking(grandTotal) {
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
   }
 
-  // 4. Finaliza com sucesso
+  // 5. Finaliza com sucesso
   requestSchedule();
   closeModal();
 
@@ -6409,7 +7062,7 @@ async function submitBooking(grandTotal) {
     showConfirmationSuccessModal({
       id: newMemberId,
       customerName: name,
-      customerPhone: phone,
+      customerPhone: formatPhone(phone),
       courtId: courtId,
       date: 'Toda ' + state.monthlyDayOfWeek + '-feira (Mensal)',
       time: state.startTime + ' às ' + state.endTime,
@@ -6419,7 +7072,7 @@ async function submitBooking(grandTotal) {
   } else {
     showConfirmationSuccessModal(unifiedBooking);
   }
-  // Limpa o carrinho do agendamento para que a próxima reserva inicie 100% zerada
+
   state.productCart = {};
 }
 
