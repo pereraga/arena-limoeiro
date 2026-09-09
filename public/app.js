@@ -941,27 +941,6 @@ function renderStep1(container) {
                         </span>
                       ` : ''}
                     </div>
-
-                    ${(() => {
-                      const dInfo = getCourtDiscountInfo(court);
-                      if (dInfo.hasDiscount) {
-                        return `
-                          <div class="mt-2.5 p-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-300 rounded-xl flex items-center justify-between">
-                            <div class="flex items-center space-x-1.5">
-                              <span class="text-sm">🔥</span>
-                              <div>
-                                <span class="text-[10px] font-black uppercase text-amber-900 block leading-none">Desconto de Horário</span>
-                                <span class="text-[11px] font-bold text-amber-800">${dInfo.startHour} às ${dInfo.endHour}</span>
-                              </div>
-                            </div>
-                            <span class="text-xs font-black text-amber-900 bg-white px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
-                              R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
-                            </span>
-                          </div>
-                        `;
-                      }
-                      return '';
-                    })()}
                   </div>
 
                   <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
