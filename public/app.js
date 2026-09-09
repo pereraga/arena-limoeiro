@@ -2615,12 +2615,21 @@ function renderLiveDashboardTab() {
     if (b.date === selectedDate && b.status !== 'cancelled') {
       const startT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
       const endT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
+      const parsedObs = typeof parseCustomerFromObservation === 'function' ? parseCustomerFromObservation(b.observation || '') : {};
+      const custObj = typeof findCustomerByPhone === 'function' ? findCustomerByPhone(b.customer_phone || b.customerPhone || '') : null;
+      const cpfVal = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || (custObj ? custObj.cpf : '');
+      const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
+      const healthVal = b.health_notes || b.healthNotes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
+
       matchesList.push({
         id: b.id,
         court_id: b.court_id || b.courtId,
         date: b.date,
         customer_name: b.customer_name || b.customerName || 'Cliente',
         customer_phone: b.customer_phone || b.customerPhone || '',
+        customer_cpf: cpfVal,
+        emergency_contact: emergVal,
+        health_notes: healthVal,
         start_time: startT,
         end_time: endT,
         time: b.time || (startT + ' às ' + endT),
@@ -2643,6 +2652,12 @@ function renderLiveDashboardTab() {
       const endT = m.end_time || m.endTime || '20:00';
       const cId = m.court_id || m.courtId;
       
+      const parsedObs = typeof parseCustomerFromObservation === 'function' ? parseCustomerFromObservation(m.observation || '') : {};
+      const custObj = typeof findCustomerByPhone === 'function' ? findCustomerByPhone(m.phone || '') : null;
+      const cpfVal = m.cpf || parsedObs.cpf || (custObj ? custObj.cpf : '');
+      const emergVal = m.emergency_contact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
+      const healthVal = m.health_notes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
+
       // Evita duplicata se já existir booking gerado para o horário fixo
       const alreadyHas = matchesList.some(b => b.court_id === cId && b.start_time === startT);
       if (!alreadyHas) {
@@ -2652,6 +2667,9 @@ function renderLiveDashboardTab() {
           date: selectedDate,
           customer_name: (m.team_name || m.teamName) + ' (' + (m.responsible_name || m.responsibleName) + ')',
           customer_phone: m.phone || '',
+          customer_cpf: cpfVal,
+          emergency_contact: emergVal,
+          health_notes: healthVal,
           start_time: startT,
           end_time: endT,
           time: m.time || (startT + ' às ' + endT),
@@ -3015,18 +3033,35 @@ function renderLiveDashboardTab() {
                   <!-- Detalhes do Cliente e Pagamento -->
                   <div class="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div class="space-y-1">
-                      <div class="flex items-center space-x-2">
-                        <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
-                        <span class="text-sm sm:text-base font-black text-slate-900">${match.customer_name}</span>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex items-center space-x-1.5">
+                          <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
+                          <span class="text-sm sm:text-base font-black text-slate-900">${match.customer_name}</span>
+                        </div>
+                        ${match.customer_cpf ? `<span class="text-[11px] font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">CPF: ${formatCPF(match.customer_cpf)}</span>` : ''}
                       </div>
 
-                      <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                      <div class="flex flex-wrap items-center gap-2.5 text-xs text-slate-600">
                         ${match.customer_phone ? `
                           <a href="${whatsappUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                             <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
-                            <span>${formattedPhone} (Chamar no WhatsApp)</span>
+                            <span>${formattedPhone} (WhatsApp)</span>
                           </a>
                         ` : '<span class="text-slate-400">Sem telefone cadastrado</span>'}
+
+                        ${match.emergency_contact ? `
+                          <span class="text-slate-700 font-semibold flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                            <i data-lucide="phone-call" class="w-3.5 h-3.5 text-rose-500"></i>
+                            <span>Emergência: <strong>${match.emergency_contact}</strong></span>
+                          </span>
+                        ` : ''}
+
+                        ${match.health_notes && match.health_notes !== 'Nenhuma restrição informada' && match.health_notes.trim().toLowerCase() !== 'nenhum' ? `
+                          <span class="text-amber-900 font-bold flex items-center gap-1 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-300 shadow-2xs">
+                            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+                            <span>Saúde: <strong>${match.health_notes}</strong></span>
+                          </span>
+                        ` : ''}
 
                         <span class="font-semibold">
                           Valor a Pagar: <strong class="text-slate-900 font-black text-sm">R$ ${match.total_price.toFixed(2).replace('.', ',')}</strong>
@@ -6238,6 +6273,18 @@ function formatCPF(val) {
 }
 
 
+function parseCustomerFromObservation(obs) {
+  if (!obs || typeof obs !== 'string') return {};
+  const res = {};
+  const cpfMatch = obs.match(/\[CPF:\s*([^\]]+)\]/i);
+  if (cpfMatch) res.cpf = cpfMatch[1].trim();
+  const saudeMatch = obs.match(/\[Saúde:\s*([^\]]+)\]/i);
+  if (saudeMatch) res.health_notes = saudeMatch[1].trim();
+  const emergMatch = obs.match(/\[Emergência:\s*([^\]]+)\]/i);
+  if (emergMatch) res.emergency_contact = emergMatch[1].trim();
+  return res;
+}
+
 function findCustomerByPhone(phone) {
   if (!phone) return null;
   const clean = String(phone).replace(/\D/g, '');
@@ -6261,28 +6308,98 @@ function findCustomerByPhone(phone) {
     if (found) return found;
   } catch(e) {}
 
-  // 3. Procura no histórico de reservas
-  const allBookings = [...(state.bookings || [])];
+  // 3. Procura no histórico de reservas (state.bookings e arena_local_bookings)
+  let localBookings = [];
+  try { localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]'); } catch(e) {}
+  const allBookings = [...(state.bookings || []), ...localBookings];
   const bMatch = allBookings.find(b => {
     const bClean = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
     return bClean === clean || (bClean.length >= 8 && clean.length >= 8 && (bClean.endsWith(clean.slice(-8)) || clean.endsWith(bClean.slice(-8))));
   });
   if (bMatch) {
+    const parsedObs = parseCustomerFromObservation(bMatch.observation || '');
     return {
       name: bMatch.customer_name || bMatch.customerName,
       phone: bMatch.customer_phone || bMatch.customerPhone,
       email: bMatch.customer_email || bMatch.customerEmail || '',
-      cpf: bMatch.customer_cpf || bMatch.customerCpf || '',
+      cpf: bMatch.customer_cpf || bMatch.customerCpf || bMatch.customerCPF || parsedObs.cpf || '',
       birth_date: bMatch.birth_date || bMatch.birthDate || '',
-      emergency_contact: bMatch.emergency_contact || bMatch.emergencyContact || '',
-      health_notes: bMatch.health_notes || bMatch.healthNotes || ''
+      emergency_contact: bMatch.emergency_contact || bMatch.emergencyContact || parsedObs.emergency_contact || '',
+      health_notes: bMatch.health_notes || bMatch.healthNotes || parsedObs.health_notes || ''
+    };
+  }
+
+  // 4. Procura nos contratos de mensalistas
+  const mMatch = (state.monthlyMembers || []).find(m => {
+    const mClean = (m.phone || '').replace(/\D/g, '');
+    return mClean === clean || (mClean.length >= 8 && clean.length >= 8 && (mClean.endsWith(clean.slice(-8)) || clean.endsWith(mClean.slice(-8))));
+  });
+  if (mMatch) {
+    const parsedObs = parseCustomerFromObservation(mMatch.observation || '');
+    return {
+      name: mMatch.responsible_name || mMatch.responsibleName || mMatch.team_name,
+      phone: mMatch.phone,
+      email: mMatch.email || '',
+      cpf: mMatch.cpf || parsedObs.cpf || '',
+      birth_date: mMatch.birth_date || '',
+      emergency_contact: mMatch.emergency_contact || parsedObs.emergency_contact || '',
+      health_notes: mMatch.health_notes || parsedObs.health_notes || ''
     };
   }
 
   return null;
 }
 
-function handleCustomerPhoneInput(input) {
+function autoSaveCustomerDraft() {
+  const phoneInput = document.getElementById('custPhone');
+  const phone = phoneInput ? phoneInput.value.trim() : (state.customerPhone || '');
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length < 10) return;
+
+  const nameInput = document.getElementById('custName');
+  const cpfInput = document.getElementById('custCPF');
+  const emailInput = document.getElementById('custEmail');
+  const birthInput = document.getElementById('custBirthDate');
+  const emergInput = document.getElementById('custEmergency');
+  const healthInput = document.getElementById('custHealthNotes');
+
+  const name = nameInput ? nameInput.value.trim() : '';
+  const cpf = cpfInput ? cpfInput.value.trim() : '';
+  const email = emailInput ? emailInput.value.trim() : '';
+  const birthDate = birthInput ? birthInput.value : '';
+  const emergency = emergInput ? emergInput.value.trim() : '';
+  const healthNotes = healthInput ? healthInput.value.trim() : '';
+
+  if (!name && !cpf && !email && !birthDate) return;
+
+  const currentId = (state.checkoutCustomer && state.checkoutCustomer.id) ? state.checkoutCustomer.id : ('cust-' + Date.now());
+  const record = {
+    id: currentId,
+    name: name || (state.checkoutCustomer ? state.checkoutCustomer.name : ''),
+    phone: formatPhone(phone),
+    cpf: formatCPF(cpf) || (state.checkoutCustomer ? state.checkoutCustomer.cpf : ''),
+    email: email || (state.checkoutCustomer ? state.checkoutCustomer.email : ''),
+    birth_date: birthDate || (state.checkoutCustomer ? state.checkoutCustomer.birth_date : ''),
+    emergency_contact: emergency || (state.checkoutCustomer ? state.checkoutCustomer.emergency_contact : ''),
+    health_notes: healthNotes || (state.checkoutCustomer ? state.checkoutCustomer.health_notes : 'Nenhuma restrição informada'),
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+    const idx = local.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone);
+    if (idx >= 0) local[idx] = { ...local[idx], ...record };
+    else local.unshift(record);
+    localStorage.setItem('arena_customers', JSON.stringify(local));
+  } catch(e) {}
+
+  if (!state.supabaseCustomers) state.supabaseCustomers = [];
+  const sIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone);
+  if (sIdx >= 0) state.supabaseCustomers[sIdx] = { ...state.supabaseCustomers[sIdx], ...record };
+  else state.supabaseCustomers.unshift(record);
+}
+
+async function handleCustomerPhoneInput(input) {
   const formatted = formatPhone(input.value);
   input.value = formatted;
   state.customerPhone = formatted;
@@ -6292,7 +6409,71 @@ function handleCustomerPhoneInput(input) {
   if (!container) return;
 
   if (clean.length >= 10) {
-    const customer = findCustomerByPhone(clean);
+    // 1. Busca imediata na memória e cache local
+    let customer = findCustomerByPhone(clean);
+    if (customer) {
+      renderCustomerDynamicArea(customer, formatted);
+      return;
+    }
+
+    // 2. Busca assíncrona no banco Supabase
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      container.innerHTML = `
+        <div class="p-4 bg-emerald-50/70 border border-emerald-300 rounded-2xl text-center text-xs text-emerald-900 flex items-center justify-center space-x-2 animate-pulse">
+          <span class="inline-block animate-spin text-sm">⚽</span>
+          <span class="font-bold">Consultando cadastro do atleta na base da Arena...</span>
+        </div>
+      `;
+      try {
+        const client = window.ArenaSupabase.getClient();
+        const { data: dbCust } = await client
+          .from('customers')
+          .select('*')
+          .or(`phone.eq.${formatted},phone.eq.${clean},phone.ilike.%${clean.slice(-8)}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (dbCust) {
+          customer = dbCust;
+          if (!state.supabaseCustomers) state.supabaseCustomers = [];
+          if (!state.supabaseCustomers.find(c => c.id === dbCust.id)) {
+            state.supabaseCustomers.unshift(dbCust);
+          }
+          try {
+            const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+            if (!local.find(c => (c.phone || '').replace(/\D/g, '') === clean)) {
+              local.unshift(dbCust);
+              localStorage.setItem('arena_customers', JSON.stringify(local));
+            }
+          } catch(e) {}
+        } else {
+          const { data: prevBooking } = await client
+            .from('bookings')
+            .select('*')
+            .or(`customer_phone.eq.${formatted},customer_phone.eq.${clean},customer_phone.ilike.%${clean.slice(-8)}%`)
+            .order('date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (prevBooking) {
+            const pObs = parseCustomerFromObservation(prevBooking.observation || '');
+            customer = {
+              id: prevBooking.customer_id || ('cust-' + Date.now()),
+              name: prevBooking.customer_name,
+              phone: prevBooking.customer_phone,
+              email: prevBooking.customer_email || '',
+              cpf: prevBooking.customer_cpf || pObs.cpf || '',
+              birth_date: prevBooking.birth_date || '',
+              emergency_contact: prevBooking.emergency_contact || pObs.emergency_contact || '',
+              health_notes: prevBooking.health_notes || pObs.health_notes || ''
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('Erro na consulta de atleta:', err);
+      }
+    }
+
     renderCustomerDynamicArea(customer, formatted);
   } else {
     container.innerHTML = `
@@ -6386,13 +6567,13 @@ function renderCustomerDynamicArea(customer, phoneStr) {
 
         <div id="customerReadOnlyDetails" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
           <p><span class="text-slate-400 font-bold block text-[10px] uppercase">Nome do Atleta:</span> <strong class="text-slate-900">${customer.name}</strong></p>
-          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">CPF:</span> <strong class="font-mono text-slate-900">${customer.cpf || 'Não cadastrado'}</strong></p>
+          <p><span class="text-slate-400 font-bold block text-[10px] uppercase">CPF:</span> <strong class="font-mono text-slate-900">${customer.cpf ? formatCPF(customer.cpf) : 'Não cadastrado'}</strong></p>
           <p><span class="text-slate-400 font-bold block text-[10px] uppercase">E-mail:</span> <strong class="text-slate-900">${customer.email || 'Não cadastrado'}</strong></p>
           <p><span class="text-slate-400 font-bold block text-[10px] uppercase">Data de Nascimento:</span> <strong class="text-slate-900">${customer.birth_date || '-'}</strong></p>
           <p class="sm:col-span-2"><span class="text-slate-400 font-bold block text-[10px] uppercase">Contato de Emergência:</span> <strong class="text-slate-900">${customer.emergency_contact || '-'}</strong></p>
           <p class="sm:col-span-2">
             <span class="text-slate-400 font-bold block text-[10px] uppercase">Aviso de Saúde Pré-existente:</span>
-            ${customer.health_notes && customer.health_notes !== 'Nenhuma restrição informada' ? `
+            ${customer.health_notes && customer.health_notes !== 'Nenhuma restrição informada' && customer.health_notes.trim().toLowerCase() !== 'nenhum' ? `
               <span class="inline-flex items-center px-2 py-0.5 mt-0.5 rounded-lg text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
                 ⚠️ ${customer.health_notes}
               </span>
@@ -6403,38 +6584,38 @@ function renderCustomerDynamicArea(customer, phoneStr) {
         <div id="customerEditableDetails" class="hidden space-y-3 pt-2 border-t border-emerald-200">
           <div>
             <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
-            <input type="text" id="custName" value="${customer.name}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+            <input type="text" id="custName" value="${customer.name}" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF *</label>
-              <input type="text" id="custCPF" value="${customer.cpf || ''}" maxlength="14" oninput="handleCPFInput(this)" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 bg-white">
+              <input type="text" id="custCPF" value="${customer.cpf ? formatCPF(customer.cpf) : ''}" maxlength="14" oninput="handleCPFInput(this); autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 bg-white">
               <span id="cpfStatusMsg" class="text-[10px]"></span>
             </div>
             <div>
               <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">E-mail para Envio Automático *</label>
-              <input type="email" id="custEmail" value="${customer.email || ''}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+              <input type="email" id="custEmail" value="${customer.email || ''}" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
             </div>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data de Nascimento</label>
-              <input type="date" id="custBirthDate" value="${customer.birth_date || ''}" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+              <input type="date" id="custBirthDate" value="${customer.birth_date || ''}" onchange="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
             </div>
             <div>
               <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Contato de Emergência</label>
-              <input type="text" id="custEmergency" value="${customer.emergency_contact || ''}" placeholder="Nome e Telefone" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
+              <input type="text" id="custEmergency" value="${customer.emergency_contact || ''}" oninput="autoSaveCustomerDraft()" placeholder="Nome e Telefone" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 bg-white">
             </div>
           </div>
           <div>
             <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Aviso de Saúde Pré-existente / Ficha Médica</label>
-            <textarea id="custHealthNotes" rows="2" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white" placeholder="Hipertensão, lesão no joelho, alergias, etc.">${customer.health_notes || ''}</textarea>
+            <textarea id="custHealthNotes" rows="2" oninput="autoSaveCustomerDraft()" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 bg-white" placeholder="Hipertensão, lesão no joelho, alergias, etc.">${customer.health_notes || ''}</textarea>
           </div>
         </div>
 
         <div class="p-2.5 bg-emerald-600/10 rounded-xl text-[11px] font-bold text-emerald-950 flex items-center gap-1.5">
           <i data-lucide="check" class="w-4 h-4 text-emerald-700 shrink-0"></i>
-          <span>Cadastro verificado na base! Clique abaixo para confirmar seu agendamento.</span>
+          <span>Dados do atleta identificados! Clique abaixo para confirmar seu agendamento.</span>
         </div>
       </div>
     `;
@@ -6453,42 +6634,42 @@ function renderCustomerDynamicArea(customer, phoneStr) {
 
         <div>
           <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Nome Completo do Responsável / Peladeiro *</label>
-          <input type="text" id="custName" required placeholder="Ex: Lucas Gabriel da Silva" 
+          <input type="text" id="custName" required placeholder="Ex: Lucas Gabriel da Silva" oninput="autoSaveCustomerDraft()"
                  class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">CPF (com validação oficial) *</label>
-            <input type="text" id="custCPF" required placeholder="000.000.000-00" maxlength="14" oninput="handleCPFInput(this)" 
+            <input type="text" id="custCPF" required placeholder="000.000.000-00" maxlength="14" oninput="handleCPFInput(this); autoSaveCustomerDraft()" 
                    class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
             <span id="cpfStatusMsg" class="text-[10px] font-semibold text-slate-400 block mt-0.5"></span>
           </div>
 
           <div>
             <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Data de Nascimento *</label>
-            <input type="date" id="custBirthDate" required 
+            <input type="date" id="custBirthDate" required onchange="autoSaveCustomerDraft()"
                    class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
           </div>
         </div>
 
         <div>
           <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">E-mail para Envio Automático *</label>
-          <input type="email" id="custEmail" required placeholder="seuemail@exemplo.com" 
+          <input type="email" id="custEmail" required placeholder="seuemail@exemplo.com" oninput="autoSaveCustomerDraft()"
                  class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
           <p class="text-[10px] text-slate-500 mt-0.5">A Arena enviará comprovantes e lembretes automáticos para este e-mail.</p>
         </div>
 
         <div>
           <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Contato de Emergência do Peladeiro *</label>
-          <input type="text" id="custEmergency" required placeholder="Ex: Maria (Esposa) - (81) 98888-7777" 
+          <input type="text" id="custEmergency" required placeholder="Ex: Maria (Esposa) - (81) 98888-7777" oninput="autoSaveCustomerDraft()"
                  class="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
           <p class="text-[10px] text-slate-500 mt-0.5">Nome e telefone para contato imediato caso necessário.</p>
         </div>
 
         <div>
           <label class="block text-[11px] font-black text-slate-800 uppercase mb-1">Aviso de Saúde Pré-existente / Ficha Médica</label>
-          <textarea id="custHealthNotes" rows="2" placeholder="Ex: Hipertensão, problema cardíaco, recuperação de lesão no joelho, alergias, etc. (Deixe em branco ou digite 'Nenhum' caso não possua)" 
+          <textarea id="custHealthNotes" rows="2" oninput="autoSaveCustomerDraft()" placeholder="Ex: Hipertensão, problema cardíaco, recuperação de lesão no joelho, alergias, etc. (Deixe em branco ou digite 'Nenhum' caso não possua)" 
                     class="w-full p-2.5 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white"></textarea>
           <p class="text-[10px] text-amber-900 italic mt-0.5 font-medium">⚠️ Informação médica de segurança para primeiros socorros em caso de queda ou desmaio durante o jogo.</p>
         </div>
@@ -6931,9 +7112,10 @@ async function submitBooking(grandTotal) {
     }
   }
 
+  const cpfObs = cpf ? `[CPF: ${formatCPF(cpf)}]` : '';
   const healthObs = healthNotes ? `[Saúde: ${healthNotes}]` : '';
   const emergencyObs = emergency ? `[Emergência: ${emergency}]` : '';
-  const fullObservation = [state.observation, healthObs, emergencyObs].filter(Boolean).join(' | ');
+  const fullObservation = [state.observation, cpfObs, healthObs, emergencyObs].filter(Boolean).join(' | ');
 
   const dbBookingPayload = {
     id: newBookingId,
@@ -7039,6 +7221,7 @@ async function submitBooking(grandTotal) {
     customerCPF: formatCPF(cpf),
     emergencyContact: emergency,
     healthNotes: healthNotes,
+    birthDate: birthDate,
     totalPrice: Number(grandTotal) || 0,
     startTime: state.startTime,
     endTime: state.endTime,
@@ -7063,6 +7246,9 @@ async function submitBooking(grandTotal) {
       id: newMemberId,
       customerName: name,
       customerPhone: formatPhone(phone),
+      customerCPF: formatCPF(cpf),
+      emergencyContact: emergency,
+      healthNotes: healthNotes,
       courtId: courtId,
       date: 'Toda ' + state.monthlyDayOfWeek + '-feira (Mensal)',
       time: state.startTime + ' às ' + state.endTime,
@@ -7086,6 +7272,10 @@ function showConfirmationSuccessModal(booking) {
 
   const custName = booking.customer_name || booking.customerName || state.customerName || 'Cliente';
   const custPhone = booking.customer_phone || booking.customerPhone || state.customerPhone || '';
+  const custCpf = booking.customerCPF || booking.customer_cpf || (state.checkoutCustomer ? state.checkoutCustomer.cpf : '');
+  const custEmerg = booking.emergencyContact || booking.emergency_contact || (state.checkoutCustomer ? state.checkoutCustomer.emergency_contact : '');
+  const custHealth = booking.healthNotes || booking.health_notes || (state.checkoutCustomer ? state.checkoutCustomer.health_notes : '');
+
   const price = typeof booking.total_price === 'number' ? booking.total_price : 
                 (typeof booking.totalPrice === 'number' ? booking.totalPrice : 
                 (typeof booking.monthly_price === 'number' ? booking.monthly_price : 0));
@@ -7124,6 +7314,12 @@ Bora pro jogo!`);
 
         <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-left space-y-2 mb-6 text-xs sm:text-sm">
           <div class="flex justify-between"><span class="text-slate-500">Responsável:</span><strong class="text-slate-800">${custName}</strong></div>
+          ${custCpf ? `<div class="flex justify-between"><span class="text-slate-500">CPF do Atleta:</span><strong class="font-mono text-slate-800">${formatCPF(custCpf)}</strong></div>` : ''}
+          <div class="flex justify-between"><span class="text-slate-500">WhatsApp:</span><strong class="font-mono text-slate-800">${custPhone}</strong></div>
+          ${custEmerg ? `<div class="flex justify-between"><span class="text-slate-500">Contato Emergência:</span><strong class="text-slate-800">${custEmerg}</strong></div>` : ''}
+          ${custHealth && custHealth !== 'Nenhuma restrição informada' && custHealth.trim().toLowerCase() !== 'nenhum' ? `
+            <div class="flex justify-between items-center"><span class="text-slate-500">Aviso de Saúde:</span><span class="text-amber-900 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">⚠️ ${custHealth}</span></div>
+          ` : ''}
           <div class="flex justify-between"><span class="text-slate-500">Espaço:</span><strong class="text-slate-800">${courtName.split(' - ')[0]}</strong></div>
           <div class="flex justify-between"><span class="text-slate-500">Data e Horário:</span><strong class="text-slate-800">${booking.date} (${booking.time})</strong></div>
           ${savedItemsText ? `
@@ -7132,7 +7328,7 @@ Bora pro jogo!`);
               <p class="text-slate-700 font-semibold">${savedItemsText} (Pagar no consumo)</p>
             </div>
           ` : ''}
-          <div class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500 font-bold">Total Pago das Horas:</span><strong class="text-emerald-700 font-black">R$ ${price.toFixed(2).replace('.', ',')}</strong></div>
+          <div class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500 font-bold">Total do Horário:</span><strong class="text-emerald-700 font-black">R$ ${price.toFixed(2).replace('.', ',')}</strong></div>
         </div>
 
         <div class="space-y-3">
@@ -7404,11 +7600,43 @@ function handleDisconnectSupabase() {
 
 async function loadSupabaseCustomers() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-    const client = window.ArenaSupabase.getClient();
-    const { data } = await client.from('customers').select('*').order('created_at', { ascending: false });
-    if (data) {
-      state.supabaseCustomers = data;
-      if (state.currentMode === 'admin' && state.adminTab === 'customers') renderStepContent();
+    try {
+      const client = window.ArenaSupabase.getClient();
+      const { data, error } = await client.from('customers').select('*').order('created_at', { ascending: false });
+      if (data && !error) {
+        state.supabaseCustomers = data;
+        // Consolida com o localStorage para que o preenchimento seja imediato
+        try {
+          const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
+          const map = new Map();
+          data.forEach(c => {
+            const clean = (c.phone || '').replace(/\D/g, '');
+            if (clean) map.set(clean, c);
+          });
+          local.forEach(c => {
+            const clean = (c.phone || '').replace(/\D/g, '');
+            if (clean) {
+              if (!map.has(clean)) {
+                map.set(clean, c);
+              } else {
+                const current = map.get(clean);
+                map.set(clean, {
+                  ...current,
+                  cpf: current.cpf || c.cpf,
+                  emergency_contact: current.emergency_contact || c.emergency_contact,
+                  health_notes: current.health_notes || c.health_notes,
+                  birth_date: current.birth_date || c.birth_date
+                });
+              }
+            }
+          });
+          localStorage.setItem('arena_customers', JSON.stringify(Array.from(map.values())));
+        } catch(e) {}
+
+        if (state.currentMode === 'admin' && state.adminTab === 'customers') renderStepContent();
+      }
+    } catch(err) {
+      console.warn('Aviso ao sincronizar clientes do Supabase:', err);
     }
   }
 }
@@ -7458,6 +7686,9 @@ async function syncDataFromSupabase() {
         localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
       }
     }
+
+    // Carrega clientes do Supabase para ter os dados registrados prontos na memória
+    await loadSupabaseCustomers();
 
     renderApp();
     requestSchedule();
@@ -7515,9 +7746,13 @@ async function syncDataFromSupabase() {
           const { data } = await client.from('courts').select('*').order('order_index', { ascending: true });
           if (data) { state.courts = data.map(normalizeCourt); _realtimeRefreshUI(); }
         })
+        // ──── Clientes / Fichas de Atletas ────
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, async () => {
+          await loadSupabaseCustomers();
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Arena Limoeiro – Realtime ativo. Agendamentos atualizados automaticamente.');
+            console.log('✅ Arena Limoeiro – Realtime ativo. Agendamentos e clientes atualizados automaticamente.');
           }
         });
     }
