@@ -63,14 +63,14 @@ body {
 
 .court-card:hover, .service-card:hover {
   transform: translateY(-2px);
-  border-color: #00a859;
-  box-shadow: 0 10px 25px -5px rgba(0, 168, 89, 0.15), 0 8px 10px -6px rgba(0, 168, 89, 0.08);
+  border-color: #cbd5e1;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.06);
 }
 
 .court-card.selected, .service-card.selected {
-  border: 2.5px solid #00a859 !important;
+  border: 1.5px solid #cbd5e1 !important;
   background-color: #ffffff !important;
-  box-shadow: 0 0 0 1px #00a859, 0 10px 25px -5px rgba(0, 168, 89, 0.15) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* Botão Próxima Etapa */

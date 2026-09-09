@@ -843,7 +843,7 @@ function renderStep1(container) {
 
           return `
             <div onclick="selectCourt('${court.id}')" 
-                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col ${isSelected ? 'selected ring-2 ring-emerald-500 border-2 border-emerald-500' : 'border border-slate-200'} shadow-sm">
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
               
               <div class="relative h-48 w-full overflow-hidden bg-slate-900">
                 <img src="${court.image}" alt="${court.name}" 
