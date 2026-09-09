@@ -254,7 +254,12 @@ function loadInitialData() {
     defaultMonthly.forEach(m => { if (m && m.id) mergedMonthlyMap.set(m.id, m); });
     localMonthly.forEach(m => { if (m && m.id) mergedMonthlyMap.set(m.id, m); });
     state.monthlyMembers = Array.from(mergedMonthlyMap.values());
-    state.adminUsers = d.initialAdmins;
+    const defaultAdmins = d.initialAdmins || [];
+    const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
+    const mergedAdminsMap = new Map();
+    defaultAdmins.forEach(u => { if (u && (u.id || u.email)) mergedAdminsMap.set(u.id || u.email, u); });
+    localAdmins.forEach(u => { if (u && (u.id || u.email)) mergedAdminsMap.set(u.id || u.email, u); });
+    state.adminUsers = Array.from(mergedAdminsMap.values());
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const cleanedLocal = localSaved.filter(b => b && b.id && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
@@ -2197,7 +2202,7 @@ async function handleLoginSubmit(event) {
       const { data, error } = await client
         .from('admin_users')
         .select('*')
-        .eq('email', email)
+        .ilike('email', email)
         .eq('password', password)
         .maybeSingle();
 
@@ -2205,9 +2210,18 @@ async function handleLoginSubmit(event) {
     } catch(e) {}
   }
 
-  // 2. Fallback de administradores pré-configurados caso banco não responda
+  // 2. Verifica no state e localStorage (gestores criados ou modificados)
   if (!authenticatedUser) {
-    const defaultAdmins = [
+    const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
+    const allKnownAdmins = [...(state.adminUsers || []), ...localAdmins];
+    authenticatedUser = allKnownAdmins.find(u => 
+      u && u.email && u.email.trim().toLowerCase() === email.toLowerCase() && String(u.password).trim() === password
+    );
+  }
+
+  // 3. Fallback de administradores pré-configurados caso banco não responda
+  if (!authenticatedUser) {
+    const defaultAdmins = (typeof initialAdmins !== 'undefined' && initialAdmins) ? initialAdmins : [
       { id: "admin-1", name: "Gabriel Alves", email: "admin@arenalimoeiro.com.br", password: "admin123", role: "Administrador Geral" },
       { id: "admin-2", name: "Recepção & Atendimento", email: "recepcao@arenalimoeiro.com.br", password: "arena123", role: "Gerente do Sistema" }
     ];
@@ -4315,15 +4329,19 @@ function renderAdminSubTabContent(tab) {
                     </p>
                   </div>
                 </div>
-                <div>
+                <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                  <button onclick="openEditAdminUserModal('${u.id}')" class="px-3 py-1.5 rounded-xl border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs" title="Modificar nome, e-mail e senha">
+                    <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span>Editar</span>
+                  </button>
                   ${isMaster ? `
-                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-3 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
-                      👑 Proprietário Principal
+                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2.5 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
+                      👑 Proprietário
                     </span>
                   ` : `
-                    <button onclick="deleteAdminUser('${u.id}')" class="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer">
+                    <button onclick="deleteAdminUser('${u.id}')" class="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" title="Excluir este acesso">
                       <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                      <span>Excluir Acesso</span>
+                      <span>Excluir</span>
                     </button>
                   `}
                 </div>
@@ -5270,8 +5288,51 @@ function openAdminUserModal() {
   openNewAdminUserModal();
 }
 
-// GERADOR DE E-MAIL E SENHA ALEATÓRIOS
-function generateRandomCredentials() {
+function slugifyAdminName(name) {
+  if (!name) return '';
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '')
+    .trim();
+}
+
+// GERADOR DE E-MAIL E SENHA COM O NOME DA PESSOA
+function generateCredentialsFromName(isEdit = false) {
+  const prefix = isEdit ? 'editAdmin' : 'newAdmin';
+  const nameEl = document.getElementById(`${prefix}Name`);
+  const emailEl = document.getElementById(`${prefix}Email`);
+  const passEl = document.getElementById(`${prefix}Password`);
+  const rawName = nameEl ? nameEl.value.trim() : '';
+
+  if (!rawName) {
+    alert('Por favor, digite primeiro o Nome Completo do Gestor acima para gerar as credenciais com o nome dele.');
+    if (nameEl) nameEl.focus();
+    return;
+  }
+
+  const clean = slugifyAdminName(rawName);
+  const parts = clean.split(/\s+/).filter(Boolean);
+  const first = parts[0] || 'gestor';
+  const last = parts.length > 1 ? parts[parts.length - 1] : '';
+  const emailUser = last ? `${first}.${last}` : first;
+  const email = `${emailUser}@arenalimoeiro.com.br`;
+
+  const capFirst = first.charAt(0).toUpperCase() + first.slice(1);
+  const currentYear = new Date().getFullYear();
+  const password = `${capFirst}@${currentYear}!`;
+
+  if (emailEl) emailEl.value = email;
+  if (passEl) passEl.value = password;
+}
+
+// GERADOR DE E-MAIL E SENHA 100% ALEATÓRIOS
+function generateRandomCredentials(isEdit = false) {
+  const prefix = isEdit ? 'editAdmin' : 'newAdmin';
+  const emailEl = document.getElementById(`${prefix}Email`);
+  const passEl = document.getElementById(`${prefix}Password`);
+
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
   let rand = '';
   for (let i = 0; i < 4; i++) {
@@ -5281,48 +5342,53 @@ function generateRandomCredentials() {
   const email = `gerente.${rand}@arenalimoeiro.com.br`;
   const password = `arena${randomNum}!`;
 
-  const emailEl = document.getElementById('newAdminEmail');
-  const passEl = document.getElementById('newAdminPassword');
-  const previewBox = document.getElementById('generatedCredentialsPreview');
-  const previewText = document.getElementById('generatedCredentialsText');
-
   if (emailEl) emailEl.value = email;
   if (passEl) passEl.value = password;
+}
 
-  if (previewBox && previewText) {
-    previewText.innerText = `E-mail: ${email}\nSenha: ${password}`;
-    previewBox.classList.remove('hidden');
+// COPIAR CREDENCIAIS FORMATADAS PARA ÁREA DE TRANSFERÊNCIA
+function copyCredentials(prefix) {
+  const nameEl = document.getElementById(`${prefix}Name`);
+  const emailEl = document.getElementById(`${prefix}Email`);
+  const passEl = document.getElementById(`${prefix}Password`);
+  const roleEl = document.getElementById(`${prefix}Role`);
+
+  const name = nameEl ? nameEl.value.trim() : 'Gestor';
+  const email = emailEl ? emailEl.value.trim() : '';
+  const pass = passEl ? passEl.value.trim() : '';
+  const role = roleEl ? roleEl.value : 'Gerente do Sistema';
+
+  if (!email || !pass) {
+    alert('Preencha o e-mail e a senha primeiro.');
+    return;
+  }
+
+  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}\n🌐 Link de Acesso: ${window.location.origin}`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('✅ Credenciais copiadas com sucesso! Você pode colar no WhatsApp do gestor.');
+    }).catch(() => {
+      prompt('Copie as credenciais abaixo:', text);
+    });
+  } else {
+    prompt('Copie as credenciais abaixo:', text);
   }
 }
 
 function copyGeneratedCredentials() {
-  const emailEl = document.getElementById('newAdminEmail');
-  const passEl = document.getElementById('newAdminPassword');
-  if (emailEl && passEl) {
-    const text = `Acesso à Administração - Arena Limoeiro:\nE-mail: ${emailEl.value}\nSenha: ${passEl.value}\nLink: ${window.location.origin}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Credenciais copiadas com sucesso! Você pode enviá-las agora.');
-      }).catch(() => {
-        prompt('Copie as credenciais abaixo:', text);
-      });
-    } else {
-      prompt('Copie as credenciais abaixo:', text);
-    }
-  }
+  copyCredentials('newAdmin');
 }
 
-// MODAL DE CADASTRO DE NOVO GESTOR COM GERADOR AUTOMÁTICO
+// MODAL DE CADASTRO DE NOVO GESTOR
 function openNewAdminUserModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
-  const randomNum = Math.floor(1000 + Math.random() * 9000);
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
   let rand = '';
-  for (let i = 0; i < 4; i++) {
-    rand += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  for (let i = 0; i < 4; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
   const initialGeneratedEmail = `gerente.${rand}@arenalimoeiro.com.br`;
   const initialGeneratedPassword = `arena${randomNum}!`;
 
@@ -5336,7 +5402,7 @@ function openNewAdminUserModal() {
             </div>
             <div>
               <h3 class="text-base font-black uppercase">Cadastrar Novo Gestor do Sistema</h3>
-              <p class="text-xs text-emerald-200">Crie o acesso para novos gerentes operarem e modificarem o sistema</p>
+              <p class="text-xs text-emerald-200">Defina o nome, e-mail e senha como desejar</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-xl transition-all cursor-pointer">
@@ -5347,8 +5413,9 @@ function openNewAdminUserModal() {
         <form onsubmit="handleNewAdminUserSubmit(event)" class="p-6 space-y-4">
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo do Gestor *</label>
-            <input type="text" id="newAdminName" required placeholder="Ex: Lucas Ferreira Silva" 
+            <input type="text" id="newAdminName" required placeholder="Ex: Carlos Eduardo Silva" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900">
+            <p class="text-[11px] text-slate-400 mt-1">Ao digitar o nome, você pode usar os botões abaixo para criar o e-mail e a senha com o nome dele, ou digitar livremente.</p>
           </div>
 
           <div>
@@ -5360,35 +5427,48 @@ function openNewAdminUserModal() {
             <p class="text-[11px] text-slate-500 mt-1">O <strong>Gerente do Sistema</strong> pode gerenciar quadras, preços, produtos do bar, reservas e clientes, sem acesso técnico ao banco Supabase.</p>
           </div>
 
-          <!-- Gerador Automático de E-mail e Senha -->
-          <div class="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
-            <div class="flex items-center justify-between">
+          <!-- Gerador e Customização Livre de E-mail e Senha -->
+          <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span class="text-xs font-black text-emerald-950 uppercase flex items-center gap-1.5">
                 <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i>
-                Gerador de Credenciais
+                Credenciais de Acesso
               </span>
-              <button type="button" onclick="generateRandomCredentials()" 
-                      class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer">
-                <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
-                <span>🎲 Gerar Aleatórios</span>
-              </button>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button type="button" onclick="generateCredentialsFromName(false)" 
+                        class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha usando o nome digitado">
+                  <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                  <span>✨ Gerar c/ Nome</span>
+                </button>
+                <button type="button" onclick="generateRandomCredentials(false)" 
+                        class="px-2.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha aleatórios">
+                  <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                  <span>🎲 Aleatório</span>
+                </button>
+              </div>
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1">E-mail de Login *</label>
-              <input type="email" id="newAdminEmail" required value="${initialGeneratedEmail}" placeholder="gerente@arenalimoeiro.com.br" 
+              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                <span>E-mail de Login *</span>
+                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou modificar livremente</span>
+              </label>
+              <input type="email" id="newAdminEmail" required value="${initialGeneratedEmail}" placeholder="nome@arenalimoeiro.com.br" 
                      class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1">Senha de Acesso *</label>
+              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                <span>Senha de Acesso *</span>
+                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou modificar livremente</span>
+              </label>
               <input type="text" id="newAdminPassword" required value="${initialGeneratedPassword}" 
                      class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
             </div>
 
-            <button type="button" onclick="copyGeneratedCredentials()" class="w-full py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 transition-all shadow-2xs cursor-pointer">
+            <button type="button" onclick="copyCredentials('newAdmin')" class="w-full py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 transition-all shadow-2xs cursor-pointer">
               <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              <span>Copiar Credenciais Geradas</span>
+              <span>📋 Copiar Credenciais Deste Gestor</span>
             </button>
           </div>
 
@@ -5402,6 +5482,160 @@ function openNewAdminUserModal() {
   `;
 
   lucide.createIcons();
+}
+
+// MODAL DE EDIÇÃO DE GESTOR EXISTENTE
+function openEditAdminUserModal(id) {
+  const user = (state.adminUsers || []).find(u => u.id === id);
+  if (!user) {
+    alert('Gestor não encontrado.');
+    return;
+  }
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const isMaster = user.email === 'admin@arenalimoeiro.com.br' || (user.role === 'Administrador Geral' && (user.name === 'Gabriel Alves' || user.id === 'admin-1'));
+  const currentName = user.name || (user.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : '');
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="edit-3" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">Editar Acesso do Gestor</h3>
+              <p class="text-xs text-emerald-200">Modifique o nome, e-mail e senha como desejar</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-xl transition-all cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleEditAdminUserSubmit(event, '${user.id}')" class="p-6 space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo do Gestor *</label>
+            <input type="text" id="editAdminName" required value="${currentName.replace(/"/g, '&quot;')}" placeholder="Ex: Carlos Eduardo Silva" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
+            <select id="editAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600" ${isMaster ? 'disabled' : ''}>
+              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Modifica tudo, exceto Supabase e Acessos)</option>
+              <option value="Administrador Geral" ${user.role === 'Administrador Geral' ? 'selected' : ''}>Administrador Geral (Acesso Total e Irrestrito)</option>
+            </select>
+            ${isMaster ? '<p class="text-[11px] text-emerald-700 font-bold mt-1">👑 Administrador Geral Principal mantém seu acesso total.</p>' : ''}
+          </div>
+
+          <!-- Gerador e Customização Livre de E-mail e Senha -->
+          <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span class="text-xs font-black text-emerald-950 uppercase flex items-center gap-1.5">
+                <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i>
+                Credenciais de Acesso
+              </span>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button type="button" onclick="generateCredentialsFromName(true)" 
+                        class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha usando o nome digitado">
+                  <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+                  <span>✨ Gerar c/ Nome</span>
+                </button>
+                <button type="button" onclick="generateRandomCredentials(true)" 
+                        class="px-2.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha aleatórios">
+                  <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                  <span>🎲 Aleatório</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                <span>E-mail de Login *</span>
+                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou alterar livremente</span>
+              </label>
+              <input type="email" id="editAdminEmail" required value="${(user.email || '').replace(/"/g, '&quot;')}" placeholder="nome@arenalimoeiro.com.br" 
+                     class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                <span>Senha de Acesso *</span>
+                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou alterar livremente</span>
+              </label>
+              <input type="text" id="editAdminPassword" required value="${(user.password || '').replace(/"/g, '&quot;')}" 
+                     class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+            </div>
+
+            <button type="button" onclick="copyCredentials('editAdmin')" class="w-full py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 transition-all shadow-2xs cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>📋 Copiar Credenciais Deste Gestor</span>
+            </button>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3">
+            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
+            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Salvar Alterações</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  lucide.createIcons();
+}
+
+async function handleEditAdminUserSubmit(event, id) {
+  event.preventDefault();
+  const name = document.getElementById('editAdminName').value.trim();
+  const email = document.getElementById('editAdminEmail').value.trim();
+  const roleEl = document.getElementById('editAdminRole');
+  const role = roleEl ? roleEl.value : 'Gerente do Sistema';
+  const password = document.getElementById('editAdminPassword').value.trim();
+
+  if (!name || !email || !password) {
+    alert('Por favor, preencha todos os campos obrigatórios.');
+    return;
+  }
+
+  const idx = state.adminUsers.findIndex(u => u.id === id);
+  if (idx === -1) {
+    alert('Gestor não encontrado.');
+    return;
+  }
+
+  const updatedUser = {
+    ...state.adminUsers[idx],
+    name,
+    email,
+    role,
+    password,
+    updated_at: new Date().toISOString()
+  };
+
+  state.adminUsers[idx] = updatedUser;
+  localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
+
+  // Se o gestor logado for o mesmo sendo editado, atualiza a sessão imediatamente
+  if (state.currentUser && (state.currentUser.id === id || state.currentUser.email.toLowerCase() === email.toLowerCase())) {
+    state.currentUser = { ...state.currentUser, name, email, role, password };
+    localStorage.setItem('arena_user', JSON.stringify(state.currentUser));
+  }
+
+  closeModal();
+  if (state.currentMode === 'admin') renderStepContent();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('admin_users').upsert([updatedUser]);
+    } catch(e) {}
+  }
+
+  alert(`✅ Gestor "${name}" atualizado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}`);
 }
 
 async function handleNewAdminUserSubmit(event) {
@@ -5426,9 +5660,7 @@ async function handleNewAdminUserSubmit(event) {
   };
 
   state.adminUsers.push(newUser);
-  const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
-  localAdmins.push(newUser);
-  localStorage.setItem('arena_admin_users', JSON.stringify(localAdmins));
+  localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
 
   closeModal();
   if (state.currentMode === 'admin') renderStepContent();
@@ -5449,7 +5681,11 @@ async function loadAdminUsers() {
       const client = window.ArenaSupabase.getClient();
       const { data } = await client.from('admin_users').select('*');
       if (data && data.length > 0) {
-        state.adminUsers = data;
+        const mergedMap = new Map();
+        (state.adminUsers || []).forEach(u => { if (u && u.id) mergedMap.set(u.id, u); });
+        data.forEach(u => { if (u && u.id) mergedMap.set(u.id, u); });
+        state.adminUsers = Array.from(mergedMap.values());
+        localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
         if (state.currentMode === 'admin' && state.adminTab === 'users') renderStepContent();
       }
     } catch(e) {}
