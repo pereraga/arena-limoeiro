@@ -592,6 +592,15 @@ function calculateLocalSchedule(courtId, date) {
       };
     }
 
+    // Checagem se há um agendamento finalizando exatamente neste horário (ex: jogo anterior encerra às 11:00)
+    const endingBooking = allBookings.find(b => {
+      const bCourtId = b.court_id || b.courtId;
+      if (bCourtId !== courtId || b.date !== date) return false;
+      if (b.status === 'cancelled') return false;
+      const bEnd = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : null);
+      return bEnd && timeToMinutes(bEnd) === slotMin;
+    });
+
     // Checagem 4: Bloqueio automático de horários que já passaram hoje ou em datas anteriores
     if (isSlotPast) {
       return {
@@ -599,7 +608,13 @@ function calculateLocalSchedule(courtId, date) {
         status: "past",
         statusLabel: "Horário Encerrado",
         isPast: true,
-        isAvailable: false
+        isAvailable: false,
+        endsBooking: endingBooking ? {
+          customerName: endingBooking.customer_name || endingBooking.customerName || 'Cliente',
+          time: endingBooking.time,
+          startTime: endingBooking.start_time || endingBooking.startTime,
+          endTime: endingBooking.end_time || endingBooking.endTime
+        } : null
       };
     }
 
@@ -607,7 +622,13 @@ function calculateLocalSchedule(courtId, date) {
       time,
       status: "available",
       statusLabel: "Livre para Agendamento",
-      isAvailable: true
+      isAvailable: true,
+      endsBooking: endingBooking ? {
+        customerName: endingBooking.customer_name || endingBooking.customerName || 'Cliente',
+        time: endingBooking.time,
+        startTime: endingBooking.start_time || endingBooking.startTime,
+        endTime: endingBooking.end_time || endingBooking.endTime
+      } : null
     };
   });
 }
@@ -623,6 +644,7 @@ function requestSchedule() {
   // Se houver slots selecionados que ficaram indisponíveis na data/campo, limpa a seleção
   if (Array.isArray(state.selectedSlots) && state.selectedSlots.length > 0) {
     const hasUnavailable = state.selectedSlots.some(time => {
+      if (time === state.endTime) return false;
       const slot = (state.slots || []).find(s => s.time === time);
       return !slot || slot.status !== 'available';
     });
@@ -1568,20 +1590,27 @@ function renderStep3Content() {
               if (isAvail) {
                 if (isSelected) {
                   const isStart = state.startTime === slot.time;
-                  const isEndSlot = (slotMin + 30) === timeToMinutes(state.endTime);
+                  const isEnd = state.endTime === slot.time;
                   let slotBadge = '';
-                  if (isStart && isEndSlot) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ 30 min (' + slot.time + ' às ' + state.endTime + ')</span>';
+                  const durLabel = state.selectedDuration === 60 ? '1h Fechada' : (state.selectedDuration === 90 ? '1h30 Fechada' : (state.selectedDuration === 120 ? '2h Fechadas' : `${state.selectedDuration} min`));
+
+                  if (isStart && isEnd) {
+                    slotBadge = `<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ ${durLabel}</span>`;
                   } else if (isStart) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (' + slot.time + ')' + (isDiscountSlot ? ' 🔥' : '') + '</span>';
-                  } else if (isEndSlot) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Até às ' + state.endTime + ' (Fim)</span>';
+                    slotBadge = `<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (${slot.time})${isDiscountSlot ? ' 🔥' : ''}</span>`;
+                  } else if (isEnd) {
+                    slotBadge = `<span class="text-[10px] font-black bg-white/30 text-white px-2 py-0.5 rounded-full ring-2 ring-white/50 shadow-xs">✓ Término (${slot.time}) • ${durLabel}</span>`;
                   } else {
                     slotBadge = '<span class="text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded-full">✓ No Jogo</span>';
                   }
                   cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer transform scale-[1.02] transition-all';
                   badge = slotBadge;
-                  icon = isDiscountSlot ? '🔥' : '🟢';
+                  icon = isEnd ? '🏁' : (isDiscountSlot ? '🔥' : '🟢');
+                } else if (slot.endsBooking) {
+                  cardClass = 'bg-emerald-50/90 border-2 border-dashed border-emerald-400 text-emerald-950 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all shadow-xs';
+                  badge = `<span class="text-[10px] font-black text-emerald-900 bg-emerald-200/90 px-1.5 py-0.5 rounded-md block truncate">🏁 Fim de Jogo às ${slot.time} • 1h Fechada (${slot.endsBooking.customerName})</span>`;
+                  icon = '🏁';
+                  nameLabel = `<span class="text-[10px] text-emerald-700 font-bold block mt-0.5">🟢 Livre a partir das ${slot.time}</span>`;
                 } else {
                   if (isDiscountSlot) {
                     cardClass = 'bg-amber-50/90 border-2 border-amber-400 text-amber-950 hover:bg-amber-100 hover:border-amber-500 cursor-pointer transition-all shadow-xs';
@@ -1775,6 +1804,7 @@ function selectBookingDuration(mins) {
 
     if (canFit) {
       state.endTime = minutesToTime(targetEndMin);
+      newSlots.push(state.endTime);
       state.selectedSlots = newSlots;
     } else {
       alert(`Atenção: Não há ${mins === 60 ? '1 hora' : (mins === 90 ? '1h30' : '2 horas')} contínua livre a partir das ${state.startTime}.\nPor favor, escolha outro horário livre ou diminua a duração.`);
@@ -1799,7 +1829,7 @@ function syncSelectedSlotsState() {
   const sMin = timeToMinutes(state.startTime);
   const eMin = timeToMinutes(state.endTime);
   const slots = [];
-  for (let m = sMin; m < eMin; m += 30) {
+  for (let m = sMin; m <= eMin; m += 30) {
     slots.push(minutesToTime(m));
   }
   state.selectedSlots = slots;
@@ -1808,7 +1838,7 @@ function syncSelectedSlotsState() {
 
 function handleSlotClick(time) {
   const slot = (state.slots || []).find(s => s.time === time);
-  if (!slot || slot.status !== 'available') return;
+  if (!slot || (slot.status !== 'available' && !slot.endsBooking)) return;
 
   const clickedMin = timeToMinutes(time);
   const dur = (state.selectedDuration && state.selectedDuration >= 30) ? state.selectedDuration : 60;
@@ -1843,6 +1873,7 @@ function handleSlotClick(time) {
   if (canFit) {
     state.startTime = time;
     state.endTime = minutesToTime(targetEndMin);
+    newSlots.push(state.endTime);
     state.selectedSlots = newSlots;
   } else {
     // Se a duração completa (ex: 1h30 ou 2h) não cabe, tenta pelo menos 1 hora (60 min)
@@ -1861,13 +1892,14 @@ function handleSlotClick(time) {
     if (fitOneHour) {
       state.startTime = time;
       state.endTime = minutesToTime(clickedMin + 60);
+      oneHourSlots.push(state.endTime);
       state.selectedSlots = oneHourSlots;
       state.selectedDuration = 60;
     } else {
       // Apenas 30 minutos disponíveis neste bloco
       state.startTime = time;
       state.endTime = minutesToTime(clickedMin + 30);
-      state.selectedSlots = [time];
+      state.selectedSlots = [time, state.endTime];
       state.selectedDuration = 30;
     }
   }
