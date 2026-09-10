@@ -414,7 +414,7 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   // 3. Reservas ativas no mesmo campo e data (ANTI-CHOQUE)
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const bookingMap = new Map();
-  [...(state.bookings || []), ...localBookings].forEach(b => {
+  [...localBookings, ...(state.bookings || [])].forEach(b => {
     if (b && b.id) bookingMap.set(b.id, b);
   });
   const allBookings = Array.from(bookingMap.values());
@@ -501,7 +501,7 @@ function calculateLocalSchedule(courtId, date) {
   // 2. Bookings consolidados
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const bookingMap = new Map();
-  [...(state.bookings || []), ...localBookings].forEach(b => {
+  [...localBookings, ...(state.bookings || [])].forEach(b => {
     if (b && b.id) bookingMap.set(b.id, b);
   });
   const allBookings = Array.from(bookingMap.values());
@@ -1177,7 +1177,7 @@ function renderCalendarHTML() {
   // Consulta reservas no banco de dados e local (sincronizadas em tempo real)
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const bookingMap = new Map();
-  [...(state.bookings || []), ...localBookings].forEach(b => {
+  [...localBookings, ...(state.bookings || [])].forEach(b => {
     if (b && b.id) bookingMap.set(b.id, b);
   });
   const allBookings = Array.from(bookingMap.values());
@@ -2768,7 +2768,7 @@ function renderLiveDashboardTab() {
   // Junta reservas avulsas e horários fixos do dia (sem duplicatas por ID)
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const bookingMap = new Map();
-  [...(state.bookings || []), ...localBookings].forEach(b => {
+  [...localBookings, ...(state.bookings || [])].forEach(b => {
     if (b && b.id) bookingMap.set(b.id, b);
   });
   const allBookings = Array.from(bookingMap.values());
@@ -3676,7 +3676,7 @@ function renderBarControlTab() {
   // Encontra todas as reservas com pedidos no bar
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const bookingMap = new Map();
-  [...(state.bookings || []), ...localBookings].forEach(b => {
+  [...localBookings, ...(state.bookings || [])].forEach(b => {
     if (b && b.id) bookingMap.set(b.id, b);
   });
   const allBookings = Array.from(bookingMap.values());
@@ -6935,7 +6935,7 @@ function findCustomerByPhone(phone) {
   // 3. Procura no histórico de reservas (state.bookings e arena_local_bookings)
   let localBookings = [];
   try { localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]'); } catch(e) {}
-  const allBookings = [...(state.bookings || []), ...localBookings];
+  const allBookings = [...localBookings, ...(state.bookings || [])];
   found = matchInList(allBookings, {
     phone: b => b.customer_phone || b.customerPhone,
     format: b => {
@@ -8306,6 +8306,13 @@ async function syncDataFromSupabase() {
         state.maintenanceBlocks = Array.from(map.values());
         localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
       }
+
+      // Sincroniza também arena_local_bookings com os dados atualizados do banco
+      const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+      const localMap = new Map();
+      localBookings.forEach(lb => { if (lb && lb.id) localMap.set(lb.id, lb); });
+      dbBookings.forEach(db => { if (db && db.id) localMap.set(db.id, db); });
+      localStorage.setItem('arena_local_bookings', JSON.stringify(Array.from(localMap.values())));
     }
 
     // Carrega clientes do Supabase para ter os dados registrados prontos na memória
