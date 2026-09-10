@@ -218,6 +218,12 @@ document.addEventListener('DOMContentLoaded', () => {
   autoAdvanceFinishedMatches();
   setInterval(autoAdvanceFinishedMatches, 30000);
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
+  // Registra Service Worker para notificações em segundo plano no celular
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js?v=4.7.3').catch(err => {
+      console.warn('Aviso Service Worker:', err);
+    });
+  }
 });
 
 // BATIMENTO AO VIVO: Atualiza a contagem dos cronômetros sem resetar o scroll da tela
@@ -777,6 +783,10 @@ function renderStepper() {
           <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
         </div>
         <div class="flex items-center space-x-2 text-xs self-stretch sm:self-auto justify-end flex-shrink-0">
+          <button onclick="requestNotificationPermission()" class="px-2.5 py-1 rounded-lg ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-800/90 text-emerald-200 border border-emerald-500/50' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'} font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm" title="Receber alertas no celular a cada novo agendamento">
+            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-3.5 h-3.5"></i>
+            <span>${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações'}</span>
+          </button>
           <button onclick="switchToClientView()" class="px-2.5 py-1 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm">
             <i data-lucide="eye" class="w-3.5 h-3.5"></i>
             <span>Ver Tela do Cliente</span>
@@ -2355,6 +2365,19 @@ function renderAdminView(container) {
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
+          <button onclick="requestNotificationPermission()" 
+                  class="px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all shadow-xs ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'}" 
+                  title="Receber alertas sonoros no celular a cada novo agendamento">
+            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-4 h-4"></i>
+            <span>${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações no Celular'}</span>
+          </button>
+
+          ${window.Notification && Notification.permission === 'granted' ? `
+            <button onclick="requestNotificationPermission()" class="px-2.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all" title="Testar som e notificação no celular">
+              🧪 Testar
+            </button>
+          ` : ''}
+
           <button onclick="openDirectBookingModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>⚡ Fazer Reserva Balcão</span>
@@ -8294,6 +8317,216 @@ async function loadSupabaseCustomers() {
   }
 }
 
+// ============================================================================
+// 🔔 SISTEMA DE NOTIFICAÇÕES MOBILE NO NAVEGADOR COM SOM E VIBRAÇÃO
+// ============================================================================
+let arenaAudioCtx = null;
+function getArenaAudioContext() {
+  if (!arenaAudioCtx) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioContextClass) arenaAudioCtx = new AudioContextClass();
+  }
+  if (arenaAudioCtx && arenaAudioCtx.state === 'suspended') {
+    arenaAudioCtx.resume();
+  }
+  return arenaAudioCtx;
+}
+
+function playNotificationSound() {
+  try {
+    const ctx = getArenaAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Tom 1 (587.33 Hz - Ré5)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0, now);
+    gain1.gain.linearRampToValueAtTime(0.35, now + 0.04);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    // Tom 2 (880 Hz - Lá5)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.14);
+    gain2.gain.setValueAtTime(0, now + 0.14);
+    gain2.gain.linearRampToValueAtTime(0.4, now + 0.18);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.14);
+    osc2.stop(now + 0.55);
+
+    // Tom 3 (1174.66 Hz - Ré6 brilhante)
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.type = 'triangle';
+    osc3.frequency.setValueAtTime(1174.66, now + 0.28);
+    gain3.gain.setValueAtTime(0, now + 0.28);
+    gain3.gain.linearRampToValueAtTime(0.45, now + 0.32);
+    gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    osc3.start(now + 0.28);
+    osc3.stop(now + 0.85);
+  } catch (err) {
+    console.warn('Alerta sonoro:', err);
+  }
+}
+
+function showToastNotification(htmlContent, duration = 6500) {
+  let toastContainer = document.getElementById('arenaToastContainer');
+  if (!toastContainer) {
+    toastContainer = document.createElement('div');
+    toastContainer.id = 'arenaToastContainer';
+    toastContainer.className = 'fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-50 flex flex-col gap-2.5 pointer-events-none';
+    document.body.appendChild(toastContainer);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'pointer-events-auto bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 text-white p-4 rounded-2xl border-2 border-emerald-500 shadow-2xl flex items-start space-x-3 transform transition-all duration-300 translate-y-[-20px] opacity-0';
+  toast.innerHTML = `
+    <div class="p-2 bg-emerald-500/20 rounded-xl text-emerald-400 shrink-0 mt-0.5">
+      <i data-lucide="bell-ring" class="w-5 h-5"></i>
+    </div>
+    <div class="flex-1 text-xs">
+      ${htmlContent}
+    </div>
+    <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white text-base font-bold ml-1">✕</button>
+  `;
+
+  toastContainer.appendChild(toast);
+  if (window.lucide) lucide.createIcons();
+
+  requestAnimationFrame(() => {
+    toast.classList.remove('translate-y-[-20px]', 'opacity-0');
+  });
+
+  setTimeout(() => {
+    toast.classList.add('opacity-0', 'translate-y-[-10px]');
+    setTimeout(() => toast.remove(), 350);
+  }, duration);
+}
+
+const recentNotifiedBookings = new Set();
+
+function triggerBookingNotification(booking) {
+  if (!booking || !booking.id) return;
+  if (recentNotifiedBookings.has(booking.id)) return;
+  recentNotifiedBookings.add(booking.id);
+  setTimeout(() => recentNotifiedBookings.delete(booking.id), 60000);
+
+  // 1. Alerta Sonoro
+  playNotificationSound();
+
+  // 2. Vibração (Mobile Android)
+  if ('vibrate' in navigator) {
+    try { navigator.vibrate([200, 100, 200, 100, 300]); } catch(e) {}
+  }
+
+  // 3. Monta dados completos requisitados pelo gestor
+  const court = (state.courts || []).find(c => c.id === (booking.court_id || booking.courtId));
+  const courtName = court ? court.name : 'Quadra Esportiva';
+  const custName = booking.customer_name || booking.customerName || 'Cliente';
+  const custPhone = booking.customer_phone || booking.customerPhone || '';
+  const bDate = formatDisplayDate(booking.date);
+  const bTime = booking.time || `${booking.start_time} às ${booking.end_time}`;
+  const price = Number(booking.total_price || 0).toFixed(2).replace('.', ',');
+  const durLabel = booking.duration ? (booking.duration === 60 ? '1h Fechada' : `${booking.duration} min`) : '1h Fechada';
+
+  const notifTitle = `⚽ Novo Agendamento — ${courtName}`;
+  const notifBody = `🏟️ Arena: ${courtName}\n⏰ Horário: ${bDate} (${bTime} • ${durLabel})\n💰 Valor: R$ ${price}\n👤 Cliente: ${custName}${custPhone ? ' (' + custPhone + ')' : ''}`;
+
+  // 4. Dispara Notificação Nativa no Celular / Sistema Operacional
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notifOptions = {
+      body: notifBody,
+      icon: '/logo.jpg',
+      badge: '/logo.jpg',
+      tag: 'arena-booking-' + booking.id,
+      renotify: true,
+      vibrate: [200, 100, 200, 100, 300],
+      data: { url: '/?admin=true' }
+    };
+
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready.then(reg => {
+        reg.showNotification(notifTitle, notifOptions);
+      }).catch(() => {
+        try { new Notification(notifTitle, notifOptions); } catch(e) {}
+      });
+    } else {
+      try { new Notification(notifTitle, notifOptions); } catch(e) {}
+    }
+  }
+
+  // 5. Toast Flutuante no App
+  showToastNotification(`
+    <h5 class="font-black text-white text-xs mb-0.5 flex items-center gap-1.5">
+      <span>🔔 Novo Agendamento Confirmado!</span>
+    </h5>
+    <p class="text-emerald-300 font-bold mb-1">🏟️ <strong>Arena:</strong> ${courtName}</p>
+    <p class="text-slate-300">⏰ <strong>Horário:</strong> ${bDate} • ${bTime} <span class="text-amber-400 font-bold">(${durLabel})</span></p>
+    <p class="text-slate-300 font-bold mt-0.5">💰 <strong>Valor:</strong> <strong class="text-white text-sm font-black">R$ ${price}</strong></p>
+    <p class="text-slate-300 text-[11px] mt-0.5">👤 <strong>Cliente:</strong> ${custName} ${custPhone ? '• ' + custPhone : ''}</p>
+  `);
+}
+
+async function requestNotificationPermission() {
+  getArenaAudioContext();
+
+  if (!('Notification' in window)) {
+    alert('Seu navegador atual não suporta notificações de sistema. No celular, recomendamos usar o Google Chrome ou adicionar o site à tela de início.');
+    return;
+  }
+
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      if ('serviceWorker' in navigator) {
+        try {
+          await navigator.serviceWorker.register('/sw.js');
+        } catch(swErr) {
+          console.warn('Aviso Service Worker:', swErr);
+        }
+      }
+      playNotificationSound();
+      if ('vibrate' in navigator) {
+        try { navigator.vibrate([150, 50, 150]); } catch(e) {}
+      }
+
+      // Notificação de teste imediata com todos os dados preenchidos
+      const court = (state.courts && state.courts[0]) ? state.courts[0].name : 'Quadra de Beach Tennis 1';
+      triggerBookingNotification({
+        id: 'test-' + Date.now(),
+        court_id: (state.courts && state.courts[0]) ? state.courts[0].id : 'court-beach-1',
+        date: getFormattedDate(new Date()),
+        start_time: '19:00',
+        end_time: '20:00',
+        time: '19:00 às 20:00',
+        total_price: 90.00,
+        customer_name: 'Teste Notificação Arena',
+        customer_phone: '(81) 98463-4126',
+        duration: 60
+      });
+
+      if (state.currentMode === 'admin') renderStepContent();
+      else renderApp();
+    } else if (perm === 'denied') {
+      alert('As notificações foram bloqueadas nas permissões do seu navegador.\n\nPara ativar no celular:\n1. Toque no ícone de configurações ou cadeado 🔒 ao lado do endereço "arenalimoeiro.vercel.app".\n2. Ative as "Notificações".\n3. Recarregue a página e toque novamente em Ativar.');
+    }
+  } catch (err) {
+    console.error('Erro ao solicitar permissão de notificação:', err);
+  }
+}
+
 async function syncDataFromSupabase() {
   if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
   const client = window.ArenaSupabase.getClient();
@@ -8376,6 +8609,12 @@ async function syncDataFromSupabase() {
             state.bookings = [...state.bookings, payload.new];
             _realtimeRefreshUI();
           }
+
+          // 🔔 Dispara notificação com som e vibração no celular/navegador do gestor
+          if (payload.new) {
+            triggerBookingNotification(payload.new);
+          }
+
           // Busca completa para garantir consistência
           const { data } = await client.from('bookings').select('*');
           if (data) { state.bookings = data; _realtimeRefreshUI(); }
