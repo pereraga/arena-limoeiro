@@ -776,34 +776,54 @@ function renderStepper() {
       ? state.currentUser.name 
       : (state.currentUser?.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser?.name || 'Gabriel Alves'));
 
+    const isGranted = window.Notification && Notification.permission === 'granted';
+
     stepperContainer.innerHTML = `
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between w-full bg-black/60 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl border border-emerald-500/30 gap-2.5">
-        <div class="flex items-center justify-between w-full sm:w-auto text-xs text-emerald-300 min-w-0">
-          <div class="flex items-center space-x-1.5 min-w-0 truncate">
-            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-            <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
-          </div>
-          <button onclick="logoutAdmin()" class="sm:hidden px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap text-xs transition-all shadow-sm flex-shrink-0" title="Sair do painel">
-            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-            <span>Sair</span>
-          </button>
+      <div class="w-full bg-slate-950/90 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-emerald-500/30 shadow-md flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
+        <!-- Saudação Centralizada no Mobile / Alinhada à Esquerda no PC -->
+        <div class="flex items-center justify-center md:justify-start space-x-2 text-xs sm:text-sm text-emerald-300 w-full md:w-auto">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+          <span>Olá tudo bom, <strong class="text-white font-bold">${displayName}</strong></span>
         </div>
-        <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 text-xs w-full sm:w-auto flex-shrink-0">
-          <button onclick="requestNotificationPermission()" class="w-full sm:w-auto px-2.5 py-1.5 rounded-lg ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-800/90 text-emerald-200 border border-emerald-500/50' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'} font-bold flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center" title="Receber alertas no celular a cada novo agendamento">
-            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <span class="truncate">${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Notificações'}</span>
+
+        <!-- Botões Perfeitamente Centralizados e com Tamanho Correto para Leitura -->
+        <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2 w-full md:w-auto">
+          <!-- Botão de Notificações com Destaque -->
+          <button onclick="requestNotificationPermission()" 
+                  class="col-span-2 sm:col-span-1 w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center space-x-2 transition-all shadow-md text-center cursor-pointer ${isGranted ? 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/60 ring-1 ring-emerald-400/30' : 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse'}" 
+                  title="Receber alertas sonoros no celular e computador a cada novo agendamento">
+            <i data-lucide="${isGranted ? 'bell-check' : 'bell-ring'}" class="w-4 h-4 flex-shrink-0"></i>
+            <span class="whitespace-nowrap">${isGranted ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações'}</span>
           </button>
-          <button onclick="switchToClientView()" class="w-full sm:w-auto px-2.5 py-1.5 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center" title="Alternar para a visão pública do cliente">
-            <i data-lucide="eye" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <span class="truncate">Ver Cliente</span>
+
+          ${isGranted ? `
+            <button onclick="requestNotificationPermission()" 
+                    class="col-span-2 sm:col-span-1 w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition-all text-center cursor-pointer shadow-xs"
+                    title="Testar som e alerta no aparelho">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5 flex-shrink-0"></i>
+              <span>Testar Som</span>
+            </button>
+          ` : ''}
+
+          <!-- Botão Ver Tela do Cliente -->
+          <button onclick="switchToClientView()" 
+                  class="col-span-1 w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center cursor-pointer"
+                  title="Alternar para a visão pública do cliente">
+            <i data-lucide="eye" class="w-4 h-4 flex-shrink-0"></i>
+            <span class="whitespace-nowrap">Ver Tela Cliente</span>
           </button>
-          <button onclick="logoutAdmin()" class="hidden sm:flex px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold items-center space-x-1 whitespace-nowrap transition-all shadow-sm" title="Sair do painel">
-            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+
+          <!-- Botão Sair -->
+          <button onclick="logoutAdmin()" 
+                  class="col-span-1 w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center cursor-pointer"
+                  title="Sair do painel administrativo">
+            <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i>
             <span>Sair</span>
           </button>
         </div>
       </div>
     `;
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
@@ -2370,31 +2390,32 @@ function renderAdminView(container) {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+        <div class="flex flex-wrap items-center justify-center md:justify-end gap-2 w-full md:w-auto mt-3 md:mt-0">
           <button onclick="requestNotificationPermission()" 
-                  class="flex-1 sm:flex-initial justify-center px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all shadow-xs ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'}" 
-                  title="Receber alertas sonoros no celular a cada novo agendamento">
+                  class="flex-1 sm:flex-initial justify-center px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center space-x-2 transition-all shadow-xs cursor-pointer ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/60 ring-1 ring-emerald-400/30' : 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse'}" 
+                  title="Receber alertas sonoros no celular e computador a cada novo agendamento">
             <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-4 h-4 flex-shrink-0"></i>
             <span class="whitespace-nowrap">${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações'}</span>
           </button>
 
           ${window.Notification && Notification.permission === 'granted' ? `
-            <button onclick="requestNotificationPermission()" class="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all" title="Testar som e notificação no celular">
-              🧪 Testar
+            <button onclick="requestNotificationPermission()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs flex items-center space-x-1" title="Testar som e notificação no celular ou computador">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5 flex-shrink-0"></i>
+              <span>Testar</span>
             </button>
           ` : ''}
 
-          <button onclick="openDirectBookingModal()" class="flex-1 sm:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all">
+          <button onclick="openDirectBookingModal()" class="flex-1 sm:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
             <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
             <span class="whitespace-nowrap">⚡ Reserva Balcão</span>
           </button>
 
-          <button onclick="syncDataFromSupabase().then(() => renderStepContent())" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all" title="Atualizar dados do banco">
+          <button onclick="syncDataFromSupabase().then(() => renderStepContent())" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-2xs" title="Atualizar dados do banco">
             <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
             <span class="hidden sm:inline">Atualizar</span>
           </button>
 
-          <button onclick="logoutAdmin()" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all">
+          <button onclick="logoutAdmin()" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-2xs">
             <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i>
             <span>Sair</span>
           </button>
@@ -2761,22 +2782,22 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
         </div>
 
         <!-- Controles Rápidos de Navegação -->
-        <div class="flex items-center space-x-1.5 self-stretch sm:self-center justify-between sm:justify-end flex-wrap gap-1.5">
+        <div class="flex items-center justify-center sm:justify-end flex-wrap gap-2 w-full sm:w-auto">
           <button type="button" onclick="setAdminFilterDate('${todayStr}')" 
-                  class="px-3 py-1.5 rounded-xl text-xs font-black transition-all ${selectedDate === todayStr ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+                  class="px-3.5 py-2 rounded-xl text-xs font-black transition-all ${selectedDate === todayStr ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'} cursor-pointer">
             ⚡ Hoje
           </button>
           <div class="flex items-center space-x-1">
-            <button type="button" onclick="navigateAdminFilterDate(-1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Dia Anterior">
+            <button type="button" onclick="navigateAdminFilterDate(-1)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" title="Dia Anterior">
               <i data-lucide="chevron-left" class="w-4 h-4"></i>
             </button>
-            <button type="button" onclick="navigateAdminFilterDate(1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Próximo Dia">
+            <button type="button" onclick="navigateAdminFilterDate(1)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" title="Próximo Dia">
               <i data-lucide="chevron-right" class="w-4 h-4"></i>
             </button>
           </div>
-          <div class="relative flex-1 sm:flex-initial">
+          <div class="relative flex-1 sm:flex-initial min-w-[130px]">
             <input type="date" value="${selectedDate}" onchange="setAdminFilterDate(this.value)" 
-                   class="w-full sm:w-auto p-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer bg-slate-50 hover:bg-white" title="Escolher outra data">
+                   class="w-full sm:w-auto px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer bg-slate-50 hover:bg-white text-center shadow-2xs" title="Escolher outra data">
           </div>
         </div>
       </div>
@@ -3045,23 +3066,23 @@ function renderLiveDashboardTab() {
       ${renderHorizontalDayCalendar(selectedDate, allBookings, state.monthlyMembers)}
 
       <!-- Barra de Filtros por Quadra e Status -->
-      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-center gap-2.5 w-full md:w-auto">
-          <div class="flex items-center gap-2">
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-3 w-full md:w-auto">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
             <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center">
               <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1"></i> Quadra:
             </span>
-            <select onchange="setAdminFilterCourt(this.value)" class="flex-1 sm:flex-initial p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
+            <select onchange="setAdminFilterCourt(this.value)" class="flex-1 sm:flex-initial p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
               <option value="all" ${state.adminFilterCourt === 'all' ? 'selected' : ''}>🏟️ Todas as Quadras</option>
               ${state.courts.map(c => `<option value="${c.id}" ${state.adminFilterCourt === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
             </select>
           </div>
 
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 w-full sm:w-auto">
             <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center">
               <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1"></i> Status:
             </span>
-            <select onchange="setAdminFilterStatus(this.value)" class="flex-1 sm:flex-initial p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
+            <select onchange="setAdminFilterStatus(this.value)" class="flex-1 sm:flex-initial p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
               <option value="all" ${state.adminFilterStatus === 'all' ? 'selected' : ''}>Todos os Status</option>
               <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo / Em Andamento</option>
               <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximas Partidas</option>
@@ -3070,10 +3091,10 @@ function renderLiveDashboardTab() {
           </div>
         </div>
 
-        <div class="w-full md:w-auto flex justify-end">
-          <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all">
+        <div class="w-full md:w-auto flex items-center justify-center md:justify-end">
+          <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm flex items-center space-x-1.5 transition-all text-center cursor-pointer">
             <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
-            <span>Nova Reserva Balcão</span>
+            <span>⚡ Nova Reserva Balcão</span>
           </button>
         </div>
       </div>
@@ -8532,6 +8553,7 @@ async function requestNotificationPermission() {
       renderStepper();
       if (state.currentMode === 'admin') renderStepContent();
       else renderApp();
+      if (window.lucide) lucide.createIcons();
     } else if (perm === 'denied') {
       alert('As notificações foram bloqueadas nas permissões do seu navegador.\n\nPara ativar no celular:\n1. Toque no ícone de configurações ou cadeado 🔒 ao lado do endereço "arenalimoeiro.vercel.app".\n2. Ative as "Notificações".\n3. Recarregue a página e toque novamente em Ativar.');
     }
