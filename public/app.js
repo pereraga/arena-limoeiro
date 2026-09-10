@@ -779,45 +779,42 @@ function renderStepper() {
     const isGranted = window.Notification && Notification.permission === 'granted';
 
     stepperContainer.innerHTML = `
-      <div class="w-full bg-slate-950/90 backdrop-blur-md p-3 sm:p-4 rounded-2xl border border-emerald-500/30 shadow-md flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
-        <!-- Saudação Centralizada no Mobile / Alinhada à Esquerda no PC -->
-        <div class="flex items-center justify-center md:justify-start space-x-2 text-xs sm:text-sm text-emerald-300 w-full md:w-auto">
+      <div class="flex items-center justify-between w-full bg-black/60 p-2 sm:px-4 sm:py-2.5 rounded-2xl border border-emerald-500/30 gap-2 overflow-x-auto scrollbar-none">
+        <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs text-emerald-300 min-w-0 flex-shrink truncate">
           <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-          <span>Olá tudo bom, <strong class="text-white font-bold">${displayName}</strong></span>
+          <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
         </div>
 
-        <!-- Botões Perfeitamente Centralizados e com Tamanho Correto para Leitura -->
-        <div class="grid grid-cols-2 sm:flex sm:flex-wrap items-center justify-center gap-2 w-full md:w-auto">
-          <!-- Botão de Notificações com Destaque -->
+        <!-- Botões deitados (em linha horizontal) nas plataformas -->
+        <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
           <button onclick="requestNotificationPermission()" 
-                  class="col-span-2 sm:col-span-1 w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center justify-center space-x-2 transition-all shadow-md text-center cursor-pointer ${isGranted ? 'bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400/60 ring-1 ring-emerald-400/30' : 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse'}" 
-                  title="Receber alertas sonoros no celular e computador a cada novo agendamento">
-            <i data-lucide="${isGranted ? 'bell-check' : 'bell-ring'}" class="w-4 h-4 flex-shrink-0"></i>
-            <span class="whitespace-nowrap">${isGranted ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações'}</span>
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl ${isGranted ? 'bg-emerald-800/90 text-emerald-200 border border-emerald-500/50' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'} font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                  title="Receber alertas sonoros no celular e computador">
+            <i data-lucide="${isGranted ? 'bell-check' : 'bell-ring'}" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span>${isGranted ? '🔔 Notificações Ativas' : '🔔 Notificações'}</span>
           </button>
 
           ${isGranted ? `
             <button onclick="requestNotificationPermission()" 
-                    class="col-span-2 sm:col-span-1 w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold text-xs flex items-center justify-center space-x-1.5 transition-all text-center cursor-pointer shadow-xs"
-                    title="Testar som e alerta no aparelho">
+                    class="px-2 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold text-xs flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer"
+                    title="Testar som no aparelho">
               <i data-lucide="volume-2" class="w-3.5 h-3.5 flex-shrink-0"></i>
-              <span>Testar Som</span>
+              <span class="hidden sm:inline">Testar</span>
             </button>
           ` : ''}
 
-          <!-- Botão Ver Tela do Cliente -->
           <button onclick="switchToClientView()" 
-                  class="col-span-1 w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center cursor-pointer"
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
                   title="Alternar para a visão pública do cliente">
-            <i data-lucide="eye" class="w-4 h-4 flex-shrink-0"></i>
-            <span class="whitespace-nowrap">Ver Tela Cliente</span>
+            <i data-lucide="eye" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span class="hidden sm:inline">Ver Tela do Cliente</span>
+            <span class="sm:hidden">Ver Cliente</span>
           </button>
 
-          <!-- Botão Sair -->
           <button onclick="logoutAdmin()" 
-                  class="col-span-1 w-full sm:w-auto px-3.5 py-2.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs sm:text-sm flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center cursor-pointer"
-                  title="Sair do painel administrativo">
-            <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i>
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                  title="Sair do painel">
+            <i data-lucide="log-out" class="w-3.5 h-3.5 flex-shrink-0"></i>
             <span>Sair</span>
           </button>
         </div>
