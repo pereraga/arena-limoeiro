@@ -777,21 +777,27 @@ function renderStepper() {
       : (state.currentUser?.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser?.name || 'Gabriel Alves'));
 
     stepperContainer.innerHTML = `
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between w-full bg-black/60 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl border border-emerald-500/30 gap-2">
-        <div class="flex items-center space-x-2 text-xs text-emerald-300 min-w-0">
-          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-          <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between w-full bg-black/60 p-2.5 sm:px-4 sm:py-2.5 rounded-2xl border border-emerald-500/30 gap-2.5">
+        <div class="flex items-center justify-between w-full sm:w-auto text-xs text-emerald-300 min-w-0">
+          <div class="flex items-center space-x-1.5 min-w-0 truncate">
+            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
+          </div>
+          <button onclick="logoutAdmin()" class="sm:hidden px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap text-xs transition-all shadow-sm flex-shrink-0" title="Sair do painel">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            <span>Sair</span>
+          </button>
         </div>
-        <div class="flex items-center space-x-2 text-xs self-stretch sm:self-auto justify-end flex-shrink-0">
-          <button onclick="requestNotificationPermission()" class="px-2.5 py-1 rounded-lg ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-800/90 text-emerald-200 border border-emerald-500/50' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'} font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm" title="Receber alertas no celular a cada novo agendamento">
-            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-3.5 h-3.5"></i>
-            <span>${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações'}</span>
+        <div class="grid grid-cols-2 sm:flex sm:items-center gap-2 text-xs w-full sm:w-auto flex-shrink-0">
+          <button onclick="requestNotificationPermission()" class="w-full sm:w-auto px-2.5 py-1.5 rounded-lg ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-800/90 text-emerald-200 border border-emerald-500/50' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'} font-bold flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center" title="Receber alertas no celular a cada novo agendamento">
+            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span class="truncate">${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Notificações'}</span>
           </button>
-          <button onclick="switchToClientView()" class="px-2.5 py-1 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm">
-            <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-            <span>Ver Tela do Cliente</span>
+          <button onclick="switchToClientView()" class="w-full sm:w-auto px-2.5 py-1.5 rounded-lg bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center justify-center space-x-1.5 transition-all shadow-sm text-center" title="Alternar para a visão pública do cliente">
+            <i data-lucide="eye" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span class="truncate">Ver Cliente</span>
           </button>
-          <button onclick="logoutAdmin()" class="px-2.5 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm">
+          <button onclick="logoutAdmin()" class="hidden sm:flex px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold items-center space-x-1 whitespace-nowrap transition-all shadow-sm" title="Sair do painel">
             <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
             <span>Sair</span>
           </button>
@@ -2364,32 +2370,32 @@ function renderAdminView(container) {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
           <button onclick="requestNotificationPermission()" 
-                  class="px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all shadow-xs ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'}" 
+                  class="flex-1 sm:flex-initial justify-center px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all shadow-xs ${window.Notification && Notification.permission === 'granted' ? 'bg-emerald-50 text-emerald-800 border border-emerald-300' : 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black animate-pulse'}" 
                   title="Receber alertas sonoros no celular a cada novo agendamento">
-            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-4 h-4"></i>
-            <span>${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações no Celular'}</span>
+            <i data-lucide="${window.Notification && Notification.permission === 'granted' ? 'bell-check' : 'bell-ring'}" class="w-4 h-4 flex-shrink-0"></i>
+            <span class="whitespace-nowrap">${window.Notification && Notification.permission === 'granted' ? '🔔 Notificações Ativas' : '🔔 Ativar Notificações'}</span>
           </button>
 
           ${window.Notification && Notification.permission === 'granted' ? `
-            <button onclick="requestNotificationPermission()" class="px-2.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all" title="Testar som e notificação no celular">
+            <button onclick="requestNotificationPermission()" class="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all" title="Testar som e notificação no celular">
               🧪 Testar
             </button>
           ` : ''}
 
-          <button onclick="openDirectBookingModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span>⚡ Fazer Reserva Balcão</span>
+          <button onclick="openDirectBookingModal()" class="flex-1 sm:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all">
+            <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
+            <span class="whitespace-nowrap">⚡ Reserva Balcão</span>
           </button>
 
           <button onclick="syncDataFromSupabase().then(() => renderStepContent())" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all" title="Atualizar dados do banco">
-            <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600"></i>
+            <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
             <span class="hidden sm:inline">Atualizar</span>
           </button>
 
           <button onclick="logoutAdmin()" class="px-3.5 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 transition-all">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
+            <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i>
             <span>Sair</span>
           </button>
         </div>
@@ -2755,20 +2761,22 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
         </div>
 
         <!-- Controles Rápidos de Navegação -->
-        <div class="flex items-center space-x-1.5 self-end sm:self-center">
+        <div class="flex items-center space-x-1.5 self-stretch sm:self-center justify-between sm:justify-end flex-wrap gap-1.5">
           <button type="button" onclick="setAdminFilterDate('${todayStr}')" 
                   class="px-3 py-1.5 rounded-xl text-xs font-black transition-all ${selectedDate === todayStr ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
             ⚡ Hoje
           </button>
-          <button type="button" onclick="navigateAdminFilterDate(-1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Dia Anterior">
-            <i data-lucide="chevron-left" class="w-4 h-4"></i>
-          </button>
-          <button type="button" onclick="navigateAdminFilterDate(1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Próximo Dia">
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </button>
-          <div class="relative">
+          <div class="flex items-center space-x-1">
+            <button type="button" onclick="navigateAdminFilterDate(-1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Dia Anterior">
+              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </button>
+            <button type="button" onclick="navigateAdminFilterDate(1)" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer" title="Próximo Dia">
+              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <div class="relative flex-1 sm:flex-initial">
             <input type="date" value="${selectedDate}" onchange="setAdminFilterDate(this.value)" 
-                   class="p-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer bg-slate-50 hover:bg-white" title="Escolher outra data">
+                   class="w-full sm:w-auto p-1.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer bg-slate-50 hover:bg-white" title="Escolher outra data">
           </div>
         </div>
       </div>
@@ -3037,31 +3045,35 @@ function renderLiveDashboardTab() {
       ${renderHorizontalDayCalendar(selectedDate, allBookings, state.monthlyMembers)}
 
       <!-- Barra de Filtros por Quadra e Status -->
-      <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs font-black uppercase text-slate-700 mr-1 flex items-center">
-            <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1"></i> Filtrar Quadra:
-          </span>
-          <select onchange="setAdminFilterCourt(this.value)" class="p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
-            <option value="all" ${state.adminFilterCourt === 'all' ? 'selected' : ''}>🏟️ Todas as Quadras</option>
-            ${state.courts.map(c => `<option value="${c.id}" ${state.adminFilterCourt === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
-          </select>
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-center gap-2.5 w-full md:w-auto">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center">
+              <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1"></i> Quadra:
+            </span>
+            <select onchange="setAdminFilterCourt(this.value)" class="flex-1 sm:flex-initial p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
+              <option value="all" ${state.adminFilterCourt === 'all' ? 'selected' : ''}>🏟️ Todas as Quadras</option>
+              ${state.courts.map(c => `<option value="${c.id}" ${state.adminFilterCourt === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1"></i> Status:
+            </span>
+            <select onchange="setAdminFilterStatus(this.value)" class="flex-1 sm:flex-initial p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
+              <option value="all" ${state.adminFilterStatus === 'all' ? 'selected' : ''}>Todos os Status</option>
+              <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo / Em Andamento</option>
+              <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximas Partidas</option>
+              <option value="finished" ${state.adminFilterStatus === 'finished' ? 'selected' : ''}>✅ Finalizadas</option>
+            </select>
+          </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs font-black uppercase text-slate-700 mr-1 flex items-center">
-            <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1"></i> Status:
-          </span>
-          <select onchange="setAdminFilterStatus(this.value)" class="p-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
-            <option value="all" ${state.adminFilterStatus === 'all' ? 'selected' : ''}>Todos os Status</option>
-            <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo / Em Andamento</option>
-            <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximas Partidas</option>
-            <option value="finished" ${state.adminFilterStatus === 'finished' ? 'selected' : ''}>✅ Finalizadas</option>
-          </select>
-
-          <button onclick="openDirectBookingModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all ml-auto md:ml-0">
-            <i data-lucide="plus-circle" class="w-4 h-4"></i>
-            <span>+ Nova Reserva</span>
+        <div class="w-full md:w-auto flex justify-end">
+          <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all">
+            <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
+            <span>Nova Reserva Balcão</span>
           </button>
         </div>
       </div>
@@ -3216,7 +3228,7 @@ function renderLiveDashboardTab() {
                     </div>
 
                     <!-- Botões de Ação do Jogo -->
-                    <div class="flex items-center space-x-1.5 self-end md:self-center flex-shrink-0 flex-wrap">
+                    <div class="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end mt-1 md:mt-0">
                       ${(match.isLive || match.isOvertime) ? `
                         <!-- Jogo em andamento: Finalizar Jogo (atualiza bar para entregue automaticamente) -->
                         <button onclick="finishMatchManual('${match.id}')" class="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Finalizar o jogo agora (atualiza o bar para entregue se houver pedidos)">
@@ -4938,9 +4950,9 @@ function openAddBarItemsModal(bookingId) {
             }).join('')}
           </div>
 
-          <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
-            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md">Salvar Itens no Jogo</button>
+          <div class="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3">
+            <button type="button" onclick="closeModal()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
+            <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md">Salvar Itens no Jogo</button>
           </div>
         </form>
       </div>
@@ -5139,10 +5151,10 @@ function openDirectBookingModal() {
             <textarea id="directObsInput" rows="2" placeholder="Ex: Solicitou coletes reservas, churrasqueira..." class="w-full p-3 border border-slate-300 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-600"></textarea>
           </div>
 
-          <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
-            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5">
-              <i data-lucide="check-circle" class="w-4 h-4"></i>
+          <div class="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 sm:gap-3">
+            <button type="button" onclick="closeModal()" class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
+            <button type="submit" class="w-full sm:w-auto justify-center px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4 flex-shrink-0"></i>
               <span>Confirmar e Salvar Reserva</span>
             </button>
           </div>
@@ -8517,6 +8529,7 @@ async function requestNotificationPermission() {
         duration: 60
       });
 
+      renderStepper();
       if (state.currentMode === 'admin') renderStepContent();
       else renderApp();
     } else if (perm === 'denied') {
