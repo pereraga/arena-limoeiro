@@ -130,6 +130,9 @@ function normalizeCourt(c) {
   const isMaint = c.isMaintenance === true || c.status === 'maintenance' || specsObj.status === 'maintenance';
   const maintReason = specsObj.maintenance_reason || c.maintenanceReason || c.maintenance_reason || '';
   const maintNotice = specsObj.maintenance_notice || c.maintenanceNotice || c.maintenance_notice || '';
+  const badgeMode = specsObj.badge_mode || c.badge_mode || (c.badge ? 'manual' : 'none');
+  const badgeText = specsObj.badge_text !== undefined ? specsObj.badge_text : (c.badge || '');
+  const badgeAutoFreq = specsObj.badge_auto_freq || c.badge_auto_freq || 'weekly';
 
   return {
     ...c,
@@ -153,12 +156,85 @@ function normalizeCourt(c) {
     maintenance_reason: maintReason,
     maintenanceNotice: maintNotice,
     maintenance_notice: maintNotice,
+    badge: c.badge || null,
+    badgeMode: badgeMode,
+    badge_mode: badgeMode,
+    badgeText: badgeText,
+    badge_text: badgeText,
+    badgeAutoFreq: badgeAutoFreq,
+    badge_auto_freq: badgeAutoFreq,
     discountPricePerHour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
     discount_price_per_hour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
     discountStartTime: specsObj.discount_start_time || c.discountStartTime || '09:00',
     discountEndTime: specsObj.discount_end_time || c.discountEndTime || '16:00',
     image: c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
   };
+}
+
+// ⭐ Retorna o badge / destaque da quadra (calculado automaticamente ou definido manualmente)
+function getCourtDisplayBadge(court) {
+  if (!court) return '';
+  const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
+  const mode = specs.badge_mode || court.badge_mode || (court.badge ? 'manual' : 'none');
+
+  if (mode === 'none') {
+    return '';
+  }
+
+  if (mode === 'manual') {
+    const text = specs.badge_text !== undefined ? specs.badge_text : (court.badge || '');
+    return (text || '').trim();
+  }
+
+  if (mode === 'auto') {
+    const freq = specs.badge_auto_freq || court.badge_auto_freq || 'weekly';
+    const now = new Date();
+    const todayStr = getFormattedDate(now);
+    const allBookings = (state.bookings || []).filter(b => b.status !== 'cancelled');
+
+    if (freq === 'daily') {
+      const todayBookings = allBookings.filter(b => b.date === todayStr);
+      const courtCounts = {};
+      todayBookings.forEach(b => {
+        const cId = b.court_id || b.courtId;
+        courtCounts[cId] = (courtCounts[cId] || 0) + 1;
+      });
+      const myCount = courtCounts[court.id] || 0;
+      if (myCount === 0) return '';
+      const maxCount = Math.max(...Object.values(courtCounts), 0);
+      if (myCount === maxCount && maxCount >= 2) {
+        return `🔥 Mais Agendado Hoje (${myCount} jogos)`;
+      } else if (myCount >= 2) {
+        return `⚡ Alta Procura Hoje`;
+      }
+      return '';
+    } else {
+      // Semanal (últimos 7 dias)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const weekBookings = allBookings.filter(b => {
+        if (!b.date) return false;
+        const bDate = new Date(b.date + 'T12:00:00');
+        return bDate >= sevenDaysAgo && bDate <= now;
+      });
+      const courtCounts = {};
+      weekBookings.forEach(b => {
+        const cId = b.court_id || b.courtId;
+        courtCounts[cId] = (courtCounts[cId] || 0) + 1;
+      });
+      const myCount = courtCounts[court.id] || 0;
+      if (myCount === 0) return '';
+      const maxCount = Math.max(...Object.values(courtCounts), 0);
+      if (myCount === maxCount && maxCount >= 2) {
+        return `🔥 Mais Agendado da Semana`;
+      } else if (myCount >= 3) {
+        return `⚡ Alta Procura`;
+      }
+      return '';
+    }
+  }
+
+  return (court.badge || '').trim();
 }
 
 function getCourtNormalHourlyPrice(court) {
@@ -248,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=4.8.0').catch(err => {
+    navigator.serviceWorker.register('/sw.js?v=4.8.1').catch(err => {
       console.warn('Aviso Service Worker:', err);
     });
   }
@@ -996,11 +1072,15 @@ function renderStep1(container) {
                     <span class="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-300 shadow-md flex items-center animate-pulse">
                       <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> AVISO PRÉVIO DE MANUTENÇÃO
                     </span>
-                  ` : (court.badge ? `
-                    <span class="bg-emerald-800/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md flex items-center">
-                      ${court.badge}
-                    </span>
-                  ` : ''))}
+                  ` : (() => {
+                    const dispBadge = getCourtDisplayBadge(court);
+                    if (!dispBadge) return '';
+                    return `
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        ${dispBadge}
+                      </span>
+                    `;
+                  })())}
                 </div>
 
                 <div class="absolute bottom-2.5 left-3 text-white">
@@ -3287,29 +3367,29 @@ function renderLiveDashboardTab() {
                     </div>
 
                     <!-- Botões de Ação do Jogo -->
-                    <div class="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end mt-1 md:mt-0">
+                    <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full md:w-auto pt-2 sm:pt-0">
                       ${(match.isLive || match.isOvertime) ? `
                         <!-- Jogo em andamento: Finalizar Jogo (atualiza bar para entregue automaticamente) -->
                         <button onclick="finishMatchManual('${match.id}')" class="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Finalizar o jogo agora (atualiza o bar para entregue se houver pedidos)">
-                          <i data-lucide="square" class="w-4 h-4"></i>
-                          <span>⏹ Finalizar Jogo</span>
+                          <span class="text-sm leading-none">⏹️</span>
+                          <span>Finalizar Jogo</span>
                         </button>
                       ` : (match.status !== 'finished' && isSelectedDateToday ? `
                         <!-- Jogo agendado hoje: Liberar Entrada / Iniciar Jogo -->
                         <button onclick="startMatchNow('${match.id}')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Liberar entrada e iniciar jogo agora">
-                          <i data-lucide="play" class="w-4 h-4"></i>
-                          <span>▶ Liberar Jogo</span>
+                          <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                          <span>Liberar Jogo</span>
                         </button>
                       ` : (match.status !== 'finished' ? `
                         <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
-                          <i data-lucide="play" class="w-4 h-4"></i>
-                          <span>▶ Liberar Jogo</span>
+                          <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                          <span>Liberar Jogo</span>
                         </button>
                       ` : ''))}
 
                       <!-- Botão de Comanda do Bar -->
-                      <button onclick="openAddBarItemsModal('${match.id}')" class="px-3 py-2 text-slate-800 hover:text-emerald-800 bg-slate-100 hover:bg-emerald-50 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Adicionar / Registrar Consumo do Bar para este jogo">
-                        <i data-lucide="beer" class="w-4 h-4 text-amber-500"></i>
+                      <button onclick="openAddBarItemsModal('${match.id}')" class="px-3.5 py-2 text-slate-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Adicionar / Registrar Consumo do Bar para este jogo">
+                        <span class="text-base leading-none">🍺</span>
                         <span>+ Comanda Bar</span>
                       </button>
 
@@ -3617,6 +3697,15 @@ function renderCourtsControlTab() {
                         ✓ DISPONÍVEL
                       </span>
                     `))))}
+                    ${(() => {
+                      const curDisp = getCourtDisplayBadge(court);
+                      if (!curDisp) return '';
+                      return `
+                        <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                          ${curDisp}
+                        </span>
+                      `;
+                    })()}
                   </div>
 
                   <!-- Ações Rápidas no Canto Superior Direito da Imagem -->
@@ -3673,7 +3762,15 @@ function renderCourtsControlTab() {
                         <span class="w-2 h-2 rounded-full bg-amber-600 mr-1.5 animate-ping"></span>
                         Partida ao Vivo em Andamento
                       </div>
-                      <p class="font-medium text-[11px] text-amber-800">${liveBooking.customer_name || liveBooking.customerName} (${liveBooking.time})</p>
+                      <p class="font-medium text-[11px] text-amber-800">${liveBooking.customer_name} (${liveBooking.start_time} às ${liveBooking.end_time})</p>
+                    </div>
+                  ` : (nextBooking ? `
+                    <div class="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs">
+                      <div class="font-black flex items-center mb-0.5">
+                        <i data-lucide="clock" class="w-4 h-4 text-blue-600 mr-1.5"></i>
+                        Próxima Partida Hoje
+                      </div>
+                      <p class="font-medium text-[11px] text-blue-800">${nextBooking.customer_name} às ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}</p>
                     </div>
                   ` : `
                     <div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
@@ -3683,7 +3780,7 @@ function renderCourtsControlTab() {
                       </div>
                       <p class="font-medium text-[11px] text-emerald-700">Clientes podem agendar normalmente no site.</p>
                     </div>
-                  `)))}
+                  `))))}
 
                   <div class="text-xs text-slate-600 space-y-1.5 pt-1">
                     <p class="flex items-center"><i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Piso: ${specs.surface || specs.type || 'Oficial de Alto Desempenho'}</span></p>
@@ -3706,6 +3803,23 @@ function renderCourtsControlTab() {
                         class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
                   <i data-lucide="clock" class="w-3.5 h-3.5 text-rose-600"></i>
                   <span>Agendar Treino / Manutenção (com Horário)</span>
+                </button>
+
+                <!-- Botão de Destaque & Marketing (Manual ou Automático) -->
+                <button onclick="openCourtBadgeModal('${court.id}')" 
+                        class="w-full py-2 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-600"></i>
+                  <span>${(() => {
+                    const sp = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
+                    const bMode = sp.badge_mode || court.badge_mode || (court.badge ? 'manual' : 'none');
+                    const curDisp = getCourtDisplayBadge(court);
+                    if (bMode === 'auto') {
+                      return `⚡ Destaque: Automático ${curDisp ? `("${curDisp}")` : ''}`;
+                    } else if (bMode === 'manual' && curDisp) {
+                      return `⭐ Destaque: "${curDisp}"`;
+                    }
+                    return '⭐ Selo de Destaque / Badge (Manual ou Auto)';
+                  })()}</span>
                 </button>
 
                 <div class="flex items-center space-x-2">
@@ -4873,6 +4987,289 @@ async function handleRemoveMaintenanceNotice(courtId) {
   showToastNotification(`
     <h5 class="font-black text-white text-xs mb-0.5">✓ Aviso Removido</h5>
     <p class="text-emerald-300 font-bold">${court.name} está operando normalmente sem avisos.</p>
+  `, 3500);
+}
+
+// ==============================================================================
+// ⭐ MODAL DE DESTAQUE / BADGE DA QUADRA (MANUAL OU AUTOMÁTICO)
+// ==============================================================================
+function openCourtBadgeModal(courtId) {
+  const court = state.courts.find(c => c.id === courtId);
+  if (!court) return;
+
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
+  const currentMode = specs.badge_mode || court.badge_mode || (court.badge ? 'manual' : 'none');
+  const currentText = specs.badge_text !== undefined ? specs.badge_text : (court.badge || '');
+  const currentAutoFreq = specs.badge_auto_freq || court.badge_auto_freq || 'weekly';
+  const displayNow = getCourtDisplayBadge(court);
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        
+        <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300">
+              <i data-lucide="sparkles" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-tight">Selo de Destaque & Marketing</h3>
+              <p class="text-xs text-emerald-200 font-medium">${court.name}</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleSaveCourtBadge(event, '${court.id}')" class="p-6 space-y-4 overflow-y-auto">
+          
+          <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-700">
+            <p class="font-bold flex items-center mb-1 text-slate-900">
+              <i data-lucide="info" class="w-4 h-4 mr-1.5 text-emerald-600"></i>
+              Como funciona o Selo de Destaque:
+            </p>
+            <p class="text-[11px] text-slate-600 leading-relaxed">
+              O selo aparece no topo da foto do campo no site para chamar atenção e gerar desejo de alugar. Você pode deixar <strong>Sem Destaque</strong>, ativar o modo <strong>Automático</strong> (calculado pelos jogos reais da semana ou do dia) ou escolher um selo <strong>Manual</strong>.
+            </p>
+          </div>
+
+          <!-- Escolha do Modo -->
+          <div class="space-y-2.5">
+            <label class="block text-xs font-bold text-slate-700 uppercase">Escolha a Opção do Selo:</label>
+            
+            <!-- Opção 1: Sem Destaque -->
+            <label class="flex items-start p-3 rounded-2xl border ${currentMode === 'none' ? 'border-emerald-500 bg-emerald-50/20 ring-1 ring-emerald-500/30' : 'border-slate-200 bg-white hover:border-slate-300'} cursor-pointer transition-all">
+              <input type="radio" name="badgeMode" value="none" ${currentMode === 'none' ? 'checked' : ''} 
+                     onchange="toggleBadgeModeControls('none')" class="mt-0.5 text-emerald-600 focus:ring-emerald-500">
+              <div class="ml-3 text-xs">
+                <span class="font-black text-slate-800 block">⚪ Sem Destaque (Quadra Limpa)</span>
+                <span class="text-[11px] text-slate-500">Nenhum selo será exibido no card desta quadra.</span>
+              </div>
+            </label>
+
+            <!-- Opção 2: Automático -->
+            <label class="flex items-start p-3 rounded-2xl border ${currentMode === 'auto' ? 'border-emerald-500 bg-emerald-50/20 ring-1 ring-emerald-500/30' : 'border-slate-200 bg-white hover:border-slate-300'} cursor-pointer transition-all">
+              <input type="radio" name="badgeMode" value="auto" ${currentMode === 'auto' ? 'checked' : ''} 
+                     onchange="toggleBadgeModeControls('auto')" class="mt-0.5 text-emerald-600 focus:ring-emerald-500">
+              <div class="ml-3 text-xs flex-1">
+                <span class="font-black text-slate-800 block">⚡ Automático (Baseado nos Jogos Reais)</span>
+                <span class="text-[11px] text-slate-500">O sistema atualiza o selo sozinho conforme a procura real obtida dos agendamentos.</span>
+                
+                <div id="badgeAutoOptions" class="${currentMode === 'auto' ? 'mt-2.5' : 'hidden mt-2.5'} pl-1 space-y-1.5 border-t border-slate-100 pt-2">
+                  <label class="block text-[11px] font-bold text-slate-700 uppercase">Período de Comparação:</label>
+                  <select name="badgeAutoFreq" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
+                    <option value="weekly" ${currentAutoFreq === 'weekly' ? 'selected' : ''}>📅 Semanal (Últimos 7 dias — "🔥 Mais Agendado da Semana")</option>
+                    <option value="daily" ${currentAutoFreq === 'daily' ? 'selected' : ''}>☀️ Diário (Jogos de Hoje — "⚡ Mais Procurado Hoje")</option>
+                  </select>
+                </div>
+              </div>
+            </label>
+
+            <!-- Opção 3: Manual -->
+            <label class="flex items-start p-3 rounded-2xl border ${currentMode === 'manual' ? 'border-emerald-500 bg-emerald-50/20 ring-1 ring-emerald-500/30' : 'border-slate-200 bg-white hover:border-slate-300'} cursor-pointer transition-all">
+              <input type="radio" name="badgeMode" value="manual" ${currentMode === 'manual' ? 'checked' : ''} 
+                     onchange="toggleBadgeModeControls('manual')" class="mt-0.5 text-emerald-600 focus:ring-emerald-500">
+              <div class="ml-3 text-xs flex-1">
+                <span class="font-black text-slate-800 block">⭐ Manual (Gatilho de Desejo / Marketing)</span>
+                <span class="text-[11px] text-slate-500">Escolha um selo estratégico ou digite o texto livre para gerar desejo de alugar.</span>
+                
+                <div id="badgeManualOptions" class="${currentMode === 'manual' ? 'mt-2.5' : 'hidden mt-2.5'} space-y-2.5 border-t border-slate-100 pt-2">
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Escolha um selo rápido de 1 clique:</label>
+                    <div class="flex flex-wrap gap-1.5">
+                      <button type="button" onclick="setCourtBadgePreset('🔥 Mais Agendado da Semana')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        🔥 Mais Agendado da Semana
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('⚡ Alta Procura')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        ⚡ Alta Procura
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('⭐ Preferido da Galera')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        ⭐ Preferido da Galera
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('🏆 Campo Oficial / Principal')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        🏆 Campo Oficial
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('🌧️ 100% Coberto (Sem Chuva)')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        🌧️ 100% Coberto
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('✨ Grama Nova / Reformada')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        ✨ Grama Nova
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('🏖️ Areia Fina Tratada')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        🏖️ Areia Fina
+                      </button>
+                      <button type="button" onclick="setCourtBadgePreset('🎯 Melhor Custo-Benefício')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                        🎯 Custo-Benefício
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Texto do Selo:</label>
+                    <input type="text" id="badgeCustomTextInput" name="badgeCustomText" value="${currentText}" 
+                           placeholder="Ex: 🔥 Mais Agendado da Semana, ⚡ Alta Demanda..." 
+                           class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                  </div>
+                </div>
+              </div>
+            </label>
+
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+            ${(currentMode !== 'none' || displayNow) ? `
+              <button type="button" onclick="handleRemoveCourtBadge('${court.id}')" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center justify-center space-x-1 transition-all cursor-pointer">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Remover Destaque</span>
+              </button>
+            ` : '<div></div>'}
+
+            <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+              <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-100 transition-all cursor-pointer">
+                Cancelar
+              </button>
+              <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Salvar Destaque</span>
+              </button>
+            </div>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function toggleBadgeModeControls(mode) {
+  const autoDiv = document.getElementById('badgeAutoOptions');
+  const manDiv = document.getElementById('badgeManualOptions');
+  if (autoDiv) {
+    if (mode === 'auto') autoDiv.classList.remove('hidden');
+    else autoDiv.classList.add('hidden');
+  }
+  if (manDiv) {
+    if (mode === 'manual') manDiv.classList.remove('hidden');
+    else manDiv.classList.add('hidden');
+  }
+}
+
+function setCourtBadgePreset(text) {
+  const input = document.getElementById('badgeCustomTextInput');
+  if (input) input.value = text;
+}
+
+async function handleSaveCourtBadge(e, courtId) {
+  e.preventDefault();
+  const form = e.target;
+  const mode = form.elements['badgeMode'].value;
+  const autoFreq = form.elements['badgeAutoFreq'] ? form.elements['badgeAutoFreq'].value : 'weekly';
+  const customText = form.elements['badgeCustomText'] ? form.elements['badgeCustomText'].value.trim() : '';
+
+  closeModal();
+
+  const court = state.courts.find(c => c.id === courtId);
+  if (!court) return;
+
+  if (typeof court.specs === 'string') {
+    try { court.specs = JSON.parse(court.specs || '{}'); } catch(e) { court.specs = {}; }
+  } else if (!court.specs) {
+    court.specs = {};
+  }
+
+  court.specs.badge_mode = mode;
+  court.specs.badge_auto_freq = autoFreq;
+  court.specs.badge_text = mode === 'manual' ? customText : '';
+
+  court.badge_mode = mode;
+  court.badge_auto_freq = autoFreq;
+  court.badge_text = mode === 'manual' ? customText : '';
+  court.badge = mode === 'manual' ? customText : (mode === 'auto' ? 'auto' : null);
+
+  // Atualiza estado local e localStorage
+  const idx = state.courts.findIndex(c => c.id === courtId);
+  if (idx !== -1) {
+    state.courts[idx] = normalizeCourt({ ...court });
+  }
+  localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+
+  _refreshAllUI();
+
+  // Salva no Supabase
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('courts').update({
+        badge: mode === 'manual' ? customText : (mode === 'auto' ? 'auto' : null),
+        specs: court.specs
+      }).eq('id', courtId);
+    } catch(err) {
+      console.warn('Erro ao salvar badge no Supabase:', err);
+    }
+  }
+
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
+    window.ArenaSupabase.broadcastCourtUpdate(court);
+  }
+
+  const disp = getCourtDisplayBadge(court);
+  showToastNotification(`
+    <h5 class="font-black text-white text-xs mb-0.5">⭐ Destaque Atualizado</h5>
+    <p class="text-amber-300 font-bold">${court.name}: ${mode === 'none' ? 'Sem destaque' : (mode === 'auto' ? 'Modo Automático Ativo' : disp)}</p>
+  `, 4000);
+}
+
+async function handleRemoveCourtBadge(courtId) {
+  closeModal();
+  const court = state.courts.find(c => c.id === courtId);
+  if (!court) return;
+
+  if (typeof court.specs === 'string') {
+    try { court.specs = JSON.parse(court.specs || '{}'); } catch(e) { court.specs = {}; }
+  } else if (!court.specs) {
+    court.specs = {};
+  }
+
+  court.specs.badge_mode = 'none';
+  court.specs.badge_text = '';
+  court.badge_mode = 'none';
+  court.badge_text = '';
+  court.badge = null;
+
+  const idx = state.courts.findIndex(c => c.id === courtId);
+  if (idx !== -1) {
+    state.courts[idx] = normalizeCourt({ ...court });
+  }
+  localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+
+  _refreshAllUI();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('courts').update({
+        badge: null,
+        specs: court.specs
+      }).eq('id', courtId);
+    } catch(err) {
+      console.warn('Erro ao remover badge no Supabase:', err);
+    }
+  }
+
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
+    window.ArenaSupabase.broadcastCourtUpdate(court);
+  }
+
+  showToastNotification(`
+    <h5 class="font-black text-white text-xs mb-0.5">✓ Destaque Removido</h5>
+    <p class="text-emerald-300 font-bold">${court.name} agora está sem nenhum selo de destaque.</p>
   `, 3500);
 }
 
@@ -6658,18 +7055,22 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     discountPricePerHour: discountPrice,
     discount_price_per_hour: discountPrice,
     discountStartTime: discountStart,
-    discountEndTime: discountEnd
+    discountEndTime: discountEnd,
+    badge: existingCourt ? existingCourt.badge : null,
+    badge_mode: existingSpecs.badge_mode || 'none',
+    badge_text: existingSpecs.badge_text || '',
+    badge_auto_freq: existingSpecs.badge_auto_freq || 'weekly'
   };
 
   closeModal();
 
   if (isEditing) {
     const idx = state.courts.findIndex(c => c.id === courtIdToEdit);
-    if (idx !== -1) state.courts[idx] = savedCourt;
-    if (state.selectedCourt && state.selectedCourt.id === courtIdToEdit) state.selectedCourt = savedCourt;
+    if (idx !== -1) state.courts[idx] = normalizeCourt(savedCourt);
+    if (state.selectedCourt && state.selectedCourt.id === courtIdToEdit) state.selectedCourt = normalizeCourt(savedCourt);
   } else {
-    state.courts.push(savedCourt);
-    state.selectedCourt = savedCourt;
+    state.courts.push(normalizeCourt(savedCourt));
+    state.selectedCourt = normalizeCourt(savedCourt);
   }
 
   // Persistir em localStorage
@@ -6700,7 +7101,8 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
           description, 
           observation, 
           image: savedCourt.image, 
-          specs: savedCourt.specs
+          specs: savedCourt.specs,
+          badge: savedCourt.badge
         }).eq('id', courtIdToEdit);
       } else {
         await client.from('courts').insert([{
@@ -6714,8 +7116,12 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
           observation, 
           image: savedCourt.image, 
           specs: savedCourt.specs,
+          badge: savedCourt.badge,
           order_index: state.courts.length
         }]);
+      }
+      if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
+        window.ArenaSupabase.broadcastCourtUpdate(savedCourt);
       }
     } catch(e) {
       console.warn('Erro ao salvar quadra no Supabase:', e);
