@@ -193,10 +193,16 @@ function canAdvanceFromStep(step) {
 
 
 function calculateDuration() {
+  if (!state.startTime || !state.endTime) {
+    if (!state.selectedDuration || state.selectedDuration < 30) {
+      state.selectedDuration = 60;
+    }
+    return;
+  }
   const startMin = timeToMinutes(state.startTime);
   let endMin = timeToMinutes(state.endTime);
   if (endMin <= startMin) {
-    endMin = startMin + 30;
+    endMin = startMin + (state.selectedDuration || 60);
     state.endTime = minutesToTime(endMin);
   }
   state.selectedDuration = endMin - startMin;
@@ -1459,7 +1465,7 @@ function renderStep3Content() {
           </div>
           <div>
             <h3 class="text-base font-black text-slate-900">Horários do Campo — ${court.name}</h3>
-            <p class="text-xs text-slate-500">Toque no horário de início e no horário de término para definir o tempo de jogo (ex: 17:00 até 18:00 = 1 hora).</p>
+            <p class="text-xs text-slate-500">Escolha a duração desejada e toque no horário para reservar sua partida (ex: 10:00 = 10:00 às 11:00).</p>
           </div>
         </div>
 
@@ -1483,6 +1489,31 @@ function renderStep3Content() {
           }
           return '';
         })()}
+
+        <!-- Seletor de Duração do Jogo -->
+        <div class="mt-4 mb-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+          <span class="text-xs font-black text-slate-700 uppercase block mb-2 flex items-center gap-1.5">
+            <i data-lucide="timer" class="w-4 h-4 text-emerald-600"></i>
+            Duração Desejada da Partida:
+          </span>
+          <div class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="selectBookingDuration(60)" 
+                    class="py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 60 || !state.selectedDuration ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+              <span>⏱️ 1 Hora</span>
+              <span class="text-[10px] font-normal opacity-85">60 min de jogo</span>
+            </button>
+            <button type="button" onclick="selectBookingDuration(90)" 
+                    class="py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 90 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+              <span>⏱️ 1h 30min</span>
+              <span class="text-[10px] font-normal opacity-85">90 min de jogo</span>
+            </button>
+            <button type="button" onclick="selectBookingDuration(120)" 
+                    class="py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 120 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+              <span>⏱️ 2 Horas</span>
+              <span class="text-[10px] font-normal opacity-85">120 min de jogo</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Legenda -->
         <div class="flex flex-wrap gap-2 mb-5 mt-3">
@@ -1537,14 +1568,14 @@ function renderStep3Content() {
               if (isAvail) {
                 if (isSelected) {
                   const isStart = state.startTime === slot.time;
-                  const isEnd = state.endTime === slot.time;
+                  const isEndSlot = (slotMin + 30) === timeToMinutes(state.endTime);
                   let slotBadge = '';
-                  if (isStart && isEnd) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Horário' + (isDiscountSlot ? ' 🔥' : '') + '</span>';
+                  if (isStart && isEndSlot) {
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ 30 min (' + slot.time + ' às ' + state.endTime + ')</span>';
                   } else if (isStart) {
                     slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (' + slot.time + ')' + (isDiscountSlot ? ' 🔥' : '') + '</span>';
-                  } else if (isEnd) {
-                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Término (' + slot.time + ')</span>';
+                  } else if (isEndSlot) {
+                    slotBadge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Até às ' + state.endTime + ' (Fim)</span>';
                   } else {
                     slotBadge = '<span class="text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded-full">✓ No Jogo</span>';
                   }
@@ -1587,10 +1618,11 @@ function renderStep3Content() {
 
               return `
                 <div class="p-3 rounded-2xl ${cardClass} select-none" ${clickable}>
-                  <div class="flex items-center justify-between mb-1">
+                  <div class="flex items-center justify-between mb-0.5">
                     <span class="text-base font-black">${slot.time}</span>
                     <span class="text-base">${icon}</span>
                   </div>
+                  <span class="text-[10px] font-semibold opacity-75 block mb-1">(${slot.time} às ${minutesToTime(slotMin + 30)})</span>
                   ${badge}
                   ${nameLabel}
                 </div>
@@ -1618,31 +1650,34 @@ function renderStep3Content() {
             const normalPrice = getCourtNormalHourlyPrice(court);
 
             return `
-              <div class="bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4 sm:p-5 rounded-2xl border-2 border-emerald-300 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+              <div class="bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 border border-emerald-500/50">
                 <div>
                   <div class="flex items-center space-x-2 flex-wrap gap-1">
-                    <span class="px-2.5 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-black uppercase">Tempo Reservado</span>
-                    <span class="text-xs text-emerald-950 font-black">${state.startTime} às ${state.endTime}</span>
+                    <span class="px-2.5 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-black uppercase tracking-wider">Horário Confirmado</span>
+                    <span class="text-xs text-white font-black">${state.startTime} às ${state.endTime}</span>
+                    <span class="px-2 py-0.5 rounded-md bg-white/20 text-emerald-100 text-[10px] font-bold">
+                      ${formattedDuration}
+                    </span>
                     ${isDiscApplied ? `
-                      <span class="px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 text-[10px] font-black uppercase flex items-center shadow-xs">
-                        🔥 Desconto Aplicado (09h às 16h)
+                      <span class="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-black uppercase flex items-center shadow-xs">
+                        🔥 Desconto Especial Aplicado
                       </span>
                     ` : ''}
                   </div>
-                  <p class="text-base sm:text-lg font-black text-slate-900 mt-1">
-                    ⏱️ Tempo Total: <span class="text-emerald-800">${formattedDuration}</span>
+                  <p class="text-base sm:text-xl font-black text-white mt-1.5">
+                    ⏱️ Jogo das <span class="underline decoration-emerald-300 decoration-2 underline-offset-2">${state.startTime}</span> até às <span class="underline decoration-emerald-300 decoration-2 underline-offset-2">${state.endTime}</span> (${formattedDuration})
                   </p>
-                  <p class="text-xs text-slate-600 mt-0.5">
+                  <p class="text-xs text-emerald-100 mt-0.5">
                     ${isDiscApplied ? `
-                      Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h <span class="line-through text-slate-400 text-[11px]">R$ ${normalPrice.toFixed(2)}</span> (Desconto Especial de Horário)
+                      Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h <span class="line-through text-emerald-200 text-[11px]">R$ ${normalPrice.toFixed(2)}</span> (Desconto Especial de Horário)
                     ` : `
                       Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h
                     `}
                   </p>
                 </div>
-                <div class="text-right bg-white px-5 py-3 rounded-xl border border-emerald-300 shadow-sm w-full sm:w-auto">
-                  <span class="text-[11px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
-                  <p class="text-xl sm:text-2xl font-black text-emerald-800">
+                <div class="text-right bg-white text-slate-900 px-5 py-3 rounded-2xl border border-emerald-300 shadow-md w-full sm:w-auto">
+                  <span class="text-[10px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
+                  <p class="text-xl sm:text-2xl font-black text-emerald-700">
                     R$ ${courtFinalPrice.toFixed(2).replace('.', ',')}
                   </p>
                 </div>
@@ -1720,22 +1755,54 @@ function renderStep3Content() {
   }
 }
 
+function selectBookingDuration(mins) {
+  state.selectedDuration = mins;
+  if (state.startTime) {
+    const sMin = timeToMinutes(state.startTime);
+    const targetEndMin = sMin + mins;
+
+    let canFit = true;
+    const newSlots = [];
+    for (let m = sMin; m < targetEndMin; m += 30) {
+      const tStr = minutesToTime(m);
+      const sObj = (state.slots || []).find(s => s.time === tStr);
+      if (!sObj || sObj.status !== 'available') {
+        canFit = false;
+        break;
+      }
+      newSlots.push(tStr);
+    }
+
+    if (canFit) {
+      state.endTime = minutesToTime(targetEndMin);
+      state.selectedSlots = newSlots;
+    } else {
+      alert(`Atenção: Não há ${mins === 60 ? '1 hora' : (mins === 90 ? '1h30' : '2 horas')} contínua livre a partir das ${state.startTime}.\nPor favor, escolha outro horário livre ou diminua a duração.`);
+      // Tenta 1 hora ou mantém o que couber
+      if (mins > 60) {
+        selectBookingDuration(60);
+        return;
+      }
+    }
+  }
+  calculateDuration();
+  renderStep3Content();
+  renderBottomBar();
+  if (window.lucide) lucide.createIcons();
+}
+
 function syncSelectedSlotsState() {
-  if (!Array.isArray(state.selectedSlots) || state.selectedSlots.length === 0) {
-    state.startTime = null;
-    state.endTime = null;
-    state.selectedDuration = 0;
+  if (!state.startTime || !state.endTime) {
+    state.selectedSlots = [];
     return;
   }
-  const sorted = [...state.selectedSlots].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
-  state.selectedSlots = sorted;
-  state.startTime = sorted[0];
-  if (sorted.length === 1) {
-    state.endTime = minutesToTime(timeToMinutes(sorted[0]) + 30);
-  } else {
-    // Quando selecionado ex: 17:00, 17:30 e 18:00, o término é 18:00 (duração exata de 1 hora)
-    state.endTime = sorted[sorted.length - 1];
+  const sMin = timeToMinutes(state.startTime);
+  const eMin = timeToMinutes(state.endTime);
+  const slots = [];
+  for (let m = sMin; m < eMin; m += 30) {
+    slots.push(minutesToTime(m));
   }
+  state.selectedSlots = slots;
   calculateDuration();
 }
 
@@ -1743,126 +1810,69 @@ function handleSlotClick(time) {
   const slot = (state.slots || []).find(s => s.time === time);
   if (!slot || slot.status !== 'available') return;
 
-  if (!Array.isArray(state.selectedSlots)) {
+  const clickedMin = timeToMinutes(time);
+  const dur = (state.selectedDuration && state.selectedDuration >= 30) ? state.selectedDuration : 60;
+  state.selectedDuration = dur;
+
+  // Se clicou no próprio horário de início já selecionado, limpa a seleção
+  if (state.startTime === time) {
+    state.startTime = null;
+    state.endTime = null;
     state.selectedSlots = [];
+    calculateDuration();
+    renderStep3Content();
+    renderBottomBar();
+    if (window.lucide) lucide.createIcons();
+    return;
   }
 
-  const clickedMin = timeToMinutes(time);
+  // Tenta alocar a duração selecionada (ex: 60 min) a partir do horário clicado
+  const targetEndMin = clickedMin + dur;
+  let canFit = true;
+  const newSlots = [];
+  for (let m = clickedMin; m < targetEndMin; m += 30) {
+    const tStr = minutesToTime(m);
+    const sObj = (state.slots || []).find(s => s.time === tStr);
+    if (!sObj || sObj.status !== 'available') {
+      canFit = false;
+      break;
+    }
+    newSlots.push(tStr);
+  }
 
-  // Helper para verificar se todos os slots de um intervalo contínuo estão disponíveis
-  function getAvailableRange(fromMin, toMin) {
-    const range = [];
-    for (let m = fromMin; m <= toMin; m += 30) {
+  if (canFit) {
+    state.startTime = time;
+    state.endTime = minutesToTime(targetEndMin);
+    state.selectedSlots = newSlots;
+  } else {
+    // Se a duração completa (ex: 1h30 ou 2h) não cabe, tenta pelo menos 1 hora (60 min)
+    let fitOneHour = true;
+    const oneHourSlots = [];
+    for (let m = clickedMin; m < clickedMin + 60; m += 30) {
       const tStr = minutesToTime(m);
       const sObj = (state.slots || []).find(s => s.time === tStr);
-      if (!sObj || sObj.status !== 'available') return null;
-      range.push(tStr);
-    }
-    return range;
-  }
-
-  // 1. Se nada está selecionado: seleciona 1 hora padrão (ex: 17:00 às 18:00 -> slots 17:00, 17:30, 18:00)
-  if (state.selectedSlots.length === 0) {
-    const oneHourRange = getAvailableRange(clickedMin, clickedMin + 60);
-    if (oneHourRange && oneHourRange.length === 3) {
-      state.selectedSlots = oneHourRange;
-    } else {
-      const thirtyMinRange = getAvailableRange(clickedMin, clickedMin + 30);
-      if (thirtyMinRange && thirtyMinRange.length === 2) {
-        state.selectedSlots = thirtyMinRange;
-      } else {
-        state.selectedSlots = [time];
+      if (!sObj || sObj.status !== 'available') {
+        fitOneHour = false;
+        break;
       }
+      oneHourSlots.push(tStr);
     }
-    syncSelectedSlotsState();
-    renderStep3Content();
-    renderBottomBar();
-    if (window.lucide) lucide.createIcons();
-    return;
-  }
 
-  const sorted = [...state.selectedSlots].sort((a, b) => timeToMinutes(a) - timeToMinutes(b));
-  const startMin = timeToMinutes(sorted[0]);
-  const endMin = timeToMinutes(sorted[sorted.length - 1]);
-
-  // 2. Clicou no próprio horário de início: limpa seleção
-  if (clickedMin === startMin) {
-    state.selectedSlots = [];
-    syncSelectedSlotsState();
-    renderStep3Content();
-    renderBottomBar();
-    if (window.lucide) lucide.createIcons();
-    return;
-  }
-
-  // 3. Clicou no horário de término atual:
-  // Se tem mais de 2 slots (ex: 17:00, 17:30, 18:00), recua para o anterior (17:00 às 17:30)
-  if (clickedMin === endMin) {
-    if (sorted.length > 2) {
-      state.selectedSlots = sorted.slice(0, -1);
+    if (fitOneHour) {
+      state.startTime = time;
+      state.endTime = minutesToTime(clickedMin + 60);
+      state.selectedSlots = oneHourSlots;
+      state.selectedDuration = 60;
     } else {
-      state.selectedSlots = [sorted[0]];
-    }
-    syncSelectedSlotsState();
-    renderStep3Content();
-    renderBottomBar();
-    if (window.lucide) lucide.createIcons();
-    return;
-  }
-
-  // 4. Clicou em um horário intermediário já selecionado (ex: clicou em 17:30 tendo 17:00 às 19:00):
-  // Ajusta o término para esse horário clicado
-  if (clickedMin > startMin && clickedMin < endMin) {
-    state.selectedSlots = sorted.filter(t => timeToMinutes(t) <= clickedMin);
-    syncSelectedSlotsState();
-    renderStep3Content();
-    renderBottomBar();
-    if (window.lucide) lucide.createIcons();
-    return;
-  }
-
-  // 5. Clicou em um horário posterior ao término (ex: tinha 17:00 às 18:00 e clicou 18:30 ou 19:00):
-  // Expande o intervalo do Início até o novo Término
-  if (clickedMin > endMin) {
-    const extendedRange = getAvailableRange(startMin, clickedMin);
-    if (extendedRange) {
-      state.selectedSlots = extendedRange;
-      syncSelectedSlotsState();
-      renderStep3Content();
-      renderBottomBar();
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-  }
-
-  // 6. Clicou em um horário anterior ao início (ex: tinha 17:00 às 18:00 e clicou 16:00 ou 16:30):
-  // Expande o Início para trás até o Término atual
-  if (clickedMin < startMin) {
-    const earlierRange = getAvailableRange(clickedMin, endMin);
-    if (earlierRange) {
-      state.selectedSlots = earlierRange;
-      syncSelectedSlotsState();
-      renderStep3Content();
-      renderBottomBar();
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-  }
-
-  // 7. Não foi possível estender continuamente (ex: horário ocupado no meio):
-  // Inicia nova seleção a partir deste novo horário clicado
-  const oneHourRange = getAvailableRange(clickedMin, clickedMin + 60);
-  if (oneHourRange && oneHourRange.length === 3) {
-    state.selectedSlots = oneHourRange;
-  } else {
-    const thirtyMinRange = getAvailableRange(clickedMin, clickedMin + 30);
-    if (thirtyMinRange && thirtyMinRange.length === 2) {
-      state.selectedSlots = thirtyMinRange;
-    } else {
+      // Apenas 30 minutos disponíveis neste bloco
+      state.startTime = time;
+      state.endTime = minutesToTime(clickedMin + 30);
       state.selectedSlots = [time];
+      state.selectedDuration = 30;
     }
   }
-  syncSelectedSlotsState();
+
+  calculateDuration();
   renderStep3Content();
   renderBottomBar();
   if (window.lucide) lucide.createIcons();
@@ -2500,14 +2510,22 @@ function startMatchNow(matchId) {
   state.matchDelays[matchId].earlyStartTs = now.toISOString();
   localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
 
-  // Atualiza status no Supabase
+  // Atualiza status no Supabase sem sobrescrever o horário agendado original
   const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
   if (client) {
-    client.from('bookings').update({ status: 'in_progress', start_time: nowStr }).eq('id', matchId).then(() => {});
+    client.from('bookings').update({ status: 'in_progress' }).eq('id', matchId).then(() => {});
   }
   // Atualiza estado local
   const booking = state.bookings.find(b => b.id === matchId);
-  if (booking) { booking.status = 'in_progress'; booking.start_time = nowStr; }
+  if (booking) { booking.status = 'in_progress'; }
+
+  // Atualiza localBookings
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const lIdx = localBookings.findIndex(b => b.id === matchId);
+  if (lIdx !== -1) {
+    localBookings[lIdx].status = 'in_progress';
+    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+  }
 
   renderStepContent();
   if (window.lucide) lucide.createIcons();
