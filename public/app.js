@@ -127,6 +127,10 @@ function normalizeCourt(c) {
   if (typeof specsObj === 'string') {
     try { specsObj = JSON.parse(specsObj); } catch(e) { specsObj = {}; }
   }
+  const isMaint = c.isMaintenance === true || c.status === 'maintenance' || specsObj.status === 'maintenance';
+  const maintReason = specsObj.maintenance_reason || c.maintenanceReason || c.maintenance_reason || '';
+  const maintNotice = specsObj.maintenance_notice || c.maintenanceNotice || c.maintenance_notice || '';
+
   return {
     ...c,
     id: c.id,
@@ -143,6 +147,12 @@ function normalizeCourt(c) {
     orderIndex: order,
     order_index: order,
     specs: specsObj,
+    isMaintenance: isMaint,
+    status: isMaint ? 'maintenance' : (specsObj.status || c.status || 'active'),
+    maintenanceReason: maintReason,
+    maintenance_reason: maintReason,
+    maintenanceNotice: maintNotice,
+    maintenance_notice: maintNotice,
     discountPricePerHour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
     discount_price_per_hour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
     discountStartTime: specsObj.discount_start_time || c.discountStartTime || '09:00',
@@ -238,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=4.7.8').catch(err => {
+    navigator.serviceWorker.register('/sw.js?v=4.7.9').catch(err => {
       console.warn('Aviso Service Worker:', err);
     });
   }
@@ -982,11 +992,15 @@ function renderStep1(container) {
                     <span class="bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg border border-rose-400/50 shadow-md flex items-center animate-pulse">
                       <i data-lucide="wrench" class="w-3 h-3 mr-1"></i> EM MANUTENÇÃO
                     </span>
+                  ` : (specs && specs.maintenance_notice ? `
+                    <span class="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-300 shadow-md flex items-center animate-pulse">
+                      <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> AVISO PRÉVIO DE MANUTENÇÃO
+                    </span>
                   ` : (court.badge ? `
                     <span class="bg-emerald-800/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/30 shadow-md flex items-center">
                       ${court.badge}
                     </span>
-                  ` : '')}
+                  ` : ''))}
                 </div>
 
                 <div class="absolute bottom-2.5 left-3 text-white">
@@ -1044,6 +1058,17 @@ function renderStep1(container) {
                       <span>Horários: ${specs.opening_time || court.openingTime || '06:00'} às ${specs.closing_time || court.closingTime || '23:00'}</span>
                     </p>
                   </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  ${(specs && specs.maintenance_notice) ? `
+                    <div class="mt-2.5 p-2.5 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs flex items-start space-x-2">
+                      <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                      <div>
+                        <strong class="font-black text-amber-950 uppercase text-[10px] tracking-wide block">Aviso Prévio de Manutenção</strong>
+                        <span class="text-[11px] font-semibold leading-tight text-amber-900">${specs.maintenance_notice}</span>
+                      </div>
+                    </div>
+                  ` : ''}
                 </div>
 
                 <div>
@@ -1061,7 +1086,12 @@ function renderStep1(container) {
                           <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
                           <span>Em Manutenção</span>
                         </span>
-                      ` : ''}
+                      ` : (specs && specs.maintenance_notice ? `
+                        <span class="px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-300 flex items-center space-x-1">
+                          <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+                          <span>Aviso Prévio</span>
+                        </span>
+                      ` : '')}
                     </div>
                   </div>
 
@@ -3511,6 +3541,8 @@ function renderCourtsControlTab() {
           const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
           const isUnderMaint = court.isMaintenance === true || court.status === 'maintenance' || specs.status === 'maintenance';
           const maintReason = specs.maintenance_reason || court.maintenance_reason || 'Manutenção preventiva';
+          const hasNotice = !isUnderMaint && !!(specs.maintenance_notice || court.maintenance_notice);
+          const noticeText = specs.maintenance_notice || court.maintenance_notice || '';
 
           // Checa se há treinos reservados hoje nesta quadra
           const todayStr = state.adminFilterDate || state.selectedDate || getFormattedDate(new Date());
@@ -3538,7 +3570,7 @@ function renderCourtsControlTab() {
             .sort((a, b) => a.sMin - b.sMin)[0];
 
           return `
-            <div class="bg-white rounded-3xl overflow-hidden border ${isUnderMaint ? 'border-rose-300 ring-2 ring-rose-500/20 shadow-md' : 'border-slate-200 shadow-sm'} flex flex-col justify-between">
+            <div class="bg-white rounded-3xl overflow-hidden border ${isUnderMaint ? 'border-rose-300 ring-2 ring-rose-500/20 shadow-md' : (hasNotice ? 'border-amber-300 ring-2 ring-amber-500/20 shadow-md' : 'border-slate-200 shadow-sm')} flex flex-col justify-between">
               
               <div>
                 <div class="relative h-44 w-full overflow-hidden bg-slate-900">
@@ -3553,6 +3585,10 @@ function renderCourtsControlTab() {
                     ${isUnderMaint ? `
                       <span class="bg-rose-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg border border-rose-400 shadow-md flex items-center animate-pulse">
                         <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> EM MANUTENÇÃO GERAL
+                      </span>
+                    ` : (hasNotice ? `
+                      <span class="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center animate-pulse">
+                        <i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i> AVISO PRÉVIO DE MANUTENÇÃO
                       </span>
                     ` : (courtMaintToday.length > 0 ? `
                       <span class="bg-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center">
@@ -3570,7 +3606,7 @@ function renderCourtsControlTab() {
                       <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-md flex items-center">
                         ✓ DISPONÍVEL
                       </span>
-                    `)))}
+                    `))))}
                   </div>
 
                   <!-- Ações Rápidas no Canto Superior Direito da Imagem -->
@@ -3601,6 +3637,15 @@ function renderCourtsControlTab() {
                       </div>
                       <p class="font-medium text-[11px] text-rose-700">Motivo: <strong>${maintReason}</strong></p>
                     </div>
+                  ` : (hasNotice ? `
+                    <div class="p-3 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs space-y-1">
+                      <div class="font-black flex items-center justify-between text-amber-900">
+                        <span class="flex items-center"><i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600 mr-1.5"></i> Aviso Prévio de Manutenção Ativo</span>
+                        <span class="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-full">ALERTA</span>
+                      </div>
+                      <p class="text-[11px] text-amber-800 font-semibold">${noticeText}</p>
+                      <p class="text-[10px] text-slate-500 pt-0.5">Visível para os clientes ao selecionar a quadra.</p>
+                    </div>
                   ` : (courtMaintToday.length > 0 ? `
                     <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-1">
                       <div class="font-black flex items-center text-amber-900">
@@ -3628,7 +3673,7 @@ function renderCourtsControlTab() {
                       </div>
                       <p class="font-medium text-[11px] text-emerald-700">Clientes podem agendar normalmente no site.</p>
                     </div>
-                  `))}
+                  `)))}
 
                   <div class="text-xs text-slate-600 space-y-1.5 pt-1">
                     <p class="flex items-center"><i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Piso: ${specs.surface || specs.type || 'Oficial de Alto Desempenho'}</span></p>
@@ -3648,7 +3693,7 @@ function renderCourtsControlTab() {
               <!-- Botões de Ação por Campo -->
               <div class="p-5 pt-0 space-y-2">
                 <button onclick="openMaintenanceModal('${court.id}')" 
-                        class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all">
+                        class="w-full py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
                   <i data-lucide="clock" class="w-3.5 h-3.5 text-rose-600"></i>
                   <span>Agendar Treino / Manutenção (com Horário)</span>
                 </button>
@@ -3656,21 +3701,26 @@ function renderCourtsControlTab() {
                 <div class="flex items-center space-x-2">
                   ${isUnderMaint ? `
                     <button onclick="setCourtMaintenance('${court.id}', false)" 
-                            class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center justify-center space-x-1 transition-all">
-                      <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
-                      <span>Liberar Dia</span>
+                            class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-md shadow-emerald-600/30">
+                      <i data-lucide="check-circle" class="w-4 h-4"></i>
+                      <span>✓ Liberar Espaço</span>
                     </button>
                   ` : `
-                    <button onclick="setCourtMaintenance('${court.id}', true, 'Interdição geral da quadra')" 
-                            class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl flex items-center justify-center space-x-1 transition-all">
+                    <button onclick="openMaintenanceNoticeModal('${court.id}')" 
+                            class="flex-1 py-2 ${hasNotice ? 'bg-amber-100 border-2 border-amber-400 text-amber-950 font-black' : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold'} text-xs rounded-xl flex items-center justify-center space-x-1 transition-all cursor-pointer">
                       <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
-                      <span>Fechar Dia</span>
+                      <span>${hasNotice ? 'Editar Aviso' : 'Aviso Prévio'}</span>
+                    </button>
+                    <button onclick="setCourtMaintenance('${court.id}', true, 'Interdição geral da quadra')" 
+                            class="flex-1 py-2 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-bold text-xs rounded-xl flex items-center justify-center space-x-1 transition-all cursor-pointer">
+                      <i data-lucide="wrench" class="w-3.5 h-3.5 text-slate-500 hover:text-rose-600"></i>
+                      <span>Interditar</span>
                     </button>
                   `}
                   
-                  <button onclick="setAdminTab('schedule')" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center space-x-1 transition-all">
+                  <button onclick="setAdminTab('schedule')" class="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl flex items-center justify-center space-x-1 transition-all cursor-pointer">
                     <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
-                    <span>Ver Grade</span>
+                    <span>Grade</span>
                   </button>
                 </div>
               </div>
@@ -4589,21 +4639,231 @@ async function setCourtMaintenance(courtId, inMaintenance, reason = '') {
   }
 
   court.isMaintenance = inMaintenance;
-  court.specs.status = inMaintenance ? 'maintenance' : 'active';
+  court.status = inMaintenance ? 'maintenance' : 'active';
+  court.specs.status = inMaintenance ? 'maintenance' : 'Disponível';
   court.specs.maintenance_reason = inMaintenance ? reason : '';
+  if (!inMaintenance) {
+    court.specs.maintenance_notice = '';
+    court.maintenance_notice = '';
+  }
+
+  // Atualiza no estado e no localStorage
+  const courtIdx = state.courts.findIndex(c => c.id === courtId);
+  if (courtIdx !== -1) {
+    state.courts[courtIdx] = normalizeCourt({ ...court });
+  }
+  localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+
+  // Re-renderiza imediatamente a interface
+  _refreshAllUI();
+
+  // Salva no Supabase
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('courts').update({ specs: court.specs, status: court.status }).eq('id', courtId);
+    } catch(err) {
+      console.warn('Erro ao atualizar manutenção no Supabase:', err);
+    }
+  }
+
+  // Transmite via Broadcast para TODOS os outros aparelhos atualizarem instantaneamente
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
+    window.ArenaSupabase.broadcastCourtUpdate(court);
+  }
+
+  showToastNotification(inMaintenance ? `
+    <h5 class="font-black text-white text-xs mb-0.5">⚠️ Quadra Interditada</h5>
+    <p class="text-rose-300 font-bold">${court.name} foi colocada em manutenção geral.</p>
+  ` : `
+    <h5 class="font-black text-white text-xs mb-0.5">✓ Quadra Liberada com Sucesso!</h5>
+    <p class="text-emerald-300 font-bold">${court.name} está 100% livre e disponível para jogos.</p>
+  `, 3500);
+}
+
+// ⚠️ MODAL DE AVISO PRÉVIO DE MANUTENÇÃO (POSSIBILIDADE DE MANUTENÇÃO)
+function openMaintenanceNoticeModal(courtId) {
+  const court = state.courts.find(c => c.id === courtId);
+  if (!court) return;
+
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
+  const currentNotice = specs.maintenance_notice || court.maintenance_notice || '';
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        
+        <div class="bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/30 border border-amber-400/30 flex items-center justify-center text-amber-300">
+              <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-tight">Aviso Prévio de Manutenção</h3>
+              <p class="text-xs text-amber-300 font-medium">${court.name}</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-amber-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleSaveMaintenanceNotice(event, '${court.id}')" class="p-6 space-y-4 overflow-y-auto">
+          
+          <div class="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900">
+            <p class="font-bold flex items-center mb-1">
+              <i data-lucide="info" class="w-4 h-4 mr-1.5 text-amber-700"></i>
+              Como funciona o Aviso Prévio:
+            </p>
+            <p class="text-[11px] text-amber-800">
+              O aviso prévio sinaliza para clientes e recepcionistas que há <strong>possibilidade de manutenção ou reparo técnico</strong> nesta quadra, sem bloquear o agendamento caso você queira deixá-lo visível.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5">Escolha um motivo rápido:</label>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setMaintenanceNoticePreset('Possibilidade de reparo técnico / manutenção preventiva neste espaço.')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                🛠️ Reparo Técnico Preventivo
+              </button>
+              <button type="button" onclick="setMaintenanceNoticePreset('Possibilidade de manutenção na iluminação e refletores.')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                💡 Refletores / Iluminação
+              </button>
+              <button type="button" onclick="setMaintenanceNoticePreset('Manutenção e nivelamento programado da grama sintética.')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                🌱 Grama / Piso
+              </button>
+              <button type="button" onclick="setMaintenanceNoticePreset('Possibilidade de manutenção periódica nesta quadra.')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 transition-all cursor-pointer">
+                ⚠️ Manutenção Periódica
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Texto do Aviso Prévio (Visível para todos):</label>
+            <textarea id="maintenanceNoticeText" rows="3" required placeholder="Ex: Possibilidade de manutenção preventiva nos próximos dias/horários..." class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">${currentNotice}</textarea>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+            ${currentNotice ? `
+              <button type="button" onclick="handleRemoveMaintenanceNotice('${court.id}')" class="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center justify-center space-x-1 transition-all cursor-pointer">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                <span>Remover Aviso</span>
+              </button>
+            ` : '<div></div>'}
+
+            <div class="flex items-center space-x-2 w-full sm:w-auto justify-end">
+              <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-100 transition-all cursor-pointer">
+                Cancelar
+              </button>
+              <button type="submit" class="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Ativar Aviso Prévio</span>
+              </button>
+            </div>
+          </div>
+
+        </form>
+
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+
+function setMaintenanceNoticePreset(text) {
+  const txt = document.getElementById('maintenanceNoticeText');
+  if (txt) txt.value = text;
+}
+
+async function handleSaveMaintenanceNotice(e, courtId) {
+  e.preventDefault();
+  const text = document.getElementById('maintenanceNoticeText').value.trim();
+  closeModal();
+
+  const court = state.courts.find(c => c.id === courtId);
+  if (!court) return;
+
+  if (typeof court.specs === 'string') {
+    try { court.specs = JSON.parse(court.specs || '{}'); } catch(e) { court.specs = {}; }
+  } else if (!court.specs) {
+    court.specs = {};
+  }
+
+  court.specs.maintenance_notice = text;
+  court.maintenance_notice = text;
+
+  // Atualiza no estado local e localStorage
+  const idx = state.courts.findIndex(c => c.id === courtId);
+  if (idx !== -1) {
+    state.courts[idx] = normalizeCourt({ ...court });
+  }
+  localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+
+  _refreshAllUI();
+
+  // Salva no Supabase
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('courts').update({ specs: court.specs }).eq('id', courtId);
+    } catch(err) {
+      console.warn('Erro ao atualizar aviso prévio no Supabase:', err);
+    }
+  }
+
+  // Transmite via Broadcast instantâneo
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
+    window.ArenaSupabase.broadcastCourtUpdate(court);
+  }
+
+  showToastNotification(`
+    <h5 class="font-black text-white text-xs mb-0.5">⚠️ Aviso Prévio Ativado</h5>
+    <p class="text-amber-300 font-bold">${court.name}: ${text}</p>
+  `, 4000);
+}
+
+async function handleRemoveMaintenanceNotice(courtId) {
+  closeModal();
+  const court = state.courts.find(c => c.id === courtId);
+  if (!court) return;
+
+  if (typeof court.specs === 'string') {
+    try { court.specs = JSON.parse(court.specs || '{}'); } catch(e) { court.specs = {}; }
+  } else if (!court.specs) {
+    court.specs = {};
+  }
+
+  court.specs.maintenance_notice = '';
+  court.maintenance_notice = '';
+
+  const idx = state.courts.findIndex(c => c.id === courtId);
+  if (idx !== -1) {
+    state.courts[idx] = normalizeCourt({ ...court });
+  }
+  localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+
+  _refreshAllUI();
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
       await client.from('courts').update({ specs: court.specs }).eq('id', courtId);
     } catch(err) {
-      console.warn('Erro ao atualizar manutenção no Supabase:', err);
+      console.warn('Erro ao remover aviso prévio no Supabase:', err);
     }
   }
 
-  requestSchedule();
-  renderStepContent();
-  lucide.createIcons();
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
+    window.ArenaSupabase.broadcastCourtUpdate(court);
+  }
+
+  showToastNotification(`
+    <h5 class="font-black text-white text-xs mb-0.5">✓ Aviso Removido</h5>
+    <p class="text-emerald-300 font-bold">${court.name} está operando normalmente sem avisos.</p>
+  `, 3500);
 }
 
 // Modal unificado para cadastrar Manutenção ou Treino Reservado com horário de início e término
@@ -8661,6 +8921,22 @@ async function syncDataFromSupabase() {
             triggerBookingNotification(b);
           }
         });
+
+        // Ouvinte de atualização de quadras (liberação, manutenção, aviso prévio)
+        bChan.on('broadcast', { event: 'court_updated' }, (evt) => {
+          const updatedCourt = evt.payload;
+          if (updatedCourt && updatedCourt.id) {
+            const norm = normalizeCourt(updatedCourt);
+            const idx = state.courts.findIndex(c => c.id === norm.id);
+            if (idx !== -1) {
+              state.courts[idx] = norm;
+            } else {
+              state.courts.push(norm);
+            }
+            localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+            _refreshAllUI();
+          }
+        });
       }
     }
 
@@ -8781,6 +9057,35 @@ async function checkAndSyncBookingsBackground() {
         brandNew.forEach(b => {
           triggerBookingNotification(b);
         });
+      }
+    }
+
+    // Sincroniza quadras em segundo plano (detecta liberação, manutenção ou aviso prévio)
+    const { data: dbCourts } = await client.from('courts').select('*').order('order_index', { ascending: true });
+    if (dbCourts && Array.isArray(dbCourts) && dbCourts.length > 0) {
+      const normCourts = dbCourts.map(normalizeCourt);
+      let courtsChanged = false;
+      if (normCourts.length !== state.courts.length) {
+        courtsChanged = true;
+      } else {
+        for (let i = 0; i < normCourts.length; i++) {
+          const nc = normCourts[i];
+          const sc = state.courts.find(c => c.id === nc.id);
+          if (!sc) { courtsChanged = true; break; }
+          const scNotice = (sc.specs && sc.specs.maintenance_notice) || sc.maintenance_notice || '';
+          const ncNotice = (nc.specs && nc.specs.maintenance_notice) || nc.maintenance_notice || '';
+          const scStatus = (sc.specs && sc.specs.status) || sc.status || '';
+          const ncStatus = (nc.specs && nc.specs.status) || nc.status || '';
+          if (scStatus !== ncStatus || scNotice !== ncNotice || sc.isMaintenance !== nc.isMaintenance) {
+            courtsChanged = true;
+            break;
+          }
+        }
+      }
+      if (courtsChanged) {
+        state.courts = normCourts;
+        localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+        _refreshAllUI();
       }
     }
   } catch(err) {

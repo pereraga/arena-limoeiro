@@ -156,6 +156,21 @@
       } catch (err) {
         console.warn('Erro ao transmitir broadcast de agendamento:', err);
       }
+    },
+
+    broadcastCourtUpdate(court) {
+      try {
+        const chan = this.getBroadcastChannel();
+        if (chan) {
+          chan.send({
+            type: 'broadcast',
+            event: 'court_updated',
+            payload: court
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao transmitir broadcast de quadra:', err);
+      }
     }
   };
 
