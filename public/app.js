@@ -324,7 +324,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=4.8.1').catch(err => {
+    navigator.serviceWorker.register('/sw.js?v=4.8.2').catch(err => {
       console.warn('Aviso Service Worker:', err);
     });
   }
@@ -4785,7 +4785,7 @@ async function setCourtMaintenance(courtId, inMaintenance, reason = '') {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      await client.from('courts').update({ specs: court.specs, status: court.status }).eq('id', courtId);
+      await client.from('courts').update({ specs: court.specs }).eq('id', courtId);
     } catch(err) {
       console.warn('Erro ao atualizar manutenção no Supabase:', err);
     }
