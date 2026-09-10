@@ -128,6 +128,34 @@
         console.error('Erro no cadastro do cliente:', err);
         return { id: 'cust-' + Date.now(), name, phone, email, ...extraData };
       }
+    },
+
+    // Canal de Transmissão Ultrarrápida em Tempo Real (Broadcast WebSocket)
+    getBroadcastChannel() {
+      const client = this.getClient();
+      if (!client) return null;
+      if (!this._broadcastChannel) {
+        this._broadcastChannel = client.channel('arena_realtime_broadcast', {
+          config: { broadcast: { self: false } }
+        });
+        this._broadcastChannel.subscribe();
+      }
+      return this._broadcastChannel;
+    },
+
+    broadcastBooking(booking) {
+      try {
+        const chan = this.getBroadcastChannel();
+        if (chan) {
+          chan.send({
+            type: 'broadcast',
+            event: 'new_booking',
+            payload: booking
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao transmitir broadcast de agendamento:', err);
+      }
     }
   };
 

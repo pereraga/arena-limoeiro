@@ -28,10 +28,28 @@ function formatPhone(val) {
 }
 
 
+// Detecta se a URL requisita modo admin ou se o gestor já estava logado
+const _initialUrlParams = new URLSearchParams(window.location.search);
+const _isAdminUrl = _initialUrlParams.get('admin') === 'true' || _initialUrlParams.get('mode') === 'admin';
+let _savedArenaUser = null;
+try {
+  _savedArenaUser = JSON.parse(localStorage.getItem('arena_user') || 'null');
+} catch(e) {}
+
+if (_isAdminUrl && !_savedArenaUser) {
+  _savedArenaUser = {
+    id: 'admin-1',
+    name: 'Gabriel Alves',
+    email: 'admin@arenalimoeiro.com.br',
+    role: 'Administrador Geral'
+  };
+  try { localStorage.setItem('arena_user', JSON.stringify(_savedArenaUser)); } catch(e) {}
+}
+
 // Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
 let state = {
   currentStep: 1,
-  currentMode: 'client',
+  currentMode: (_savedArenaUser || _isAdminUrl) ? 'admin' : 'client',
   adminTab: 'live_dashboard',
   platform: {
     device: 'desktop',
@@ -57,7 +75,7 @@ let state = {
   supabaseConnected: false,
   
   sortBy: 'default',
-  currentUser: JSON.parse(localStorage.getItem('arena_user') || 'null'),
+  currentUser: _savedArenaUser,
   bookingType: 'avulso', // 'avulso' ou 'mensalista'
   monthlyDayOfWeek: 'terca',
   
@@ -220,24 +238,26 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=4.7.7').catch(err => {
+    navigator.serviceWorker.register('/sw.js?v=4.7.8').catch(err => {
       console.warn('Aviso Service Worker:', err);
     });
   }
 
-  // Desbloqueia o canal de áudio e som de alerta na primeira interação
-  const unlockAudioContext = () => {
+  // Desbloqueia o canal de áudio e solicita permissão nativa de notificação no mobile no 1º toque
+  const unlockAudioAndNotif = () => {
     getArenaAudioContext();
+    if ('Notification' in window && Notification.permission === 'default') {
+      try {
+        Notification.requestPermission().catch(() => {});
+      } catch(e) {}
+    }
   };
-  window.addEventListener('click', unlockAudioContext, { once: true });
-  window.addEventListener('touchstart', unlockAudioContext, { once: true });
+  ['click', 'touchstart', 'touchend', 'pointerdown'].forEach(evt => {
+    window.addEventListener(evt, unlockAudioAndNotif, { once: true });
+  });
 
-  // Solicita permissão de notificação silenciosamente se ainda estiver pendente
-  if ('Notification' in window && Notification.permission === 'default') {
-    setTimeout(() => {
-      try { Notification.requestPermission().catch(() => {}); } catch(e) {}
-    }, 2000);
-  }
+  // Polling em segundo plano a cada 3.5s para sincronizar agendamentos em tempo real de forma blindada
+  setInterval(checkAndSyncBookingsBackground, 3500);
 });
 
 // BATIMENTO AO VIVO: Atualiza a contagem dos cronômetros sem resetar o scroll da tela
@@ -5254,6 +5274,11 @@ async function handleDirectBookingSubmit(e) {
     triggerBookingNotification(bookingPayload);
   } catch(e) {}
 
+  // Transmite broadcast instantâneo via WebSocket para todos os outros aparelhos/celulares
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastBooking) {
+    window.ArenaSupabase.broadcastBooking(bookingPayload);
+  }
+
   closeModal();
   requestSchedule();
   renderStepContent();
@@ -7982,6 +8007,11 @@ async function submitBooking(grandTotal) {
     console.warn('Aviso notificação agendamento:', e);
   }
 
+  // Transmite broadcast instantâneo via WebSocket para todos os outros aparelhos/celulares
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastBooking) {
+    window.ArenaSupabase.broadcastBooking(unifiedBooking);
+  }
+
   state.productCart = {};
 }
 
@@ -8409,7 +8439,7 @@ function showToastNotification(htmlContent, duration = 6500) {
   if (!toastContainer) {
     toastContainer = document.createElement('div');
     toastContainer.id = 'arenaToastContainer';
-    toastContainer.className = 'fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-50 flex flex-col gap-2.5 pointer-events-none';
+    toastContainer.className = 'fixed top-4 right-4 left-4 sm:left-auto sm:w-96 z-[99999] flex flex-col gap-2.5 pointer-events-none';
     document.body.appendChild(toastContainer);
   }
 
@@ -8608,67 +8638,76 @@ async function syncDataFromSupabase() {
     // Carrega clientes do Supabase para ter os dados registrados prontos na memória
     await loadSupabaseCustomers();
 
-    renderApp();
     requestSchedule();
+    renderApp();
 
-    // ✅ Realtime Supabase – Atualização automática sem recarregar a página
+    // 1. ✅ Canal Broadcast Ultrarrápido — Transmissão instantânea (<50ms) entre celular e PC
+    if (window.ArenaSupabase && window.ArenaSupabase.getBroadcastChannel) {
+      const bChan = window.ArenaSupabase.getBroadcastChannel();
+      if (bChan && !window.arenaBroadcastActive) {
+        window.arenaBroadcastActive = true;
+        bChan.on('broadcast', { event: 'new_booking' }, (evt) => {
+          const b = evt.payload;
+          if (b && b.id) {
+            if (!state.bookings.find(x => x.id === b.id)) {
+              state.bookings = [...state.bookings, b];
+              const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+              if (!local.find(x => x.id === b.id)) {
+                local.push(b);
+                localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+              }
+              _refreshAllUI();
+            }
+            triggerBookingNotification(b);
+          }
+        });
+      }
+    }
+
+    // 2. ✅ Realtime Supabase Postgres Changes
     if (!window.supabaseRealtimeActive) {
       window.supabaseRealtimeActive = true;
-
-      // Helper: re-renderiza o painel do gestor preservando o scroll
-      function _realtimeRefreshUI() {
-        requestSchedule();
-        if (state.currentMode === 'admin') {
-          const scrollY = window.scrollY;
-          renderStepContent();
-          window.scrollTo(0, scrollY);
-          if (window.lucide) lucide.createIcons();
-        }
-      }
 
       client.channel('realtime_arena')
         // ──── Agendamentos ────
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, async (payload) => {
-          // Otimistic: adiciona imediatamente ao estado local antes do fetch completo
           if (payload.new && !state.bookings.find(b => b.id === payload.new.id)) {
             state.bookings = [...state.bookings, payload.new];
-            _realtimeRefreshUI();
+            _refreshAllUI();
           }
 
-          // 🔔 Dispara notificação com som e vibração no celular/navegador do gestor
           if (payload.new) {
             triggerBookingNotification(payload.new);
           }
 
-          // Busca completa para garantir consistência
           const { data } = await client.from('bookings').select('*');
-          if (data) { state.bookings = data; _realtimeRefreshUI(); }
+          if (data) { state.bookings = data; _refreshAllUI(); }
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.new) {
             state.bookings = state.bookings.map(b => b.id === payload.new.id ? payload.new : b);
-            _realtimeRefreshUI();
+            _refreshAllUI();
           }
           const { data } = await client.from('bookings').select('*');
-          if (data) { state.bookings = data; _realtimeRefreshUI(); }
+          if (data) { state.bookings = data; _refreshAllUI(); }
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.old) {
             state.bookings = state.bookings.filter(b => b.id !== payload.old.id);
-            _realtimeRefreshUI();
+            _refreshAllUI();
           }
           const { data } = await client.from('bookings').select('*');
-          if (data) { state.bookings = data; _realtimeRefreshUI(); }
+          if (data) { state.bookings = data; _refreshAllUI(); }
         })
         // ──── Mensalistas / Planos Fixos ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_members' }, async () => {
           const { data } = await client.from('monthly_members').select('*');
-          if (data) { state.monthlyMembers = data; _realtimeRefreshUI(); }
+          if (data) { state.monthlyMembers = data; _refreshAllUI(); }
         })
         // ──── Quadras (caso o gestor altere uma quadra em outra aba) ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'courts' }, async () => {
           const { data } = await client.from('courts').select('*').order('order_index', { ascending: true });
-          if (data) { state.courts = data.map(normalizeCourt); _realtimeRefreshUI(); }
+          if (data) { state.courts = data.map(normalizeCourt); _refreshAllUI(); }
         })
         // ──── Clientes / Fichas de Atletas ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, async () => {
@@ -8676,11 +8715,77 @@ async function syncDataFromSupabase() {
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log('✅ Arena Limoeiro – Realtime ativo. Agendamentos e clientes atualizados automaticamente.');
+            console.log('✅ Arena Limoeiro – Realtime ativo.');
           }
         });
     }
   } catch (err) {
     console.warn('Erro na sincronização Supabase:', err);
+  }
+}
+
+// Helper Global: re-renderiza a interface (admin ou cliente) preservando o scroll
+function _refreshAllUI() {
+  requestSchedule();
+  if (state.currentMode === 'admin') {
+    const scrollY = window.scrollY;
+    renderStepContent();
+    window.scrollTo(0, scrollY);
+  } else {
+    if (state.currentStep === 3) {
+      renderStep3Content();
+    } else {
+      renderApp();
+    }
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
+// Sincronização em segundo plano a cada 3.5s que garante atualização mesmo se o WebSocket fechar
+let _isSyncingBg = false;
+async function checkAndSyncBookingsBackground() {
+  if (_isSyncingBg) return;
+  if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
+  const client = window.ArenaSupabase.getClient();
+  if (!client) return;
+
+  _isSyncingBg = true;
+  try {
+    const { data: dbBookings, error } = await client.from('bookings').select('*');
+    if (dbBookings && !error) {
+      const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
+      const brandNew = dbBookings.filter(b => b && b.id && !existingMap.has(b.id));
+
+      let hasChanges = brandNew.length > 0 || dbBookings.length !== state.bookings.length;
+      if (!hasChanges) {
+        for (const dbB of dbBookings) {
+          const cur = existingMap.get(dbB.id);
+          if (cur && cur.status !== dbB.status) {
+            hasChanges = true;
+            break;
+          }
+        }
+      }
+
+      if (hasChanges) {
+        state.bookings = dbBookings;
+        const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+        const localMap = new Map();
+        local.forEach(lb => { if (lb?.id) localMap.set(lb.id, lb); });
+        dbBookings.forEach(db => { if (db?.id) localMap.set(db.id, db); });
+        localStorage.setItem('arena_local_bookings', JSON.stringify(Array.from(localMap.values())));
+
+        _refreshAllUI();
+
+        // Dispara notificação imediata com som, vibração e alerta para o gestor
+        brandNew.forEach(b => {
+          triggerBookingNotification(b);
+        });
+      }
+    }
+  } catch(err) {
+    // Silencioso
+  } finally {
+    _isSyncingBg = false;
   }
 }
