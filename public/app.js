@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=4.7.9').catch(err => {
+    navigator.serviceWorker.register('/sw.js?v=4.8.0').catch(err => {
       console.warn('Aviso Service Worker:', err);
     });
   }
@@ -3094,32 +3094,42 @@ function renderLiveDashboardTab() {
       ${renderHorizontalDayCalendar(selectedDate, allBookings, state.monthlyMembers)}
 
       <!-- Barra de Filtros por Quadra e Status -->
-      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-3 w-full md:w-auto">
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center">
-              <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1"></i> Quadra:
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 overflow-hidden">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-3 w-full md:w-auto min-w-0">
+          
+          <!-- Filtro Quadra -->
+          <div class="flex items-center gap-2 w-full sm:w-auto min-w-0">
+            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center min-w-[70px]">
+              <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1 flex-shrink-0"></i> Quadra:
             </span>
-            <select onchange="setAdminFilterCourt(this.value)" class="flex-1 sm:flex-initial p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
-              <option value="all" ${state.adminFilterCourt === 'all' ? 'selected' : ''}>🏟️ Todas as Quadras</option>
-              ${state.courts.map(c => `<option value="${c.id}" ${state.adminFilterCourt === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
-            </select>
+            <div class="relative flex-1 min-w-0 max-w-full">
+              <select onchange="setAdminFilterCourt(this.value)" class="w-full min-w-0 p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-sm">
+                <option value="all" ${state.adminFilterCourt === 'all' ? 'selected' : ''}>🏟️ Todas as Quadras</option>
+                ${state.courts.map(c => `<option value="${c.id}" ${state.adminFilterCourt === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+              </select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
 
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center">
-              <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1"></i> Status:
+          <!-- Filtro Status -->
+          <div class="flex items-center gap-2 w-full sm:w-auto min-w-0">
+            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center min-w-[70px]">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1 flex-shrink-0"></i> Status:
             </span>
-            <select onchange="setAdminFilterStatus(this.value)" class="flex-1 sm:flex-initial p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600">
-              <option value="all" ${state.adminFilterStatus === 'all' ? 'selected' : ''}>Todos os Status</option>
-              <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo / Em Andamento</option>
-              <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximas Partidas</option>
-              <option value="finished" ${state.adminFilterStatus === 'finished' ? 'selected' : ''}>✅ Finalizadas</option>
-            </select>
+            <div class="relative flex-1 min-w-0 max-w-full">
+              <select onchange="setAdminFilterStatus(this.value)" class="w-full min-w-0 p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-sm">
+                <option value="all" ${state.adminFilterStatus === 'all' ? 'selected' : ''}>Todos os Status</option>
+                <option value="live" ${state.adminFilterStatus === 'live' ? 'selected' : ''}>🟢 Ao Vivo / Em Andamento</option>
+                <option value="upcoming" ${state.adminFilterStatus === 'upcoming' ? 'selected' : ''}>🔵 Próximas Partidas</option>
+                <option value="finished" ${state.adminFilterStatus === 'finished' ? 'selected' : ''}>✅ Finalizadas</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
+
         </div>
 
-        <div class="w-full md:w-auto flex items-center justify-center md:justify-end">
+        <div class="w-full md:w-auto flex items-center justify-center md:justify-end flex-shrink-0">
           <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm flex items-center space-x-1.5 transition-all text-center cursor-pointer">
             <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
             <span>⚡ Nova Reserva Balcão</span>
