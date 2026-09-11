@@ -91,12 +91,18 @@
           .maybeSingle();
 
         if (existing) {
-          if (name && name !== existing.name) {
+          const updates = {};
+          if (name && name !== existing.name) updates.name = name;
+          if (email && email !== existing.email) updates.email = email;
+          if (extraData.cpf && extraData.cpf !== existing.cpf) updates.cpf = extraData.cpf;
+          if (extraData.emergency_contact && extraData.emergency_contact !== existing.emergency_contact) updates.emergency_contact = extraData.emergency_contact;
+          if (extraData.health_notes && extraData.health_notes !== existing.health_notes) updates.health_notes = extraData.health_notes;
+          if (Object.keys(updates).length > 0) {
             try {
-              await client.from('customers').update({ name, email: email || existing.email }).eq('id', existing.id);
+              await client.from('customers').update(updates).eq('id', existing.id);
             } catch(e) {}
           }
-          return { ...existing, ...extraData };
+          return { ...existing, ...updates, ...extraData };
         }
 
         const newId = 'cust-' + Date.now();

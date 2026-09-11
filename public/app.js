@@ -3209,10 +3209,14 @@ function renderLiveDashboardTab() {
 
         </div>
 
-        <div class="w-full md:w-auto flex items-center justify-center md:justify-end flex-shrink-0">
+        <div class="w-full md:w-auto flex flex-col gap-2 items-stretch md:items-end justify-center flex-shrink-0">
           <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm flex items-center space-x-1.5 transition-all text-center cursor-pointer">
             <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
             <span>⚡ Nova Reserva Balcão</span>
+          </button>
+          <button onclick="openSearchMatchesModal()" class="w-full sm:w-auto justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-slate-700 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all text-center cursor-pointer">
+            <i data-lucide="search" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span>🔍 Pesquisar Jogos (Nome/Quadra/CPF)</span>
           </button>
         </div>
       </div>
@@ -3238,11 +3242,16 @@ function renderLiveDashboardTab() {
               <i data-lucide="calendar" class="w-8 h-8"></i>
             </div>
             <h4 class="text-sm sm:text-base font-black text-slate-800">Nenhum jogo agendado para esta data</h4>
-            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Cadastre uma nova reserva direta ou selecione outro dia no calendário acima.</p>
-            <button onclick="openDirectBookingModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow inline-flex items-center space-x-1.5">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              <span>+ Fazer Reserva Direta Agora</span>
-            </button>
+            <div class="flex flex-wrap items-center justify-center gap-2.5">
+              <button onclick="openDirectBookingModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-sm inline-flex items-center space-x-1.5 cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>+ Fazer Reserva Direta Agora</span>
+              </button>
+              <button onclick="openSearchMatchesModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold shadow-xs inline-flex items-center space-x-1.5 cursor-pointer">
+                <i data-lucide="search" class="w-4 h-4 text-emerald-600"></i>
+                <span>🔍 Pesquisar Outros Jogos</span>
+              </button>
+            </div>
           </div>
         ` : `
           <div class="space-y-4">
@@ -5799,6 +5808,20 @@ function openDirectBookingModal() {
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CPF do Atleta / Responsável (Opcional)</label>
+              <input type="text" id="directCustomerCpf" placeholder="000.000.000-00" maxlength="14" oninput="this.value = formatCPF(this.value)" 
+                     class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 font-mono">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Contato de Emergência (Opcional)</label>
+              <input type="text" id="directCustomerEmergency" placeholder="Ex: Maria (81) 99999-9999" 
+                     class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Agendamento</label>
               <select id="directTypeSelect" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white">
                 <option value="avulso">Jogo Avulso</option>
@@ -5862,9 +5885,19 @@ async function handleDirectBookingSubmit(e) {
   const duration = parseInt(document.getElementById('directDurationSelect').value, 10);
   const name = document.getElementById('directCustomerName').value.trim();
   const phone = document.getElementById('directCustomerPhone').value.trim();
+  const rawCpf = (document.getElementById('directCustomerCpf')?.value || '').trim();
+  const customerCpf = rawCpf ? formatCPF(rawCpf) : '';
+  const emergency = (document.getElementById('directCustomerEmergency')?.value || '').trim();
   const bookingType = document.getElementById('directTypeSelect').value;
   const paymentMethod = document.getElementById('directPaymentSelect').value;
-  const obs = document.getElementById('directObsInput').value.trim();
+  let obs = document.getElementById('directObsInput').value.trim();
+
+  if (customerCpf && !obs.includes('[CPF:')) {
+    obs = obs ? `${obs} [CPF: ${customerCpf}]` : `[CPF: ${customerCpf}]`;
+  }
+  if (emergency && !obs.includes('[Emergência:')) {
+    obs = obs ? `${obs} [Emergência: ${emergency}]` : `[Emergência: ${emergency}]`;
+  }
 
   // Calcula end_time
   const sMin = timeToMinutes(startTime);
@@ -5906,6 +5939,9 @@ async function handleDirectBookingSubmit(e) {
     duration,
     customer_name: name,
     customer_phone: phone,
+    customer_cpf: customerCpf,
+    customerCPF: customerCpf,
+    emergency_contact: emergency,
     total_price: totalPrice,
     status: 'confirmed',
     booking_type: bookingType,
@@ -5926,14 +5962,36 @@ async function handleDirectBookingSubmit(e) {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      // Garante cliente na tabela customers
+      // Garante cliente na tabela customers com CPF e contato de emergência
       if (window.ArenaSupabase.getOrCreateCustomer) {
-        await window.ArenaSupabase.getOrCreateCustomer(name, phone);
+        await window.ArenaSupabase.getOrCreateCustomer(name, phone, '', { cpf: customerCpf, emergency_contact: emergency });
       }
       await client.from('bookings').insert([bookingPayload]);
     } catch(err) {
       console.warn('Erro ao salvar no Supabase:', err);
     }
+  }
+
+  // Atualiza cache local de clientes
+  if (!state.supabaseCustomers) state.supabaseCustomers = [];
+  const cleanP = phone.replace(/\D/g, '');
+  const exIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanP);
+  if (exIdx >= 0) {
+    state.supabaseCustomers[exIdx] = { 
+      ...state.supabaseCustomers[exIdx], 
+      name, 
+      phone, 
+      cpf: customerCpf || state.supabaseCustomers[exIdx].cpf, 
+      emergency_contact: emergency || state.supabaseCustomers[exIdx].emergency_contact 
+    };
+  } else {
+    state.supabaseCustomers.unshift({ 
+      id: 'cust-' + Date.now(), 
+      name, 
+      phone, 
+      cpf: customerCpf, 
+      emergency_contact: emergency 
+    });
   }
 
   // Dispara notificação imediata
@@ -5962,6 +6020,424 @@ async function handleDirectBookingSubmit(e) {
     }
   }, 300);
 }
+
+// ==============================================================================
+// 🔍 CONSULTA & PESQUISA AVANÇADA DE JOGOS E HISTÓRICO DE PARTIDAS
+// ==============================================================================
+function getAllHistoricalMatches() {
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const bookingMap = new Map();
+  [...localBookings, ...(state.bookings || [])].forEach(b => {
+    if (b && b.id) bookingMap.set(b.id, b);
+  });
+  const allBookings = Array.from(bookingMap.values());
+
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  const result = [];
+
+  // 1. Reservas Gravadas (Avulsas, Balcão, Online e Histórico)
+  allBookings.forEach(b => {
+    const startT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
+    const endT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
+    const parsedObs = typeof parseCustomerFromObservation === 'function' ? parseCustomerFromObservation(b.observation || '') : {};
+    const custObj = typeof findCustomerByPhone === 'function' ? findCustomerByPhone(b.customer_phone || b.customerPhone || '') : null;
+    const cpfVal = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || (custObj ? custObj.cpf : '');
+    const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
+    const court = state.courts.find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva', id: b.court_id };
+
+    const sMin = timeToMinutes(startT);
+    const eMin = timeToMinutes(endT);
+
+    let computedStatus = b.status || 'confirmed';
+    if (computedStatus !== 'finished' && computedStatus !== 'cancelled') {
+      if (b.date === todayStr) {
+        if (currentMinutes >= sMin && currentMinutes <= eMin) {
+          computedStatus = 'live';
+        } else if (currentMinutes < sMin) {
+          computedStatus = 'upcoming';
+        } else {
+          computedStatus = 'finished';
+        }
+      } else if (b.date < todayStr) {
+        computedStatus = 'finished';
+      } else {
+        computedStatus = 'upcoming';
+      }
+    }
+
+    result.push({
+      id: b.id,
+      court_id: b.court_id || b.courtId,
+      courtName: court.name,
+      date: b.date,
+      start_time: startT,
+      end_time: endT,
+      time: b.time || (`${startT} às ${endT}`),
+      duration: b.duration || 60,
+      customer_name: b.customer_name || b.customerName || 'Cliente',
+      customer_phone: b.customer_phone || b.customerPhone || '',
+      customer_cpf: cpfVal,
+      emergency_contact: emergVal,
+      total_price: parseFloat(b.total_price || b.totalPrice || 0),
+      status: computedStatus,
+      rawStatus: b.status || 'confirmed',
+      booking_type: b.booking_type || b.bookingType || 'avulso',
+      payment_method: b.payment_method || b.paymentMethod || 'pix',
+      product_cart: b.product_cart || b.productCart || {},
+      observation: b.observation || ''
+    });
+  });
+
+  // Ordena por data decrescente (mais recentes primeiro), depois por horário
+  result.sort((a, b) => {
+    if (a.date !== b.date) return b.date.localeCompare(a.date);
+    return timeToMinutes(b.start_time) - timeToMinutes(a.start_time);
+  });
+
+  return result;
+}
+
+function openSearchMatchesModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-4xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        
+        <!-- Topo / Header da Janela Sobreposta -->
+        <div class="arena-header-bg p-4 sm:p-5 text-white flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center space-x-2.5 sm:space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 flex-shrink-0">
+              <i data-lucide="search" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm sm:text-base font-black uppercase tracking-wide flex items-center gap-2">
+                <span>Pesquisa de Jogos & Histórico de Partidas</span>
+                <span class="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-400/30">Banco de Dados</span>
+              </h3>
+              <p class="text-xs text-emerald-200 font-medium">Consulte todos os jogos gravados por Nome do Cliente, Quadra, CPF ou Telefone</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-2 rounded-xl hover:bg-white/10 transition-colors cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Painel de Filtros Instantâneos -->
+        <div class="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex-shrink-0 space-y-2.5">
+          <!-- Linha de Busca Principal -->
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input type="text" id="matchSearchQuery" oninput="handleMatchModalFilter()" placeholder="Digite o Nome do Cliente, CPF (000.000...) ou Telefone WhatsApp..." 
+                   class="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 outline-none shadow-sm transition-all" autofocus>
+            <button onclick="clearMatchSearchQuery()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold p-1 cursor-pointer">
+              <i data-lucide="x-circle" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Filtros de Quadra, Status e Período -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <!-- Quadra -->
+            <div class="relative">
+              <select id="matchSearchCourt" onchange="handleMatchModalFilter()" class="w-full p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-xs">
+                <option value="all">🏟️ Todas as Quadras</option>
+                ${state.courts.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+              </select>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+
+            <!-- Status -->
+            <div class="relative">
+              <select id="matchSearchStatus" onchange="handleMatchModalFilter()" class="w-full p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-xs">
+                <option value="all">⚡ Todos os Status</option>
+                <option value="live">🟢 Ao Vivo / Em Andamento</option>
+                <option value="upcoming">🔵 Agendados / Futuros</option>
+                <option value="finished">✅ Finalizados / Passados</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+
+            <!-- Período -->
+            <div class="relative">
+              <select id="matchSearchPeriod" onchange="handleMatchModalFilter()" class="w-full p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-xs">
+                <option value="all">📅 Todo o Histórico Gravado</option>
+                <option value="today">Hoje (${formatDisplayDate(getFormattedDate(new Date()))})</option>
+                <option value="next7">Próximos 7 dias</option>
+                <option value="past30">Últimos 30 dias</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra com contador de resultados -->
+        <div class="px-4 py-2.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-600 flex-shrink-0">
+          <span id="matchSearchCountLabel">Carregando jogos...</span>
+          <span class="text-[11px] text-slate-400 font-normal">Base de Dados Arena Limoeiro</span>
+        </div>
+
+        <!-- Área de Rolagem com Resultados -->
+        <div id="matchSearchResultsContainer" class="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-3">
+          <!-- Injetado dinamicamente por handleMatchModalFilter() -->
+        </div>
+
+        <!-- Rodapé do Modal -->
+        <div class="p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-shrink-0">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer">
+            Fechar Janela
+          </button>
+          <button type="button" onclick="openDirectBookingModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>+ Nova Reserva Balcão</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+  handleMatchModalFilter();
+}
+
+function clearMatchSearchQuery() {
+  const input = document.getElementById('matchSearchQuery');
+  if (input) {
+    input.value = '';
+    input.focus();
+    handleMatchModalFilter();
+  }
+}
+
+function handleMatchModalFilter() {
+  const queryEl = document.getElementById('matchSearchQuery');
+  const courtEl = document.getElementById('matchSearchCourt');
+  const statusEl = document.getElementById('matchSearchStatus');
+  const periodEl = document.getElementById('matchSearchPeriod');
+  const container = document.getElementById('matchSearchResultsContainer');
+  const countLabel = document.getElementById('matchSearchCountLabel');
+
+  if (!container) return;
+
+  const rawQuery = (queryEl ? queryEl.value : '').trim().toLowerCase();
+  const cleanDigits = rawQuery.replace(/\D/g, '');
+  const courtFilter = courtEl ? courtEl.value : 'all';
+  const statusFilter = statusEl ? statusEl.value : 'all';
+  const periodFilter = periodEl ? periodEl.value : 'all';
+
+  const matches = getAllHistoricalMatches();
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+
+  const filtered = matches.filter(m => {
+    // Filtro por Quadra
+    if (courtFilter !== 'all' && m.court_id !== courtFilter) return false;
+
+    // Filtro por Status
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'live' && m.status !== 'live') return false;
+      if (statusFilter === 'upcoming' && m.status !== 'upcoming') return false;
+      if (statusFilter === 'finished' && m.status !== 'finished') return false;
+    }
+
+    // Filtro por Período
+    if (periodFilter === 'today' && m.date !== todayStr) return false;
+    if (periodFilter === 'next7') {
+      const next7Date = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      const next7Str = getFormattedDate(next7Date);
+      if (m.date < todayStr || m.date > next7Str) return false;
+    }
+    if (periodFilter === 'past30') {
+      const past30Date = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const past30Str = getFormattedDate(past30Date);
+      if (m.date > todayStr || m.date < past30Str) return false;
+    }
+
+    // Filtro por Texto (Nome, CPF, Telefone, Quadra, Observação)
+    if (rawQuery) {
+      const nameMatch = (m.customer_name || '').toLowerCase().includes(rawQuery);
+      const courtMatch = (m.courtName || '').toLowerCase().includes(rawQuery);
+      const obsMatch = (m.observation || '').toLowerCase().includes(rawQuery);
+      
+      const cleanPhone = (m.customer_phone || '').replace(/\D/g, '');
+      const phoneMatch = cleanDigits.length >= 2 && cleanPhone.includes(cleanDigits);
+
+      const cleanCpf = (m.customer_cpf || '').replace(/\D/g, '');
+      const cpfMatch = cleanDigits.length >= 2 && cleanCpf.includes(cleanDigits);
+
+      if (!nameMatch && !courtMatch && !obsMatch && !phoneMatch && !cpfMatch) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (countLabel) {
+    countLabel.innerHTML = `Mostrando <strong>${filtered.length}</strong> ${filtered.length === 1 ? 'jogo encontrado' : 'jogos encontrados'}`;
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="text-center py-12 px-4 bg-white rounded-2xl border border-dashed border-slate-300">
+        <div class="w-14 h-14 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="search-x" class="w-7 h-7"></i>
+        </div>
+        <h4 class="text-sm font-bold text-slate-800">Nenhum jogo encontrado</h4>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Verifique a grafia do nome, dígitos do CPF ou altere os filtros de quadra e período acima.</p>
+        <button onclick="clearMatchSearchQuery()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+          Limpar Pesquisa
+        </button>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = filtered.map(m => {
+    const cleanPhone = (m.customer_phone || '').replace(/\D/g, '');
+    const zapMsg = `Olá ${m.customer_name}! Falamos da Arena Limoeiro sobre o seu jogo no dia ${formatDisplayDate(m.date)} (${m.time}) na quadra ${m.courtName}.`;
+    const zapUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`;
+
+    let statusBadge = '';
+    if (m.status === 'live') {
+      statusBadge = `
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-500 text-white shadow-xs animate-pulse">
+          <span class="w-2 h-2 rounded-full bg-white mr-1.5 animate-ping"></span>
+          🟢 AO VIVO
+        </span>
+      `;
+    } else if (m.status === 'upcoming') {
+      statusBadge = `
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+          🔵 AGENDADO
+        </span>
+      `;
+    } else if (m.status === 'finished') {
+      statusBadge = `
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+          ✅ FINALIZADO
+        </span>
+      `;
+    } else {
+      statusBadge = `
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+          ❌ CANCELADO
+        </span>
+      `;
+    }
+
+    const hasBar = m.product_cart && Object.keys(m.product_cart).filter(k => !k.startsWith('_')).some(k => m.product_cart[k] > 0);
+
+    return `
+      <div class="p-3.5 sm:p-4 bg-white rounded-2xl border border-slate-200 shadow-xs hover:border-emerald-300 hover:shadow-sm transition-all space-y-3">
+        
+        <!-- Linha Topo: Quadra, Data/Hora e Status -->
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center text-xs font-black text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+              <i data-lucide="trophy" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 flex-shrink-0"></i>
+              ${m.courtName}
+            </span>
+            <span class="inline-flex items-center text-xs font-bold text-slate-600 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 flex-shrink-0"></i>
+              ${formatDisplayDate(m.date)} • ${m.time}
+            </span>
+          </div>
+          <div>${statusBadge}</div>
+        </div>
+
+        <!-- Dados do Cliente & Pagamento -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          
+          <!-- Cliente & CPF -->
+          <div>
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Cliente / Peladeiro</span>
+            <div class="text-xs sm:text-sm font-black text-slate-900 truncate mt-0.5">${m.customer_name}</div>
+            <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+              ${m.customer_cpf ? `
+                <span class="inline-flex items-center text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <i data-lucide="credit-card" class="w-3 h-3 text-emerald-600 mr-1 flex-shrink-0"></i>
+                  CPF: ${formatCPF(m.customer_cpf)}
+                </span>
+              ` : `
+                <span class="text-[11px] text-slate-400 italic font-mono">Sem CPF cadastrado</span>
+              `}
+            </div>
+          </div>
+
+          <!-- Contato & WhatsApp -->
+          <div>
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Contato WhatsApp</span>
+            <div class="text-xs font-bold text-slate-800 mt-0.5">${formatPhone(m.customer_phone) || 'Não informado'}</div>
+            ${cleanPhone ? `
+              <a href="${zapUrl}" target="_blank" class="inline-flex items-center text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline mt-1">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5 mr-1 text-emerald-600"></i>
+                Conversar no WhatsApp
+              </a>
+            ` : ''}
+          </div>
+
+          <!-- Financeiro & Pedidos -->
+          <div>
+            <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Valor & Comanda</span>
+            <div class="text-xs sm:text-sm font-black text-emerald-700 mt-0.5">
+              R$ ${m.total_price.toFixed(2).replace('.', ',')}
+              <span class="text-[11px] font-normal text-slate-500 uppercase ml-1">(${m.payment_method})</span>
+            </div>
+            <div class="mt-1 flex items-center gap-1.5">
+              ${hasBar ? `
+                <span class="inline-flex items-center text-[11px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  <i data-lucide="beer" class="w-3 h-3 text-amber-600 mr-1"></i> Comanda Bar Ativa
+                </span>
+              ` : `
+                <span class="text-[11px] text-slate-400">Sem itens de bar</span>
+              `}
+            </div>
+          </div>
+
+        </div>
+
+        ${m.observation ? `
+          <div class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100">
+            <span class="font-bold text-slate-700">Obs:</span> ${m.observation}
+          </div>
+        ` : ''}
+
+        <!-- Botões de Ação Rápida -->
+        <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" onclick="goToMatchDate('${m.date}')" class="px-3 py-1.5 bg-slate-100 hover:bg-emerald-100 text-slate-700 hover:text-emerald-800 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Abrir no Calendário do Dia</span>
+          </button>
+          
+          <button type="button" onclick="openAddBarItemsModal('${m.id}')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer">
+            <i data-lucide="beer" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Comanda Bar</span>
+          </button>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function goToMatchDate(dateStr) {
+  closeModal();
+  setAdminFilterDate(dateStr);
+}
+
+// Vincula funções no escopo global window para garantir chamadas inline de eventos
+window.openSearchMatchesModal = openSearchMatchesModal;
+window.clearMatchSearchQuery = clearMatchSearchQuery;
+window.handleMatchModalFilter = handleMatchModalFilter;
+window.goToMatchDate = goToMatchDate;
 
 async function moveCourtOrder(courtId, direction) {
   const list = [...state.courts].sort((a, b) => (a.orderIndex || a.order_index || 0) - (b.orderIndex || b.order_index || 0));
