@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.arenalimoeiro.twa",
+        "sha256_cert_fingerprints": ["41:A5:44:F9:8F:36:AB:0F:5B:36:2C:86:95:78:9C:82:A9:D7:2B:B7:2C:36:FF:73:84:86:E2:D2:13:71:05:52"]
+      }
+    }]
