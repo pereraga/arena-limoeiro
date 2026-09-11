@@ -8,6 +8,14 @@
   <meta http-equiv="Expires" content="0">
   <title>Arena Limoeiro - Complexo Poliesportivo e Lazer | Agendamento Online</title>
   
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#064e3b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="/logo.jpg">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   
@@ -16,11 +24,20 @@
   
   <!-- Supabase JS Client & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/supabase-client.js?v=4.8.2"></script>
-  <script src="/default-data.js?v=4.8.2"></script>
+  <script src="/supabase-client.js?v=4.8.3"></script>
+  <script src="/default-data.js?v=4.8.3"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(console.error);
+      });
+    }
+  </script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.8.2">
+  <link rel="stylesheet" href="/styles.css?v=4.8.3">
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24">
 
@@ -82,6 +99,6 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=4.8.2"></script>
+  <script src="/app.js?v=4.8.3"></script>
 </body>
 </html>
