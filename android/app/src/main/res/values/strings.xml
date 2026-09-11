@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Arena Limoeiro</string>
+    <string name="title_activity_main">Arena Limoeiro</string>
+    <string name="package_name">com.arenalimoeiro.app</string>
+    <string name="custom_url_scheme">com.arenalimoeiro.app</string>
+</resources>

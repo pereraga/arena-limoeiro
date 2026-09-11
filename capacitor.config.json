@@ -1,0 +1,8 @@
+﻿{
+  "appId": "com.arenalimoeiro.app",
+  "appName": "Arena Limoeiro",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https"
+  }
+}

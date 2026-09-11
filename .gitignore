@@ -4,3 +4,13 @@
 .DS_Store
 dist/
 .vercel
+
+# Android build outputs & IDE
+android/.gradle
+android/build
+android/app/build
+android/.idea
+*.iml
+.gradle/
+local.properties
+
