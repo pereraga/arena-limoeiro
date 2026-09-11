@@ -1575,9 +1575,11 @@ function renderStep3Content() {
 
   const durationHours = Math.floor(state.selectedDuration / 60);
   const durationMins = state.selectedDuration % 60;
-  const formattedDuration = durationMins > 0 ? 
-    `${durationHours}h ${durationMins}min (${state.selectedDuration} minutos)` : 
-    `${durationHours} ${durationHours === 1 ? 'Hora' : 'Horas'} (${state.selectedDuration} minutos)`;
+  const formattedDuration = state.selectedDuration === 30 ? 
+    '30 Minutos (Meia Hora)' : 
+    (durationHours > 0 ? 
+      (durationMins > 0 ? `${durationHours}h ${durationMins}min (${state.selectedDuration} minutos)` : `${durationHours} ${durationHours === 1 ? 'Hora' : 'Horas'} (${state.selectedDuration} minutos)`) : 
+      `${state.selectedDuration} minutos`);
 
   // FILTRA HORÁRIOS: OCULTA COMPLETAMENTE OS OCUPADOS PARA NÃO PODER SELECIONAR 2X
   const availableSlots = (state.slots || []).filter(s => s.status === 'available');
@@ -1676,19 +1678,24 @@ function renderStep3Content() {
             <i data-lucide="timer" class="w-4 h-4 text-emerald-600"></i>
             Duração Desejada da Partida:
           </span>
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" onclick="selectBookingDuration(30)" 
+                    class="py-2.5 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 30 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+              <span>⏱️ 30 Minutos</span>
+              <span class="text-[10px] font-normal opacity-85">Meia hora de jogo</span>
+            </button>
             <button type="button" onclick="selectBookingDuration(60)" 
-                    class="py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 60 || !state.selectedDuration ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+                    class="py-2.5 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 60 || !state.selectedDuration ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
               <span>⏱️ 1 Hora</span>
               <span class="text-[10px] font-normal opacity-85">60 min de jogo</span>
             </button>
             <button type="button" onclick="selectBookingDuration(90)" 
-                    class="py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 90 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+                    class="py-2.5 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 90 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
               <span>⏱️ 1h 30min</span>
               <span class="text-[10px] font-normal opacity-85">90 min de jogo</span>
             </button>
             <button type="button" onclick="selectBookingDuration(120)" 
-                    class="py-2.5 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 120 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
+                    class="py-2.5 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center ${state.selectedDuration === 120 ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'}">
               <span>⏱️ 2 Horas</span>
               <span class="text-[10px] font-normal opacity-85">120 min de jogo</span>
             </button>
@@ -1750,7 +1757,7 @@ function renderStep3Content() {
                   const isStart = state.startTime === slot.time;
                   const isEnd = state.endTime === slot.time;
                   let slotBadge = '';
-                  const durLabel = state.selectedDuration === 60 ? '1h Fechada' : (state.selectedDuration === 90 ? '1h30 Fechada' : (state.selectedDuration === 120 ? '2h Fechadas' : `${state.selectedDuration} min`));
+                  const durLabel = state.selectedDuration === 30 ? '30 min' : (state.selectedDuration === 60 ? '1h Fechada' : (state.selectedDuration === 90 ? '1h30 Fechada' : (state.selectedDuration === 120 ? '2h Fechadas' : `${state.selectedDuration} min`)));
 
                   if (isStart && isEnd) {
                     slotBadge = `<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ ${durLabel}</span>`;
@@ -1765,8 +1772,10 @@ function renderStep3Content() {
                   badge = slotBadge;
                   icon = isEnd ? '🏁' : (isDiscountSlot ? '🔥' : '🟢');
                 } else if (slot.endsBooking) {
+                  const prevDur = slot.endsBooking.duration || (timeToMinutes(slot.endsBooking.endTime || slot.endsBooking.end_time) - timeToMinutes(slot.endsBooking.startTime || slot.endsBooking.start_time)) || 60;
+                  const prevDurLabel = prevDur === 30 ? '30 min' : (prevDur === 60 ? '1h Fechada' : (prevDur === 90 ? '1h30' : `${prevDur} min`));
                   cardClass = 'bg-emerald-50/90 border-2 border-dashed border-emerald-400 text-emerald-950 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all shadow-xs';
-                  badge = `<span class="text-[10px] font-black text-emerald-900 bg-emerald-200/90 px-1.5 py-0.5 rounded-md block truncate">🏁 Fim de Jogo às ${slot.time} • 1h Fechada (${slot.endsBooking.customerName})</span>`;
+                  badge = `<span class="text-[10px] font-black text-emerald-900 bg-emerald-200/90 px-1.5 py-0.5 rounded-md block truncate">🏁 Fim de Jogo às ${slot.time} • ${prevDurLabel} (${slot.endsBooking.customerName})</span>`;
                   icon = '🏁';
                   nameLabel = `<span class="text-[10px] text-emerald-700 font-bold block mt-0.5">🟢 Livre a partir das ${slot.time}</span>`;
                 } else {
@@ -1861,6 +1870,29 @@ function renderStep3Content() {
                       Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h
                     `}
                   </p>
+                  <!-- Botões de ajuste rápido de término: 30 min (19:00 até 19:30) ou 1h (19:00 até 20:00) -->
+                  <div class="mt-3 pt-2.5 border-t border-emerald-500/40 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <span class="text-[11px] font-bold text-emerald-100 flex items-center gap-1">
+                      <i data-lucide="sliders" class="w-3.5 h-3.5 text-emerald-300"></i>
+                      Ajustar Término:
+                    </span>
+                    <button type="button" onclick="selectBookingDuration(30)" 
+                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 30 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
+                      ⏱️ Até às ${minutesToTime(timeToMinutes(state.startTime) + 30)} (30 min)
+                    </button>
+                    <button type="button" onclick="selectBookingDuration(60)" 
+                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 60 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
+                      ⏱️ Até às ${minutesToTime(timeToMinutes(state.startTime) + 60)} (1 hora)
+                    </button>
+                    <button type="button" onclick="selectBookingDuration(90)" 
+                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 90 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
+                      ⏱️ Até às ${minutesToTime(timeToMinutes(state.startTime) + 90)} (1h 30m)
+                    </button>
+                    <button type="button" onclick="selectBookingDuration(120)" 
+                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 120 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
+                      ⏱️ Até às ${minutesToTime(timeToMinutes(state.startTime) + 120)} (2 horas)
+                    </button>
+                  </div>
                 </div>
                 <div class="text-right bg-white text-slate-900 px-5 py-3 rounded-2xl border border-emerald-300 shadow-md w-full sm:w-auto">
                   <span class="text-[10px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
@@ -1965,10 +1997,13 @@ function selectBookingDuration(mins) {
       newSlots.push(state.endTime);
       state.selectedSlots = newSlots;
     } else {
-      alert(`Atenção: Não há ${mins === 60 ? '1 hora' : (mins === 90 ? '1h30' : '2 horas')} contínua livre a partir das ${state.startTime}.\nPor favor, escolha outro horário livre ou diminua a duração.`);
-      // Tenta 1 hora ou mantém o que couber
+      const durText = mins === 30 ? '30 minutos' : (mins === 60 ? '1 hora' : (mins === 90 ? '1h30' : '2 horas'));
+      alert(`Atenção: Não há ${durText} contínua livre a partir das ${state.startTime}.\nPor favor, escolha outro horário livre ou diminua a duração.`);
       if (mins > 60) {
         selectBookingDuration(60);
+        return;
+      } else if (mins === 60) {
+        selectBookingDuration(30);
         return;
       }
     }
@@ -1978,6 +2013,7 @@ function selectBookingDuration(mins) {
   renderBottomBar();
   if (window.lucide) lucide.createIcons();
 }
+window.selectBookingDuration = selectBookingDuration;
 
 function syncSelectedSlotsState() {
   if (!state.startTime || !state.endTime) {
@@ -1999,8 +2035,6 @@ function handleSlotClick(time) {
   if (!slot || (slot.status !== 'available' && !slot.endsBooking)) return;
 
   const clickedMin = timeToMinutes(time);
-  const dur = (state.selectedDuration && state.selectedDuration >= 30) ? state.selectedDuration : 60;
-  state.selectedDuration = dur;
 
   // Se clicou no próprio horário de início já selecionado, limpa a seleção
   if (state.startTime === time) {
@@ -2014,7 +2048,23 @@ function handleSlotClick(time) {
     return;
   }
 
-  // Tenta alocar a duração selecionada (ex: 60 min) a partir do horário clicado
+  // Se já há um horário de início e o usuário clicou no slot imediatamente seguinte (+30min)
+  if (state.startTime && time === minutesToTime(timeToMinutes(state.startTime) + 30)) {
+    if (state.selectedDuration !== 30) {
+      // Alterna rapidamente para 30 minutos (ex: 19:00 até 19:30)
+      selectBookingDuration(30);
+      return;
+    } else {
+      // Já está em 30 min: expande para 60 min (ex: 19:00 até 20:00) se estiver disponível
+      selectBookingDuration(60);
+      return;
+    }
+  }
+
+  const dur = (state.selectedDuration && state.selectedDuration >= 30) ? state.selectedDuration : 60;
+  state.selectedDuration = dur;
+
+  // Tenta alocar a duração selecionada a partir do horário clicado
   const targetEndMin = clickedMin + dur;
   let canFit = true;
   const newSlots = [];
@@ -2034,27 +2084,35 @@ function handleSlotClick(time) {
     newSlots.push(state.endTime);
     state.selectedSlots = newSlots;
   } else {
-    // Se a duração completa (ex: 1h30 ou 2h) não cabe, tenta pelo menos 1 hora (60 min)
-    let fitOneHour = true;
-    const oneHourSlots = [];
-    for (let m = clickedMin; m < clickedMin + 60; m += 30) {
-      const tStr = minutesToTime(m);
-      const sObj = (state.slots || []).find(s => s.time === tStr);
-      if (!sObj || sObj.status !== 'available') {
-        fitOneHour = false;
-        break;
+    // Se a duração completa (ex: 1h30 ou 2h) não cabe, tenta 1 hora (60 min)
+    if (dur > 60) {
+      let fitOneHour = true;
+      const oneHourSlots = [];
+      for (let m = clickedMin; m < clickedMin + 60; m += 30) {
+        const tStr = minutesToTime(m);
+        const sObj = (state.slots || []).find(s => s.time === tStr);
+        if (!sObj || sObj.status !== 'available') {
+          fitOneHour = false;
+          break;
+        }
+        oneHourSlots.push(tStr);
       }
-      oneHourSlots.push(tStr);
-    }
 
-    if (fitOneHour) {
-      state.startTime = time;
-      state.endTime = minutesToTime(clickedMin + 60);
-      oneHourSlots.push(state.endTime);
-      state.selectedSlots = oneHourSlots;
-      state.selectedDuration = 60;
+      if (fitOneHour) {
+        state.startTime = time;
+        state.endTime = minutesToTime(clickedMin + 60);
+        oneHourSlots.push(state.endTime);
+        state.selectedSlots = oneHourSlots;
+        state.selectedDuration = 60;
+      } else {
+        // Apenas 30 minutos disponíveis neste bloco
+        state.startTime = time;
+        state.endTime = minutesToTime(clickedMin + 30);
+        state.selectedSlots = [time, state.endTime];
+        state.selectedDuration = 30;
+      }
     } else {
-      // Apenas 30 minutos disponíveis neste bloco
+      // Duração de 60 min não coube, aloca 30 minutos
       state.startTime = time;
       state.endTime = minutesToTime(clickedMin + 30);
       state.selectedSlots = [time, state.endTime];
@@ -5786,8 +5844,10 @@ function openDirectBookingModal() {
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Duração *</label>
               <select id="directDurationSelect" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
-                <option value="60">1 Hora (60 min)</option>
-                <option value="120">2 Horas (120 min)</option>
+                <option value="30">⏱️ 30 Minutos (Meia Hora)</option>
+                <option value="60" selected>⏱️ 1 Hora (60 min)</option>
+                <option value="90">⏱️ 1h 30min (90 min)</option>
+                <option value="120">⏱️ 2 Horas (120 min)</option>
               </select>
             </div>
           </div>
