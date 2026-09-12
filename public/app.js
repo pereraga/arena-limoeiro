@@ -9850,6 +9850,95 @@ async function syncDataFromSupabase() {
     // Carrega clientes do Supabase para ter os dados registrados prontos na memória
     await loadSupabaseCustomers();
 
+    // Sistema Avançado de Notificações Mobile / Segundo Plano da Arena Limoeiro
+    async function triggerBookingNotification(booking, type = 'new') {
+      if (!booking) return;
+
+      const court = state.courts.find(c => c.id === booking.court_id || c.id === booking.courtId);
+      const courtName = court ? court.name : (booking.court_name || 'Quadra');
+      const customerName = booking.customer_name || booking.name || 'Cliente';
+      const dateFormatted = booking.date || '';
+      const timeFormatted = booking.start_time ? `${booking.start_time}` : (booking.time || '');
+
+      const isUpdate = type === 'update';
+      const title = isUpdate ? '🔄 Jogo Atualizado na Arena!' : '⚽ Novo Jogo Agendado!';
+      const body = `${courtName} • ${customerName} | ${dateFormatted} às ${timeFormatted}`;
+
+      // 1. Som e vibração local no celular
+      try {
+        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
+      } catch (e) {}
+
+      // 2. Notificação Nativa do Android via Capacitor LocalNotifications
+      try {
+        const LocalNotifications = window.Capacitor?.Plugins?.LocalNotifications;
+        if (LocalNotifications) {
+          await LocalNotifications.requestPermissions().catch(() => {});
+          await LocalNotifications.createChannel({
+            id: 'arena_bookings',
+            name: 'Agendamentos e Jogos',
+            description: 'Notificações de novos jogos e atualizações na Arena Limoeiro',
+            importance: 5,
+            visibility: 1,
+            vibration: true
+          }).catch(() => {});
+
+          const notifId = Math.floor(Math.random() * 1000000);
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                id: notifId,
+                title: title,
+                body: body,
+                channelId: 'arena_bookings',
+                smallIcon: 'ic_launcher_round',
+                schedule: { at: new Date(Date.now() + 100) },
+                extra: { bookingId: booking.id, type: type }
+              }
+            ]
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('Erro ao disparar LocalNotification via Capacitor:', err);
+      }
+
+      // 3. Fallback: Service Worker para PWA / Navegador em Segundo Plano
+      try {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            title: title,
+            options: {
+              body: body,
+              icon: '/icon-192.png',
+              badge: '/icon-192.png',
+              vibrate: [200, 100, 200],
+              tag: 'booking-' + (booking.id || Date.now()),
+              data: { url: '/', bookingId: booking.id }
+            }
+          });
+          return;
+        }
+      } catch (swErr) {}
+
+      // 4. Fallback Web Notification
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(title, { body: body, icon: '/icon-192.png' });
+        }
+      } catch (e) {}
+    }
+
+    // Solicitar permissão de notificação no celular
+    try {
+      if (window.Capacitor?.Plugins?.LocalNotifications) {
+        window.Capacitor.Plugins.LocalNotifications.requestPermissions().catch(() => {});
+      } else if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch (e) {}
+
     requestSchedule();
     renderApp();
 
@@ -9870,7 +9959,7 @@ async function syncDataFromSupabase() {
               }
               _refreshAllUI();
             }
-            triggerBookingNotification(b);
+            triggerBookingNotification(b, 'new');
           }
         });
 
@@ -9887,6 +9976,7 @@ async function syncDataFromSupabase() {
             }
             localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
             _refreshAllUI();
+            triggerBookingNotification({ court_name: norm.name, customer_name: 'Gestor da Arena' }, 'update');
           }
         });
       }
@@ -9905,7 +9995,7 @@ async function syncDataFromSupabase() {
           }
 
           if (payload.new) {
-            triggerBookingNotification(payload.new);
+            triggerBookingNotification(payload.new, 'new');
           }
 
           const { data } = await client.from('bookings').select('*');
@@ -9915,6 +10005,7 @@ async function syncDataFromSupabase() {
           if (payload.new) {
             state.bookings = state.bookings.map(b => b.id === payload.new.id ? payload.new : b);
             _refreshAllUI();
+            triggerBookingNotification(payload.new, 'update');
           }
           const { data } = await client.from('bookings').select('*');
           if (data) { state.bookings = data; _refreshAllUI(); }
@@ -9984,16 +10075,15 @@ async function checkAndSyncBookingsBackground() {
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
       const brandNew = dbBookings.filter(b => b && b.id && !existingMap.has(b.id));
 
-      let hasChanges = brandNew.length > 0 || dbBookings.length !== state.bookings.length;
-      if (!hasChanges) {
-        for (const dbB of dbBookings) {
-          const cur = existingMap.get(dbB.id);
-          if (cur && cur.status !== dbB.status) {
-            hasChanges = true;
-            break;
-          }
+      const updatedBookings = [];
+      for (const dbB of dbBookings) {
+        const cur = existingMap.get(dbB.id);
+        if (cur && (cur.status !== dbB.status || cur.start_time !== dbB.start_time || cur.date !== dbB.date || cur.court_id !== dbB.court_id)) {
+          updatedBookings.push(dbB);
         }
       }
+
+      let hasChanges = brandNew.length > 0 || updatedBookings.length > 0 || dbBookings.length !== state.bookings.length;
 
       if (hasChanges) {
         state.bookings = dbBookings;
@@ -10007,7 +10097,10 @@ async function checkAndSyncBookingsBackground() {
 
         // Dispara notificação imediata com som, vibração e alerta para o gestor
         brandNew.forEach(b => {
-          triggerBookingNotification(b);
+          triggerBookingNotification(b, 'new');
+        });
+        updatedBookings.forEach(b => {
+          triggerBookingNotification(b, 'update');
         });
       }
     }
