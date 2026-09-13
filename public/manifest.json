@@ -1,4 +1,4 @@
-﻿{
+{
   "id": "/?source=pwa",
   "name": "Arena Limoeiro - Complexo Poliesportivo e Lazer",
   "short_name": "Arena Limoeiro",
@@ -13,6 +13,11 @@
   "dir": "ltr",
   "categories": ["sports", "business", "lifestyle"],
   "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
