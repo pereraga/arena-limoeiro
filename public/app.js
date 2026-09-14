@@ -394,7 +394,7 @@ function loadInitialData() {
     state.adminUsers = Array.from(mergedAdminsMap.values());
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    const cleanedLocal = localSaved.filter(b => b && b.id && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
+    const cleanedLocal = localSaved.filter(b => b && b.id && b.status !== 'cancelled' && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
     if (cleanedLocal.length !== localSaved.length) {
       localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
     }
@@ -538,12 +538,9 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   }
 
   // 3. Reservas ativas no mesmo campo e data (ANTI-CHOQUE)
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const bookingMap = new Map();
-  [...localBookings, ...(state.bookings || [])].forEach(b => {
-    if (b && b.id) bookingMap.set(b.id, b);
-  });
-  const allBookings = Array.from(bookingMap.values());
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   const bookingConflict = allBookings.find(b => {
     const bCourtId = b.court_id || b.courtId;
@@ -625,12 +622,9 @@ function calculateLocalSchedule(courtId, date) {
   const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
 
   // 2. Bookings consolidados
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const bookingMap = new Map();
-  [...localBookings, ...(state.bookings || [])].forEach(b => {
-    if (b && b.id) bookingMap.set(b.id, b);
-  });
-  const allBookings = Array.from(bookingMap.values());
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   return operatingHours.map(time => {
     const slotMin = timeToMinutes(time);
@@ -692,6 +686,10 @@ function calculateLocalSchedule(courtId, date) {
       const bCourtId = b.court_id || b.courtId;
       if (bCourtId !== courtId || b.date !== date) return false;
       if (b.status === 'cancelled') return false;
+      if (b.status === 'finished') {
+        const finishEndMin = timeToMinutes(b.end_time || b.endTime || '00:00');
+        if (slotMin >= finishEndMin) return false;
+      }
 
       const bStart = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : null);
       const bEnd = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : null);
@@ -1355,12 +1353,9 @@ function renderCalendarHTML() {
   const todayStr = getFormattedDate(now);
 
   // Consulta reservas no banco de dados e local (sincronizadas em tempo real)
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const bookingMap = new Map();
-  [...localBookings, ...(state.bookings || [])].forEach(b => {
-    if (b && b.id) bookingMap.set(b.id, b);
-  });
-  const allBookings = Array.from(bookingMap.values());
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   const selectedCourtId = state.selectedCourt ? state.selectedCourt.id : null;
   const isDbConnected = window.ArenaSupabase && window.ArenaSupabase.isReady();
@@ -3016,12 +3011,9 @@ function renderLiveDashboardTab() {
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
   // Junta reservas avulsas e horários fixos do dia (sem duplicatas por ID)
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const bookingMap = new Map();
-  [...localBookings, ...(state.bookings || [])].forEach(b => {
-    if (b && b.id) bookingMap.set(b.id, b);
-  });
-  const allBookings = Array.from(bookingMap.values());
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   let matchesList = [];
 
@@ -4001,12 +3993,9 @@ function renderBarControlTab() {
   const selectedDate = state.adminFilterDate || getFormattedDate(new Date());
 
   // Encontra todas as reservas com pedidos no bar
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const bookingMap = new Map();
-  [...localBookings, ...(state.bookings || [])].forEach(b => {
-    if (b && b.id) bookingMap.set(b.id, b);
-  });
-  const allBookings = Array.from(bookingMap.values());
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   const barOrders = allBookings.filter(b => {
     if (b.status === 'cancelled') return false;
@@ -5763,30 +5752,67 @@ async function handleSaveBarItems(e, bookingId) {
 }
 
 // Cancelamento de Agendamento
+// Cancelamento de Agendamento e Liberação Imediata da Grade de Horários
 async function handleCancelBooking(bookingId) {
-  if (!confirm('Deseja realmente cancelar esta reserva de jogo?')) return;
+  if (!bookingId) return;
+  if (!confirm('Deseja realmente cancelar esta reserva de jogo e liberar o horário para os clientes?')) return;
 
-  const idx = (state.bookings || []).findIndex(b => b.id === bookingId);
-  if (idx !== -1) {
-    state.bookings[idx].status = 'cancelled';
-  }
+  // 1. Remove do estado em memória
+  state.bookings = (state.bookings || []).filter(b => b.id !== bookingId);
 
-  // Remove também do localStorage local
-  let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  local = local.filter(b => b.id !== bookingId);
-  localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+  // 2. Remove do localStorage local
+  try {
+    let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    local = local.filter(b => b && b.id !== bookingId);
+    localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+  } catch (e) {}
 
-  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+  // 3. Se for um horário fixo (monthly-...), lida com a tabela monthly_members
+  if (String(bookingId).startsWith('monthly-')) {
+    const memberId = String(bookingId).replace('monthly-', '');
+    state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        await client.from('monthly_members').delete().eq('id', memberId);
+      } catch(e) {
+        console.warn('Erro ao remover monthly_members:', e);
+      }
+    }
+  } else if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
+      // Atualiza primeiro para cancelled para propagar Realtime instantâneo para todos os clientes
+      await client.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
+      // E remove da tabela para liberação definitiva
       await client.from('bookings').delete().eq('id', bookingId);
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Erro ao deletar booking no Supabase:', e);
+    }
   }
 
+  // 4. Limpa seleções pendentes de horários
+  if (state.selectedSlots && state.selectedSlots.length > 0) {
+    state.selectedSlots = [];
+    state.startTime = null;
+    state.endTime = null;
+    state.selectedDuration = 0;
+  }
+
+  // 5. Recalcula a grade de horários do agendamento principal imediatamente
   requestSchedule();
-  renderStepContent();
-  lucide.createIcons();
+  _refreshAllUI();
+  if (state.currentMode === 'admin') {
+    renderStepContent();
+  }
+  if (window.lucide) lucide.createIcons();
+
+  // Se o modal de busca estiver aberto, atualiza a pesquisa
+  if (typeof renderSearchResults === 'function' && document.getElementById('matchSearchResultsList')) {
+    renderSearchResults();
+  }
 }
+window.handleCancelBooking = handleCancelBooking;
 
 // 6. MODAL DE FAZER RESERVA DIRETA (BALCÃO / WHATSAPP)
 function openDirectBookingModal() {
@@ -6085,12 +6111,9 @@ async function handleDirectBookingSubmit(e) {
 // 🔍 CONSULTA & PESQUISA AVANÇADA DE JOGOS E HISTÓRICO DE PARTIDAS
 // ==============================================================================
 function getAllHistoricalMatches() {
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const bookingMap = new Map();
-  [...localBookings, ...(state.bookings || [])].forEach(b => {
-    if (b && b.id) bookingMap.set(b.id, b);
-  });
-  const allBookings = Array.from(bookingMap.values());
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   const now = new Date();
   const todayStr = getFormattedDate(now);
@@ -6479,6 +6502,13 @@ function handleMatchModalFilter() {
             <i data-lucide="beer" class="w-3.5 h-3.5 text-amber-600"></i>
             <span>Comanda Bar</span>
           </button>
+
+          ${m.status !== 'cancelled' ? `
+            <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer" title="Cancelar Agendamento e Liberar Horário">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+              <span>Cancelar / Liberar Horário</span>
+            </button>
+          ` : ''}
         </div>
 
       </div>
@@ -9839,12 +9869,10 @@ async function syncDataFromSupabase() {
         localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
       }
 
-      // Sincroniza também arena_local_bookings com os dados atualizados do banco
-      const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-      const localMap = new Map();
-      localBookings.forEach(lb => { if (lb && lb.id) localMap.set(lb.id, lb); });
-      dbBookings.forEach(db => { if (db && db.id) localMap.set(db.id, db); });
-      localStorage.setItem('arena_local_bookings', JSON.stringify(Array.from(localMap.values())));
+      // Sincroniza arena_local_bookings diretamente com os dados autoritativos do banco
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
+      state.bookings = validDbBookings;
+      localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
     }
 
     // Carrega clientes do Supabase para ter os dados registrados prontos na memória
@@ -9999,24 +10027,44 @@ async function syncDataFromSupabase() {
           }
 
           const { data } = await client.from('bookings').select('*');
-          if (data) { state.bookings = data; _refreshAllUI(); }
+          if (data) { 
+            state.bookings = data.filter(b => b && b.status !== 'cancelled');
+            localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+            _refreshAllUI(); 
+          }
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.new) {
-            state.bookings = state.bookings.map(b => b.id === payload.new.id ? payload.new : b);
+            if (payload.new.status === 'cancelled') {
+              state.bookings = (state.bookings || []).filter(b => b.id !== payload.new.id);
+            } else {
+              state.bookings = (state.bookings || []).map(b => b.id === payload.new.id ? payload.new : b);
+            }
+            localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
-            triggerBookingNotification(payload.new, 'update');
+            if (payload.new.status !== 'cancelled') {
+              triggerBookingNotification(payload.new, 'update');
+            }
           }
           const { data } = await client.from('bookings').select('*');
-          if (data) { state.bookings = data; _refreshAllUI(); }
+          if (data) { 
+            state.bookings = data.filter(b => b && b.status !== 'cancelled');
+            localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+            _refreshAllUI(); 
+          }
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.old) {
-            state.bookings = state.bookings.filter(b => b.id !== payload.old.id);
+            state.bookings = (state.bookings || []).filter(b => b.id !== payload.old.id);
+            localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
           }
           const { data } = await client.from('bookings').select('*');
-          if (data) { state.bookings = data; _refreshAllUI(); }
+          if (data) { 
+            state.bookings = data.filter(b => b && b.status !== 'cancelled');
+            localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+            _refreshAllUI(); 
+          }
         })
         // ──── Mensalistas / Planos Fixos ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_members' }, async () => {
@@ -10083,15 +10131,14 @@ async function checkAndSyncBookingsBackground() {
         }
       }
 
-      let hasChanges = brandNew.length > 0 || updatedBookings.length > 0 || dbBookings.length !== state.bookings.length;
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
+      const newIds = new Set(validDbBookings.map(b => b.id));
+      const hasDeleted = (state.bookings || []).some(b => b && b.id && !newIds.has(b.id));
+      let hasChanges = brandNew.length > 0 || updatedBookings.length > 0 || hasDeleted || validDbBookings.length !== (state.bookings || []).length;
 
       if (hasChanges) {
-        state.bookings = dbBookings;
-        const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-        const localMap = new Map();
-        local.forEach(lb => { if (lb?.id) localMap.set(lb.id, lb); });
-        dbBookings.forEach(db => { if (db?.id) localMap.set(db.id, db); });
-        localStorage.setItem('arena_local_bookings', JSON.stringify(Array.from(localMap.values())));
+        state.bookings = validDbBookings;
+        localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
 
         _refreshAllUI();
 
