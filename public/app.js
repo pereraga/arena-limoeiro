@@ -36,20 +36,59 @@ try {
   _savedArenaUser = JSON.parse(localStorage.getItem('arena_user') || 'null');
 } catch(e) {}
 
-if (_isAdminUrl && !_savedArenaUser) {
-  _savedArenaUser = {
-    id: 'admin-1',
-    name: 'Gabriel Alves',
-    email: 'admin@arenalimoeiro.com.br',
-    role: 'Administrador Geral'
-  };
-  try { localStorage.setItem('arena_user', JSON.stringify(_savedArenaUser)); } catch(e) {}
+// Validação estrita de credenciais aceitas:
+// O usuário precisa ter sido autenticado com sucesso no login da gerência (authenticated === true)
+const _isUserProperlyLogged = !!(
+  _savedArenaUser && 
+  _savedArenaUser.email && 
+  _savedArenaUser.role && 
+  _savedArenaUser.authenticated === true
+);
+
+if (!_isUserProperlyLogged) {
+  _savedArenaUser = null;
+  try { localStorage.removeItem('arena_user'); } catch(e) {}
+}
+
+// 🔐 CONTROLE GLOBAL DE AUTENTICAÇÃO DO GESTOR
+function isManagerLoggedIn() {
+  if (!state || !state.currentUser) return false;
+  const u = state.currentUser;
+  if (!u.email || typeof u.email !== 'string') return false;
+  if (!u.role || typeof u.role !== 'string') return false;
+  if (u.authenticated !== true) return false;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem('arena_user') || 'null');
+    if (!saved || !saved.email || saved.authenticated !== true) return false;
+    if (saved.email.toLowerCase() !== u.email.toLowerCase()) return false;
+  } catch(e) {
+    return false;
+  }
+
+  return true;
+}
+window.isManagerLoggedIn = isManagerLoggedIn;
+
+// Se o usuário tentar acessar a URL de admin sem estar logado, solicitamos o login
+if (_isAdminUrl && !_isUserProperlyLogged) {
+  window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      if (!isManagerLoggedIn() && typeof openLoginModal === 'function') {
+        openLoginModal(() => {
+          state.currentMode = 'admin';
+          state.adminTab = 'live_dashboard';
+          renderApp();
+        });
+      }
+    }, 350);
+  });
 }
 
 // Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
 let state = {
   currentStep: 1,
-  currentMode: (_savedArenaUser || _isAdminUrl) ? 'admin' : 'client',
+  currentMode: _isUserProperlyLogged ? 'admin' : 'client',
   adminTab: 'live_dashboard',
   platform: {
     device: 'desktop',
@@ -2509,13 +2548,14 @@ function handleGestaoButtonClick() {
     state.currentMode = 'client';
     renderApp();
   } else {
-    if (state.currentUser) {
+    if (isManagerLoggedIn()) {
       state.currentMode = 'admin';
-    state.adminTab = 'live_dashboard';
+      state.adminTab = 'live_dashboard';
       renderApp();
     } else {
       openLoginModal(() => {
         state.currentMode = 'admin';
+        state.adminTab = 'live_dashboard';
         renderApp();
       });
     }
@@ -2639,16 +2679,26 @@ async function handleLoginSubmit(event) {
       authenticatedUser.name = 'Gabriel Alves';
       authenticatedUser.role = 'Administrador Geral';
     }
+    authenticatedUser.authenticated = true;
+    authenticatedUser.loginTimestamp = Date.now();
     state.currentUser = authenticatedUser;
     localStorage.setItem('arena_user', JSON.stringify(authenticatedUser));
     closeModal();
     state.currentMode = 'admin';
+    state.adminTab = 'live_dashboard';
     renderApp();
 
     if (window._onLoginSuccess) {
       window._onLoginSuccess();
       window._onLoginSuccess = null;
     }
+
+    // Solicita permissão de notificação no navegador para este aparelho agora que o gestor se autenticou
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch(e) {}
   } else {
     if (submitBtn) {
       submitBtn.disabled = false;
@@ -2681,6 +2731,15 @@ function isReceptionUser() {
 
 // PAINEL DO ADMINISTRADOR / RECEPÇÃO
 function renderAdminView(container) {
+  if (!isManagerLoggedIn()) {
+    state.currentMode = 'client';
+    openLoginModal(() => {
+      state.currentMode = 'admin';
+      state.adminTab = 'live_dashboard';
+      renderApp();
+    });
+    return;
+  }
   const isRecep = isReceptionUser();
   if (isRecep && state.adminTab !== 'live_dashboard' && state.adminTab !== 'bar_control') {
     state.adminTab = 'live_dashboard';
@@ -9603,9 +9662,11 @@ async function submitBooking(grandTotal) {
     showConfirmationSuccessModal(unifiedBooking);
   }
 
-  // Dispara notificação imediata de novo agendamento com som, vibração e alerta nativo
+  // Dispara notificação imediata apenas se quem estiver no aparelho for um gestor com credencial aceita
   try {
-    triggerBookingNotification(unifiedBooking);
+    if (isManagerLoggedIn()) {
+      triggerBookingNotification(unifiedBooking);
+    }
   } catch(e) {
     console.warn('Aviso notificação agendamento:', e);
   }
@@ -9993,6 +10054,8 @@ function getArenaAudioContext() {
 }
 
 function playNotificationSound() {
+  // 🔒 Somente executa som se for gestor com credencial aceita e logado
+  if (!isManagerLoggedIn()) return;
   try {
     const ctx = getArenaAudioContext();
     if (!ctx) return;
@@ -10078,6 +10141,14 @@ function showToastNotification(htmlContent, duration = 6500) {
 const recentNotifiedBookings = new Set();
 
 function triggerBookingNotification(booking) {
+  // 🔒 RESTRIÇÃO ESTRITA: Notificações de novos agendamentos/pedidos
+  // SÓ APARECEM para quem tem conta credencial aceita para login na seção de gerência.
+  // Caso o usuário não tenha entrado com login de gerência, a notificação de pedido
+  // NÃO será notificada nem no mobile, nem no tablet, nem no navegador de computador.
+  if (!isManagerLoggedIn()) {
+    return;
+  }
+
   if (!booking || !booking.id) return;
   if (recentNotifiedBookings.has(booking.id)) return;
   recentNotifiedBookings.add(booking.id);
@@ -10140,6 +10211,7 @@ function triggerBookingNotification(booking) {
 }
 
 async function requestNotificationPermission() {
+  if (!isManagerLoggedIn()) return;
   getArenaAudioContext();
 
   if (!('Notification' in window)) {
@@ -10259,12 +10331,14 @@ async function syncDataFromSupabase(skipRender = false) {
       } catch(e) {}
     }
 
-    // Solicitar permissão de notificação no celular
+    // Solicitar permissão de notificação no celular apenas para gestores logados
     try {
-      if (window.Capacitor?.Plugins?.LocalNotifications) {
-        window.Capacitor.Plugins.LocalNotifications.requestPermissions().catch(() => {});
-      } else if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
+      if (isManagerLoggedIn()) {
+        if (window.Capacitor?.Plugins?.LocalNotifications) {
+          window.Capacitor.Plugins.LocalNotifications.requestPermissions().catch(() => {});
+        } else if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission().catch(() => {});
+        }
       }
     } catch (e) {}
 
