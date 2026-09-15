@@ -1644,27 +1644,13 @@ function renderStep3Content() {
 
       <!-- GRADE DE HORÁRIOS: MOSTRA TODOS (LIVRES + OCUPADOS/EM JOGO) -->
       <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm mb-8">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold flex-shrink-0">
-              <i data-lucide="clock" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <h3 class="text-base font-black text-slate-900">Horários do Campo — ${court.name}</h3>
-              <p class="text-xs text-slate-500">Escolha o horário para a sua partida (30 min ou 1h)</p>
-            </div>
+        <div class="flex items-center space-x-3 mb-3">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold flex-shrink-0">
+            <i data-lucide="clock" class="w-5 h-5"></i>
           </div>
-
-          <!-- OPÇÃO RÁPIDA: SOMENTE MEIA HORA OU 1 HORA -->
-          <div class="inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-xs self-start sm:self-auto">
-            <button type="button" onclick="selectBookingDuration(30)" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${state.selectedDuration === 30 ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'}">
-              <span>⚡ Somente Meia Hora (30 min)</span>
-            </button>
-            <button type="button" onclick="selectBookingDuration(60)" 
-                    class="px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${state.selectedDuration !== 30 ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'}">
-              <span>⏱️ 1 Hora de Jogo</span>
-            </button>
+          <div>
+            <h3 class="text-base font-black text-slate-900">Horários do Campo — ${court.name}</h3>
+            <p class="text-xs text-slate-500">Toque nos horários da grade para selecionar o início e término da sua partida.</p>
           </div>
         </div>
 
@@ -1890,28 +1876,17 @@ function renderStep3Content() {
                       Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h
                     `}
                   </p>
-                  <!-- Botões de ajuste rápido de duração: Somente Meia Hora ou 1 Hora -->
-                  <div class="mt-3 pt-2.5 border-t border-emerald-500/40 flex flex-wrap items-center gap-1.5 sm:gap-2">
-                    <span class="text-[11px] font-bold text-emerald-100 flex items-center gap-1">
+                  <!-- Ajuste manual do horário de término na hora selecionada -->
+                  <div class="mt-3 pt-2.5 border-t border-emerald-500/40 flex flex-wrap items-center gap-2">
+                    <span class="text-xs font-bold text-emerald-100 flex items-center gap-1.5">
                       <i data-lucide="sliders" class="w-3.5 h-3.5 text-emerald-300"></i>
-                      Duração da Reserva:
+                      Término da Partida:
                     </span>
-                    <button type="button" onclick="selectBookingDuration(30)" 
-                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 30 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
-                      ⚡ Somente Meia Hora (30 min)
-                    </button>
-                    <button type="button" onclick="selectBookingDuration(60)" 
-                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 60 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
-                      ⏱️ 1 Hora Completa
-                    </button>
-                    <button type="button" onclick="selectBookingDuration(90)" 
-                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 90 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
-                      ⏱️ 1h 30m
-                    </button>
-                    <button type="button" onclick="selectBookingDuration(120)" 
-                            class="px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${state.selectedDuration === 120 ? 'bg-white text-emerald-950 font-black shadow-sm ring-2 ring-emerald-300' : 'bg-white/15 text-white hover:bg-white/25'}">
-                      ⏱️ 2 Horas
-                    </button>
+                    <select onchange="handleEndTimeSelect(this.value)" 
+                            class="bg-emerald-950/90 text-white text-xs font-black px-3 py-1.5 rounded-xl border border-emerald-400/60 focus:ring-2 focus:ring-emerald-300 outline-none cursor-pointer">
+                      ${generateAvailableEndOptions(state.startTime, state.endTime)}
+                    </select>
+                    <span class="text-[11px] text-emerald-200 opacity-90">(ou toque no horário de término na grade)</span>
                   </div>
                 </div>
                 <div class="text-right bg-white text-slate-900 px-5 py-3 rounded-2xl border border-emerald-300 shadow-md w-full sm:w-auto">
@@ -2050,6 +2025,58 @@ function syncSelectedSlotsState() {
   calculateDuration();
 }
 
+function generateAvailableEndOptions(startTime, currentEndTime) {
+  if (!startTime) return '';
+  const startMin = timeToMinutes(startTime);
+  const options = [];
+
+  for (let mins = 30; mins <= 240; mins += 30) {
+    const endMin = startMin + mins;
+    const endStr = minutesToTime(endMin);
+
+    let canFit = true;
+    for (let m = startMin; m < endMin; m += 30) {
+      const tStr = minutesToTime(m);
+      const sObj = (state.slots || []).find(s => s.time === tStr);
+      if (!sObj || (sObj.status !== 'available' && !sObj.endsBooking)) {
+        canFit = false;
+        break;
+      }
+    }
+    if (!canFit) break;
+
+    const durHours = Math.floor(mins / 60);
+    const durMins = mins % 60;
+    const durLabel = mins === 30 ? '30 min (Meia Hora)' : (durMins > 0 ? `${durHours}h ${durMins}min` : `${durHours} ${durHours === 1 ? 'hora' : 'horas'}`);
+    const isSelected = currentEndTime === endStr;
+    options.push(`<option value="${endStr}" ${isSelected ? 'selected' : ''}>Até às ${endStr} (${durLabel})</option>`);
+  }
+
+  return options.join('');
+}
+window.generateAvailableEndOptions = generateAvailableEndOptions;
+
+function handleEndTimeSelect(endTime) {
+  if (!state.startTime || !endTime) return;
+  const startMin = timeToMinutes(state.startTime);
+  const endMin = timeToMinutes(endTime);
+  if (endMin <= startMin) return;
+
+  const slots = [];
+  for (let m = startMin; m <= endMin; m += 30) {
+    slots.push(minutesToTime(m));
+  }
+  state.endTime = endTime;
+  state.selectedSlots = slots;
+  state.selectedDuration = endMin - startMin;
+
+  calculateDuration();
+  renderStep3Content();
+  renderBottomBar();
+  if (window.lucide) lucide.createIcons();
+}
+window.handleEndTimeSelect = handleEndTimeSelect;
+
 function handleSlotClick(time) {
   const slot = (state.slots || []).find(s => s.time === time);
   if (!slot || (slot.status !== 'available' && !slot.endsBooking)) return;
@@ -2141,21 +2168,13 @@ function handleSlotClick(time) {
   }
 
   // 3. Novo horário de início (ou clicou antes do início atual)
+  // Seleciona inicialmente 30 minutos (início no horário clicado até +30min).
+  // O usuário pode estender clicando no horário de término na grade ou no seletor manual.
   state.startTime = time;
-
-  // Tenta selecionar 1 hora por padrão (60 min = 2 blocos de 30 min)
-  if (isSlotPlayable(clickedMin) && isSlotPlayable(clickedMin + 30)) {
-    const endT = minutesToTime(clickedMin + 60);
-    state.endTime = endT;
-    state.selectedDuration = 60;
-    state.selectedSlots = [time, minutesToTime(clickedMin + 30), endT];
-  } else {
-    // Apenas 30 minutos disponíveis neste bloco
-    const endT = minutesToTime(clickedMin + 30);
-    state.endTime = endT;
-    state.selectedDuration = 30;
-    state.selectedSlots = [time, endT];
-  }
+  const endT = minutesToTime(clickedMin + 30);
+  state.endTime = endT;
+  state.selectedDuration = 30;
+  state.selectedSlots = [time, endT];
 
   calculateDuration();
   renderStep3Content();
