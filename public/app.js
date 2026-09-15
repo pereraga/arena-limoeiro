@@ -1579,10 +1579,10 @@ function renderStep3Content() {
   const durationHours = Math.floor(state.selectedDuration / 60);
   const durationMins = state.selectedDuration % 60;
   const formattedDuration = state.selectedDuration === 30 ? 
-    '30 Minutos (Meia Hora)' : 
+    '30 min' : 
     (durationHours > 0 ? 
-      (durationMins > 0 ? `${durationHours}h ${durationMins}min (${state.selectedDuration} minutos)` : `${durationHours} ${durationHours === 1 ? 'Hora' : 'Horas'} (${state.selectedDuration} minutos)`) : 
-      `${state.selectedDuration} minutos`);
+      (durationMins > 0 ? `${durationHours}h ${durationMins}min` : `${durationHours} ${durationHours === 1 ? 'Hora' : 'Horas'}`) : 
+      `${state.selectedDuration} min`);
 
   // FILTRA HORÁRIOS: OCULTA COMPLETAMENTE OS OCUPADOS PARA NÃO PODER SELECIONAR 2X
   const availableSlots = (state.slots || []).filter(s => s.status === 'available');
@@ -1876,18 +1876,7 @@ function renderStep3Content() {
                       Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h
                     `}
                   </p>
-                  <!-- Ajuste manual do horário de término na hora selecionada -->
-                  <div class="mt-3 pt-2.5 border-t border-emerald-500/40 flex flex-wrap items-center gap-2">
-                    <span class="text-xs font-bold text-emerald-100 flex items-center gap-1.5">
-                      <i data-lucide="sliders" class="w-3.5 h-3.5 text-emerald-300"></i>
-                      Término da Partida:
-                    </span>
-                    <select onchange="handleEndTimeSelect(this.value)" 
-                            class="bg-emerald-950/90 text-white text-xs font-black px-3 py-1.5 rounded-xl border border-emerald-400/60 focus:ring-2 focus:ring-emerald-300 outline-none cursor-pointer">
-                      ${generateAvailableEndOptions(state.startTime, state.endTime)}
-                    </select>
-                    <span class="text-[11px] text-emerald-200 opacity-90">(ou toque no horário de término na grade)</span>
-                  </div>
+
                 </div>
                 <div class="text-right bg-white text-slate-900 px-5 py-3 rounded-2xl border border-emerald-300 shadow-md w-full sm:w-auto">
                   <span class="text-[10px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
@@ -2025,57 +2014,7 @@ function syncSelectedSlotsState() {
   calculateDuration();
 }
 
-function generateAvailableEndOptions(startTime, currentEndTime) {
-  if (!startTime) return '';
-  const startMin = timeToMinutes(startTime);
-  const options = [];
 
-  for (let mins = 30; mins <= 240; mins += 30) {
-    const endMin = startMin + mins;
-    const endStr = minutesToTime(endMin);
-
-    let canFit = true;
-    for (let m = startMin; m < endMin; m += 30) {
-      const tStr = minutesToTime(m);
-      const sObj = (state.slots || []).find(s => s.time === tStr);
-      if (!sObj || (sObj.status !== 'available' && !sObj.endsBooking)) {
-        canFit = false;
-        break;
-      }
-    }
-    if (!canFit) break;
-
-    const durHours = Math.floor(mins / 60);
-    const durMins = mins % 60;
-    const durLabel = mins === 30 ? '30 min (Meia Hora)' : (durMins > 0 ? `${durHours}h ${durMins}min` : `${durHours} ${durHours === 1 ? 'hora' : 'horas'}`);
-    const isSelected = currentEndTime === endStr;
-    options.push(`<option value="${endStr}" ${isSelected ? 'selected' : ''}>Até às ${endStr} (${durLabel})</option>`);
-  }
-
-  return options.join('');
-}
-window.generateAvailableEndOptions = generateAvailableEndOptions;
-
-function handleEndTimeSelect(endTime) {
-  if (!state.startTime || !endTime) return;
-  const startMin = timeToMinutes(state.startTime);
-  const endMin = timeToMinutes(endTime);
-  if (endMin <= startMin) return;
-
-  const slots = [];
-  for (let m = startMin; m <= endMin; m += 30) {
-    slots.push(minutesToTime(m));
-  }
-  state.endTime = endTime;
-  state.selectedSlots = slots;
-  state.selectedDuration = endMin - startMin;
-
-  calculateDuration();
-  renderStep3Content();
-  renderBottomBar();
-  if (window.lucide) lucide.createIcons();
-}
-window.handleEndTimeSelect = handleEndTimeSelect;
 
 function handleSlotClick(time) {
   const slot = (state.slots || []).find(s => s.time === time);
