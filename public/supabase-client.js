@@ -77,26 +77,37 @@
       }
     },
 
-    // Buscar ou Criar Cliente na tabela 'customers' com suporte a ficha completa
+    // Buscar ou Criar Cliente na tabela 'customers' com suporte a documento e observações
     async getOrCreateCustomer(name, phone, email = '', extraData = {}) {
       const client = this.getClient();
       if (!client) return { id: 'cust-local-' + Date.now(), name, phone, email, ...extraData };
 
       try {
-        // Tenta encontrar por telefone
-        const { data: existing } = await client
-          .from('customers')
-          .select('*')
-          .eq('phone', phone)
-          .maybeSingle();
+        const cleanPhone = (phone || '').replace(/\D/g, '');
+        // Tenta encontrar por telefone (formatado ou apenas dígitos)
+        let existing = null;
+        if (phone) {
+          const { data: byPhone } = await client
+            .from('customers')
+            .select('*')
+            .or(`phone.eq.${phone},phone.eq.${cleanPhone}`)
+            .limit(1);
+          if (byPhone && byPhone.length > 0) existing = byPhone[0];
+        }
+
+        const notesArr = [];
+        if (extraData.birth_date) notesArr.push(`Nascimento: ${extraData.birth_date}`);
+        if (extraData.emergency_contact) notesArr.push(`Emergência: ${extraData.emergency_contact}`);
+        if (extraData.health_notes) notesArr.push(`Saúde: ${extraData.health_notes}`);
+        const notesStr = notesArr.join(' | ') || null;
 
         if (existing) {
           const updates = {};
           if (name && name !== existing.name) updates.name = name;
           if (email && email !== existing.email) updates.email = email;
-          if (extraData.cpf && extraData.cpf !== existing.cpf) updates.cpf = extraData.cpf;
-          if (extraData.emergency_contact && extraData.emergency_contact !== existing.emergency_contact) updates.emergency_contact = extraData.emergency_contact;
-          if (extraData.health_notes && extraData.health_notes !== existing.health_notes) updates.health_notes = extraData.health_notes;
+          if (extraData.cpf && extraData.cpf !== existing.document) updates.document = extraData.cpf;
+          if (notesStr && notesStr !== existing.notes) updates.notes = notesStr;
+
           if (Object.keys(updates).length > 0) {
             try {
               await client.from('customers').update(updates).eq('id', existing.id);
@@ -106,30 +117,33 @@
         }
 
         const newId = 'cust-' + Date.now();
-        const payload = { id: newId, name, phone, email };
-        if (extraData.cpf) payload.cpf = extraData.cpf;
-        if (extraData.birth_date) payload.birth_date = extraData.birth_date;
-        if (extraData.emergency_contact) payload.emergency_contact = extraData.emergency_contact;
-        if (extraData.health_notes) payload.health_notes = extraData.health_notes;
+        const payload = {
+          id: newId,
+          name: name || 'Cliente',
+          phone: phone || '',
+          email: email || '',
+          document: extraData.cpf || null,
+          notes: notesStr
+        };
 
-        let created = null;
-        try {
-          const { data, error } = await client
-            .from('customers')
-            .insert([payload])
-            .select()
-            .single();
-          if (!error) created = data;
-        } catch(colErr) {
-          const { data, error } = await client
-            .from('customers')
-            .insert([{ id: newId, name, phone, email }])
-            .select()
-            .single();
-          if (!error) created = data;
+        const { data: created, error } = await client
+          .from('customers')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (!error && created) {
+          return created;
         }
 
-        return created || { id: newId, name, phone, email, ...extraData };
+        // Fallback garantido: apenas campos base essenciais
+        const { data: fallbackCreated } = await client
+          .from('customers')
+          .insert([{ id: newId, name: name || 'Cliente', phone: phone || '', email: email || '' }])
+          .select()
+          .single();
+
+        return fallbackCreated || { id: newId, name, phone, email, document: extraData.cpf, ...extraData };
       } catch (err) {
         console.error('Erro no cadastro do cliente:', err);
         return { id: 'cust-' + Date.now(), name, phone, email, ...extraData };

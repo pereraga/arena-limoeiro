@@ -6039,28 +6039,44 @@ async function handleDirectBookingSubmit(e) {
     if (prod) barTotal += prod.price;
   });
 
-  const totalPrice = courtPrice + barTotal;
-  const newBookingId = 'booking-' + Date.now();
+  const extraObs = [customerCpf ? `[CPF: ${customerCpf}]` : '', emergency ? `[Emergência: ${emergency}]` : '', obs].filter(Boolean).join(' | ');
 
-  const bookingPayload = {
+  let savedCust = null;
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      if (window.ArenaSupabase.getOrCreateCustomer) {
+        savedCust = await window.ArenaSupabase.getOrCreateCustomer(name, phone, '', { cpf: customerCpf, emergency_contact: emergency });
+      }
+    } catch (e) {
+      console.warn('Aviso cadastro cliente admin:', e);
+    }
+  }
+
+  // Payload limpo com apenas as colunas existentes na tabela 'bookings' do Supabase
+  const dbBookingPayload = {
     id: newBookingId,
     court_id: courtId,
+    customer_id: (savedCust && savedCust.id) ? savedCust.id : null,
     date,
-    time: `${startTime} às ${endTime}`,
     start_time: startTime,
     end_time: endTime,
+    time: `${startTime} às ${endTime}`,
     duration,
     customer_name: name,
     customer_phone: phone,
-    customer_cpf: customerCpf,
-    customerCPF: customerCpf,
-    emergency_contact: emergency,
     total_price: totalPrice,
     status: 'confirmed',
     booking_type: bookingType,
     payment_method: paymentMethod,
     product_cart: productCart,
-    observation: obs
+    observation: extraObs
+  };
+
+  const bookingPayload = {
+    ...dbBookingPayload,
+    customer_cpf: customerCpf,
+    customerCPF: customerCpf,
+    emergency_contact: emergency
   };
 
   // Salva no estado
@@ -6075,11 +6091,17 @@ async function handleDirectBookingSubmit(e) {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      // Garante cliente na tabela customers com CPF e contato de emergência
-      if (window.ArenaSupabase.getOrCreateCustomer) {
-        await window.ArenaSupabase.getOrCreateCustomer(name, phone, '', { cpf: customerCpf, emergency_contact: emergency });
+      const { error: insErr } = await client.from('bookings').insert([dbBookingPayload]);
+      if (insErr) {
+        console.warn('Aviso inserção booking admin Supabase:', insErr);
+        if (insErr.code === '23503') {
+          dbBookingPayload.customer_id = null;
+          await client.from('bookings').insert([dbBookingPayload]);
+        }
       }
-      await client.from('bookings').insert([bookingPayload]);
+      if (window.ArenaSupabase.broadcastBooking) {
+        window.ArenaSupabase.broadcastBooking(bookingPayload);
+      }
     } catch(err) {
       console.warn('Erro ao salvar no Supabase:', err);
     }
@@ -9194,10 +9216,11 @@ async function submitBooking(grandTotal) {
         }
       }
 
-      // Cria ou atualiza cliente no Supabase
+      // Cria ou atualiza cliente no Supabase primeiro para obter o customer_id real
+      let savedCustomer = null;
       try {
         if (window.ArenaSupabase.getOrCreateCustomer) {
-          await window.ArenaSupabase.getOrCreateCustomer(name, formatPhone(phone), email, {
+          savedCustomer = await window.ArenaSupabase.getOrCreateCustomer(name, formatPhone(phone), email, {
             cpf: formatCPF(cpf),
             birth_date: birthDate,
             emergency_contact: emergency,
@@ -9208,13 +9231,29 @@ async function submitBooking(grandTotal) {
         console.warn('Aviso no cadastro de cliente Supabase:', custErr);
       }
 
-      // Insere no Supabase
+      const validCustomerId = (savedCustomer && savedCustomer.id) ? savedCustomer.id : null;
+      dbBookingPayload.customer_id = validCustomerId;
+      dbMemberPayload.customer_id = validCustomerId;
+
+      // Insere no Supabase garantindo que nunca quebre por Foreign Key
       if (isMensal) {
         const { error: insErr } = await client.from('monthly_members').insert([dbMemberPayload]);
-        if (insErr) console.warn('Aviso inserção mensalista Supabase:', insErr);
+        if (insErr) {
+          console.warn('Aviso inserção mensalista Supabase:', insErr);
+          if (insErr.code === '23503') {
+            dbMemberPayload.customer_id = null;
+            await client.from('monthly_members').insert([dbMemberPayload]);
+          }
+        }
       } else {
         const { error: insErr } = await client.from('bookings').insert([dbBookingPayload]);
-        if (insErr) console.warn('Aviso inserção booking Supabase:', insErr);
+        if (insErr) {
+          console.warn('Aviso inserção booking Supabase:', insErr);
+          if (insErr.code === '23503') {
+            dbBookingPayload.customer_id = null;
+            await client.from('bookings').insert([dbBookingPayload]);
+          }
+        }
       }
     } catch (err) {
       console.warn('Erro na conexão com Supabase, salvando localmente:', err);
