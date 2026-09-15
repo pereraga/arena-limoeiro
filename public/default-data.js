@@ -57,7 +57,12 @@ const initialCourts = [
       status: "Disponível",
       discount_price_per_hour: 80.00,
       discount_start_time: "09:00",
-      discount_end_time: "16:00"
+      discount_end_time: "16:00",
+      gallery: [
+        "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&auto=format&fit=crop&q=80"
+      ]
     },
     discountPricePerHour: 80.00,
     discount_price_per_hour: 80.00,
@@ -81,7 +86,12 @@ const initialCourts = [
       type: "Grama Sintética Bicolor Coberta",
       capacity: "12 a 14 Jogadores (6x6 / 7x7)",
       features: ["100% Coberto (Sem chuva)", "Ventilação Forçada", "Gramado com Amortecimento", "Câmeras de Gravação"],
-      status: "Disponível"
+      status: "Disponível",
+      gallery: [
+        "https://images.unsplash.com/photo-1529900245534-47fbf8204bca?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80"
+      ]
     }
   },
   {
@@ -104,7 +114,11 @@ const initialCourts = [
       status: "Disponível",
       discount_price_per_hour: 60.00,
       discount_start_time: "09:00",
-      discount_end_time: "16:00"
+      discount_end_time: "16:00",
+      gallery: [
+        "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1592709823125-a191f07a2a5e?w=800&auto=format&fit=crop&q=80"
+      ]
     },
     discountPricePerHour: 60.00,
     discount_price_per_hour: 60.00,
@@ -128,7 +142,11 @@ const initialCourts = [
       type: "Areia de Quartzo Branca Filtrada",
       capacity: "4 a 8 Jogadores",
       features: ["Rede de Futevôlei / Vôlei / Beach", "Refletores LED Direcionais", "Área de Descanso com Puffs"],
-      status: "Disponível"
+      status: "Disponível",
+      gallery: [
+        "https://images.unsplash.com/photo-1592656094267-764a45160876?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&auto=format&fit=crop&q=80"
+      ]
     }
   },
   {
@@ -148,7 +166,11 @@ const initialCourts = [
       type: "Piso Flutuante de Madeira Tratada / Poliuretano",
       capacity: "10 a 20 Jogadores",
       features: ["Marcações Oficiais Futsal/Basquete/Vôlei", "Tabelas Hidráulicas", "Placar Eletrônico", "Vestiários Completos"],
-      status: "Disponível"
+      status: "Disponível",
+      gallery: [
+        "https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1519766304817-4f37bda74a29?w=800&auto=format&fit=crop&q=80"
+      ]
     }
   },
   {
@@ -168,7 +190,11 @@ const initialCourts = [
       type: "Vidro Temperado Panorâmico + Grama Fina",
       capacity: "4 Jogadores (Duplas)",
       features: ["Vidro 12mm Oficial", "Piso de Alta Performance", "Iluminação LED Especial de Alto Contraste"],
-      status: "Disponível"
+      status: "Disponível",
+      gallery: [
+        "https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=800&auto=format&fit=crop&q=80"
+      ]
     }
   }
 ];

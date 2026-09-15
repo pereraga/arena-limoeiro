@@ -225,3 +225,29 @@ html[data-touch="true"] .slot-pill {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* 🏟️ Carrossel de Fotos das Quadras */
+.court-carousel {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.court-nav-arrow {
+  transition: opacity 0.2s ease, transform 0.15s ease, background-color 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .court-nav-arrow {
+    opacity: 0.7;
+  }
+  .court-card:hover .court-nav-arrow {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 639px) {
+  .court-nav-arrow {
+    opacity: 0.85;
+  }
+}

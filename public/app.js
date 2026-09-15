@@ -134,6 +134,14 @@ function normalizeCourt(c) {
   const badgeText = specsObj.badge_text !== undefined ? specsObj.badge_text : (c.badge || '');
   const badgeAutoFreq = specsObj.badge_auto_freq || c.badge_auto_freq || 'weekly';
 
+  let specsGallery = (specsObj && Array.isArray(specsObj.gallery) && specsObj.gallery.length > 0)
+    ? specsObj.gallery
+    : (c.gallery && Array.isArray(c.gallery) && c.gallery.length > 0 ? c.gallery : (c.image ? [c.image] : []));
+  specsGallery = specsGallery.filter(Boolean);
+  if (specsGallery.length === 0 && c.image) specsGallery = [c.image];
+  if (specsGallery.length === 0) specsGallery = ['https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'];
+  specsObj.gallery = specsGallery;
+
   return {
     ...c,
     id: c.id,
@@ -150,6 +158,7 @@ function normalizeCourt(c) {
     orderIndex: order,
     order_index: order,
     specs: specsObj,
+    gallery: specsGallery,
     isMaintenance: isMaint,
     status: isMaint ? 'maintenance' : (specsObj.status || c.status || 'active'),
     maintenanceReason: maintReason,
@@ -167,7 +176,7 @@ function normalizeCourt(c) {
     discount_price_per_hour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
     discountStartTime: specsObj.discount_start_time || c.discountStartTime || '09:00',
     discountEndTime: specsObj.discount_end_time || c.discountEndTime || '16:00',
-    image: c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
+    image: specsGallery[0] || c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
   };
 }
 
@@ -1014,6 +1023,76 @@ function renderStepContent() {
   }
 }
 
+// 📸 NAVEGAÇÃO E SWIPE DO CARROSSEL DE FOTOS DAS QUADRAS
+let _courtTouchStartX = 0;
+let _courtTouchStartY = 0;
+window._lastCourtSwipeTime = 0;
+
+function handleCourtTouchStart(event, courtId) {
+  if (!event.touches || event.touches.length === 0) return;
+  _courtTouchStartX = event.touches[0].clientX;
+  _courtTouchStartY = event.touches[0].clientY;
+}
+
+function handleCourtTouchEnd(event, courtId) {
+  if (!event.changedTouches || event.changedTouches.length === 0) return;
+  const deltaX = event.changedTouches[0].clientX - _courtTouchStartX;
+  const deltaY = event.changedTouches[0].clientY - _courtTouchStartY;
+
+  // Verifica se o movimento foi predominantemente horizontal (>30px)
+  if (Math.abs(deltaX) > 30 && Math.abs(deltaX) > Math.abs(deltaY) * 1.1) {
+    window._lastCourtSwipeTime = Date.now();
+    const delta = deltaX < 0 ? 1 : -1; // Deslizar esquerda = próxima foto; direita = foto anterior
+    changeCourtImage(courtId, delta, event);
+  }
+}
+
+function changeCourtImage(courtId, delta, event) {
+  if (event) {
+    if (typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+  }
+  const court = (state.courts || []).find(c => c.id === courtId);
+  if (!court) return;
+
+  const specs = typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {});
+  const gallery = (specs && Array.isArray(specs.gallery) && specs.gallery.length > 0)
+    ? specs.gallery
+    : (court.gallery && Array.isArray(court.gallery) && court.gallery.length > 0 ? court.gallery : [court.image].filter(Boolean));
+
+  if (gallery.length <= 1) return;
+
+  state.courtPhotoIndex = state.courtPhotoIndex || {};
+  let curIdx = (state.courtPhotoIndex[courtId] !== undefined) ? state.courtPhotoIndex[courtId] : 0;
+  curIdx = (curIdx + delta + gallery.length) % gallery.length;
+  state.courtPhotoIndex[courtId] = curIdx;
+
+  const imgEl = document.getElementById(`court-img-${courtId}`);
+  if (imgEl) {
+    imgEl.style.opacity = '0.3';
+    imgEl.src = gallery[curIdx];
+    setTimeout(() => {
+      imgEl.style.opacity = '1';
+    }, 60);
+  }
+
+  const dotsEl = document.getElementById(`court-dots-${courtId}`);
+  if (dotsEl) {
+    dotsEl.innerHTML = gallery.map((_, i) => `
+      <span class="inline-block transition-all duration-300 rounded-full shadow-sm ${i === curIdx ? 'w-3.5 h-1.5 bg-emerald-400' : 'w-1.5 h-1.5 bg-white/60'}"></span>
+    `).join('');
+  }
+
+  const counterEl = document.getElementById(`court-counter-${courtId}`);
+  if (counterEl) {
+    counterEl.innerHTML = `
+      <i data-lucide="camera" class="w-3 h-3 text-emerald-400"></i>
+      <span>${curIdx + 1}/${gallery.length}</span>
+    `;
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
 // ETAPA 1: VISÃO TOTALMENTE LIMPA PARA O CLIENTE
 function renderStep1(container) {
   let displayCourts = [...state.courts].filter(court => {
@@ -1079,6 +1158,15 @@ function renderStep1(container) {
           const capacity = specs.capacity || '14 a 16 Jogadores (7x7 / 8x8)';
           const courtType = specs.type || 'Grama Sintética 60mm Monofilamento (FIFA Quality)';
 
+          const courtGallery = (specs && Array.isArray(specs.gallery) && specs.gallery.length > 0)
+            ? specs.gallery
+            : (court.gallery && Array.isArray(court.gallery) && court.gallery.length > 0 ? court.gallery : [court.image].filter(Boolean));
+          
+          state.courtPhotoIndex = state.courtPhotoIndex || {};
+          const currentPhotoIdx = (state.courtPhotoIndex[court.id] !== undefined) ? state.courtPhotoIndex[court.id] : 0;
+          const safeIdx = (currentPhotoIdx >= 0 && currentPhotoIdx < courtGallery.length) ? currentPhotoIdx : 0;
+          const currentActiveImage = courtGallery[safeIdx] || court.image;
+
           const registeredFixos = (state.monthlyMembers || []).filter(m => (m.courtId === court.id || m.court_id === court.id));
           const fixosList = registeredFixos.map(m => `${m.team_name || m.teamName} (${(m.day_of_week_label || m.dayOfWeekLabel || 'Semanal')} ${m.time})`);
 
@@ -1086,14 +1174,52 @@ function renderStep1(container) {
             <div onclick="selectCourt('${court.id}')" 
                  class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
               
-              <div class="relative h-48 w-full overflow-hidden bg-slate-900">
-                <img src="${court.image}" alt="${court.name}" 
-                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
-                     class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-${court.id}"
+                   ontouchstart="handleCourtTouchStart(event, '${court.id}')"
+                   ontouchend="handleCourtTouchEnd(event, '${court.id}')">
                 
-                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                <img id="court-img-${court.id}" src="${currentActiveImage}" alt="${court.name}" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
 
-                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5">
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                ${courtGallery.length > 1 ? `
+                  <button type="button" 
+                          onclick="changeCourtImage('${court.id}', -1, event)" 
+                          title="Foto anterior"
+                          class="court-nav-arrow absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg cursor-pointer hover:scale-110 active:scale-95">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  </button>
+
+                  <button type="button" 
+                          onclick="changeCourtImage('${court.id}', 1, event)" 
+                          title="Próxima foto"
+                          class="court-nav-arrow absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg cursor-pointer hover:scale-110 active:scale-95">
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </button>
+
+                  <!-- Indicador de Bolinhas (Dots) -->
+                  <div id="court-dots-${court.id}" class="absolute bottom-2.5 right-3 flex items-center space-x-1.5 z-10 pointer-events-none">
+                    ${courtGallery.map((_, i) => `
+                      <span class="inline-block transition-all duration-300 rounded-full shadow-sm ${i === safeIdx ? 'w-3.5 h-1.5 bg-emerald-400' : 'w-1.5 h-1.5 bg-white/60'}"></span>
+                    `).join('')}
+                  </div>
+
+                  <!-- Contador de Fotos -->
+                  <div class="absolute top-3 right-3 z-10 pointer-events-none">
+                    <span id="court-counter-${court.id}" class="bg-black/75 backdrop-blur-md text-white text-[10px] font-black px-2 py-0.5 rounded-md border border-white/20 shadow-sm flex items-center gap-1">
+                      <i data-lucide="camera" class="w-3 h-3 text-emerald-400"></i>
+                      <span>${safeIdx + 1}/${courtGallery.length}</span>
+                    </span>
+                  </div>
+                ` : ''}
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
                   <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
                     ${categoryLabel}
                   </span>
@@ -1116,7 +1242,7 @@ function renderStep1(container) {
                   })())}
                 </div>
 
-                <div class="absolute bottom-2.5 left-3 text-white">
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
                   <span class="text-[10px] font-bold text-emerald-300 flex items-center">
                     <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
                     ${bookingsCount} agendamentos este mês
@@ -7356,14 +7482,133 @@ async function handleProductSubmit(event) {
   }
 }
 
-// MODAL DE ESPAÇO / QUADRA
-function setCourtFormImage(url) {
-  const input = document.getElementById('courtImage');
-  if (input) {
-    input.value = url;
-    const preview = document.getElementById('courtImagePreview');
-    if (preview) preview.src = url;
+// 📸 GERENCIADOR DE GALERIA DE FOTOS DA QUADRA (ADMIN)
+window._courtModalGallery = [];
+
+function renderCourtModalGallery() {
+  const container = document.getElementById('courtModalGalleryList');
+  const countEl = document.getElementById('courtModalGalleryCount');
+  if (!container) return;
+
+  const gallery = window._courtModalGallery || [];
+  if (countEl) {
+    countEl.textContent = `${gallery.length} foto${gallery.length === 1 ? '' : 's'}`;
   }
+
+  if (gallery.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full py-5 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
+        <i data-lucide="image" class="w-6 h-6 mx-auto mb-1 text-slate-300"></i>
+        <p class="text-xs font-semibold text-slate-500">Nenhuma foto adicionada nesta quadra ainda.</p>
+        <p class="text-[10px] text-slate-400">Adicione uma URL ou envie uma foto do dispositivo abaixo.</p>
+      </div>
+    `;
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  container.innerHTML = gallery.map((imgUrl, idx) => `
+    <div class="relative group rounded-xl overflow-hidden border ${idx === 0 ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-200'} bg-slate-100 aspect-video flex flex-col justify-between shadow-sm">
+      <img src="${imgUrl}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-full h-full object-cover">
+      
+      <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40">
+        <!-- Top bar: Capa e Excluir -->
+        <div class="absolute top-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1">
+          ${idx === 0 ? `
+            <span class="bg-emerald-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded shadow flex items-center gap-0.5">
+              <span>★ Capa</span>
+            </span>
+          ` : `
+            <button type="button" onclick="setCourtModalCoverImage(${idx})" 
+                    class="bg-black/70 hover:bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded backdrop-blur-sm transition-colors cursor-pointer" 
+                    title="Definir como primeira foto / capa">
+              Tornar Capa
+            </button>
+          `}
+          
+          <button type="button" onclick="removeCourtModalGalleryImage(${idx})" 
+                  class="w-5 h-5 rounded-full bg-rose-600/90 hover:bg-rose-700 text-white flex items-center justify-center transition-transform hover:scale-110 cursor-pointer shadow" 
+                  title="Remover esta foto">
+            <i data-lucide="trash-2" class="w-3 h-3"></i>
+          </button>
+        </div>
+
+        <!-- Bottom bar: índice -->
+        <div class="absolute bottom-1.5 left-2">
+          <span class="text-[10px] font-bold text-white/90 drop-shadow">Foto #${idx + 1}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function addCourtModalGalleryImage(url) {
+  const clean = (url || '').trim();
+  if (!clean) return;
+  window._courtModalGallery = window._courtModalGallery || [];
+  if (!window._courtModalGallery.includes(clean)) {
+    window._courtModalGallery.push(clean);
+  }
+  renderCourtModalGallery();
+  const input = document.getElementById('courtNewPhotoUrl');
+  if (input) input.value = '';
+}
+
+function removeCourtModalGalleryImage(index) {
+  window._courtModalGallery = window._courtModalGallery || [];
+  if (index >= 0 && index < window._courtModalGallery.length) {
+    window._courtModalGallery.splice(index, 1);
+    renderCourtModalGallery();
+  }
+}
+
+function setCourtModalCoverImage(index) {
+  window._courtModalGallery = window._courtModalGallery || [];
+  if (index > 0 && index < window._courtModalGallery.length) {
+    const item = window._courtModalGallery.splice(index, 1)[0];
+    window._courtModalGallery.unshift(item);
+    renderCourtModalGallery();
+  }
+}
+
+function handleCourtImageUpload(inputEl) {
+  if (!inputEl || !inputEl.files || !inputEl.files[0]) return;
+  const file = inputEl.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const rawDataUrl = e.target.result;
+    const img = new Image();
+    img.onload = function() {
+      const maxWidth = 960;
+      const maxHeight = 640;
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      if (height > maxHeight) {
+        width = Math.round((width * maxHeight) / height);
+        height = maxHeight;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      addCourtModalGalleryImage(compressedDataUrl);
+      inputEl.value = '';
+    };
+    img.src = rawDataUrl;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setCourtFormImage(url) {
+  addCourtModalGalleryImage(url);
 }
 
 function openCourtModal(courtIdToEdit = null) {
@@ -7377,6 +7622,14 @@ function openCourtModal(courtIdToEdit = null) {
   const currentOpenTime = specs.opening_time || '06:00';
   const currentCloseTime = specs.closing_time || '23:00';
   const currentImage = court ? court.image : 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
+
+  const initialGallery = (specs && Array.isArray(specs.gallery) && specs.gallery.length > 0)
+    ? [...specs.gallery]
+    : (court && court.gallery && Array.isArray(court.gallery) && court.gallery.length > 0 ? [...court.gallery] : (court && court.image ? [court.image] : [currentImage]));
+  window._courtModalGallery = initialGallery.filter(Boolean);
+  if (window._courtModalGallery.length === 0) {
+    window._courtModalGallery = [currentImage];
+  }
 
   const defaultHoursList = [
     "06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30",
@@ -7552,35 +7805,70 @@ function openCourtModal(courtIdToEdit = null) {
                       class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">${court ? (court.observation || '') : ''}</textarea>
           </div>
 
-          <!-- Foto da Quadra -->
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-bold text-slate-700 uppercase">Foto da Quadra (URL ou Atalhos Rápidos)</label>
-              <span class="text-[10px] text-slate-400">Clique para aplicar foto rápida:</span>
-            </div>
-            
-            <div class="flex flex-wrap gap-1.5 mb-2">
-              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
-                ⚽ Futebol Society
-              </button>
-              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
-                🏐 Beach Tennis
-              </button>
-              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
-                🏀 Ginásio / Futsal
-              </button>
-              <button type="button" onclick="setCourtFormImage('https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
-                🎾 Padel / Raquete
-              </button>
+          <!-- Fotos da Quadra (Galeria para os Jogadores) -->
+          <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="block text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <i data-lucide="images" class="w-4 h-4 text-emerald-600"></i>
+                  <span>Fotos da Quadra (Galeria de Imagens)</span>
+                </label>
+                <p class="text-[11px] text-slate-500 font-medium">As fotos cadastradas aqui serão exibidas para os clientes com setinhas no computador e arrasto de dedo no celular.</p>
+              </div>
+              <span id="courtModalGalleryCount" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                ${(window._courtModalGallery || []).length} fotos
+              </span>
             </div>
 
-            <div class="flex items-center space-x-3">
-              <input type="url" id="courtImage" 
-                     value="${currentImage}" 
-                     placeholder="https://..."
-                     onchange="const p=document.getElementById('courtImagePreview'); if(p) p.src=this.value;"
-                     class="flex-1 p-3 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono">
-              <img id="courtImagePreview" src="${currentImage}" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0 bg-slate-100">
+            <!-- Grade de Miniaturas da Galeria -->
+            <div id="courtModalGalleryList" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <!-- Renderizado dinamicamente por renderCourtModalGallery() -->
+            </div>
+
+            <!-- Adicionar Foto por URL ou Upload -->
+            <div class="pt-2 border-t border-slate-200 space-y-2">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase">Adicionar Nova Foto:</label>
+              <div class="flex items-center gap-2">
+                <input type="url" id="courtNewPhotoUrl" 
+                       placeholder="Cole o link da imagem (https://...)" 
+                       class="flex-1 p-2.5 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white font-mono">
+                
+                <button type="button" onclick="const u=document.getElementById('courtNewPhotoUrl').value; addCourtModalGalleryImage(u);"
+                        class="px-3 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer shadow-sm">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Adicionar</span>
+                </button>
+
+                <input type="file" id="courtPhotoFileInput" accept="image/*" class="hidden" onchange="handleCourtImageUpload(this)">
+                <button type="button" onclick="document.getElementById('courtPhotoFileInput').click();"
+                        title="Enviar foto do computador ou celular"
+                        class="px-3 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer border border-slate-300">
+                  <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                  <span class="hidden sm:inline">Enviar Arquivo</span>
+                </button>
+              </div>
+
+              <!-- Atalhos rápidos para fotos esportivas -->
+              <div class="pt-1">
+                <span class="text-[10px] text-slate-400 font-semibold block mb-1">Ou adicione fotos rápidas de alta qualidade:</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button type="button" onclick="addCourtModalGalleryImage('https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                    + ⚽ Society Campo
+                  </button>
+                  <button type="button" onclick="addCourtModalGalleryImage('https://images.unsplash.com/photo-1529900245534-47fbf8204bca?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                    + 🏟️ Society Coberto
+                  </button>
+                  <button type="button" onclick="addCourtModalGalleryImage('https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                    + 🏐 Beach Tennis
+                  </button>
+                  <button type="button" onclick="addCourtModalGalleryImage('https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                    + 🏀 Futsal / Ginásio
+                  </button>
+                  <button type="button" onclick="addCourtModalGalleryImage('https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=800&auto=format&fit=crop&q=80')" class="px-2 py-1 bg-white hover:bg-emerald-50 hover:text-emerald-700 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition-all cursor-pointer">
+                    + 🎾 Padel / Tênis
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -7609,6 +7897,7 @@ function openCourtModal(courtIdToEdit = null) {
     </div>
   `;
 
+  renderCourtModalGallery();
   if (window.lucide) lucide.createIcons();
 }
 
@@ -7622,12 +7911,16 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
   const type = document.getElementById('courtType').value.trim();
   const description = document.getElementById('courtDescription').value.trim();
   const observation = document.getElementById('courtObservation').value.trim();
-  const image = document.getElementById('courtImage').value.trim();
   const openingTime = document.getElementById('courtOpeningTime')?.value || '06:00';
   const closingTime = document.getElementById('courtClosingTime')?.value || '23:00';
   const discountPrice = parseFloat(document.getElementById('courtDiscountPrice')?.value) || 0;
   const discountStart = document.getElementById('courtDiscountStart')?.value || '09:00';
   const discountEnd = document.getElementById('courtDiscountEnd')?.value || '16:00';
+
+  const gallery = (window._courtModalGallery && window._courtModalGallery.length > 0)
+    ? window._courtModalGallery.filter(Boolean)
+    : ['https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'];
+  const primaryImage = gallery[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
 
   const categoryLabels = {
     society: "Futebol Society", beach: "Beach Tennis & Vôlei", futsal: "Ginásio Poliesportivo", padel: "Padel & Tênis"
@@ -7653,9 +7946,11 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     monthly_price: monthlyPrice,
     description,
     observation,
-    image: image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80',
+    image: primaryImage,
+    gallery: gallery,
     specs: {
       ...existingSpecs,
+      gallery: gallery,
       type: type || "Piso Esportivo",
       surface: type || "Piso Esportivo",
       capacity: capacity || "10 a 16 Jogadores",
@@ -9501,6 +9796,10 @@ function handleSearch(query) {
 }
 
 function selectCourt(courtId) {
+  // Evita abrir a quadra acidentalmente logo após gesto de arrastar o carrossel de fotos (Mobile)
+  if (window._lastCourtSwipeTime && (Date.now() - window._lastCourtSwipeTime < 450)) {
+    return;
+  }
   state.productCart = {};
   const rawCourt = state.courts.find(c => c.id === courtId);
   if (!rawCourt) return;
