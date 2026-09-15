@@ -322,6 +322,14 @@ document.addEventListener('DOMContentLoaded', () => {
   autoAdvanceFinishedMatches();
   setInterval(autoAdvanceFinishedMatches, 30000);
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
+  setInterval(() => {
+    if (state.currentStep === 3 && state.selectedCourt && state.selectedDate) {
+      const now = new Date();
+      if (state.selectedDate === getFormattedDate(now)) {
+        requestSchedule();
+      }
+    }
+  }, 30000); // Atualiza os horários para ocultar os que acabaram de passar
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js?v=4.8.2').catch(err => {
@@ -628,7 +636,7 @@ function calculateLocalSchedule(courtId, date) {
 
   return operatingHours.map(time => {
     const slotMin = timeToMinutes(time);
-    const isSlotPast = isDatePast || (isDateToday && slotMin <= currentMinutes);
+    const isSlotPast = isDatePast || (isDateToday && slotMin < currentMinutes);
 
     // Checagem 1: Manutenção por janela de horário neste campo
     const maintBlock = allMaint.find(mb => {
@@ -1698,9 +1706,6 @@ function renderStep3Content() {
           <span class="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
             <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Manutenção
           </span>
-          <span class="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-full">
-            <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Encerrado
-          </span>
         </div>
 
         <!-- Grade de horários -->
@@ -1710,7 +1715,30 @@ function renderStep3Content() {
             const todayStr = getFormattedDate(now);
             const nowMin = now.getHours() * 60 + now.getMinutes();
             const isToday = state.selectedDate === todayStr;
-            return (state.slots || []).map(slot => {
+
+            // Filtra os horários: para o dia atual, oculta os horários que já passaram
+            const visibleSlots = (state.slots || []).filter(slot => {
+              if (!isToday) return true;
+              const slotMin = timeToMinutes(slot.time);
+              const isPast = slot.status === 'past' || slot.isPast || (slotMin < nowMin);
+              return !isPast;
+            });
+
+            if (visibleSlots.length === 0) {
+              return `
+                <div class="col-span-2 sm:col-span-3 p-6 sm:p-8 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-center my-2">
+                  <span class="text-3xl mb-1 block">⏰</span>
+                  <h4 class="text-base font-black text-slate-800">Horários de hoje encerrados</h4>
+                  <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Todos os horários de hoje para esta quadra já passaram. Escolha uma data futura no calendário para agendar.</p>
+                  <button type="button" onclick="goToStep(2)" class="mt-4 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md cursor-pointer transition-all inline-flex items-center gap-1.5">
+                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                    <span>Escolher Próxima Data</span>
+                  </button>
+                </div>
+              `;
+            }
+
+            return visibleSlots.map(slot => {
               const slotMin = timeToMinutes(slot.time);
               const slotEndMin = slotMin + 30;
               const isSelected = Array.isArray(state.selectedSlots) && state.selectedSlots.includes(slot.time);
@@ -1807,13 +1835,26 @@ function renderStep3Content() {
         </div>
 
         ${(() => {
-          const availCount = (state.slots || []).filter(s => s.status === 'available').length;
-          if (availCount === 0) return `
-            <div class="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-center">
+          const now = new Date();
+          const todayStr = getFormattedDate(now);
+          const nowMin = now.getHours() * 60 + now.getMinutes();
+          const isToday = state.selectedDate === todayStr;
+
+          const remainingSlots = (state.slots || []).filter(s => {
+            if (!isToday) return true;
+            return timeToMinutes(s.time) >= nowMin;
+          });
+
+          // Se já não sobrou nenhum slot, a mensagem central no grid já informa
+          if (remainingSlots.length === 0) return '';
+
+          const remainingAvail = remainingSlots.filter(s => s.status === 'available');
+          if (remainingAvail.length === 0) return `
+            <div class="p-4 bg-rose-50 rounded-2xl border border-rose-200 text-center mb-6">
               <i data-lucide="alert-circle" class="w-6 h-6 text-rose-600 mx-auto mb-1"></i>
-              <h4 class="text-sm font-black text-rose-900">Nenhum horário livre nesta data</h4>
-              <p class="text-xs text-rose-700 mt-1">Todos os horários deste campo já foram reservados ou já se encerraram no dia de hoje.</p>
-              <button onclick="goToStep(2)" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow">Escolher Outra Data</button>
+              <h4 class="text-sm font-black text-rose-900">Todos os horários restantes estão reservados</h4>
+              <p class="text-xs text-rose-700 mt-1">Não há mais vagas livres hoje para esta quadra. Escolha outra data no calendário.</p>
+              <button onclick="goToStep(2)" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold shadow hover:bg-rose-700 cursor-pointer">Escolher Outra Data</button>
             </div>`;
           return '';
         })()}
