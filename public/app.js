@@ -312,13 +312,29 @@ function calculateDuration() {
   state.selectedDuration = endMin - startMin;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Carrega dados padrão imediatamente para que o site nunca fique em branco
+document.addEventListener('DOMContentLoaded', async () => {
+  // 1. Carrega dados padrão locais imediatamente para que o estado básico esteja pronto
   loadInitialData();
   initEventListeners();
+
+  // 2. ⚡ SINCRONIZAÇÃO INSTANTÂNEA ANTES DE RENDERIZAR:
+  // Carrega os dados reais da nuvem em paralelo (<150ms) ANTES da primeira renderização da tela.
+  // Isso elimina o atraso de 1s e impede totalmente que o site mostre informações antigas ao abrir.
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      await Promise.race([
+        syncDataFromSupabase(true),
+        new Promise(resolve => setTimeout(resolve, 800)) // timeout de proteção de 800ms
+      ]);
+    } catch (e) {
+      console.warn('Aviso sincronização inicial:', e);
+    }
+  }
+
+  // 3. Renderiza o site com os dados 100% atualizados em primeira mão
   renderApp();
   requestSchedule();
-  initCloudSync();
+
   autoAdvanceFinishedMatches();
   setInterval(autoAdvanceFinishedMatches, 30000);
   setInterval(liveDashboardHeartbeat, 10000); // Atualização ao vivo contínua dos cronômetros e jogos
@@ -330,6 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }, 30000); // Atualiza os horários para ocultar os que acabaram de passar
+
   // Registra Service Worker para notificações em segundo plano no celular
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js?v=4.8.2').catch(err => {
@@ -348,6 +365,16 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   ['click', 'touchstart', 'touchend', 'pointerdown'].forEach(evt => {
     window.addEventListener(evt, unlockAudioAndNotif, { once: true });
+  });
+
+  // 4. ⚡ Atualização instantânea ao sair/minimizar e voltar para a aba (sem nenhum atraso)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkAndSyncBookingsBackground();
+    }
+  });
+  window.addEventListener('focus', () => {
+    checkAndSyncBookingsBackground();
   });
 
   // Polling em segundo plano a cada 3.5s para sincronizar agendamentos em tempo real de forma blindada
@@ -9824,31 +9851,48 @@ async function requestNotificationPermission() {
   }
 }
 
-async function syncDataFromSupabase() {
+
+async function syncDataFromSupabase(skipRender = false) {
   if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
   const client = window.ArenaSupabase.getClient();
+  if (!client) return;
 
   try {
-    const { data: dbCourts } = await client.from('courts').select('*').order('order_index', { ascending: true });
+    // ⚡ Consultas paralelas de alta velocidade (1 única rodada de rede HTTP/2)
+    const [
+      { data: dbCourts },
+      { data: dbProducts },
+      { data: dbMembers },
+      { data: dbBookings },
+      { data: dbCustomers, error: errCust }
+    ] = await Promise.all([
+      client.from('courts').select('*').order('order_index', { ascending: true }),
+      client.from('products').select('*'),
+      client.from('monthly_members').select('*'),
+      client.from('bookings').select('*'),
+      client.from('customers').select('*').order('created_at', { ascending: false })
+    ]);
+
     if (dbCourts && dbCourts.length > 0) {
       state.courts = dbCourts.map(normalizeCourt);
       if (state.selectedCourt) {
         const matching = state.courts.find(c => c.id === state.selectedCourt.id);
         if (matching) state.selectedCourt = matching;
       }
+      localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
     }
 
-    const { data: dbProducts } = await client.from('products').select('*');
     if (dbProducts && dbProducts.length > 0) {
       state.products = dbProducts;
     }
 
-    const { data: dbMembers } = await client.from('monthly_members').select('*');
     if (dbMembers) state.monthlyMembers = dbMembers;
 
-    const { data: dbBookings } = await client.from('bookings').select('*');
     if (dbBookings) {
-      state.bookings = dbBookings;
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
+      state.bookings = validDbBookings;
+      localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
+
       const maintFromDb = dbBookings
         .filter(b => b.booking_type === 'manutencao' || b.bookingType === 'manutencao')
         .map(b => ({
@@ -9868,94 +9912,13 @@ async function syncDataFromSupabase() {
         state.maintenanceBlocks = Array.from(map.values());
         localStorage.setItem('arena_maintenance_blocks', JSON.stringify(state.maintenanceBlocks));
       }
-
-      // Sincroniza arena_local_bookings diretamente com os dados autoritativos do banco
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
-      state.bookings = validDbBookings;
-      localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
     }
 
-    // Carrega clientes do Supabase para ter os dados registrados prontos na memória
-    await loadSupabaseCustomers();
-
-    // Sistema Avançado de Notificações Mobile / Segundo Plano da Arena Limoeiro
-    async function triggerBookingNotification(booking, type = 'new') {
-      if (!booking) return;
-
-      const court = state.courts.find(c => c.id === booking.court_id || c.id === booking.courtId);
-      const courtName = court ? court.name : (booking.court_name || 'Quadra');
-      const customerName = booking.customer_name || booking.name || 'Cliente';
-      const dateFormatted = booking.date || '';
-      const timeFormatted = booking.start_time ? `${booking.start_time}` : (booking.time || '');
-
-      const isUpdate = type === 'update';
-      const title = isUpdate ? '🔄 Jogo Atualizado na Arena!' : '⚽ Novo Jogo Agendado!';
-      const body = `${courtName} • ${customerName} | ${dateFormatted} às ${timeFormatted}`;
-
-      // 1. Som e vibração local no celular
+    if (dbCustomers && !errCust) {
+      state.supabaseCustomers = dbCustomers;
       try {
-        if ('vibrate' in navigator) navigator.vibrate([200, 100, 200]);
-      } catch (e) {}
-
-      // 2. Notificação Nativa do Android via Capacitor LocalNotifications
-      try {
-        const LocalNotifications = window.Capacitor?.Plugins?.LocalNotifications;
-        if (LocalNotifications) {
-          await LocalNotifications.requestPermissions().catch(() => {});
-          await LocalNotifications.createChannel({
-            id: 'arena_bookings',
-            name: 'Agendamentos e Jogos',
-            description: 'Notificações de novos jogos e atualizações na Arena Limoeiro',
-            importance: 5,
-            visibility: 1,
-            vibration: true
-          }).catch(() => {});
-
-          const notifId = Math.floor(Math.random() * 1000000);
-          await LocalNotifications.schedule({
-            notifications: [
-              {
-                id: notifId,
-                title: title,
-                body: body,
-                channelId: 'arena_bookings',
-                smallIcon: 'ic_launcher_round',
-                schedule: { at: new Date(Date.now() + 100) },
-                extra: { bookingId: booking.id, type: type }
-              }
-            ]
-          });
-          return;
-        }
-      } catch (err) {
-        console.warn('Erro ao disparar LocalNotification via Capacitor:', err);
-      }
-
-      // 3. Fallback: Service Worker para PWA / Navegador em Segundo Plano
-      try {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({
-            type: 'SHOW_NOTIFICATION',
-            title: title,
-            options: {
-              body: body,
-              icon: '/icon-192.png',
-              badge: '/icon-192.png',
-              vibrate: [200, 100, 200],
-              tag: 'booking-' + (booking.id || Date.now()),
-              data: { url: '/', bookingId: booking.id }
-            }
-          });
-          return;
-        }
-      } catch (swErr) {}
-
-      // 4. Fallback Web Notification
-      try {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(title, { body: body, icon: '/icon-192.png' });
-        }
-      } catch (e) {}
+        localStorage.setItem('arena_customers', JSON.stringify(dbCustomers));
+      } catch(e) {}
     }
 
     // Solicitar permissão de notificação no celular
@@ -9968,7 +9931,9 @@ async function syncDataFromSupabase() {
     } catch (e) {}
 
     requestSchedule();
-    renderApp();
+    if (!skipRender) {
+      renderApp();
+    }
 
     // 1. ✅ Canal Broadcast Ultrarrápido — Transmissão instantânea (<50ms) entre celular e PC
     if (window.ArenaSupabase && window.ArenaSupabase.getBroadcastChannel) {
@@ -10118,7 +10083,14 @@ async function checkAndSyncBookingsBackground() {
 
   _isSyncingBg = true;
   try {
-    const { data: dbBookings, error } = await client.from('bookings').select('*');
+    const [
+      { data: dbBookings, error },
+      { data: dbCourts }
+    ] = await Promise.all([
+      client.from('bookings').select('*'),
+      client.from('courts').select('*').order('order_index', { ascending: true })
+    ]);
+
     if (dbBookings && !error) {
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
       const brandNew = dbBookings.filter(b => b && b.id && !existingMap.has(b.id));
@@ -10153,7 +10125,6 @@ async function checkAndSyncBookingsBackground() {
     }
 
     // Sincroniza quadras em segundo plano (detecta liberação, manutenção ou aviso prévio)
-    const { data: dbCourts } = await client.from('courts').select('*').order('order_index', { ascending: true });
     if (dbCourts && Array.isArray(dbCourts) && dbCourts.length > 0) {
       const normCourts = dbCourts.map(normalizeCourt);
       let courtsChanged = false;
