@@ -77,6 +77,61 @@
       }
     },
 
+    // Utilitário para extrair dados estruturados das observações do cliente
+    parseCustomerNotes(notes) {
+      const result = { emergency_contact: '', health_notes: '', birth_date: '', cpf: '' };
+      if (!notes) return result;
+      if (typeof notes === 'object') {
+        return {
+          emergency_contact: notes.emergency_contact || notes.emergencyContact || '',
+          health_notes: notes.health_notes || notes.healthNotes || '',
+          birth_date: notes.birth_date || notes.birthDate || '',
+          cpf: notes.cpf || ''
+        };
+      }
+      const trimmed = String(notes).trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const obj = JSON.parse(trimmed);
+          return {
+            emergency_contact: obj.emergency_contact || obj.emergencyContact || '',
+            health_notes: obj.health_notes || obj.healthNotes || '',
+            birth_date: obj.birth_date || obj.birthDate || '',
+            cpf: obj.cpf || ''
+          };
+        } catch(e) {}
+      }
+      const parts = trimmed.split(/\s*\|\s*/);
+      for (const part of parts) {
+        if (/^emerg[êe]ncia:\s*/i.test(part)) {
+          result.emergency_contact = part.replace(/^emerg[êe]ncia:\s*/i, '').trim();
+        } else if (/^sa[úu]de:\s*/i.test(part)) {
+          result.health_notes = part.replace(/^sa[úu]de:\s*/i, '').trim();
+        } else if (/^nascimento:\s*/i.test(part)) {
+          result.birth_date = part.replace(/^nascimento:\s*/i, '').trim();
+        } else if (/^cpf:\s*/i.test(part)) {
+          result.cpf = part.replace(/^cpf:\s*/i, '').trim();
+        }
+      }
+      if (!result.emergency_contact) {
+        const m = trimmed.match(/emerg[êe]ncia:\s*([^|\n]+)/i);
+        if (m) result.emergency_contact = m[1].trim();
+      }
+      if (!result.health_notes) {
+        const m = trimmed.match(/sa[úu]de:\s*([^|\n]+)/i);
+        if (m) result.health_notes = m[1].trim();
+      }
+      if (!result.birth_date) {
+        const m = trimmed.match(/nascimento:\s*([^|\n]+)/i);
+        if (m) result.birth_date = m[1].trim();
+      }
+      if (!result.cpf) {
+        const m = trimmed.match(/cpf:\s*([^|\n]+)/i);
+        if (m) result.cpf = m[1].trim();
+      }
+      return result;
+    },
+
     // Buscar ou Criar Cliente na tabela 'customers' com suporte a documento e observações
     async getOrCreateCustomer(name, phone, email = '', extraData = {}) {
       const client = this.getClient();
@@ -84,36 +139,71 @@
 
       try {
         const cleanPhone = (phone || '').replace(/\D/g, '');
-        // Tenta encontrar por telefone (formatado ou apenas dígitos)
         let existing = null;
+
+        // 1. Tenta encontrar por telefone sem quebrar a sintaxe do PostgREST
         if (phone) {
-          const { data: byPhone } = await client
-            .from('customers')
-            .select('*')
-            .or(`phone.eq.${phone},phone.eq.${cleanPhone}`)
-            .limit(1);
-          if (byPhone && byPhone.length > 0) existing = byPhone[0];
+          const { data: d1 } = await client.from('customers').select('*').eq('phone', phone).limit(1);
+          if (d1 && d1.length > 0) existing = d1[0];
+        }
+        if (!existing && cleanPhone) {
+          const { data: d2 } = await client.from('customers').select('*').eq('phone', cleanPhone).limit(1);
+          if (d2 && d2.length > 0) existing = d2[0];
+        }
+        if (!existing && cleanPhone.length >= 8) {
+          const { data: d3 } = await client.from('customers').select('*').ilike('phone', `%${cleanPhone.slice(-8)}%`).limit(1);
+          if (d3 && d3.length > 0) existing = d3[0];
         }
 
+        // 2. Tenta encontrar por CPF (documento) caso fornecido
+        const cleanCpf = (extraData.cpf || '').replace(/\D/g, '');
+        if (!existing && cleanCpf.length === 11) {
+          const { data: byDoc } = await client.from('customers').select('*').eq('document', extraData.cpf).limit(1);
+          if (byDoc && byDoc.length > 0) existing = byDoc[0];
+          else {
+            const { data: byDocClean } = await client.from('customers').select('*').eq('document', cleanCpf).limit(1);
+            if (byDocClean && byDocClean.length > 0) existing = byDocClean[0];
+          }
+        }
+
+        const existingParsed = existing ? this.parseCustomerNotes(existing.notes) : {};
+        const mergedCpf = extraData.cpf || (existing ? (existing.document || existing.cpf || existingParsed.cpf) : '') || '';
+        const mergedBirth = extraData.birth_date || (existing ? (existing.birth_date || existingParsed.birth_date) : '') || '';
+        const mergedEmergency = extraData.emergency_contact || (existing ? (existing.emergency_contact || existingParsed.emergency_contact) : '') || '';
+        const mergedHealth = (extraData.health_notes && extraData.health_notes !== 'Nenhuma restrição informada')
+          ? extraData.health_notes
+          : (existing ? (existing.health_notes || existingParsed.health_notes || extraData.health_notes || '') : (extraData.health_notes || ''));
+
         const notesArr = [];
-        if (extraData.birth_date) notesArr.push(`Nascimento: ${extraData.birth_date}`);
-        if (extraData.emergency_contact) notesArr.push(`Emergência: ${extraData.emergency_contact}`);
-        if (extraData.health_notes) notesArr.push(`Saúde: ${extraData.health_notes}`);
+        if (mergedBirth) notesArr.push(`Nascimento: ${mergedBirth}`);
+        if (mergedEmergency) notesArr.push(`Emergência: ${mergedEmergency}`);
+        if (mergedHealth) notesArr.push(`Saúde: ${mergedHealth}`);
         const notesStr = notesArr.join(' | ') || null;
 
         if (existing) {
           const updates = {};
           if (name && name !== existing.name) updates.name = name;
           if (email && email !== existing.email) updates.email = email;
-          if (extraData.cpf && extraData.cpf !== existing.document) updates.document = extraData.cpf;
+          if (mergedCpf && mergedCpf !== existing.document) updates.document = mergedCpf;
           if (notesStr && notesStr !== existing.notes) updates.notes = notesStr;
 
           if (Object.keys(updates).length > 0) {
             try {
               await client.from('customers').update(updates).eq('id', existing.id);
-            } catch(e) {}
+            } catch(e) {
+              console.warn('Aviso ao atualizar cliente no Supabase:', e);
+            }
           }
-          return { ...existing, ...updates, ...extraData };
+          return {
+            ...existing,
+            ...updates,
+            cpf: mergedCpf,
+            document: mergedCpf,
+            birth_date: mergedBirth,
+            emergency_contact: mergedEmergency,
+            emergencyContact: mergedEmergency,
+            health_notes: mergedHealth
+          };
         }
 
         const newId = 'cust-' + Date.now();
@@ -122,7 +212,7 @@
           name: name || 'Cliente',
           phone: phone || '',
           email: email || '',
-          document: extraData.cpf || null,
+          document: mergedCpf || null,
           notes: notesStr
         };
 
@@ -133,17 +223,45 @@
           .single();
 
         if (!error && created) {
-          return created;
+          return {
+            ...created,
+            cpf: mergedCpf,
+            document: mergedCpf,
+            birth_date: mergedBirth,
+            emergency_contact: mergedEmergency,
+            emergencyContact: mergedEmergency,
+            health_notes: mergedHealth
+          };
         }
 
-        // Fallback garantido: apenas campos base essenciais
+        // Fallback: tenta sem campos adicionais apenas se falhar
         const { data: fallbackCreated } = await client
           .from('customers')
           .insert([{ id: newId, name: name || 'Cliente', phone: phone || '', email: email || '' }])
           .select()
           .single();
 
-        return fallbackCreated || { id: newId, name, phone, email, document: extraData.cpf, ...extraData };
+        return fallbackCreated ? {
+          ...fallbackCreated,
+          cpf: mergedCpf,
+          document: mergedCpf,
+          birth_date: mergedBirth,
+          emergency_contact: mergedEmergency,
+          emergencyContact: mergedEmergency,
+          health_notes: mergedHealth
+        } : {
+          id: newId,
+          name,
+          phone,
+          email,
+          document: mergedCpf,
+          cpf: mergedCpf,
+          emergency_contact: mergedEmergency,
+          emergencyContact: mergedEmergency,
+          birth_date: mergedBirth,
+          health_notes: mergedHealth,
+          ...extraData
+        };
       } catch (err) {
         console.error('Erro no cadastro do cliente:', err);
         return { id: 'cust-' + Date.now(), name, phone, email, ...extraData };

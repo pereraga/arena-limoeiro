@@ -27,6 +27,40 @@ function formatPhone(val) {
   return '(' + num.slice(0, 2) + ') ' + num.slice(2, 7) + '-' + num.slice(7, 11);
 }
 
+function formatCPF(val) {
+  if (!val) return '';
+  const num = String(val).replace(/\D/g, '').slice(0, 11);
+  if (num.length <= 3) return num;
+  if (num.length <= 6) return num.slice(0, 3) + '.' + num.slice(3);
+  if (num.length <= 9) return num.slice(0, 3) + '.' + num.slice(3, 6) + '.' + num.slice(6);
+  return num.slice(0, 3) + '.' + num.slice(3, 6) + '.' + num.slice(6, 9) + '-' + num.slice(9, 11);
+}
+
+function validateCPF(cpf) {
+  if (!cpf) return false;
+  const clean = String(cpf).replace(/\D/g, '');
+  if (clean.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(clean)) return false;
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(clean.charAt(i), 10) * (10 - i);
+  }
+  let rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(clean.charAt(9), 10)) return false;
+
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(clean.charAt(i), 10) * (11 - i);
+  }
+  rev = 11 - (sum % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(clean.charAt(10), 10)) return false;
+
+  return true;
+}
+
 
 // Detecta se a URL requisita modo admin ou se o gestor já estava logado
 const _initialUrlParams = new URLSearchParams(window.location.search);
@@ -216,6 +250,89 @@ function normalizeCourt(c) {
     discountStartTime: specsObj.discount_start_time || c.discountStartTime || '09:00',
     discountEndTime: specsObj.discount_end_time || c.discountEndTime || '16:00',
     image: specsGallery[0] || c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
+  };
+}
+
+// ==============================================================================
+// 👤 NORMALIZADOR DE CLIENTES / ATLETAS (COMPATIBILIDADE SUPABASE & LOCAL)
+// ==============================================================================
+function parseCustomerNotes(notes) {
+  const result = { emergency_contact: '', health_notes: '', birth_date: '', cpf: '' };
+  if (!notes) return result;
+  if (typeof notes === 'object') {
+    return {
+      emergency_contact: notes.emergency_contact || notes.emergencyContact || '',
+      health_notes: notes.health_notes || notes.healthNotes || '',
+      birth_date: notes.birth_date || notes.birthDate || '',
+      cpf: notes.cpf || ''
+    };
+  }
+  const trimmed = String(notes).trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const obj = JSON.parse(trimmed);
+      return {
+        emergency_contact: obj.emergency_contact || obj.emergencyContact || '',
+        health_notes: obj.health_notes || obj.healthNotes || '',
+        birth_date: obj.birth_date || obj.birthDate || '',
+        cpf: obj.cpf || ''
+      };
+    } catch(e) {}
+  }
+  const parts = trimmed.split(/\s*\|\s*/);
+  for (const part of parts) {
+    if (/^emerg[êe]ncia:\s*/i.test(part)) {
+      result.emergency_contact = part.replace(/^emerg[êe]ncia:\s*/i, '').trim();
+    } else if (/^sa[úu]de:\s*/i.test(part)) {
+      result.health_notes = part.replace(/^sa[úu]de:\s*/i, '').trim();
+    } else if (/^nascimento:\s*/i.test(part)) {
+      result.birth_date = part.replace(/^nascimento:\s*/i, '').trim();
+    } else if (/^cpf:\s*/i.test(part)) {
+      result.cpf = part.replace(/^cpf:\s*/i, '').trim();
+    }
+  }
+  if (!result.emergency_contact) {
+    const m = trimmed.match(/emerg[êe]ncia:\s*([^|\n]+)/i);
+    if (m) result.emergency_contact = m[1].trim();
+  }
+  if (!result.health_notes) {
+    const m = trimmed.match(/sa[úu]de:\s*([^|\n]+)/i);
+    if (m) result.health_notes = m[1].trim();
+  }
+  if (!result.birth_date) {
+    const m = trimmed.match(/nascimento:\s*([^|\n]+)/i);
+    if (m) result.birth_date = m[1].trim();
+  }
+  if (!result.cpf) {
+    const m = trimmed.match(/cpf:\s*([^|\n]+)/i);
+    if (m) result.cpf = m[1].trim();
+  }
+  return result;
+}
+
+function normalizeCustomer(raw) {
+  if (!raw) return null;
+  const parsed = parseCustomerNotes(raw.notes);
+  const rawCpf = raw.cpf || raw.customer_cpf || raw.customerCPF || raw.document || parsed.cpf || '';
+  const cpf = rawCpf ? formatCPF(rawCpf) : '';
+  const emergencyContact = raw.emergency_contact || raw.emergencyContact || raw.emergency || parsed.emergency_contact || '';
+  const birthDate = raw.birth_date || raw.birthDate || parsed.birth_date || '';
+  const healthNotes = raw.health_notes || raw.healthNotes || parsed.health_notes || '';
+
+  return {
+    ...raw,
+    id: raw.id || ('cust-' + Date.now()),
+    name: raw.name || raw.customer_name || raw.customerName || 'Atleta',
+    phone: raw.phone || raw.customer_phone || raw.customerPhone || '',
+    email: raw.email || raw.customer_email || raw.customerEmail || '',
+    cpf: cpf,
+    document: cpf,
+    emergency_contact: emergencyContact,
+    emergencyContact: emergencyContact,
+    birth_date: birthDate,
+    birthDate: birthDate,
+    health_notes: healthNotes,
+    healthNotes: healthNotes
   };
 }
 
@@ -4667,32 +4784,72 @@ function renderAdminSubTabContent(tab) {
     try { localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]'); } catch (e) {}
 
     const mapByPhone = new Map();
-    (state.supabaseCustomers || []).forEach(c => {
-      if (c && c.phone) {
-        const clean = c.phone.replace(/\D/g, '');
-        mapByPhone.set(clean, { ...c });
+
+    function mergeCustomerIntoMap(rawCust, isHighPriority = false) {
+      if (!rawCust || !rawCust.phone) return;
+      const clean = String(rawCust.phone).replace(/\D/g, '');
+      if (!clean) return;
+      const norm = normalizeCustomer(rawCust);
+      if (!norm) return;
+
+      if (!mapByPhone.has(clean)) {
+        mapByPhone.set(clean, norm);
+        return;
       }
-    });
-    localCusts.forEach(c => {
-      if (c && c.phone) {
-        const clean = c.phone.replace(/\D/g, '');
-        if (mapByPhone.has(clean)) {
-          const existing = mapByPhone.get(clean);
-          mapByPhone.set(clean, {
-            ...existing,
-            cpf: existing.cpf || c.cpf,
-            emergency_contact: existing.emergency_contact || c.emergency_contact,
-            health_notes: existing.health_notes || c.health_notes,
-            birth_date: existing.birth_date || c.birth_date,
-            email: existing.email || c.email
-          });
-        } else {
-          mapByPhone.set(clean, { ...c });
-        }
+
+      const existing = mapByPhone.get(clean);
+      const mergedCpf = isHighPriority ? (norm.cpf || existing.cpf) : (existing.cpf || norm.cpf);
+      const mergedEmerg = isHighPriority ? (norm.emergency_contact || existing.emergency_contact) : (existing.emergency_contact || norm.emergency_contact);
+      const mergedHealth = isHighPriority
+        ? ((norm.health_notes && norm.health_notes !== 'Nenhuma restrição informada') ? norm.health_notes : (existing.health_notes || norm.health_notes))
+        : ((existing.health_notes && existing.health_notes !== 'Nenhuma restrição informada') ? existing.health_notes : (norm.health_notes || existing.health_notes));
+      const mergedBirth = isHighPriority ? (norm.birth_date || existing.birth_date) : (existing.birth_date || norm.birth_date);
+      const mergedEmail = isHighPriority ? (norm.email || existing.email) : (existing.email || norm.email);
+      const mergedName = isHighPriority ? (norm.name || existing.name) : (existing.name || norm.name);
+
+      mapByPhone.set(clean, {
+        ...existing,
+        ...norm,
+        id: existing.id || norm.id,
+        name: mergedName,
+        phone: existing.phone || norm.phone,
+        email: mergedEmail,
+        cpf: mergedCpf,
+        document: mergedCpf,
+        emergency_contact: mergedEmerg,
+        emergencyContact: mergedEmerg,
+        health_notes: mergedHealth,
+        healthNotes: mergedHealth,
+        birth_date: mergedBirth,
+        birthDate: mergedBirth
+      });
+    }
+
+    // 1. Supabase
+    (state.supabaseCustomers || []).forEach(c => mergeCustomerIntoMap(c, false));
+
+    // 2. localStorage
+    localCusts.forEach(c => mergeCustomerIntoMap(c, true));
+
+    // 3. Histórico de reservas
+    (state.bookings || []).forEach(b => {
+      const p = b.customer_phone || b.customerPhone;
+      if (p) {
+        const parsedObs = parseCustomerFromObservation(b.observation || '');
+        mergeCustomerIntoMap({
+          id: b.customer_id || b.customerId,
+          name: b.customer_name || b.customerName,
+          phone: p,
+          email: b.customer_email || b.customerEmail || '',
+          cpf: b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || '',
+          emergency_contact: b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || '',
+          health_notes: b.health_notes || b.healthNotes || parsedObs.health_notes || '',
+          birth_date: b.birth_date || b.birthDate || ''
+        }, false);
       }
     });
 
-    const allCustomers = Array.from(mapByPhone.values());
+    const allCustomers = Array.from(mapByPhone.values()).map(normalizeCustomer);
 
     return `
       <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
@@ -6296,23 +6453,29 @@ async function handleDirectBookingSubmit(e) {
   if (!state.supabaseCustomers) state.supabaseCustomers = [];
   const cleanP = phone.replace(/\D/g, '');
   const exIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanP);
+  const updatedCust = normalizeCustomer({ 
+    id: (savedCust && savedCust.id) ? savedCust.id : ('cust-' + Date.now()), 
+    name, 
+    phone, 
+    cpf: customerCpf,
+    document: customerCpf, 
+    emergency_contact: emergency,
+    emergencyContact: emergency
+  });
+
   if (exIdx >= 0) {
-    state.supabaseCustomers[exIdx] = { 
+    state.supabaseCustomers[exIdx] = normalizeCustomer({ 
       ...state.supabaseCustomers[exIdx], 
-      name, 
-      phone, 
+      ...updatedCust,
       cpf: customerCpf || state.supabaseCustomers[exIdx].cpf, 
       emergency_contact: emergency || state.supabaseCustomers[exIdx].emergency_contact 
-    };
-  } else {
-    state.supabaseCustomers.unshift({ 
-      id: 'cust-' + Date.now(), 
-      name, 
-      phone, 
-      cpf: customerCpf, 
-      emergency_contact: emergency 
     });
+  } else {
+    state.supabaseCustomers.unshift(updatedCust);
   }
+  try {
+    localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
+  } catch(e) {}
 
   // Dispara notificação imediata
   try {
@@ -8571,40 +8734,6 @@ function deleteCategory(catId, returnToCourtModal = false) {
 // 📋 VALIDAÇÃO DE CPF & IDENTIFICAÇÃO INTELIGENTE DE ATLETA / PELADEIRO
 // ==============================================================================
 
-function validateCPF(cpf) {
-  if (!cpf) return false;
-  const clean = String(cpf).replace(/\D/g, '');
-  if (clean.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(clean)) return false;
-
-  let sum = 0;
-  for (let i = 0; i < 9; i++) {
-    sum += parseInt(clean.charAt(i), 10) * (10 - i);
-  }
-  let rev = 11 - (sum % 11);
-  if (rev === 10 || rev === 11) rev = 0;
-  if (rev !== parseInt(clean.charAt(9), 10)) return false;
-
-  sum = 0;
-  for (let i = 0; i < 10; i++) {
-    sum += parseInt(clean.charAt(i), 10) * (11 - i);
-  }
-  rev = 11 - (sum % 11);
-  if (rev === 10 || rev === 11) rev = 0;
-  if (rev !== parseInt(clean.charAt(10), 10)) return false;
-
-  return true;
-}
-
-function formatCPF(val) {
-  if (!val) return '';
-  const num = String(val).replace(/\D/g, '').slice(0, 11);
-  if (num.length <= 3) return num;
-  if (num.length <= 6) return num.slice(0, 3) + '.' + num.slice(3);
-  if (num.length <= 9) return num.slice(0, 3) + '.' + num.slice(3, 6) + '.' + num.slice(6);
-  return num.slice(0, 3) + '.' + num.slice(3, 6) + '.' + num.slice(6, 9) + '-' + num.slice(9, 11);
-}
-
 
 function parseCustomerFromObservation(obs) {
   if (!obs || typeof obs !== 'string') return {};
@@ -8627,39 +8756,45 @@ function findCustomerByPhone(phone) {
 
   function matchInList(list, extractors) {
     if (!list || !list.length) return null;
-    // 1. Match exato apenas dos números
+    const matches = [];
     for (const item of list) {
       const p = extractors.phone(item);
       const cClean = (p || '').replace(/\D/g, '');
-      if (cClean && cClean === clean) return extractors.format(item);
-    }
-    // 2. Match pelos últimos 9 dígitos (cobre variações com e sem nono dígito e DDDs)
-    if (last9) {
-      for (const item of list) {
-        const p = extractors.phone(item);
-        const cClean = (p || '').replace(/\D/g, '');
-        if (cClean && cClean.length >= 9 && (cClean.endsWith(last9) || clean.endsWith(cClean.slice(-9)))) {
-          return extractors.format(item);
-        }
+      if (!cClean) continue;
+      if (cClean === clean || (last9 && cClean.length >= 9 && (cClean.endsWith(last9) || clean.endsWith(cClean.slice(-9)))) || (last8 && cClean.length >= 8 && (cClean.endsWith(last8) || clean.endsWith(cClean.slice(-8))))) {
+        const formatted = extractors.format(item);
+        if (formatted) matches.push(formatted);
       }
     }
-    // 3. Match pelos últimos 8 dígitos (identificador único da linha de telefone)
-    if (last8) {
-      for (const item of list) {
-        const p = extractors.phone(item);
-        const cClean = (p || '').replace(/\D/g, '');
-        if (cClean && cClean.length >= 8 && (cClean.endsWith(last8) || clean.endsWith(cClean.slice(-8)))) {
-          return extractors.format(item);
-        }
-      }
+    if (matches.length === 0) return null;
+    if (matches.length === 1) return matches[0];
+
+    // Mescla múltiplos registros encontrados para garantir que CPF e Emergência nunca se percam
+    let merged = { ...matches[0] };
+    for (let i = 1; i < matches.length; i++) {
+      const m = matches[i];
+      merged = {
+        ...merged,
+        id: merged.id || m.id,
+        name: merged.name || m.name,
+        phone: merged.phone || m.phone,
+        email: merged.email || m.email,
+        cpf: merged.cpf || m.cpf || '',
+        document: merged.cpf || m.cpf || '',
+        emergency_contact: merged.emergency_contact || m.emergency_contact || '',
+        emergencyContact: merged.emergency_contact || m.emergency_contact || '',
+        birth_date: merged.birth_date || m.birth_date || '',
+        birthDate: merged.birth_date || m.birth_date || '',
+        health_notes: (merged.health_notes && merged.health_notes !== 'Nenhuma restrição informada') ? merged.health_notes : (m.health_notes || merged.health_notes || '')
+      };
     }
-    return null;
+    return merged;
   }
 
   // 1. Procura em state.supabaseCustomers
   let found = matchInList(state.supabaseCustomers || [], {
     phone: c => c.phone,
-    format: c => c
+    format: c => normalizeCustomer(c)
   });
   if (found) return found;
 
@@ -8668,7 +8803,7 @@ function findCustomerByPhone(phone) {
     const local = JSON.parse(localStorage.getItem('arena_customers') || '[]');
     found = matchInList(local, {
       phone: c => c.phone,
-      format: c => c
+      format: c => normalizeCustomer(c)
     });
     if (found) return found;
   } catch(e) {}
@@ -8801,7 +8936,7 @@ async function handleCustomerPhoneInput(input) {
           .order('created_at', { ascending: false });
 
         if (allCusts && allCusts.length > 0) {
-          state.supabaseCustomers = allCusts;
+          state.supabaseCustomers = allCusts.map(normalizeCustomer);
           customer = findCustomerByPhone(clean);
           if (customer) {
             renderCustomerDynamicArea(customer, formatted);
@@ -8821,7 +8956,7 @@ async function handleCustomerPhoneInput(input) {
         if (prevBookings && prevBookings.length > 0) {
           const prevBooking = prevBookings[0];
           const pObs = parseCustomerFromObservation(prevBooking.observation || '');
-          customer = {
+          customer = normalizeCustomer({
             id: prevBooking.customer_id || ('cust-' + Date.now()),
             name: prevBooking.customer_name,
             phone: prevBooking.customer_phone,
@@ -8830,7 +8965,7 @@ async function handleCustomerPhoneInput(input) {
             birth_date: prevBooking.birth_date || '',
             emergency_contact: prevBooking.emergency_contact || pObs.emergency_contact || '',
             health_notes: prevBooking.health_notes || pObs.health_notes || ''
-          };
+          });
           if (!state.supabaseCustomers) state.supabaseCustomers = [];
           state.supabaseCustomers.unshift(customer);
         }
@@ -9007,6 +9142,9 @@ function openCustomerModal(targetPhoneOrId = null) {
       existing = state.supabaseCustomers.find(c => c.id === targetPhoneOrId || c.phone === targetPhoneOrId);
     }
   }
+  if (existing) {
+    existing = normalizeCustomer(existing);
+  }
 
   const isEditing = !!existing;
 
@@ -9114,15 +9252,17 @@ async function saveCustomerFromAdminModal(event, existingId) {
   }
 
   const cleanPhone = phone.replace(/\D/g, '');
-  const customerData = {
+  const customerData = normalizeCustomer({
+    id: existingId || ('cust-' + Date.now()),
     name,
-    phone,
-    cpf,
+    phone: formatPhone(phone),
+    cpf: formatCPF(cpf),
+    document: formatCPF(cpf),
     email,
     birth_date,
     emergency_contact,
     health_notes: health_notes || 'Nenhuma restrição informada'
-  };
+  });
 
   try {
     let localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]');
@@ -9130,17 +9270,18 @@ async function saveCustomerFromAdminModal(event, existingId) {
     if (idx >= 0) {
       localCusts[idx] = { ...localCusts[idx], ...customerData };
     } else {
-      localCusts.push({ id: existingId || ('cust_' + Date.now()), ...customerData });
+      localCusts.push(customerData);
     }
     localStorage.setItem('arena_customers', JSON.stringify(localCusts));
   } catch (e) {
     console.error('Erro ao salvar cliente local:', e);
   }
 
+  let savedCust = null;
   try {
     if (window.ArenaSupabase && window.ArenaSupabase.getOrCreateCustomer) {
-      await window.ArenaSupabase.getOrCreateCustomer(name, phone, email, {
-        cpf,
+      savedCust = await window.ArenaSupabase.getOrCreateCustomer(name, phone, email, {
+        cpf: formatCPF(cpf),
         birth_date,
         emergency_contact,
         health_notes: customerData.health_notes
@@ -9150,12 +9291,14 @@ async function saveCustomerFromAdminModal(event, existingId) {
     console.warn('Erro ao sincronizar cliente no Supabase:', err);
   }
 
+  const finalCustomer = normalizeCustomer(savedCust ? { ...customerData, ...savedCust } : customerData);
+
   if (state.supabaseCustomers) {
     const sIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone || (existingId && c.id === existingId));
     if (sIdx >= 0) {
-      state.supabaseCustomers[sIdx] = { ...state.supabaseCustomers[sIdx], ...customerData };
+      state.supabaseCustomers[sIdx] = { ...state.supabaseCustomers[sIdx], ...finalCustomer };
     } else {
-      state.supabaseCustomers.push({ id: existingId || ('cust_' + Date.now()), ...customerData });
+      state.supabaseCustomers.unshift(finalCustomer);
     }
   }
 
@@ -9375,13 +9518,14 @@ async function submitBooking(grandTotal) {
   let healthNotes = '';
 
   if (existingCust) {
+    const norm = normalizeCustomer(existingCust);
     const nameInput = document.getElementById('custName');
-    name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : existingCust.name;
-    cpf = existingCust.cpf || '';
-    email = existingCust.email || '';
-    birthDate = existingCust.birth_date || '';
-    emergency = existingCust.emergency_contact || '';
-    healthNotes = existingCust.health_notes || '';
+    name = (nameInput && nameInput.value.trim()) ? nameInput.value.trim() : norm.name;
+    cpf = norm.cpf || norm.document || '';
+    email = norm.email || '';
+    birthDate = norm.birth_date || '';
+    emergency = norm.emergency_contact || '';
+    healthNotes = norm.health_notes || '';
   } else {
     const nameInput = document.getElementById('custName');
     const cpfInput = document.getElementById('custCPF');
@@ -9453,17 +9597,18 @@ async function submitBooking(grandTotal) {
   }
 
   // 2. Salva ou atualiza os dados completos do cliente
-  const customerRecord = {
+  const customerRecord = normalizeCustomer({
     id: existingCust ? existingCust.id : ('cust-' + Date.now()),
     name,
     phone: formatPhone(phone),
     email: email || '',
     cpf: formatCPF(cpf),
+    document: formatCPF(cpf),
     birth_date: birthDate || '',
     emergency_contact: emergency || '',
     health_notes: healthNotes || 'Nenhuma restrição informada',
     created_at: existingCust ? (existingCust.created_at || new Date().toISOString()) : new Date().toISOString()
-  };
+  });
 
   if (!state.supabaseCustomers) state.supabaseCustomers = [];
   const existingIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone);
@@ -9583,6 +9728,17 @@ async function submitBooking(grandTotal) {
         }
       } catch (custErr) {
         console.warn('Aviso no cadastro de cliente Supabase:', custErr);
+      }
+
+      if (savedCustomer) {
+        const normSaved = normalizeCustomer(savedCustomer);
+        if (!state.supabaseCustomers) state.supabaseCustomers = [];
+        const exIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone);
+        if (exIdx >= 0) state.supabaseCustomers[exIdx] = { ...state.supabaseCustomers[exIdx], ...normSaved };
+        else state.supabaseCustomers.unshift(normSaved);
+        try {
+          localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
+        } catch(e) {}
       }
 
       const validCustomerId = (savedCustomer && savedCustomer.id) ? savedCustomer.id : null;
@@ -10025,12 +10181,12 @@ async function loadSupabaseCustomers() {
       const client = window.ArenaSupabase.getClient();
       const { data, error } = await client.from('customers').select('*').order('created_at', { ascending: false });
       if (data && !error) {
-        state.supabaseCustomers = data;
+        state.supabaseCustomers = (data || []).map(normalizeCustomer);
         try {
-          localStorage.setItem('arena_customers', JSON.stringify(data));
+          localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
         } catch(e) {}
 
-        if (state.currentMode === 'admin' && state.adminTab === 'customers') renderStepContent();
+        if (state.currentMode === 'admin' && (state.adminTab === 'customers' || state.adminSubTab === 'customers')) renderStepContent();
       }
     } catch(err) {
       console.warn('Aviso ao sincronizar clientes do Supabase:', err);
@@ -10325,9 +10481,9 @@ async function syncDataFromSupabase(skipRender = false) {
     }
 
     if (dbCustomers && !errCust) {
-      state.supabaseCustomers = dbCustomers;
+      state.supabaseCustomers = (dbCustomers || []).map(normalizeCustomer);
       try {
-        localStorage.setItem('arena_customers', JSON.stringify(dbCustomers));
+        localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
       } catch(e) {}
     }
 
