@@ -3781,12 +3781,11 @@ function renderLiveDashboardTab() {
                         <span>+ Comanda Bar</span>
                       </button>
 
-                      ${!isRecep ? `
-                        <button onclick="handleCancelBooking('${match.id}')" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Apagar este jogo do sistema e liberar o horário imediatamente">
-                          <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
-                          <span>Apagar Jogo</span>
-                        </button>
-                      ` : ''}
+                      <!-- Botão de Apagar Jogo (Disponível em Mobile e Computador) -->
+                      <button onclick="handleCancelBooking('${match.id}')" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs touch-manipulation" title="Apagar este jogo do sistema e liberar o horário imediatamente">
+                        <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
+                        <span>Apagar Jogo</span>
+                      </button>
                     </div>
 
                   </div>
@@ -4153,12 +4152,10 @@ function renderCourtsControlTab() {
                           <span class="w-2 h-2 rounded-full bg-amber-600 mr-1.5 animate-ping"></span>
                           Partida ao Vivo em Andamento
                         </div>
-                        ${!isRecep ? `
-                          <button onclick="handleCancelBooking('${liveBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all" title="Apagar este jogo do sistema">
-                            <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
-                            <span>Apagar Jogo</span>
-                          </button>
-                        ` : ''}
+                        <button onclick="handleCancelBooking('${liveBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all touch-manipulation" title="Apagar este jogo do sistema">
+                          <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                          <span>Apagar Jogo</span>
+                        </button>
                       </div>
                       <p class="font-medium text-[11px] text-amber-800">${liveBooking.customer_name} (${liveBooking.start_time} às ${liveBooking.end_time})</p>
                     </div>
@@ -4169,12 +4166,10 @@ function renderCourtsControlTab() {
                           <i data-lucide="clock" class="w-4 h-4 text-blue-600 mr-1.5"></i>
                           Próxima Partida Hoje
                         </div>
-                        ${!isRecep ? `
-                          <button onclick="handleCancelBooking('${nextBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all" title="Apagar este jogo do sistema">
-                            <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
-                            <span>Apagar Jogo</span>
-                          </button>
-                        ` : ''}
+                        <button onclick="handleCancelBooking('${nextBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all touch-manipulation" title="Apagar este jogo do sistema">
+                          <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                          <span>Apagar Jogo</span>
+                        </button>
                       </div>
                       <p class="font-medium text-[11px] text-blue-800">${nextBooking.customer_name} às ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}</p>
                     </div>
@@ -5287,12 +5282,10 @@ function renderSubtabBookingsItems(bookings) {
             <span>Comanda</span>
           </button>
 
-          ${!isRecep ? `
-            <button onclick="handleCancelBooking('${b.id}')" class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Apagar este jogo do sistema e liberar o horário imediatamente">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
-              <span>Apagar Jogo</span>
-            </button>
-          ` : ''}
+          <button onclick="handleCancelBooking('${b.id}')" class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Apagar este jogo do sistema e liberar o horário imediatamente">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+            <span>Apagar Jogo</span>
+          </button>
         </div>
 
       </div>
@@ -7192,12 +7185,10 @@ function handleMatchModalFilter() {
             <span>Comanda Bar</span>
           </button>
 
-          ${!isRecep ? `
-            <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Apagar este jogo permanentemente do sistema">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
-              <span>Apagar Jogo</span>
-            </button>
-          ` : ''}
+          <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Apagar este jogo permanentemente do sistema">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+            <span>Apagar Jogo</span>
+          </button>
         </div>
 
       </div>
