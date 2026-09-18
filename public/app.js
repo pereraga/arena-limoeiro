@@ -2712,20 +2712,20 @@ function openLoginModal(onSuccessCallback = null) {
           </button>
         </div>
 
-        <form onsubmit="handleLoginSubmit(event)" class="p-6 space-y-4">
+        <form onsubmit="handleLoginSubmit(event)" class="p-6 space-y-4" autocomplete="off">
           <div id="loginErrorMessage" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">E-mail do Administrador *</label>
-            <input type="email" id="loginEmail" required placeholder="admin@arenalimoeiro.com.br" 
-                   value="" autocomplete="username"
+            <input type="email" id="loginEmail" required placeholder="EMAIL" 
+                   value="" autocomplete="off"
                    class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha de Acesso *</label>
-            <input type="password" id="loginPassword" required placeholder="••••••••" 
-                   value="" autocomplete="current-password"
+            <input type="password" id="loginPassword" required placeholder="SENHA" 
+                   value="" autocomplete="new-password"
                    class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
@@ -3231,7 +3231,7 @@ function renderAdminView(container) {
           </button>
         ` : ''}
 
-        ${canManageBar() ? `
+        ${(canManageBar() || canManageProducts()) ? `
           <button onclick="setAdminTab('bar_control')" 
                   class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
                          ${currentTab === 'bar_control' ? 
@@ -3242,7 +3242,7 @@ function renderAdminView(container) {
           </button>
         ` : ''}
 
-        ${(canManageSettings() || canManageCustomers() || canManageMonthly() || canManageProducts()) ? `
+        ${(canManageSettings() || canManageCustomers() || canManageMonthly()) ? `
           <button onclick="setAdminTab('settings')" 
                   class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
                          ${currentTab === 'settings' ? 
@@ -4644,7 +4644,95 @@ function renderCourtsControlTab() {
   `;
 }
 
-// 3. ABA DE CONTROLE DE BEBIDAS, COMIDAS & BAR
+// FUNÇÕES DE CONTROLE DO MÓDULO BAR & LANCHONETE
+function setBarSubTab(tab) {
+  state.barSubTab = tab;
+  renderStepContent();
+  lucide.createIcons();
+}
+
+function setBarCategoryFilter(cat) {
+  state.barProductCategory = cat;
+  renderStepContent();
+  lucide.createIcons();
+}
+
+function handleBarProductSearch(val) {
+  state.barProductSearch = val;
+  const listEl = document.getElementById('barProductGridContainer');
+  if (listEl) {
+    listEl.innerHTML = renderBarProductCards();
+    lucide.createIcons();
+  }
+}
+
+function renderBarProductCards() {
+  const q = (state.barProductSearch || '').toLowerCase().trim();
+  const cat = state.barProductCategory || 'all';
+  const isRecep = isReceptionUser();
+
+  let list = state.products || [];
+  if (cat !== 'all') {
+    list = list.filter(p => (p.category || '').toLowerCase() === cat.toLowerCase());
+  }
+  if (q) {
+    list = list.filter(p => (p.name || '').toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
+  }
+
+  if (list.length === 0) {
+    return `
+      <div class="col-span-full py-12 text-center bg-slate-50/75 rounded-2xl border border-dashed border-slate-200">
+        <i data-lucide="search-x" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
+        <p class="text-sm font-bold text-slate-700">Nenhum produto encontrado</p>
+        <p class="text-xs text-slate-500 mt-0.5">Tente outro termo de pesquisa ou selecione outra categoria.</p>
+        ${!isRecep ? `
+          <button onclick="openProductModal()" class="mt-3 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow cursor-pointer">
+            + Cadastrar Este Produto
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  return list.map(p => `
+    <div class="p-4 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-md transition-all flex flex-col justify-between space-y-3 group">
+      <div class="flex items-start space-x-3.5">
+        <div class="relative w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
+          <img src="${p.image}" alt="${p.name}" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center space-x-1.5 mb-1">
+            <span class="text-[10px] uppercase tracking-wider font-extrabold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md">
+              ${p.category || 'Geral'}
+            </span>
+            ${p.unit ? `<span class="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded">${p.unit}</span>` : ''}
+          </div>
+          <h5 class="text-xs sm:text-sm font-black text-slate-900 line-clamp-2 leading-snug">${p.name}</h5>
+          <p class="text-base font-black text-emerald-700 mt-1">R$ ${(Number(p.price) || 0).toFixed(2).replace('.', ',')}</p>
+        </div>
+      </div>
+
+      ${!isRecep ? `
+      <div class="pt-2.5 border-t border-slate-100 flex items-center justify-end space-x-1.5">
+        <button onclick="openProductModal('${p.id}')" 
+                class="px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer"
+                title="Editar dados e preço">
+          <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+          <span>Editar</span>
+        </button>
+        <button onclick="deleteProduct('${p.id}')" 
+                class="px-2.5 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer"
+                title="Excluir produto do cardápio">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>Excluir</span>
+        </button>
+      </div>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+// 3. ABA DE CONTROLE DE BEBIDAS, COMIDAS & BAR (COM CARDÁPIO INTEGRADO)
 function renderBarControlTab() {
   const selectedDate = state.adminFilterDate || getFormattedDate(new Date());
 
@@ -4660,166 +4748,242 @@ function renderBarControlTab() {
   });
 
   const isRecep = isReceptionUser();
+  const currentSubTab = state.barSubTab || 'menu';
+  const currentCategory = state.barProductCategory || 'all';
+  const totalProducts = (state.products || []).length;
 
   return `
     <div class="space-y-6">
       
-      <!-- Cabeçalho do Bar -->
+      <!-- Cabeçalho do Bar & Lanchonete -->
       <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div class="flex items-center space-x-2">
-            <span class="p-1.5 rounded-lg bg-cyan-100 text-cyan-800"><i data-lucide="beer" class="w-5 h-5"></i></span>
-            <h3 class="text-lg font-black text-slate-900">Fila de Pedidos do Bar (Bebidas & Alimentos)</h3>
+        <div class="flex items-center space-x-3.5">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center border border-amber-500/20 shrink-0">
+            <i data-lucide="beer" class="w-6 h-6 text-amber-600"></i>
           </div>
-          <p class="text-xs text-slate-500 mt-1">Gerencie a separação de baldes de cerveja, gelo, água e petiscos para serem entregues gelados nas quadras.</p>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Módulo Bar & Lanchonete</span>
+              <span class="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">${totalProducts} produtos cadastrados</span>
+            </div>
+            <h3 class="text-xl font-black text-slate-900 mt-0.5">Bar & Lanchonete da Arena Limoeiro</h3>
+            <p class="text-xs text-slate-500">Gerencie o cardápio oficial de bebidas e comidas e a fila de gelamento e entrega de pedidos nas quadras.</p>
+          </div>
         </div>
 
         ${!isRecep ? `
         <div class="flex items-center space-x-2">
-          <button onclick="openProductModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
-            <i data-lucide="plus" class="w-4 h-4"></i>
+          <button onclick="openProductModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>+ Novo Produto / Bebida</span>
           </button>
         </div>
         ` : ''}
       </div>
 
-      <!-- Fila de Pedidos para os Jogos -->
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-        <h4 class="text-sm font-black uppercase text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center">
-          <i data-lucide="list-checks" class="w-4 h-4 text-emerald-600 mr-2"></i>
-          Pedidos de Bebidas Vinculados aos Jogos (${barOrders.length})
-        </h4>
+      <!-- Sub-navegação interna de Bar & Lanchonete -->
+      <div class="flex items-center gap-2 pb-1 overflow-x-auto scrollbar-none">
+        <button onclick="setBarSubTab('menu')" 
+                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
+                       ${currentSubTab === 'menu' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <i data-lucide="utensils" class="w-4 h-4 ${currentSubTab === 'menu' ? 'text-amber-400' : 'text-slate-500'}"></i>
+          <span>🍔 Cardápio de Produtos (${totalProducts})</span>
+        </button>
 
-        ${barOrders.length === 0 ? `
-          <div class="text-center py-10 px-4">
-            <div class="w-16 h-16 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mx-auto mb-3">
-              <i data-lucide="beer" class="w-8 h-8"></i>
+        <button onclick="setBarSubTab('orders')" 
+                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
+                       ${currentSubTab === 'orders' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <i data-lucide="list-checks" class="w-4 h-4 ${currentSubTab === 'orders' ? 'text-emerald-400' : 'text-slate-500'}"></i>
+          <span>🍺 Fila de Pedidos (${barOrders.length})</span>
+        </button>
+
+        <button onclick="setBarSubTab('all')" 
+                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
+                       ${currentSubTab === 'all' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <i data-lucide="layout-grid" class="w-4 h-4 ${currentSubTab === 'all' ? 'text-cyan-400' : 'text-slate-500'}"></i>
+          <span>📋 Visão Completa</span>
+        </button>
+      </div>
+
+      <!-- SEÇÃO CARDÁPIO DE PRODUTOS -->
+      ${(currentSubTab === 'menu' || currentSubTab === 'all') ? `
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-base font-black uppercase text-slate-900 flex items-center space-x-2">
+                  <i data-lucide="book-open" class="w-5 h-5 text-emerald-600"></i>
+                  <span>Cardápio Oficial da Arena Limoeiro</span>
+                </span>
+                <span class="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full">${totalProducts} itens</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-1">Preços, fotos e categorias dos produtos disponíveis para os atletas no aplicativo e no balcão.</p>
             </div>
-            <h4 class="text-sm sm:text-base font-black text-slate-800">Nenhum pedido de bar pendente</h4>
-            <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Quando os clientes reservarem bebidas no agendamento ou no balcão, elas aparecerão aqui na fila de gelamento.</p>
+
+            ${!isRecep ? `
+            <button onclick="openProductModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer shrink-0">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Cadastrar Novo Item</span>
+            </button>
+            ` : ''}
           </div>
-        ` : `
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${barOrders.map(order => {
-              const court = state.courts.find(c => c.id === (order.court_id || order.courtId)) || { name: 'Quadra' };
-              const cart = order.product_cart || order.productCart || {};
-              const currentStatus = cart._status || order.bar_status || 'waiting';
 
-              const productKeys = Object.keys(cart).filter(k => !k.startsWith('_'));
-              let subtotal = 0;
+          <!-- Filtros de Busca e Categorias do Cardápio -->
+          <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+            <!-- Barra de Busca Instantânea -->
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" 
+                     value="${(state.barProductSearch || '').replace(/"/g, '&quot;')}"
+                     oninput="handleBarProductSearch(this.value)" 
+                     placeholder="Buscar produto ou bebida pelo nome..." 
+                     class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all">
+            </div>
 
-              return `
-                <div class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between space-y-4">
-                  <div>
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                      <span class="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-200">
-                        🏟️ ${court.name}
-                      </span>
-                      <span class="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg">
-                        ${order.date} às ${order.time}
-                      </span>
-                    </div>
+            <!-- Categorias Pills -->
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none shrink-0">
+              <button onclick="setBarCategoryFilter('all')" 
+                      class="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer
+                             ${currentCategory === 'all' ? 'bg-emerald-700 text-white shadow-xs font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                Todos (${totalProducts})
+              </button>
+              <button onclick="setBarCategoryFilter('Bebidas')" 
+                      class="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer
+                             ${currentCategory === 'Bebidas' ? 'bg-emerald-700 text-white shadow-xs font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                🍺 Bebidas
+              </button>
+              <button onclick="setBarCategoryFilter('Alimentos')" 
+                      class="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer
+                             ${currentCategory === 'Alimentos' ? 'bg-emerald-700 text-white shadow-xs font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                🍔 Alimentos
+              </button>
+              <button onclick="setBarCategoryFilter('Churrasco')" 
+                      class="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer
+                             ${currentCategory === 'Churrasco' ? 'bg-emerald-700 text-white shadow-xs font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                🥩 Churrasco & Gelo
+              </button>
+              <button onclick="setBarCategoryFilter('Equipamentos')" 
+                      class="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer
+                             ${currentCategory === 'Equipamentos' ? 'bg-emerald-700 text-white shadow-xs font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                🎾 Equipamentos
+              </button>
+            </div>
+          </div>
 
-                    <h4 class="text-base font-black text-slate-900">${order.customer_name || order.customerName}</h4>
-                    <p class="text-xs text-slate-500 mb-3">${order.customer_phone || order.customerPhone || ''}</p>
+          <!-- Grid de Produtos -->
+          <div id="barProductGridContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            ${renderBarProductCards()}
+          </div>
+        </div>
+      ` : ''}
 
-                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5">
-                      <span class="text-[10px] font-black uppercase text-slate-500 block mb-1">Itens Reservados para o Jogo:</span>
-                      ${productKeys.map(k => {
-                        const prod = state.products.find(p => p.id === k) || { name: k, price: 0 };
-                        const q = cart[k];
-                        const itemTotal = prod.price * q;
-                        subtotal += itemTotal;
-                        return q > 0 ? `
-                          <div class="flex items-center justify-between text-xs font-medium text-slate-800">
-                            <span class="flex items-center">
-                              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span>
-                              ${q}x ${prod.name}
-                            </span>
-                            <span class="font-bold">R$ ${itemTotal.toFixed(2).replace('.', ',')}</span>
-                          </div>
-                        ` : '';
-                      }).join('')}
-                      <div class="pt-2 border-t border-slate-200 flex justify-between text-xs font-black text-slate-900">
-                        <span>Total Consumação:</span>
-                        <span class="text-emerald-700">R$ ${subtotal.toFixed(2).replace('.', ',')}</span>
+      <!-- SEÇÃO FILA DE PEDIDOS -->
+      ${(currentSubTab === 'orders' || currentSubTab === 'all') ? `
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h4 class="text-sm font-black uppercase text-slate-800 flex items-center">
+                <i data-lucide="list-checks" class="w-4 h-4 text-emerald-600 mr-2"></i>
+                Pedidos de Bebidas Vinculados aos Jogos (${barOrders.length})
+              </h4>
+              <p class="text-xs text-slate-500 mt-0.5">Acompanhe a separação e o gelamento das bebidas solicitadas nas reservas.</p>
+            </div>
+          </div>
+
+          ${barOrders.length === 0 ? `
+            <div class="text-center py-10 px-4">
+              <div class="w-16 h-16 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="beer" class="w-8 h-8"></i>
+              </div>
+              <h4 class="text-sm sm:text-base font-black text-slate-800">Nenhum pedido de bar pendente</h4>
+              <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 mb-4">Quando os clientes reservarem bebidas no agendamento ou no balcão, elas aparecerão aqui na fila de gelamento.</p>
+            </div>
+          ` : `
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${barOrders.map(order => {
+                const court = state.courts.find(c => c.id === (order.court_id || order.courtId)) || { name: 'Quadra' };
+                const cart = order.product_cart || order.productCart || {};
+                const currentStatus = cart._status || order.bar_status || 'waiting';
+
+                const productKeys = Object.keys(cart).filter(k => !k.startsWith('_'));
+                let subtotal = 0;
+
+                return `
+                  <div class="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col justify-between space-y-4">
+                    <div>
+                      <div class="flex items-center justify-between gap-2 mb-2">
+                        <span class="text-xs font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                          🏟️ ${court.name}
+                        </span>
+                        <span class="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-lg">
+                          ${order.date} às ${order.time}
+                        </span>
+                      </div>
+
+                      <h4 class="text-base font-black text-slate-900">${order.customer_name || order.customerName}</h4>
+                      <p class="text-xs text-slate-500 mb-3">${order.customer_phone || order.customerPhone || ''}</p>
+
+                      <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 space-y-1.5">
+                        <span class="text-[10px] font-black uppercase text-slate-500 block mb-1">Itens Reservados para o Jogo:</span>
+                        ${productKeys.map(k => {
+                          const prod = state.products.find(p => p.id === k) || { name: k, price: 0 };
+                          const q = cart[k];
+                          const itemTotal = prod.price * q;
+                          subtotal += itemTotal;
+                          return q > 0 ? `
+                            <div class="flex items-center justify-between text-xs font-medium text-slate-800">
+                              <span class="flex items-center">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></span>
+                                ${q}x ${prod.name}
+                              </span>
+                              <span class="font-bold">R$ ${itemTotal.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                          ` : '';
+                        }).join('')}
+                        <div class="pt-2 border-t border-slate-200 flex justify-between text-xs font-black text-slate-900">
+                          <span>Total Consumação:</span>
+                          <span class="text-emerald-700">R$ ${subtotal.toFixed(2).replace('.', ',')}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <!-- Workflow em 4 etapas de Separação / Freezer / Entrega -->
-                  <div>
-                    <span class="text-[10px] font-black uppercase text-slate-500 block mb-1.5">Status de Separação / Entrega:</span>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
-                      <button onclick="updateBarStatus('${order.id}', 'waiting')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'waiting' ? 'bg-amber-100 border-amber-400 text-amber-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
-                        ⏳ Pendente
-                      </button>
-                      <button onclick="updateBarStatus('${order.id}', 'separated')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'separated' ? 'bg-purple-100 border-purple-400 text-purple-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
-                        📦 Separado
-                      </button>
-                      <button onclick="updateBarStatus('${order.id}', 'chilling')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'chilling' ? 'bg-cyan-100 border-cyan-400 text-cyan-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
-                        ❄️ No Freezer
-                      </button>
-                      <button onclick="updateBarStatus('${order.id}', 'delivered')" 
-                              class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'delivered' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
-                        ✓ Entregue
-                      </button>
+                    <!-- Workflow em 4 etapas de Separação / Freezer / Entrega -->
+                    <div>
+                      <span class="text-[10px] font-black uppercase text-slate-500 block mb-1.5">Status de Separação / Entrega:</span>
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-center">
+                        <button onclick="updateBarStatus('${order.id}', 'waiting')" 
+                                class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'waiting' ? 'bg-amber-100 border-amber-400 text-amber-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                          ⏳ Pendente
+                        </button>
+                        <button onclick="updateBarStatus('${order.id}', 'separated')" 
+                                class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'separated' ? 'bg-purple-100 border-purple-400 text-purple-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                          📦 Separado
+                        </button>
+                        <button onclick="updateBarStatus('${order.id}', 'chilling')" 
+                                class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'chilling' ? 'bg-cyan-100 border-cyan-400 text-cyan-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                          ❄️ No Freezer
+                        </button>
+                        <button onclick="updateBarStatus('${order.id}', 'delivered')" 
+                                class="p-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer ${currentStatus === 'delivered' ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}">
+                          ✓ Entregue
+                        </button>
+                      </div>
+
+                      <div class="mt-2.5 flex justify-end">
+                        <button onclick="openAddBarItemsModal('${order.id}')" class="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1 cursor-pointer">
+                          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                          <span>+ Adicionar Mais Itens</span>
+                        </button>
+                      </div>
                     </div>
 
-                    <div class="mt-2.5 flex justify-end">
-                      <button onclick="openAddBarItemsModal('${order.id}')" class="text-xs font-bold text-emerald-700 hover:underline flex items-center space-x-1 cursor-pointer">
-                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                        <span>+ Adicionar Mais Itens</span>
-                      </button>
-                    </div>
                   </div>
-
-                </div>
-              `;
-            }).join('')}
-          </div>
-        `}
-      </div>
-
-      <!-- Cardápio e Estoque de Bebidas/Comidas -->
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h4 class="text-sm font-black uppercase text-slate-800">Cardápio de Bebidas & Produtos Cadastrados (${state.products.length})</h4>
-            <p class="text-xs text-slate-500">Itens disponíveis para os clientes comprarem na hora do agendamento ou consumirem na quadra.</p>
-          </div>
-          ${!isRecep ? `
-          <button onclick="openProductModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow cursor-pointer">
-            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>+ Adicionar</span>
-          </button>
-          ` : ''}
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          ${state.products.map(p => `
-            <div class="p-4 rounded-2xl border border-slate-200 bg-white shadow-sm flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <img src="${p.image}" class="w-12 h-12 rounded-xl object-cover border border-slate-100">
-                <div>
-                  <h5 class="text-xs font-extrabold text-slate-900 line-clamp-1">${p.name}</h5>
-                  <span class="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">${p.category}</span>
-                  <p class="text-sm font-black text-slate-900 mt-1">R$ ${p.price.toFixed(2).replace('.', ',')}</p>
-                </div>
-              </div>
-              ${!isRecep ? `
-              <button onclick="deleteProduct('${p.id}')" class="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg cursor-pointer" title="Remover produto">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
-              ` : ''}
+                `;
+              }).join('')}
             </div>
-          `).join('')}
+          `}
         </div>
-      </div>
+      ` : ''}
 
     </div>
   `;
@@ -4853,12 +5017,11 @@ function renderAdminTabContent() {
   if (canEditCourts()) allowedSubTabs.push('spaces', 'positions');
   if (canDeleteBookings() || canStartMatches()) allowedSubTabs.push('bookings');
   if (canManageMonthly()) allowedSubTabs.push('monthly');
-  if (canManageProducts()) allowedSubTabs.push('products');
   if (canManageCustomers()) allowedSubTabs.push('customers');
   if (canManageSettings()) allowedSubTabs.push('users', 'database');
   if (isMasterAdmin) allowedSubTabs.push('audit_logs');
 
-  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','products','users','customers','database','audit_logs'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','database','audit_logs'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
   if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeSubTab)) {
     activeSubTab = allowedSubTabs[0];
     state.adminSubTab = activeSubTab;
@@ -4890,12 +5053,6 @@ function renderAdminTabContent() {
         ${canManageMonthly() ? `
           <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Horários Fixos (${state.monthlyMembers.length})
-          </button>
-        ` : ''}
-
-        ${canManageProducts() ? `
-          <button onclick="setAdminSubTab('products')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'products' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            Cardápio de Produtos
           </button>
         ` : ''}
 
@@ -5542,30 +5699,6 @@ function renderAdminSubTabContent(tab) {
     `;
   }
 
-  if (tab === 'products') {
-    return `
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-base font-black text-slate-800">Cardápio de Produtos e Bar</h3>
-          <button onclick="openProductModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">+ Adicionar Produto</button>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          ${state.products.map(p => `
-            <div class="p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <img src="${p.image}" class="w-12 h-12 rounded-xl object-cover">
-                <div>
-                  <h5 class="text-xs font-bold text-slate-900">${p.name}</h5>
-                  <p class="text-xs font-black text-emerald-700">R$ ${p.price.toFixed(2).replace('.', ',')}</p>
-                </div>
-              </div>
-              <button onclick="deleteProduct('${p.id}')" class="text-slate-400 hover:text-rose-600 p-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
 
   return `
     <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
@@ -8123,9 +8256,20 @@ function adminToggleSlot(courtId, date, time) {
   lucide.createIcons();
 }
 async function deleteProduct(id) {
-  if (!confirm('Excluir este produto?')) return;
+  const prod = (state.products || []).find(p => p.id === id);
+  const prodName = prod ? prod.name : 'Produto';
+  if (!confirm(`Deseja realmente excluir o item "${prodName}" do cardápio?`)) return;
+
   state.products = state.products.filter(p => p.id !== id);
   renderStepContent();
+  lucide.createIcons();
+
+  if (typeof logSystemAction === 'function') {
+    logSystemAction('DELETE_PRODUCT', {
+      courtName: 'Bar & Lanchonete',
+      details: `Excluiu produto "${prodName}" do cardápio do bar`
+    });
+  }
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
@@ -8930,64 +9074,78 @@ function copyShareUrl() {
   }
 }
 
-// MODAL DE PRODUTOS
-function openProductModal() {
+// MODAL DE PRODUTOS (CRIAR E EDITAR)
+function openProductModal(productId = null) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
+
+  const existing = productId ? (state.products || []).find(p => p.id === productId) : null;
+  const isEditing = !!existing;
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
       <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
         <div class="arena-header-bg p-5 text-white flex items-center justify-between">
-          <div>
-            <h3 class="text-base font-black uppercase">Cadastrar Produto / Item de Bar</h3>
-            <p class="text-xs text-emerald-300 font-medium">Adicione água, bebidas, gelo ou lanches para os clientes</p>
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="${isEditing ? 'pencil' : 'plus-circle'}" class="w-5 h-5 text-emerald-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">${isEditing ? 'Editar Produto / Item do Bar' : 'Cadastrar Produto / Item de Bar'}</h3>
+              <p class="text-xs text-emerald-300 font-medium">${isEditing ? 'Altere nome, categoria, preço ou foto do produto' : 'Adicione água, bebidas, gelo ou lanches para os clientes'}</p>
+            </div>
           </div>
           <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
 
-        <form onsubmit="handleProductSubmit(event)" class="p-6 space-y-4">
+        <form onsubmit="handleProductSubmit(event, '${isEditing ? existing.id : ''}')" class="p-6 space-y-4" autocomplete="off">
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Produto / Item *</label>
             <input type="text" id="prodName" required placeholder="Ex: Garrafa de Água com Gás 500ml" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                   value="${existing ? (existing.name || '').replace(/"/g, '&quot;') : ''}"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria *</label>
-              <select id="prodCategory" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white">
-                <option value="Bebidas">Bebidas & Água</option>
-                <option value="Alimentos">Alimentos & Lanches</option>
-                <option value="Churrasco">Churrasco & Gelo</option>
-                <option value="Equipamentos">Equipamentos</option>
+              <select id="prodCategory" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-medium">
+                <option value="Bebidas" ${existing && existing.category === 'Bebidas' ? 'selected' : ''}>Bebidas & Água</option>
+                <option value="Alimentos" ${existing && existing.category === 'Alimentos' ? 'selected' : ''}>Alimentos & Lanches</option>
+                <option value="Churrasco" ${existing && existing.category === 'Churrasco' ? 'selected' : ''}>Churrasco & Gelo</option>
+                <option value="Equipamentos" ${existing && existing.category === 'Equipamentos' ? 'selected' : ''}>Equipamentos</option>
               </select>
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Preço Unitário (R$) *</label>
               <input type="number" step="0.50" id="prodPrice" required placeholder="5.00" 
+                     value="${existing ? Number(existing.price || 0).toFixed(2) : ''}"
                      class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Unidade de Medida</label>
-            <input type="text" id="prodUnit" placeholder="unid, lata, garrafa, saco" value="unid." 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <input type="text" id="prodUnit" placeholder="unid, lata, garrafa, saco" 
+                   value="${existing ? (existing.unit || 'unid.') : 'unid.'}" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Foto do Produto (URL)</label>
-            <input type="url" id="prodImage" placeholder="https://..." value="https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80" 
+            <input type="url" id="prodImage" placeholder="https://..." 
+                   value="${existing ? (existing.image || '') : 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'}" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
           </div>
 
           <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700">Cancelar</button>
-            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow">Cadastrar</button>
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 cursor-pointer">Cancelar</button>
+            <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow cursor-pointer">
+              ${isEditing ? 'Salvar Alterações' : 'Cadastrar no Cardápio'}
+            </button>
           </div>
         </form>
       </div>
@@ -8997,7 +9155,7 @@ function openProductModal() {
   lucide.createIcons();
 }
 
-async function handleProductSubmit(event) {
+async function handleProductSubmit(event, editId) {
   event.preventDefault();
   const name = document.getElementById('prodName').value.trim();
   const category = document.getElementById('prodCategory').value;
@@ -9005,26 +9163,62 @@ async function handleProductSubmit(event) {
   const unit = document.getElementById('prodUnit').value.trim() || 'unid.';
   const image = document.getElementById('prodImage').value.trim() || 'https://images.unsplash.com/photo-1559839914-17aae19cec71?w=200&auto=format&fit=crop&q=80';
 
-  const newProduct = {
-    id: 'prod-' + Date.now(),
-    name,
-    category,
-    price,
-    unit,
-    image,
-    type: 'product'
-  };
+  if (editId) {
+    const idx = (state.products || []).findIndex(p => p.id === editId);
+    if (idx !== -1) {
+      state.products[idx] = {
+        ...state.products[idx],
+        name,
+        category,
+        price,
+        unit,
+        image
+      };
+    }
+    if (typeof logSystemAction === 'function') {
+      logSystemAction('UPDATE_PRODUCT', {
+        courtName: 'Bar & Lanchonete',
+        details: `Atualizou produto "${name}" (R$ ${price.toFixed(2).replace('.', ',')}) no cardápio`
+      });
+    }
+    closeModal();
+    renderStepContent();
+    lucide.createIcons();
 
-  state.products.push(newProduct);
-  closeModal();
-  renderStepContent();
-  lucide.createIcons();
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        await client.from('products').update({ name, category, price, unit, image }).eq('id', editId);
+      } catch(e) {}
+    }
+  } else {
+    const newProduct = {
+      id: 'prod-' + Date.now(),
+      name,
+      category,
+      price,
+      unit,
+      image,
+      type: 'product'
+    };
 
-  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-    try {
-      const client = window.ArenaSupabase.getClient();
-      await client.from('products').insert([newProduct]);
-    } catch(e) {}
+    state.products.push(newProduct);
+    if (typeof logSystemAction === 'function') {
+      logSystemAction('CREATE_PRODUCT', {
+        courtName: 'Bar & Lanchonete',
+        details: `Cadastrou novo produto "${name}" (R$ ${price.toFixed(2).replace('.', ',')}) no cardápio`
+      });
+    }
+    closeModal();
+    renderStepContent();
+    lucide.createIcons();
+
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        await client.from('products').insert([newProduct]);
+      } catch(e) {}
+    }
   }
 }
 
