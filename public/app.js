@@ -5270,11 +5270,7 @@ function renderAdminSubTabContent(tab) {
                         <span class="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
                           <i data-lucide="check" class="w-3 h-3 text-emerald-700"></i> Pode apagar e gerenciar jogos
                         </span>
-                      ` : `
-                        <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 flex items-center gap-1">
-                          <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i> Não pode apagar jogos
-                        </span>
-                      `)}
+                      ` : '')}
 
                       <span class="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
                         ${activeCount}/12 permissões
