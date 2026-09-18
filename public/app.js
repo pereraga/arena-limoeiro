@@ -582,7 +582,12 @@ function loadInitialData() {
     } else {
       state.courts = (d.initialCourts || []).map(normalizeCourt);
     }
-    state.products = d.initialProducts;
+    const localProducts = JSON.parse(localStorage.getItem('arena_local_products') || 'null');
+    if (localProducts && Array.isArray(localProducts) && localProducts.length > 0) {
+      state.products = localProducts;
+    } else {
+      state.products = d.initialProducts;
+    }
     const defaultMonthly = d.initialMonthlyMembers || [];
     const localMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
     const mergedMonthlyMap = new Map();
@@ -2238,9 +2243,11 @@ function renderStep3Content() {
             return `
               <div class="bg-slate-50/80 hover:bg-white p-3.5 rounded-2xl border ${qty > 0 ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-500' : 'border-slate-200'} shadow-sm flex items-center justify-between transition-all">
                 <div class="flex items-center space-x-3 overflow-hidden">
-                  <img src="${prod.image}" 
-                       onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'"
-                       class="w-12 h-12 rounded-xl object-cover border border-slate-200 flex-shrink-0">
+                  <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center flex-shrink-0 shadow-sm overflow-hidden">
+                    <img src="${prod.image}" 
+                         onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'"
+                         class="w-full h-full object-contain">
+                  </div>
                   <div class="overflow-hidden">
                     <h4 class="text-xs sm:text-sm font-extrabold text-slate-800 truncate">${prod.name}</h4>
                     <p class="text-xs font-bold text-slate-500 mt-0.5">
@@ -2606,7 +2613,9 @@ function renderStep4(container) {
             ${savedBarItems.map(item => `
               <div class="py-3 first:pt-0 last:pb-0 flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                  <img src="${item.image}" class="w-10 h-10 rounded-xl object-cover border border-slate-200">
+                  <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 p-0.5 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
+                    <img src="${item.image}" class="w-full h-full object-contain">
+                  </div>
                   <div>
                     <h5 class="text-xs sm:text-sm font-extrabold text-slate-900">${item.name}</h5>
                     <p class="text-[11px] text-slate-500">R$ ${item.price.toFixed(2)} cada • <strong class="text-emerald-700">${item.quantity} ${item.unit || 'unid'}</strong></p>
@@ -4760,8 +4769,8 @@ function renderBarProductCards() {
   return list.map(p => `
     <div class="p-4 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-md transition-all flex flex-col justify-between space-y-3 group">
       <div class="flex items-start space-x-3.5">
-        <div class="relative w-16 h-16 rounded-2xl overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
-          <img src="${p.image}" alt="${p.name}" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+        <div class="relative w-16 h-16 rounded-2xl overflow-hidden bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm">
+          <img src="${p.image}" alt="${p.name}" onerror="this.src='https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'" class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300">
         </div>
         <div class="min-w-0 flex-1">
           <div class="flex items-center space-x-1.5 mb-1">
@@ -7212,7 +7221,9 @@ function openAddBarItemsModal(bookingId) {
               return `
                 <div class="p-3 rounded-2xl border border-slate-200 flex items-center justify-between bg-slate-50">
                   <div class="flex items-center space-x-3">
-                    <img src="${p.image}" class="w-10 h-10 rounded-xl object-cover">
+                    <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 p-0.5 flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
+                      <img src="${p.image}" class="w-full h-full object-contain">
+                    </div>
                     <div>
                       <h5 class="text-xs font-bold text-slate-900">${p.name}</h5>
                       <span class="text-[11px] font-black text-emerald-700">R$ ${p.price.toFixed(2).replace('.', ',')}</span>
@@ -8324,6 +8335,7 @@ async function deleteProduct(id) {
   if (!confirm(`Deseja realmente excluir o item "${prodName}" do cardápio?`)) return;
 
   state.products = state.products.filter(p => p.id !== id);
+  localStorage.setItem('arena_local_products', JSON.stringify(state.products));
   renderStepContent();
   lucide.createIcons();
 
@@ -9249,10 +9261,40 @@ function openProductModal(productId = null) {
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Foto do Produto (URL)</label>
-            <input type="url" id="prodImage" placeholder="https://..." 
-                   value="${existing ? (existing.image || '') : 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'}" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5 flex items-center justify-between">
+              <span>Foto do Produto</span>
+              <span class="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Salva Direto no Banco</span>
+            </label>
+
+            <!-- Armazena os dados da foto em base64 diretamente para o banco de dados -->
+            <input type="hidden" id="prodImage" value="${existing && existing.image ? existing.image : ''}">
+
+            <div class="flex items-center space-x-3.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+              <!-- Miniatura com enquadramento proporcional que nunca corta a imagem -->
+              <div class="relative w-20 h-20 rounded-2xl bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm overflow-hidden" id="prodImagePreviewContainer">
+                <img id="prodImagePreview" 
+                     src="${existing && existing.image ? existing.image : 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=150&auto=format&fit=crop&q=80'}" 
+                     alt="Foto do produto" 
+                     class="w-full h-full object-contain">
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <input type="file" id="prodImageFileInput" accept="image/*" class="hidden" onchange="handleProductPhotoSelected(event)">
+                
+                <button type="button" onclick="document.getElementById('prodImageFileInput').click()" 
+                        class="w-full py-2 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm flex items-center justify-center space-x-2 transition-all cursor-pointer">
+                  <i data-lucide="upload" class="w-4 h-4"></i>
+                  <span id="prodUploadBtnText">${existing && existing.image ? 'Trocar Foto do Aparelho' : 'Escolher Foto do Aparelho'}</span>
+                </button>
+                <p class="text-[10px] text-slate-500 mt-1.5 leading-tight">
+                  Selecione da galeria ou câmera. A foto diminui proporcionalmente para a miniatura sem cortes e é gravada direto no banco de dados.
+                </p>
+                <div id="prodImageLoading" class="hidden mt-1.5 text-[11px] font-bold text-emerald-600 flex items-center space-x-1">
+                  <span class="animate-spin inline-block">⏳</span>
+                  <span>Otimizando e preparando foto...</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3">
@@ -9268,6 +9310,67 @@ function openProductModal(productId = null) {
 
   lucide.createIcons();
 }
+
+function handleProductPhotoSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const loadingEl = document.getElementById('prodImageLoading');
+  if (loadingEl) loadingEl.classList.remove('hidden');
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      // Redimensiona proporcionalmente mantendo a proporção exata para caber na miniatura
+      const maxDim = 500;
+      let w = img.width;
+      let h = img.height;
+
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Comprime para JPEG de alta definição com tamanho compacto (~30KB) para salvar no banco
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      const hiddenInput = document.getElementById('prodImage');
+      if (hiddenInput) hiddenInput.value = compressedDataUrl;
+
+      const previewImg = document.getElementById('prodImagePreview');
+      if (previewImg) {
+        previewImg.src = compressedDataUrl;
+        previewImg.className = 'w-full h-full object-contain';
+      }
+
+      const btnText = document.getElementById('prodUploadBtnText');
+      if (btnText) btnText.textContent = 'Trocar Foto Selecionada';
+
+      if (loadingEl) loadingEl.classList.add('hidden');
+    };
+    img.onerror = function() {
+      if (loadingEl) loadingEl.classList.add('hidden');
+      alert('Não foi possível ler a imagem selecionada.');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+window.handleProductPhotoSelected = handleProductPhotoSelected;
 
 async function handleProductSubmit(event, editId) {
   event.preventDefault();
@@ -9289,6 +9392,7 @@ async function handleProductSubmit(event, editId) {
         image
       };
     }
+    localStorage.setItem('arena_local_products', JSON.stringify(state.products));
     if (typeof logSystemAction === 'function') {
       logSystemAction('UPDATE_PRODUCT', {
         courtName: 'Bar & Lanchonete',
@@ -9317,6 +9421,7 @@ async function handleProductSubmit(event, editId) {
     };
 
     state.products.push(newProduct);
+    localStorage.setItem('arena_local_products', JSON.stringify(state.products));
     if (typeof logSystemAction === 'function') {
       logSystemAction('CREATE_PRODUCT', {
         courtName: 'Bar & Lanchonete',
@@ -12092,6 +12197,7 @@ async function syncDataFromSupabase(skipRender = false) {
 
     if (dbProducts && dbProducts.length > 0) {
       state.products = dbProducts;
+      localStorage.setItem('arena_local_products', JSON.stringify(dbProducts));
     }
 
     if (dbMembers) state.monthlyMembers = dbMembers;
