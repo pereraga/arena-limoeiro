@@ -309,6 +309,51 @@
       } catch (err) {
         console.warn('Erro ao transmitir broadcast de quadra:', err);
       }
+    },
+
+    broadcastBookingDelete(deletePayload) {
+      try {
+        const chan = this.getBroadcastChannel();
+        if (chan) {
+          chan.send({
+            type: 'broadcast',
+            event: 'booking_deleted',
+            payload: deletePayload
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao transmitir broadcast de exclusão de jogo:', err);
+      }
+    },
+
+    broadcastSystemLog(logEntry) {
+      try {
+        const chan = this.getBroadcastChannel();
+        if (chan) {
+          chan.send({
+            type: 'broadcast',
+            event: 'system_log',
+            payload: logEntry
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao transmitir broadcast de log de sistema:', err);
+      }
+    },
+
+    broadcastClearLogs() {
+      try {
+        const chan = this.getBroadcastChannel();
+        if (chan) {
+          chan.send({
+            type: 'broadcast',
+            event: 'clear_logs',
+            payload: { timestamp: new Date().toISOString() }
+          });
+        }
+      } catch (err) {
+        console.warn('Erro ao transmitir broadcast de limpeza de logs:', err);
+      }
     }
   };
 

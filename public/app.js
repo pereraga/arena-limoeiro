@@ -146,6 +146,9 @@ let state = {
   adminUsers: [],
   supabaseCustomers: [],
   supabaseConnected: false,
+  systemLogs: [],
+  systemLogsSearchQuery: '',
+  systemLogsFilter: 'all',
   
   sortBy: 'default',
   currentUser: _savedArenaUser,
@@ -601,6 +604,11 @@ function loadInitialData() {
     state.bookings = cleanedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
     state.matchDelays = JSON.parse(localStorage.getItem('arena_match_delays') || '{}');
+    try {
+      state.systemLogs = JSON.parse(localStorage.getItem('arena_system_logs') || '[]');
+    } catch(e) {
+      state.systemLogs = [];
+    }
   }
 }
 
@@ -2935,6 +2943,181 @@ window.canManageMonthly = canManageMonthly;
 window.canManageProducts = canManageProducts;
 window.canManageSettings = canManageSettings;
 
+// ====================================================
+// MOTOR DE AUDITORIA E LOGS DO SISTEMA (MOBILE & PC)
+// ====================================================
+function getDeviceContext() {
+  const ua = navigator.userAgent || '';
+  const isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua) || (window.innerWidth <= 768);
+  return {
+    isMobile: isMob,
+    label: isMob ? '📱 Mobile' : '💻 PC',
+    fullLabel: isMob ? '📱 Celular / Mobile' : '💻 Computador / PC',
+    badgeClass: isMob ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-100 text-slate-800 border-slate-300'
+  };
+}
+
+function logSystemAction({ actionType, actionLabel, courtName, details, targetId }) {
+  const now = new Date();
+  const dev = getDeviceContext();
+  
+  let authorName = 'Administrador Geral (Gabriel Alves)';
+  let authorRole = 'Administrador Geral';
+
+  if (state.currentUser) {
+    authorName = (state.currentUser.name && state.currentUser.name !== 'Administrador Geral') 
+      ? state.currentUser.name 
+      : (state.currentUser.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser.name || state.currentUser.email));
+    authorRole = state.currentUser.role || 'Gerente do Sistema';
+  } else if (state.currentMode !== 'admin') {
+    authorName = 'Agendamento Online';
+    authorRole = 'Cliente Web';
+  }
+
+  const logEntry = {
+    id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+    timestamp: now.toISOString(),
+    dateStr: now.toLocaleDateString('pt-BR'),
+    timeStr: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    actionType: actionType || 'GENERIC',
+    actionLabel: actionLabel || 'Modificação no Sistema',
+    courtName: courtName || '—',
+    details: details || '',
+    userName: authorName,
+    userRole: authorRole,
+    deviceType: dev.label,
+    isMobile: dev.isMobile,
+    targetId: targetId || null
+  };
+
+  if (!state.systemLogs) state.systemLogs = [];
+  state.systemLogs = [logEntry, ...state.systemLogs];
+  if (state.systemLogs.length > 1500) {
+    state.systemLogs = state.systemLogs.slice(0, 1500);
+  }
+
+  try {
+    localStorage.setItem('arena_system_logs', JSON.stringify(state.systemLogs));
+  } catch (e) {}
+
+  // Transmissão em tempo real entre celulares e computadores
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastSystemLog) {
+    window.ArenaSupabase.broadcastSystemLog(logEntry);
+  }
+  if (window.arenaSyncChannel) {
+    try { window.arenaSyncChannel.postMessage({ type: 'system_log', payload: logEntry }); } catch(e) {}
+  }
+
+  return logEntry;
+}
+
+function handleReceivedBookingDelete(data) {
+  if (!data || !data.id) return;
+  const targetId = String(data.id);
+
+  // 1. Remove da memória
+  state.bookings = (state.bookings || []).filter(b => b && String(b.id) !== targetId);
+
+  // 2. Remove do localStorage
+  try {
+    let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    local = local.filter(b => b && String(b.id) !== targetId);
+    localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+  } catch(e) {}
+
+  // 3. Atualiza grade e interface instantaneamente (<50ms)
+  requestSchedule();
+  _refreshAllUI();
+  if (state.currentMode === 'admin') {
+    renderStepContent();
+  }
+
+  // Se o modal de busca de jogos estiver aberto, atualiza
+  if (typeof renderSearchResults === 'function' && document.getElementById('matchSearchResultsList')) {
+    renderSearchResults();
+  }
+  if (typeof filterSubtabBookingsList === 'function' && document.getElementById('subtabBookingsListContainer')) {
+    filterSubtabBookingsList();
+  }
+
+  // 4. Notifica gestores logados no aparelho (som, vibração e aviso na tela)
+  if (isManagerLoggedIn()) {
+    playNotificationSound();
+    if ('vibrate' in navigator) {
+      try { navigator.vibrate([150, 80, 150]); } catch(e) {}
+    }
+    showToastNotification(`
+      <h5 class="font-black text-white text-xs mb-0.5 flex items-center gap-1.5">
+        <span class="text-rose-400 font-black">🗑️ Jogo Excluído / Horário Liberado!</span>
+      </h5>
+      <p class="text-slate-200 font-bold mb-0.5">🏟️ <strong>Quadra:</strong> ${data.courtName || 'Quadra'}</p>
+      <p class="text-slate-300 text-xs">⏰ <strong>Horário:</strong> ${data.date || ''} (${data.time || ''})</p>
+      <p class="text-slate-300 text-xs">👤 <strong>Cliente:</strong> ${data.customerName || 'Cliente'}</p>
+      <p class="text-amber-300 text-[11px] font-bold mt-1">Excluído por: ${data.userName || 'Gestor'} (${data.deviceType || 'Dispositivo'})</p>
+    `);
+  }
+}
+
+function handleReceivedSystemLog(logEntry) {
+  if (!logEntry || !logEntry.id) return;
+  if (!state.systemLogs) state.systemLogs = [];
+  if (state.systemLogs.some(l => l.id === logEntry.id)) return;
+
+  state.systemLogs = [logEntry, ...state.systemLogs];
+  if (state.systemLogs.length > 1500) state.systemLogs = state.systemLogs.slice(0, 1500);
+
+  try {
+    localStorage.setItem('arena_system_logs', JSON.stringify(state.systemLogs));
+  } catch(e) {}
+
+  // Se estiver na aba de logs aberta, atualiza a exibição em tempo real!
+  if (state.currentMode === 'admin' && state.adminTab === 'settings' && state.adminSubTab === 'audit_logs') {
+    renderStepContent();
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+function handleReceivedClearLogs() {
+  state.systemLogs = [];
+  try {
+    localStorage.removeItem('arena_system_logs');
+  } catch(e) {}
+  if (state.currentMode === 'admin' && state.adminTab === 'settings' && state.adminSubTab === 'audit_logs') {
+    renderStepContent();
+    if (window.lucide) lucide.createIcons();
+  }
+}
+
+// Inicializa canal de sincronização entre abas do navegador
+if (typeof BroadcastChannel !== 'undefined' && !window.arenaSyncChannel) {
+  try {
+    window.arenaSyncChannel = new BroadcastChannel('arena_live_sync_v2');
+    window.arenaSyncChannel.onmessage = (ev) => {
+      const msg = ev.data;
+      if (!msg) return;
+      if (msg.type === 'booking_deleted') {
+        handleReceivedBookingDelete(msg.payload);
+      } else if (msg.type === 'new_booking') {
+        if (msg.payload && !state.bookings.some(b => b.id === msg.payload.id)) {
+          state.bookings = [...state.bookings, msg.payload];
+          _refreshAllUI();
+          triggerBookingNotification(msg.payload);
+        }
+      } else if (msg.type === 'system_log') {
+        handleReceivedSystemLog(msg.payload);
+      } else if (msg.type === 'clear_logs') {
+        handleReceivedClearLogs();
+      }
+    };
+  } catch(e) {}
+}
+
+window.getDeviceContext = getDeviceContext;
+window.logSystemAction = logSystemAction;
+window.handleReceivedBookingDelete = handleReceivedBookingDelete;
+window.handleReceivedSystemLog = handleReceivedSystemLog;
+window.handleReceivedClearLogs = handleReceivedClearLogs;
+
 // PAINEL DO ADMINISTRADOR / RECEPÇÃO
 function renderAdminView(container) {
   if (!isManagerLoggedIn()) {
@@ -3200,6 +3383,16 @@ function startMatchNow(matchId) {
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
   }
 
+  // Registra no Log de Auditoria
+  const bCourt = booking ? (state.courts || []).find(c => c.id === (booking.court_id || booking.courtId)) : null;
+  logSystemAction({
+    actionType: 'START_MATCH',
+    actionLabel: 'Início de Partida',
+    courtName: bCourt ? bCourt.name : 'Quadra',
+    details: `Partida de ${booking ? (booking.customer_name || 'Cliente') : 'Cliente'} iniciada às ${nowStr}.`,
+    targetId: matchId
+  });
+
   renderStepContent();
   if (window.lucide) lucide.createIcons();
 }
@@ -3244,6 +3437,16 @@ function finishMatchManual(matchId) {
     delete state.matchDelays[matchId];
     localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
   }
+
+  // Registra no Log de Auditoria
+  const bCourtFin = booking ? (state.courts || []).find(c => c.id === (booking.court_id || booking.courtId)) : null;
+  logSystemAction({
+    actionType: 'FINISH_MATCH',
+    actionLabel: 'Finalização de Partida',
+    courtName: bCourtFin ? bCourtFin.name : 'Quadra',
+    details: `Partida de ${booking ? (booking.customer_name || 'Cliente') : 'Cliente'} finalizada manualmente às ${nowStr}.`,
+    targetId: matchId
+  });
 
   renderStepContent();
   if (window.lucide) lucide.createIcons();
@@ -4653,8 +4856,9 @@ function renderAdminTabContent() {
   if (canManageProducts()) allowedSubTabs.push('products');
   if (canManageCustomers()) allowedSubTabs.push('customers');
   if (canManageSettings()) allowedSubTabs.push('users', 'database');
+  if (isMasterAdmin) allowedSubTabs.push('audit_logs');
 
-  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','products','users','customers','database','audit_logs'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
   if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeSubTab)) {
     activeSubTab = allowedSubTabs[0];
     state.adminSubTab = activeSubTab;
@@ -4710,6 +4914,13 @@ function renderAdminTabContent() {
         ${canManageSettings() ? `
           <button onclick="setAdminSubTab('database')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Conexão Supabase
+          </button>
+        ` : ''}
+
+        ${isMasterAdmin ? `
+          <button onclick="setAdminSubTab('audit_logs')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
+            <i data-lucide="shield-alert" class="w-3.5 h-3.5 ${activeSubTab === 'audit_logs' ? 'text-white' : 'text-amber-700'}"></i>
+            <span>📜 Logs do Sistema</span>
           </button>
         ` : ''}
       </div>
@@ -5211,6 +5422,10 @@ function renderAdminSubTabContent(tab) {
     `;
   }
 
+  if (tab === 'audit_logs') {
+    return renderSystemAuditLogsTab();
+  }
+
   if (tab === 'users') {
     const isMasterAdmin = (state.currentUser?.role || 'Administrador Geral') === 'Administrador Geral';
     if (!isMasterAdmin) {
@@ -5365,6 +5580,313 @@ function renderAdminSubTabContent(tab) {
     </div>
   `;
 }
+
+// ==============================================================================
+// ABA EXCLUSIVA DE AUDITORIA E LOGS DO SISTEMA (MOBILE & PC) - GABRIEL ALVES
+// ==============================================================================
+function renderSystemAuditLogsTab() {
+  const isMasterAdmin = (state.currentUser?.role || 'Administrador Geral') === 'Administrador Geral' || (state.currentUser?.email === 'admin@arenalimoeiro.com.br');
+  if (!isMasterAdmin) {
+    return `
+      <div class="bg-white rounded-3xl border border-slate-200 p-8 text-center shadow-xs">
+        <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto mb-3">
+          <i data-lucide="lock" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-base font-black text-slate-900">Acesso Restrito</h3>
+        <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">Esta área de logs de auditoria e movimentações do sistema é confidencial e exclusiva do Administrador Geral (Gabriel Alves).</p>
+      </div>
+    `;
+  }
+
+  const logs = state.systemLogs || [];
+  const q = (state.systemLogsSearchQuery || '').toLowerCase().trim();
+  const currentFilter = state.systemLogsFilter || 'all';
+
+  // Métricas
+  const totalLogs = logs.length;
+  const deleteCount = logs.filter(l => l.actionType === 'DELETE_BOOKING').length;
+  const bookingCount = logs.filter(l => l.actionType === 'CREATE_BOOKING').length;
+  const mobileCount = logs.filter(l => l.isMobile).length;
+  const pcCount = logs.filter(l => !l.isMobile).length;
+
+  // Filtragem
+  const filteredLogs = logs.filter(l => {
+    // 1. Filtro por tipo
+    if (currentFilter === 'delete' && l.actionType !== 'DELETE_BOOKING') return false;
+    if (currentFilter === 'booking' && l.actionType !== 'CREATE_BOOKING') return false;
+    if (currentFilter === 'match' && !['START_MATCH', 'FINISH_MATCH'].includes(l.actionType)) return false;
+    if (currentFilter === 'mobile' && !l.isMobile) return false;
+    if (currentFilter === 'pc' && l.isMobile) return false;
+
+    // 2. Busca por texto (em todos os campos)
+    if (q) {
+      const matchText = [
+        l.userName,
+        l.userRole,
+        l.details,
+        l.courtName,
+        l.actionLabel,
+        l.dateStr,
+        l.timeStr,
+        l.deviceType,
+        l.isMobile ? 'mobile celular' : 'pc computador desktop'
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      return matchText.includes(q);
+    }
+
+    return true;
+  });
+
+  return `
+    <div class="space-y-6">
+      <!-- Cabeçalho de Auditoria -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-xs">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2.5 flex-wrap gap-y-1">
+              <span class="p-2 rounded-xl bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                <i data-lucide="shield-alert" class="w-5 h-5"></i>
+              </span>
+              <h3 class="text-base sm:text-xl font-black text-slate-900 tracking-tight">Logs e Auditoria do Sistema</h3>
+              <span class="text-[10px] font-black text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full border border-amber-300">
+                👑 Exclusivo Administrador Geral
+              </span>
+            </div>
+            <p class="text-xs sm:text-sm text-slate-500">
+              Rastreamento em tempo real de todas as movimentações: quem adicionou ou apagou jogos, cadastros, horários, qual quadra e se foi via Mobile ou Computador.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="openClearLogsConfirmModal()" 
+                    class="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 hover:border-rose-300 rounded-xl text-xs font-black flex items-center space-x-1.5 transition-all shadow-xs cursor-pointer"
+                    title="Apagar todos os registros de log para começar do zero">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+              <span>Zerar Registros (Começar do Zero)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Indicadores Resumidos (KPIs) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5">
+          <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Total de Ações</span>
+            <div class="flex items-baseline gap-1 mt-0.5">
+              <span class="text-xl font-black text-slate-900">${totalLogs}</span>
+              <span class="text-[10px] text-slate-400 font-bold">registros</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700 block">Jogos Excluídos</span>
+            <div class="flex items-baseline gap-1 mt-0.5">
+              <span class="text-xl font-black text-rose-700">${deleteCount}</span>
+              <span class="text-[10px] text-rose-500 font-bold">cancelamentos</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">Agendamentos</span>
+            <div class="flex items-baseline gap-1 mt-0.5">
+              <span class="text-xl font-black text-emerald-700">${bookingCount}</span>
+              <span class="text-[10px] text-emerald-500 font-bold">criados</span>
+            </div>
+          </div>
+
+          <div class="p-3.5 bg-sky-50/70 border border-sky-200 rounded-2xl">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-sky-700 block">Dispositivos</span>
+            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span class="text-xs font-black text-sky-800">📱 ${mobileCount} Mobile</span>
+              <span class="text-slate-300">•</span>
+              <span class="text-xs font-black text-slate-800">💻 ${pcCount} PC</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Barra de Pesquisa e Filtros Rápidos -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-4 sm:p-5 shadow-xs space-y-3">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input type="text" 
+                 id="systemLogsSearchInput"
+                 value="${state.systemLogsSearchQuery || ''}"
+                 oninput="handleSystemLogsSearch(this.value)"
+                 placeholder="Pesquisar por quem fez, cliente, quadra, ação, data, mobile ou pc..." 
+                 class="w-full pl-10 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none transition-all">
+          ${state.systemLogsSearchQuery ? `
+            <button onclick="handleSystemLogsSearch('')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 cursor-pointer">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          ` : ''}
+        </div>
+
+        <!-- Filtros Rápidos Tipo Pílula -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <button onclick="setSystemLogsFilter('all')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${currentFilter === 'all' ? 'bg-slate-900 text-white font-black shadow-xs' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+            Todos (${totalLogs})
+          </button>
+          <button onclick="setSystemLogsFilter('delete')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${currentFilter === 'delete' ? 'bg-rose-600 text-white font-black shadow-xs' : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200/60'}">
+            🗑️ Exclusões (${deleteCount})
+          </button>
+          <button onclick="setSystemLogsFilter('booking')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${currentFilter === 'booking' ? 'bg-emerald-600 text-white font-black shadow-xs' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'}">
+            ⚽ Agendamentos (${bookingCount})
+          </button>
+          <button onclick="setSystemLogsFilter('match')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${currentFilter === 'match' ? 'bg-indigo-600 text-white font-black shadow-xs' : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100 border border-indigo-200/60'}">
+            ⚡ Partidas
+          </button>
+          <button onclick="setSystemLogsFilter('mobile')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${currentFilter === 'mobile' ? 'bg-sky-600 text-white font-black shadow-xs' : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200/60'}">
+            📱 Mobile (${mobileCount})
+          </button>
+          <button onclick="setSystemLogsFilter('pc')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${currentFilter === 'pc' ? 'bg-slate-800 text-white font-black shadow-xs' : 'bg-slate-100 text-slate-800 hover:bg-slate-200'}">
+            💻 PC (${pcCount})
+          </button>
+        </div>
+
+        <div class="text-[11px] text-slate-500 font-bold px-1 flex items-center justify-between">
+          <span>Exibindo <strong>${filteredLogs.length}</strong> de ${totalLogs} registros</span>
+          ${q ? `<span class="text-amber-700 font-black">Filtro de busca: "${q}"</span>` : ''}
+        </div>
+      </div>
+
+      <!-- Lista de Registros de Auditoria -->
+      <div class="space-y-3">
+        ${filteredLogs.length === 0 ? `
+          <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-xs">
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+              <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+            </div>
+            <h4 class="text-sm font-black text-slate-800">Nenhum registro encontrado</h4>
+            <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              ${q || currentFilter !== 'all' ? 'Tente limpar a pesquisa ou selecionar outro filtro acima.' : 'As movimentações realizadas no sistema (exclusões, novos agendamentos, etc.) aparecerão aqui automaticamente em tempo real.'}
+            </p>
+          </div>
+        ` : filteredLogs.map(log => {
+          const isDelete = log.actionType === 'DELETE_BOOKING';
+          const isCreate = log.actionType === 'CREATE_BOOKING';
+          const isMatch = ['START_MATCH', 'FINISH_MATCH'].includes(log.actionType);
+
+          const badgeBg = isDelete ? 'bg-rose-100 text-rose-800 border-rose-300' : (isCreate ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : (isMatch ? 'bg-indigo-100 text-indigo-800 border-indigo-300' : 'bg-slate-100 text-slate-700 border-slate-300'));
+          const iconName = isDelete ? 'trash-2' : (isCreate ? 'calendar-plus' : (log.actionType === 'START_MATCH' ? 'play' : (log.actionType === 'FINISH_MATCH' ? 'check-circle' : 'activity')));
+
+          return `
+            <div class="bg-white border ${isDelete ? 'border-rose-200/90 hover:border-rose-300' : 'border-slate-200 hover:border-slate-300'} rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-xs transition-all">
+              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                <div class="flex items-start space-x-3 min-w-0">
+                  <div class="w-10 h-10 rounded-xl ${isDelete ? 'bg-rose-100 text-rose-700' : (isCreate ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700')} flex items-center justify-center shrink-0 font-bold shadow-xs">
+                    <i data-lucide="${iconName}" class="w-5 h-5"></i>
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <span class="text-sm font-black text-slate-900">${log.userName}</span>
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                        ${log.userRole || 'Operador'}
+                      </span>
+                      <span class="text-[10px] font-black px-2 py-0.5 rounded-full ${log.isMobile ? 'bg-sky-100 text-sky-800 border border-sky-300' : 'bg-slate-100 text-slate-800 border border-slate-300'}">
+                        ${log.deviceType || (log.isMobile ? '📱 Mobile' : '💻 PC')}
+                      </span>
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <span><i data-lucide="clock" class="w-3 h-3 inline mr-0.5 text-slate-400"></i> ${log.dateStr} às ${log.timeStr}</span>
+                      <span class="text-slate-300">•</span>
+                      <span class="font-bold text-slate-700"><i data-lucide="map-pin" class="w-3 h-3 inline mr-0.5 text-emerald-600"></i> ${log.courtName || 'Quadra'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="shrink-0">
+                  <span class="text-[11px] font-black px-3 py-1 rounded-xl border flex items-center gap-1.5 ${badgeBg}">
+                    ${log.actionLabel}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Detalhes do Registro -->
+              <div class="pt-3">
+                <p class="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed bg-slate-50/80 p-3 rounded-xl border border-slate-100">
+                  ${log.details}
+                </p>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function handleSystemLogsSearch(query) {
+  state.systemLogsSearchQuery = query;
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+}
+window.handleSystemLogsSearch = handleSystemLogsSearch;
+
+function setSystemLogsFilter(filter) {
+  state.systemLogsFilter = filter;
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+}
+window.setSystemLogsFilter = setSystemLogsFilter;
+
+function openClearLogsConfirmModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 space-y-4 shadow-2xl border border-rose-100 animate-in fade-in zoom-in-95 duration-200">
+        <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+          <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        </div>
+
+        <div class="text-center space-y-1">
+          <h3 class="text-lg font-black text-slate-900">Zerar Todos os Logs do Sistema?</h3>
+          <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+            Esta ação apagará <strong>permanentemente</strong> todo o histórico de execuções gravadas até o momento.
+          </p>
+          <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-bold text-left mt-2">
+            💡 <strong>Dica:</strong> Use esta opção para limpar todos os registros de teste e começar o log do zero com o histórico limpo quando o sistema estiver 100% pronto.
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <button onclick="closeModal()" class="flex-1 py-3 px-4 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer">
+            Cancelar
+          </button>
+          <button onclick="confirmClearSystemLogs()" class="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-black shadow-md shadow-rose-600/20 transition-all cursor-pointer">
+            Sim, Zerar Tudo do Zero
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+window.openClearLogsConfirmModal = openClearLogsConfirmModal;
+
+function confirmClearSystemLogs() {
+  state.systemLogs = [];
+  try {
+    localStorage.removeItem('arena_system_logs');
+  } catch(e) {}
+
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastClearLogs) {
+    window.ArenaSupabase.broadcastClearLogs();
+  }
+  if (window.arenaSyncChannel) {
+    try { window.arenaSyncChannel.postMessage({ type: 'clear_logs' }); } catch(e) {}
+  }
+
+  closeModal();
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+
+  alert('✓ Registros de auditoria zerados com sucesso! O histórico começará do zero a partir de agora.');
+}
+window.confirmClearSystemLogs = confirmClearSystemLogs;
+window.renderSystemAuditLogsTab = renderSystemAuditLogsTab;
 
 // ==============================================================================
 // ABA DEDICADA DE GESTÃO DE AGENDAMENTOS NO PAINEL ADMIN (APAGAR E GERENCIAR JOGOS)
@@ -6580,6 +7102,15 @@ async function handleCancelBooking(bookingId) {
 
   if (!confirm('Deseja realmente apagar esta reserva de jogo e liberar o horário imediatamente no sistema?')) return;
 
+  // 0. Captura dados completos do agendamento antes da remoção
+  const bToDelete = (state.bookings || []).find(b => b && (b.id === bookingId || String(b.id) === String(bookingId)));
+  const courtObj = bToDelete ? (state.courts || []).find(c => c.id === (bToDelete.court_id || bToDelete.courtId)) : null;
+  const courtName = courtObj ? courtObj.name : 'Quadra Esportiva';
+  const custName = bToDelete ? (bToDelete.customer_name || bToDelete.customerName || 'Cliente') : 'Cliente';
+  const bDate = bToDelete ? formatDisplayDate(bToDelete.date) : '';
+  const bTime = bToDelete ? (bToDelete.time || `${bToDelete.start_time} às ${bToDelete.end_time}`) : '';
+  const bPrice = bToDelete ? Number(bToDelete.total_price || 0).toFixed(2).replace('.', ',') : '0,00';
+
   // 1. Remove do estado em memória
   state.bookings = (state.bookings || []).filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
 
@@ -6590,7 +7121,42 @@ async function handleCancelBooking(bookingId) {
     localStorage.setItem('arena_local_bookings', JSON.stringify(local));
   } catch (e) {}
 
-  // 3. Se for um horário fixo (monthly-...), lida com a tabela monthly_members
+  // 3. Transmissão imediata via WebSocket / Broadcast para TODOS os outros aparelhos (Celular e PC)
+  const devContext = getDeviceContext();
+  let currentAuthor = 'Administrador Geral (Gabriel Alves)';
+  if (state.currentUser) {
+    currentAuthor = (state.currentUser.name && state.currentUser.name !== 'Administrador Geral') 
+      ? state.currentUser.name 
+      : (state.currentUser.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser.name || state.currentUser.email));
+  }
+
+  const deletePayload = {
+    id: bookingId,
+    courtName,
+    customerName: custName,
+    date: bDate,
+    time: bTime,
+    userName: currentAuthor,
+    deviceType: devContext.label
+  };
+
+  if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
+    window.ArenaSupabase.broadcastBookingDelete(deletePayload);
+  }
+  if (window.arenaSyncChannel) {
+    try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: deletePayload }); } catch(e) {}
+  }
+
+  // 4. Registra no Log do Sistema com quem apagou, quadra, horário, data e dispositivo (Mobile ou PC)
+  logSystemAction({
+    actionType: 'DELETE_BOOKING',
+    actionLabel: 'Exclusão de Jogo',
+    courtName,
+    details: `Jogo agendado de ${custName} (${bDate} às ${bTime} • R$ ${bPrice}) foi apagado e o horário liberado no sistema.`,
+    targetId: bookingId
+  });
+
+  // 5. Se for um horário fixo (monthly-...), lida com a tabela monthly_members
   if (String(bookingId).startsWith('monthly-')) {
     const memberId = String(bookingId).replace('monthly-', '');
     state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
@@ -6614,7 +7180,7 @@ async function handleCancelBooking(bookingId) {
     }
   }
 
-  // 4. Limpa seleções pendentes de horários
+  // 6. Limpa seleções pendentes de horários
   if (state.selectedSlots && state.selectedSlots.length > 0) {
     state.selectedSlots = [];
     state.startTime = null;
@@ -6622,7 +7188,7 @@ async function handleCancelBooking(bookingId) {
     state.selectedDuration = 0;
   }
 
-  // 5. Recalcula a grade de horários do agendamento principal imediatamente
+  // 7. Recalcula a grade de horários do agendamento principal imediatamente
   requestSchedule();
   _refreshAllUI();
   if (state.currentMode === 'admin') {
@@ -6947,6 +7513,15 @@ async function handleDirectBookingSubmit(e) {
   if (window.ArenaSupabase && window.ArenaSupabase.broadcastBooking) {
     window.ArenaSupabase.broadcastBooking(bookingPayload);
   }
+
+  // Registra no Log de Auditoria do Sistema
+  logSystemAction({
+    actionType: 'CREATE_BOOKING',
+    actionLabel: 'Reserva no Balcão',
+    courtName: court ? court.name : 'Quadra',
+    details: `Reserva no balcão confirmada para ${name} (${phone}) na ${court ? court.name : 'Quadra'} - ${formatDisplayDate(date)} às ${startTime} às ${endTime}. Valor: R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
+    targetId: newBookingId
+  });
 
   closeModal();
   requestSchedule();
@@ -10581,6 +11156,16 @@ async function submitBooking(grandTotal) {
     window.ArenaSupabase.broadcastBooking(unifiedBooking);
   }
 
+  // Registra no Log de Auditoria
+  const courtOnline = state.courts.find(c => c.id === (unifiedBooking.court_id || unifiedBooking.courtId));
+  logSystemAction({
+    actionType: 'CREATE_BOOKING',
+    actionLabel: 'Novo Agendamento Online',
+    courtName: courtOnline ? courtOnline.name : 'Quadra',
+    details: `Agendamento online realizado para ${unifiedBooking.customer_name || 'Cliente'} (${unifiedBooking.customer_phone || ''}) na ${courtOnline ? courtOnline.name : 'Quadra'} - ${formatDisplayDate(unifiedBooking.date)} às ${unifiedBooking.time || ''}. Total: R$ ${Number(unifiedBooking.total_price || 0).toFixed(2).replace('.', ',')}`,
+    targetId: unifiedBooking.id
+  });
+
   state.productCart = {};
 }
 
@@ -11271,6 +11856,21 @@ async function syncDataFromSupabase(skipRender = false) {
             }
             triggerBookingNotification(b, 'new');
           }
+        });
+
+        // Ouvinte de exclusão imediata de jogos (<50ms)
+        bChan.on('broadcast', { event: 'booking_deleted' }, (evt) => {
+          handleReceivedBookingDelete(evt.payload);
+        });
+
+        // Ouvinte de logs de auditoria do sistema em tempo real
+        bChan.on('broadcast', { event: 'system_log' }, (evt) => {
+          handleReceivedSystemLog(evt.payload);
+        });
+
+        // Ouvinte de limpeza total de logs
+        bChan.on('broadcast', { event: 'clear_logs' }, () => {
+          handleReceivedClearLogs();
         });
 
         // Ouvinte de atualização de quadras (liberação, manutenção, aviso prévio)
