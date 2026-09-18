@@ -3192,8 +3192,8 @@ function renderAdminView(container) {
         </div>
       </div>
 
-      <!-- Abas Principais de Operação (Funções somem caso o usuário não tenha permissão) -->
-      <div class="flex items-center gap-2.5 mb-6 pb-2 overflow-x-auto scrollbar-none">
+      <!-- Abas Principais de Operação (flex-wrap para sobrepor em linhas caso não caiba tudo em uma linha) -->
+      <div class="flex flex-wrap items-center gap-2.5 mb-6 pb-2">
         <button onclick="setAdminTab('live_dashboard')" 
                 class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
                        ${currentTab === 'live_dashboard' ? 
@@ -4782,7 +4782,7 @@ function renderBarControlTab() {
       </div>
 
       <!-- Sub-navegação interna de Bar & Lanchonete -->
-      <div class="flex items-center gap-2 pb-1 overflow-x-auto scrollbar-none">
+      <div class="flex flex-wrap items-center gap-2 pb-1">
         <button onclick="setBarSubTab('menu')" 
                 class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
                        ${currentSubTab === 'menu' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
@@ -5030,52 +5030,52 @@ function renderAdminTabContent() {
   return `
     <div class="space-y-6">
       
-      <!-- Sub-navegação de Cadastros (Oculta abas sem permissão) -->
-      <div class="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
+      <!-- Sub-navegação de Cadastros (flex-wrap para sobrepor em linhas e mostrar o nome completo de todos os botões sem cortar) -->
+      <div class="flex flex-wrap items-center gap-2 pb-2">
         ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Espaços / Quadras
           </button>
         ` : ''}
 
         ${(canDeleteBookings() || canStartMatches()) ? `
-          <button onclick="setAdminSubTab('bookings')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('bookings')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             ⚽ Jogos Agendados (${(state.bookings || []).length})
           </button>
         ` : ''}
 
         ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Posições dos Jogos
           </button>
         ` : ''}
 
         ${canManageMonthly() ? `
-          <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Horários Fixos (${state.monthlyMembers.length})
           </button>
         ` : ''}
 
         ${canManageSettings() ? `
-          <button onclick="setAdminSubTab('users')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('users')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             👑 Gestores & Acessos
           </button>
         ` : ''}
 
         ${canManageCustomers() ? `
-          <button onclick="setAdminSubTab('customers')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('customers')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Clientes Cadastrados
           </button>
         ` : ''}
 
         ${canManageSettings() ? `
-          <button onclick="setAdminSubTab('database')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('database')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Conexão Supabase
           </button>
         ` : ''}
 
         ${isMasterAdmin ? `
-          <button onclick="setAdminSubTab('audit_logs')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('audit_logs')" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer flex items-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
             <i data-lucide="shield-alert" class="w-3.5 h-3.5 ${activeSubTab === 'audit_logs' ? 'text-white' : 'text-amber-700'}"></i>
             <span>📜 Logs do Sistema</span>
           </button>
