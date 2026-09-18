@@ -5266,11 +5266,7 @@ function renderAdminSubTabContent(tab) {
                         <span class="text-[10px] font-black text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
                           👑 Acesso Total Irrestrito
                         </span>
-                      ` : (canDel ? `
-                        <span class="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
-                          <i data-lucide="check" class="w-3 h-3 text-emerald-700"></i> Pode apagar e gerenciar jogos
-                        </span>
-                      ` : '')}
+                      ` : ''}
 
                       <span class="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
                         ${activeCount}/12 permissões
@@ -7966,8 +7962,8 @@ function openNewAdminUserModal() {
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso Base / Perfil *</label>
             <select id="newAdminRole" onchange="handleRoleChange('newAdmin')" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
-              <option value="Gerente do Sistema" selected>Gerente do Sistema (Pode apagar jogos, gerenciar quadras, bar e clientes)</option>
-              <option value="Recepção & Atendimento">Recepção & Atendimento (Visualiza e opera partidas e bar - NÃO pode apagar jogos)</option>
+              <option value="Gerente do Sistema" selected>Gerente do Sistema (Operação e Gestão)</option>
+              <option value="Recepção & Atendimento">Recepção & Atendimento (Atendimento e Quadras)</option>
               <option value="Administrador Geral">Administrador Geral (Acesso Total Irrestrito)</option>
               <option value="Personalizado">Personalizado (Definir funções individualmente na matriz abaixo)</option>
             </select>
@@ -8096,8 +8092,8 @@ function openEditAdminUserModal(id) {
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso Base / Perfil *</label>
             <select id="editAdminRole" onchange="handleRoleChange('editAdmin')" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600" ${isMaster ? 'disabled' : ''}>
-              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Pode apagar jogos, gerenciar quadras, bar e clientes)</option>
-              <option value="Recepção & Atendimento" ${user.role === 'Recepção & Atendimento' || (user.role && user.role.toLowerCase().includes('recep')) ? 'selected' : ''}>Recepção & Atendimento (Visualiza e opera jogos e bar - NÃO pode apagar jogos)</option>
+              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Operação e Gestão)</option>
+              <option value="Recepção & Atendimento" ${user.role === 'Recepção & Atendimento' || (user.role && user.role.toLowerCase().includes('recep')) ? 'selected' : ''}>Recepção & Atendimento (Atendimento e Quadras)</option>
               <option value="Administrador Geral" ${user.role === 'Administrador Geral' ? 'selected' : ''}>Administrador Geral (Acesso Total e Irrestrito)</option>
               <option value="Personalizado">Personalizado (Definir funções individualmente na matriz abaixo)</option>
             </select>
