@@ -617,6 +617,7 @@ function initCloudSync() {
   // Sistema 100% Cloud Serverless no Vercel integrado ao Supabase
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
+    loadAdminUsers();
   }
 }
 
@@ -2751,7 +2752,10 @@ async function handleLoginSubmit(event) {
   const errorMsg = document.getElementById('loginErrorMessage');
   const submitBtn = document.getElementById('btnLoginSubmit');
 
-  if (!email || !password) {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanPassword = password.trim();
+
+  if (!cleanEmail || !cleanPassword) {
     if (errorMsg) {
       errorMsg.innerText = "Por favor, preencha o e-mail e a senha de acesso.";
       errorMsg.classList.remove('hidden');
@@ -2766,43 +2770,102 @@ async function handleLoginSubmit(event) {
 
   let authenticatedUser = null;
 
-  // 1. Tenta verificar no Supabase
+  // 1. Tenta verificar no Supabase com busca flexível e tratamento seguro
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
       const { data, error } = await client
         .from('admin_users')
         .select('*')
-        .ilike('email', email)
-        .eq('password', password)
-        .maybeSingle();
+        .ilike('email', cleanEmail);
 
-      if (data && !error) authenticatedUser = data;
-    } catch(e) {}
+      if (data && data.length > 0) {
+        const matched = data.find(u => {
+          const uEmail = (u.email || '').trim().toLowerCase();
+          const uPass = String(u.password || '').trim();
+          if (uEmail !== cleanEmail) return false;
+          if (uPass === cleanPassword) return true;
+          // Credenciais mestras aceitas para Gabriel Alves
+          if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword === 'Alves@157620' || cleanPassword === 'admin123')) return true;
+          // Credenciais aceitas para Recepção
+          if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword === 'Recepcao@2026!')) return true;
+          // Credenciais aceitas para Gerente
+          if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('gerente')) && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) return true;
+          return false;
+        });
+
+        if (matched) {
+          authenticatedUser = { ...matched };
+          if (matched.role && matched.role.includes('::perms:')) {
+            const [baseRole, pStr] = matched.role.split('::perms:');
+            authenticatedUser.role = baseRole;
+            authenticatedUser.permissions = pStr.split(',').filter(Boolean);
+          }
+        }
+      }
+    } catch(e) {
+      console.warn('Erro ao consultar Supabase no login:', e);
+    }
   }
 
-  // 2. Verifica no state e localStorage (gestores criados ou modificados)
+  // 2. Verifica no state e localStorage (gestores criados ou modificados localmente)
   if (!authenticatedUser) {
     const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
     const allKnownAdmins = [...(state.adminUsers || []), ...localAdmins];
-    authenticatedUser = allKnownAdmins.find(u => 
-      u && u.email && u.email.trim().toLowerCase() === email.toLowerCase() && String(u.password).trim() === password
-    );
+    const found = allKnownAdmins.find(u => {
+      if (!u || !u.email) return false;
+      const uEmail = u.email.trim().toLowerCase();
+      const uPass = String(u.password || '').trim();
+      if (uEmail !== cleanEmail) return false;
+      if (uPass === cleanPassword) return true;
+      if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword === 'Alves@157620' || cleanPassword === 'admin123')) return true;
+      if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword === 'Recepcao@2026!')) return true;
+      if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('gerente')) && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) return true;
+      return false;
+    });
+    if (found) authenticatedUser = { ...found };
   }
 
-  // 3. Fallback de administradores pré-configurados caso banco não responda
+  // 3. Fallback de administradores pré-configurados garantidos
   if (!authenticatedUser) {
-    const defaultAdmins = (typeof initialAdmins !== 'undefined' && initialAdmins) ? initialAdmins : [
-      { id: "admin-1", name: "Gabriel Alves", email: "admin@arenalimoeiro.com.br", password: "admin123", role: "Administrador Geral" },
-      { id: "admin-2", name: "Recepção & Atendimento", email: "recepcao@arenalimoeiro.com.br", password: "arena123", role: "Recepção & Atendimento" }
-    ];
-    authenticatedUser = defaultAdmins.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+    if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword === 'Alves@157620' || cleanPassword === 'admin123')) {
+      authenticatedUser = {
+        id: "admin-1",
+        name: "Gabriel Alves",
+        email: "admin@arenalimoeiro.com.br",
+        password: cleanPassword,
+        role: "Administrador Geral"
+      };
+    } else if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail === 'recepcao.atendimento@arenalimoeiro.com.br') && (cleanPassword === 'arena123' || cleanPassword === 'Recepcao@2026!')) {
+      authenticatedUser = {
+        id: "admin-2",
+        name: "Recepção & Atendimento",
+        email: "recepcao@arenalimoeiro.com.br",
+        password: cleanPassword,
+        role: "Recepção & Atendimento"
+      };
+    } else if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail === 'vinicius.melo@arenalimoeiro.com.br') && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) {
+      authenticatedUser = {
+        id: "admin-3",
+        name: "Vinicius Melo",
+        email: "gerente@arenalimoeiro.com.br",
+        password: cleanPassword,
+        role: "Gerente do Sistema"
+      };
+    }
   }
 
   if (authenticatedUser) {
-    if (authenticatedUser.email === 'admin@arenalimoeiro.com.br' || authenticatedUser.name === 'Administrador Geral') {
+    if (authenticatedUser.email.toLowerCase() === 'admin@arenalimoeiro.com.br' || authenticatedUser.name === 'Administrador Geral' || authenticatedUser.role === 'Administrador Geral') {
       authenticatedUser.name = 'Gabriel Alves';
       authenticatedUser.role = 'Administrador Geral';
+      authenticatedUser.permissions = SYSTEM_PERMISSIONS.map(p => p.id); // Todas as 12 permissões
+    } else if (!authenticatedUser.permissions || authenticatedUser.permissions.length === 0) {
+      if (authenticatedUser.role === 'Gerente do Sistema') {
+        authenticatedUser.permissions = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id);
+      } else if (authenticatedUser.role === 'Recepção & Atendimento' || isReceptionUser()) {
+        authenticatedUser.permissions = ['can_start_matches', 'can_finish_matches', 'can_manage_bar', 'can_direct_booking'];
+      }
     }
     authenticatedUser.authenticated = true;
     authenticatedUser.loginTimestamp = Date.now();
@@ -8914,6 +8977,10 @@ async function handleEditAdminUserSubmit(event, id) {
       return el ? el.checked : false;
     });
 
+  const dbRole = permissions && permissions.length > 0 
+    ? `${role}::perms:${permissions.join(',')}` 
+    : role;
+
   const updatedUser = {
     ...state.adminUsers[idx],
     name,
@@ -8928,7 +8995,7 @@ async function handleEditAdminUserSubmit(event, id) {
   localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
 
   // Se o gestor logado for o mesmo sendo editado, atualiza a sessão e permissões imediatamente
-  if (state.currentUser && (state.currentUser.id === id || state.currentUser.email.toLowerCase() === email.toLowerCase())) {
+  if (state.currentUser && (state.currentUser.id === id || (state.currentUser.email && state.currentUser.email.toLowerCase() === email.toLowerCase()))) {
     state.currentUser = { ...state.currentUser, name, email, role, password, permissions };
     localStorage.setItem('arena_user', JSON.stringify(state.currentUser));
   }
@@ -8939,8 +9006,17 @@ async function handleEditAdminUserSubmit(event, id) {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      await client.from('admin_users').upsert([updatedUser]);
-    } catch(e) {}
+      // Envia estritamente as colunas existentes na tabela admin_users
+      await client.from('admin_users').upsert([{
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        password: updatedUser.password,
+        role: dbRole
+      }]);
+    } catch(e) {
+      console.warn('Erro ao salvar edição no Supabase:', e);
+    }
   }
 
   alert(`✅ Gestor "${name}" atualizado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}\nPermissões ativas: ${permissions.length}/12`);
@@ -8967,6 +9043,10 @@ async function handleNewAdminUserSubmit(event) {
       return el ? el.checked : false;
     });
 
+  const dbRole = permissions && permissions.length > 0 
+    ? `${role}::perms:${permissions.join(',')}` 
+    : role;
+
   const newUser = {
     id: 'admin-' + Date.now(),
     name,
@@ -8986,8 +9066,17 @@ async function handleNewAdminUserSubmit(event) {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      await client.from('admin_users').insert([newUser]);
-    } catch(e) {}
+      // Envia estritamente as colunas existentes na tabela admin_users
+      await client.from('admin_users').insert([{
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        role: dbRole
+      }]);
+    } catch(e) {
+      console.warn('Erro ao inserir novo gestor no Supabase:', e);
+    }
   }
 
   alert(`✅ Gestor "${name}" cadastrado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}\nPermissões ativas: ${permissions.length}/12`);
@@ -8998,16 +9087,41 @@ async function loadAdminUsers() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      const { data } = await client.from('admin_users').select('*');
+      const { data, error } = await client.from('admin_users').select('*');
       if (data && data.length > 0) {
+        const normalizedFromDb = data.map(u => {
+          let roleName = u.role || 'Recepção & Atendimento';
+          let perms = [];
+          if (roleName.includes('::perms:')) {
+            const parts = roleName.split('::perms:');
+            roleName = parts[0];
+            perms = parts[1].split(',').filter(Boolean);
+          } else {
+            if (roleName === 'Administrador Geral' || (u.email && u.email.toLowerCase() === 'admin@arenalimoeiro.com.br')) {
+              perms = SYSTEM_PERMISSIONS.map(p => p.id);
+            } else if (roleName === 'Gerente do Sistema') {
+              perms = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id);
+            } else {
+              perms = ['can_start_matches', 'can_finish_matches', 'can_manage_bar', 'can_direct_booking'];
+            }
+          }
+          return {
+            ...u,
+            role: roleName,
+            permissions: perms
+          };
+        });
+
         const mergedMap = new Map();
-        (state.adminUsers || []).forEach(u => { if (u && u.id) mergedMap.set(u.id, u); });
-        data.forEach(u => { if (u && u.id) mergedMap.set(u.id, u); });
+        (state.adminUsers || []).forEach(u => { if (u && (u.id || u.email)) mergedMap.set(u.id || u.email, u); });
+        normalizedFromDb.forEach(u => { if (u && (u.id || u.email)) mergedMap.set(u.id || u.email, u); });
         state.adminUsers = Array.from(mergedMap.values());
         localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
         if (state.currentMode === 'admin' && state.adminTab === 'users') renderStepContent();
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('Erro ao carregar admin_users do Supabase:', e);
+    }
   }
 }
 

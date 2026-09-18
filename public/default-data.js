@@ -14,7 +14,7 @@ const initialAdmins = [
     id: "admin-1",
     name: "Gabriel Alves",
     email: "admin@arenalimoeiro.com.br",
-    password: "admin123",
+    password: "Alves@157620",
     role: "Administrador Geral",
     permissions: [
       "can_delete_bookings",
