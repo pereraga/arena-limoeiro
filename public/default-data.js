@@ -16,6 +16,20 @@ const initialAdmins = [
     email: "admin@arenalimoeiro.com.br",
     password: "admin123",
     role: "Administrador Geral",
+    permissions: [
+      "can_delete_bookings",
+      "can_start_matches",
+      "can_finish_matches",
+      "can_direct_booking",
+      "can_manage_bar",
+      "can_manage_products",
+      "can_edit_courts",
+      "can_manage_maintenance",
+      "can_manage_categories",
+      "can_manage_customers",
+      "can_manage_monthly",
+      "can_manage_settings"
+    ],
     createdAt: "01/09/2026"
   },
   {
@@ -24,6 +38,33 @@ const initialAdmins = [
     email: "recepcao@arenalimoeiro.com.br",
     password: "arena123",
     role: "Recepção & Atendimento",
+    permissions: [
+      "can_start_matches",
+      "can_finish_matches",
+      "can_direct_booking",
+      "can_manage_bar"
+    ],
+    createdAt: "01/09/2026"
+  },
+  {
+    id: "admin-3",
+    name: "Vinicius Melo",
+    email: "gerente@arenalimoeiro.com.br",
+    password: "gerente123",
+    role: "Gerente do Sistema",
+    permissions: [
+      "can_delete_bookings",
+      "can_start_matches",
+      "can_finish_matches",
+      "can_direct_booking",
+      "can_manage_bar",
+      "can_manage_products",
+      "can_edit_courts",
+      "can_manage_maintenance",
+      "can_manage_categories",
+      "can_manage_customers",
+      "can_manage_monthly"
+    ],
     createdAt: "01/09/2026"
   }
 ];

@@ -2846,14 +2846,94 @@ function isReceptionUser() {
   return role.includes('recep') || name.includes('recep') || email.includes('recep');
 }
 
-// 🔐 Controle de Permissão: Apenas Gerente do Sistema e Administrador Geral podem apagar jogos
-// O nível de acesso da Recepção NÃO pode apagar jogos
-function canDeleteBookings() {
-  if (!isManagerLoggedIn()) return false;
-  if (isReceptionUser()) return false;
-  return true;
+// ==============================================================================
+// 🛡️ MATRIZ DE PERMISSÕES GRANULARES DO SISTEMA (GRADE 4x3 = 12 PERMISSÕES)
+// ==============================================================================
+const SYSTEM_PERMISSIONS = [
+  // Coluna 1: Operação de Jogos
+  { id: 'can_delete_bookings', col: 1, colTitle: '🎮 Operação de Jogos', label: 'Apagar / Cancelar Jogos', desc: 'Permite apagar jogos do sistema e liberar horário imediatamente', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+  { id: 'can_start_matches', col: 1, colTitle: '🎮 Operação de Jogos', label: 'Liberar e Iniciar Partidas', desc: 'Botão de liberar entrada/iniciar jogo e cronômetro ao vivo', defaultRoles: ['Administrador Geral', 'Gerente do Sistema', 'Recepção & Atendimento'] },
+  { id: 'can_finish_matches', col: 1, colTitle: '🎮 Operação de Jogos', label: 'Finalizar Jogos ao Vivo', desc: 'Permite encerrar partidas e finalizar o tempo de jogo', defaultRoles: ['Administrador Geral', 'Gerente do Sistema', 'Recepção & Atendimento'] },
+
+  // Coluna 2: Balcão e Consumo
+  { id: 'can_direct_booking', col: 2, colTitle: '🛒 Balcão & Consumo', label: 'Reserva Direta no Balcão', desc: 'Criar novas reservas avulsas diretamente na recepção', defaultRoles: ['Administrador Geral', 'Gerente do Sistema', 'Recepção & Atendimento'] },
+  { id: 'can_manage_bar', col: 2, colTitle: '🛒 Balcão & Consumo', label: 'Comanda do Bar & Lanches', desc: 'Aba de Bar, comanda individual e entrega de pedidos', defaultRoles: ['Administrador Geral', 'Gerente do Sistema', 'Recepção & Atendimento'] },
+  { id: 'can_manage_products', col: 2, colTitle: '🛒 Balcão & Consumo', label: 'Cardápio e Estoque do Bar', desc: 'Cadastrar novos produtos, fotos e alterar valores de venda', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+
+  // Coluna 3: Quadras e Espaços
+  { id: 'can_edit_courts', col: 3, colTitle: '🏟️ Quadras & Espaços', label: 'Editar Quadras e Preços', desc: 'Cadastrar quadras, alterar fotos e ajustar tarifas por hora', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+  { id: 'can_manage_maintenance', col: 3, colTitle: '🏟️ Quadras & Espaços', label: 'Treinos e Manutenções', desc: 'Bloquear horários na grade para escolinhas e reformas', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+  { id: 'can_manage_categories', col: 3, colTitle: '🏟️ Quadras & Espaços', label: 'Categorias e Esportes', desc: 'Criar e editar modalidades esportivas (Beach, Society...)', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+
+  // Coluna 4: Cadastros e Gestão
+  { id: 'can_manage_customers', col: 4, colTitle: '⚙️ Cadastros & Gestão', label: 'Base de Clientes / Atletas', desc: 'Visualizar lista de clientes, fichas médicas e telefones', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+  { id: 'can_manage_monthly', col: 4, colTitle: '⚙️ Cadastros & Gestão', label: 'Horários Fixos (Mensalistas)', desc: 'Gerenciar mensalistas e contratos semanais fixos', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
+  { id: 'can_manage_settings', col: 4, colTitle: '⚙️ Cadastros & Gestão', label: 'Gestores e Ajustes Gerais', desc: 'Cadastrar novos gestores, níveis de acesso e banco de dados', defaultRoles: ['Administrador Geral'] },
+];
+
+function userHasPermission(user, permKey) {
+  if (!user) return false;
+  const role = user.role || '';
+  const email = (user.email || '').toLowerCase();
+  const name = (user.name || '').toLowerCase();
+  const isMaster = role === 'Administrador Geral' || email === 'admin@arenalimoeiro.com.br' || name === 'gabriel alves';
+  if (isMaster) return true;
+
+  // Se o usuário possui um array explícito de permissões definido
+  if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+    return user.permissions.includes(permKey);
+  }
+
+  // Fallbacks para contas sem array de permissões
+  const isRecep = role.toLowerCase().includes('recep') || name.includes('recep') || email.includes('recep');
+  if (isRecep) {
+    const receptionAllowed = ['can_start_matches', 'can_finish_matches', 'can_manage_bar', 'can_direct_booking'];
+    return receptionAllowed.includes(permKey);
+  }
+
+  if (role === 'Gerente do Sistema') {
+    // Gerente do Sistema pode operar tudo, inclusive apagar jogos
+    // Só não acessa gestão master de Supabase e criar outros gestores
+    return permKey !== 'can_manage_settings';
+  }
+
+  return false;
 }
+
+function hasPermission(permKey) {
+  if (!isManagerLoggedIn()) return false;
+  return userHasPermission(state.currentUser, permKey);
+}
+
+// Helpers de Checagem Rápida
+function canDeleteBookings() { return hasPermission('can_delete_bookings'); }
+function canStartMatches() { return hasPermission('can_start_matches'); }
+function canFinishMatches() { return hasPermission('can_finish_matches'); }
+function canManageBar() { return hasPermission('can_manage_bar'); }
+function canDirectBooking() { return hasPermission('can_direct_booking'); }
+function canEditCourts() { return hasPermission('can_edit_courts'); }
+function canManageMaintenance() { return hasPermission('can_manage_maintenance'); }
+function canManageCategories() { return hasPermission('can_manage_categories'); }
+function canManageCustomers() { return hasPermission('can_manage_customers'); }
+function canManageMonthly() { return hasPermission('can_manage_monthly'); }
+function canManageProducts() { return hasPermission('can_manage_products'); }
+function canManageSettings() { return hasPermission('can_manage_settings'); }
+
+window.SYSTEM_PERMISSIONS = SYSTEM_PERMISSIONS;
+window.userHasPermission = userHasPermission;
+window.hasPermission = hasPermission;
 window.canDeleteBookings = canDeleteBookings;
+window.canStartMatches = canStartMatches;
+window.canFinishMatches = canFinishMatches;
+window.canManageBar = canManageBar;
+window.canDirectBooking = canDirectBooking;
+window.canEditCourts = canEditCourts;
+window.canManageMaintenance = canManageMaintenance;
+window.canManageCategories = canManageCategories;
+window.canManageCustomers = canManageCustomers;
+window.canManageMonthly = canManageMonthly;
+window.canManageProducts = canManageProducts;
+window.canManageSettings = canManageSettings;
 
 // PAINEL DO ADMINISTRADOR / RECEPÇÃO
 function renderAdminView(container) {
@@ -2867,14 +2947,20 @@ function renderAdminView(container) {
     return;
   }
   const isRecep = isReceptionUser();
-  if (isRecep && state.adminTab !== 'live_dashboard' && state.adminTab !== 'bar_control') {
+  
+  // Se a aba selecionada não for permitida para esta conta, redireciona para a aba principal
+  if (state.adminTab === 'courts_control' && !canEditCourts()) state.adminTab = 'live_dashboard';
+  if (state.adminTab === 'categories' && !canManageCategories()) state.adminTab = 'live_dashboard';
+  if (state.adminTab === 'bar_control' && !canManageBar()) state.adminTab = 'live_dashboard';
+  if (state.adminTab === 'settings' && !canManageSettings() && !canManageCustomers() && !canManageMonthly() && !canManageProducts()) {
     state.adminTab = 'live_dashboard';
   }
+
   const currentTab = state.adminTab || 'live_dashboard';
   const displayName = (state.currentUser?.name && state.currentUser.name !== 'Administrador Geral') 
     ? state.currentUser.name 
     : (state.currentUser?.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser?.name || 'Gabriel Alves'));
-  const displayRole = isRecep ? 'Recepção & Atendimento' : (state.currentUser?.role || 'Administrador Geral');
+  const displayRole = state.currentUser?.role || (isRecep ? 'Recepção & Atendimento' : 'Gerente do Sistema');
 
   container.innerHTML = `
     <div class="max-w-7xl mx-auto px-4 py-6 sm:py-8">
@@ -2904,10 +2990,12 @@ function renderAdminView(container) {
         </div>
 
         <div class="flex flex-wrap items-center justify-center md:justify-end gap-2 w-full md:w-auto mt-3 md:mt-0">
-          <button onclick="openDirectBookingModal()" class="flex-1 sm:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
-            <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
-            <span class="whitespace-nowrap">⚡ Fazer Reserva Balcão</span>
-          </button>
+          ${canDirectBooking() ? `
+            <button onclick="openDirectBookingModal()" class="flex-1 sm:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
+              <span class="whitespace-nowrap">⚡ Fazer Reserva Balcão</span>
+            </button>
+          ` : ''}
 
           <button onclick="syncDataFromSupabase().then(() => renderStepContent())" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-2xs" title="Atualizar dados do banco">
             <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
@@ -2921,7 +3009,7 @@ function renderAdminView(container) {
         </div>
       </div>
 
-      <!-- Abas Principais de Operação -->
+      <!-- Abas Principais de Operação (Funções somem caso o usuário não tenha permissão) -->
       <div class="flex items-center gap-2.5 mb-6 pb-2 overflow-x-auto scrollbar-none">
         <button onclick="setAdminTab('live_dashboard')" 
                 class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
@@ -2932,7 +3020,7 @@ function renderAdminView(container) {
           <span>Movimentação dos Jogos</span>
         </button>
 
-        ${!isRecep ? `
+        ${canEditCourts() ? `
           <button onclick="setAdminTab('courts_control')" 
                   class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
                          ${currentTab === 'courts_control' ? 
@@ -2944,7 +3032,9 @@ function renderAdminView(container) {
               ${state.courts.length}
             </span>
           </button>
+        ` : ''}
 
+        ${canManageCategories() ? `
           <button onclick="setAdminTab('categories')" 
                   class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
                          ${currentTab === 'categories' ? 
@@ -2958,16 +3048,18 @@ function renderAdminView(container) {
           </button>
         ` : ''}
 
-        <button onclick="setAdminTab('bar_control')" 
-                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
-                       ${currentTab === 'bar_control' ? 
-                         'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
-                         'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="beer" class="w-4 h-4 ${currentTab === 'bar_control' ? 'text-white' : 'text-amber-500'}"></i>
-          <span>Bar & Lanchonete</span>
-        </button>
+        ${canManageBar() ? `
+          <button onclick="setAdminTab('bar_control')" 
+                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                         ${currentTab === 'bar_control' ? 
+                           'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
+                           'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <i data-lucide="beer" class="w-4 h-4 ${currentTab === 'bar_control' ? 'text-white' : 'text-amber-500'}"></i>
+            <span>Bar & Lanchonete</span>
+          </button>
+        ` : ''}
 
-        ${!isRecep ? `
+        ${(canManageSettings() || canManageCustomers() || canManageMonthly() || canManageProducts()) ? `
           <button onclick="setAdminTab('settings')" 
                   class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
                          ${currentTab === 'settings' ? 
@@ -3598,10 +3690,12 @@ function renderLiveDashboardTab() {
         </div>
 
         <div class="w-full md:w-auto flex flex-col gap-2 items-stretch md:items-end justify-center flex-shrink-0">
-          <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm flex items-center space-x-1.5 transition-all text-center cursor-pointer">
-            <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
-            <span>⚡ Nova Reserva Balcão</span>
-          </button>
+          ${canDirectBooking() ? `
+            <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm flex items-center space-x-1.5 transition-all text-center cursor-pointer">
+              <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
+              <span>⚡ Nova Reserva Balcão</span>
+            </button>
+          ` : ''}
           <button onclick="openSearchMatchesModal()" class="w-full sm:w-auto justify-center px-4 py-2 bg-slate-900 hover:bg-slate-800 text-emerald-400 hover:text-emerald-300 border border-slate-700 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all text-center cursor-pointer">
             <i data-lucide="search" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
             <span>🔍 Pesquisar Jogos (Nome/Quadra/CPF)</span>
@@ -3765,30 +3859,32 @@ function renderLiveDashboardTab() {
 
                     <!-- Botões de Ação do Jogo -->
                     <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full md:w-auto pt-2 sm:pt-0">
-                      ${(match.isLive || match.isOvertime) ? `
+                      ${(match.isLive || match.isOvertime) ? (canFinishMatches() ? `
                         <!-- Jogo em andamento: Finalizar Jogo (atualiza bar para entregue automaticamente) -->
                         <button onclick="finishMatchManual('${match.id}')" class="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Finalizar o jogo agora (atualiza o bar para entregue se houver pedidos)">
                           <span class="text-sm leading-none">⏹️</span>
                           <span>Finalizar Jogo</span>
                         </button>
-                      ` : (match.status !== 'finished' && isSelectedDateToday ? `
+                      ` : '') : (match.status !== 'finished' && isSelectedDateToday ? (canStartMatches() ? `
                         <!-- Jogo agendado hoje: Liberar Entrada / Iniciar Jogo -->
                         <button onclick="startMatchNow('${match.id}')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Liberar entrada e iniciar jogo agora">
                           <i data-lucide="play" class="w-4 h-4 fill-current"></i>
                           <span>Liberar Jogo</span>
                         </button>
-                      ` : (match.status !== 'finished' ? `
+                      ` : '') : (match.status !== 'finished' ? (canStartMatches() ? `
                         <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
                           <i data-lucide="play" class="w-4 h-4 fill-current"></i>
                           <span>Liberar Jogo</span>
                         </button>
-                      ` : ''))}
+                      ` : '') : ''))}
 
                       <!-- Botão de Comanda do Bar -->
-                      <button onclick="openAddBarItemsModal('${match.id}')" class="px-3.5 py-2 text-slate-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Adicionar / Registrar Consumo do Bar para este jogo">
-                        <span class="text-base leading-none">🍺</span>
-                        <span>+ Comanda Bar</span>
-                      </button>
+                      ${canManageBar() ? `
+                        <button onclick="openAddBarItemsModal('${match.id}')" class="px-3.5 py-2 text-slate-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Adicionar / Registrar Consumo do Bar para este jogo">
+                          <span class="text-base leading-none">🍺</span>
+                          <span>+ Comanda Bar</span>
+                        </button>
+                      ` : ''}
 
                       <!-- Botão de Apagar Jogo (Apenas Gerente do Sistema e Administrador Geral) -->
                       ${canDeleteBookings() ? `
@@ -4547,46 +4643,71 @@ function renderAdminTabContent() {
   }
 
   const userRole = state.currentUser?.role || 'Administrador Geral';
-  const isMasterAdmin = userRole === 'Administrador Geral';
+  const isMasterAdmin = userRole === 'Administrador Geral' || (state.currentUser?.email === 'admin@arenalimoeiro.com.br');
 
-  // Se for 'settings' ou uma das abas técnicas legadas:
-  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
-  if (!isMasterAdmin && (activeSubTab === 'users' || activeSubTab === 'database')) {
-    activeSubTab = 'spaces';
-    state.adminSubTab = 'spaces';
+  // Calcula quais sub-abas o usuário logado tem permissão de acessar
+  const allowedSubTabs = [];
+  if (canEditCourts()) allowedSubTabs.push('spaces', 'positions');
+  if (canDeleteBookings() || canStartMatches()) allowedSubTabs.push('bookings');
+  if (canManageMonthly()) allowedSubTabs.push('monthly');
+  if (canManageProducts()) allowedSubTabs.push('products');
+  if (canManageCustomers()) allowedSubTabs.push('customers');
+  if (canManageSettings()) allowedSubTabs.push('users', 'database');
+
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
+  if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeSubTab)) {
+    activeSubTab = allowedSubTabs[0];
+    state.adminSubTab = activeSubTab;
   }
 
   return `
     <div class="space-y-6">
       
-      <!-- Sub-navegação de Cadastros -->
+      <!-- Sub-navegação de Cadastros (Oculta abas sem permissão) -->
       <div class="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
-        <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Espaços / Quadras
-        </button>
+        ${canEditCourts() ? `
+          <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            Espaços / Quadras
+          </button>
+        ` : ''}
 
-        <button onclick="setAdminSubTab('bookings')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          ⚽ Jogos Agendados (${(state.bookings || []).length})
-        </button>
+        ${(canDeleteBookings() || canStartMatches()) ? `
+          <button onclick="setAdminSubTab('bookings')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            ⚽ Jogos Agendados (${(state.bookings || []).length})
+          </button>
+        ` : ''}
 
-        <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Posições dos Jogos
-        </button>
-        <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Horários Fixos (${state.monthlyMembers.length})
-        </button>
-        <button onclick="setAdminSubTab('products')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'products' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Cardápio de Produtos
-        </button>
-        ${isMasterAdmin ? `
+        ${canEditCourts() ? `
+          <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            Posições dos Jogos
+          </button>
+        ` : ''}
+
+        ${canManageMonthly() ? `
+          <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            Horários Fixos (${state.monthlyMembers.length})
+          </button>
+        ` : ''}
+
+        ${canManageProducts() ? `
+          <button onclick="setAdminSubTab('products')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'products' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            Cardápio de Produtos
+          </button>
+        ` : ''}
+
+        ${canManageSettings() ? `
           <button onclick="setAdminSubTab('users')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             👑 Gestores & Acessos
           </button>
         ` : ''}
-        <button onclick="setAdminSubTab('customers')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          Clientes Cadastrados
-        </button>
-        ${isMasterAdmin ? `
+
+        ${canManageCustomers() ? `
+          <button onclick="setAdminSubTab('customers')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            Clientes Cadastrados
+          </button>
+        ` : ''}
+
+        ${canManageSettings() ? `
           <button onclick="setAdminSubTab('database')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             Conexão Supabase
           </button>
@@ -5124,42 +5245,83 @@ function renderAdminSubTabContent(tab) {
           ${(state.adminUsers || []).map(u => {
             const isMaster = u.email === 'admin@arenalimoeiro.com.br' || u.role === 'Administrador Geral';
             const uName = (u.name && u.name !== 'Administrador Geral') ? u.name : (u.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : u.name);
+            const canDel = userHasPermission(u, 'can_delete_bookings');
+            const activeCount = SYSTEM_PERMISSIONS.filter(p => userHasPermission(u, p.id)).length;
+            const isRecep = (u.role || '').toLowerCase().includes('recep');
+
             return `
-              <div class="p-4 border ${isMaster ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white'} rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                <div class="flex items-center space-x-3.5">
-                  <div class="w-10 h-10 rounded-xl ${isMaster ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'} flex items-center justify-center font-bold shrink-0 shadow-xs">
-                    <i data-lucide="${isMaster ? 'crown' : 'user-check'}" class="w-5 h-5"></i>
+              <div class="p-4 sm:p-5 border ${isMaster ? 'border-emerald-300 bg-emerald-50/40 ring-1 ring-emerald-300/50' : 'border-slate-200 bg-white'} rounded-2xl sm:rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs transition-all hover:border-slate-300">
+                <div class="flex items-start space-x-3.5">
+                  <div class="w-11 h-11 rounded-2xl ${isMaster ? 'bg-emerald-600 text-white shadow-md' : (isRecep ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-700')} flex items-center justify-center font-bold shrink-0 shadow-xs">
+                    <i data-lucide="${isMaster ? 'crown' : (isRecep ? 'headphones' : 'shield-check')}" class="w-5 h-5"></i>
                   </div>
-                  <div>
-                    <div class="flex items-center space-x-2 flex-wrap">
-                      <h4 class="text-sm font-black text-slate-900">${uName}</h4>
-                      <span class="text-[10px] font-black px-2 py-0.5 rounded-full ${isMaster ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-700 border border-slate-300'}">
+                  <div class="space-y-1.5">
+                    <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                      <h4 class="text-sm sm:text-base font-black text-slate-900">${uName}</h4>
+                      <span class="text-[10px] font-black px-2.5 py-0.5 rounded-full ${isMaster ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-700 border border-slate-300'}">
                         ${u.role || 'Gerente do Sistema'}
                       </span>
-                      ${!isMaster ? `
-                        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                          <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> Pode apagar e gerenciar jogos
+                      
+                      ${isMaster ? `
+                        <span class="text-[10px] font-black text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                          👑 Acesso Total Irrestrito
                         </span>
-                      ` : ''}
+                      ` : (canDel ? `
+                        <span class="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 flex items-center gap-1">
+                          <i data-lucide="check" class="w-3 h-3 text-emerald-700"></i> Pode apagar e gerenciar jogos
+                        </span>
+                      ` : `
+                        <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 flex items-center gap-1">
+                          <i data-lucide="lock" class="w-3 h-3 text-slate-400"></i> Não pode apagar jogos
+                        </span>
+                      `)}
+
+                      <span class="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+                        ${activeCount}/12 permissões
+                      </span>
                     </div>
-                    <p class="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-2">
-                      <span><strong>E-mail:</strong> ${u.email}</span>
+
+                    <p class="text-xs text-slate-500 flex items-center flex-wrap gap-2 pt-0.5">
+                      <span><strong>E-mail:</strong> <code class="text-slate-800 font-mono font-bold">${u.email}</code></span>
                       <span class="text-slate-300">•</span>
-                      <span><strong>Senha:</strong> <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-700 font-mono font-bold">${u.password}</code></span>
+                      <span><strong>Senha:</strong> <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-mono font-bold">${u.password}</code></span>
                     </p>
+
+                    <!-- Resumo das permissões ativas em badges compactas -->
+                    <div class="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      ${userHasPermission(u, 'can_delete_bookings') ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">Apagar Jogos</span>` : ''}
+                      ${userHasPermission(u, 'can_start_matches') ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">Liberar Jogos</span>` : ''}
+                      ${userHasPermission(u, 'can_manage_bar') ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">Bar & Comanda</span>` : ''}
+                      ${userHasPermission(u, 'can_edit_courts') ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">Quadras</span>` : ''}
+                      ${userHasPermission(u, 'can_manage_customers') ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Clientes</span>` : ''}
+                      ${userHasPermission(u, 'can_manage_monthly') ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">Mensalistas</span>` : ''}
+                    </div>
                   </div>
                 </div>
-                <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                  <button onclick="openEditAdminUserModal('${u.id}')" class="px-3 py-1.5 rounded-xl border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs" title="Modificar nome, e-mail e senha">
+
+                <div class="flex items-center gap-2 self-end lg:self-center shrink-0">
+                  <button onclick="copyCredentialsDirect('${(u.name || uName).replace(/'/g, "\\'")}', '${u.role || 'Gerente'}', '${u.email}', '${u.password}')" 
+                          class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs" 
+                          title="Copiar dados de login para o WhatsApp">
+                    <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-600"></i>
+                    <span>Copiar</span>
+                  </button>
+
+                  <button onclick="openEditAdminUserModal('${u.id}')" 
+                          class="px-3 py-2 rounded-xl border border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs" 
+                          title="Modificar nome, cargo, permissões e senha">
                     <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
                     <span>Editar</span>
                   </button>
+
                   ${isMaster ? `
-                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-2.5 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1">
+                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100/60 px-3 py-2 rounded-xl border border-emerald-200 flex items-center gap-1">
                       👑 Proprietário
                     </span>
                   ` : `
-                    <button onclick="deleteAdminUser('${u.id}')" class="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" title="Excluir este acesso">
+                    <button onclick="deleteAdminUser('${u.id}')" 
+                            class="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" 
+                            title="Excluir este acesso">
                       <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                       <span>Excluir</span>
                     </button>
@@ -7445,6 +7607,20 @@ function openAdminUserModal() {
   openNewAdminUserModal();
 }
 
+function copyCredentialsDirect(name, role, email, pass) {
+  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}\n🌐 Link de Acesso: ${window.location.origin}`;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      alert(`✅ Credenciais de "${name}" copiadas com sucesso! Você pode colar no WhatsApp.`);
+    }).catch(() => {
+      prompt('Copie as credenciais abaixo:', text);
+    });
+  } else {
+    prompt('Copie as credenciais abaixo:', text);
+  }
+}
+window.copyCredentialsDirect = copyCredentialsDirect;
+
 function slugifyAdminName(name) {
   if (!name) return '';
   return name
@@ -7455,36 +7631,120 @@ function slugifyAdminName(name) {
     .trim();
 }
 
-// GERADOR DE E-MAIL E SENHA COM O NOME DA PESSOA
+// LISTAS RICAS PARA GERAÇÃO REALMENTE ALEATÓRIA (MUDAM A CADA CLIQUE)
+const RANDOM_FIRST_NAMES = [
+  'Lucas', 'Marcos', 'Rodrigo', 'Matheus', 'Felipe', 'Bruno', 'Thiago', 'Carlos', 
+  'André', 'Vinicius', 'Gabriel', 'Rafael', 'Diego', 'Leonardo', 'Renato', 'Danilo', 
+  'Guilherme', 'Alexandre', 'Henrique', 'Eduardo', 'Samuel', 'Leandro', 'Marcelo',
+  'Juliana', 'Camila', 'Beatriz', 'Larissa', 'Mariana', 'Amanda', 'Fernanda', 'Bruna'
+];
+
+const RANDOM_LAST_NAMES = [
+  'Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira', 
+  'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes', 
+  'Soares', 'Fernandes', 'Vieira', 'Barbosa', 'Rocha', 'Dias', 'Nascimento', 'Andrade', 
+  'Moreira', 'Nunes', 'Marques', 'Machado', 'Mendes', 'Freitas', 'Cardoso', 'Ramos'
+];
+
+const RANDOM_ROLE_NAMES = [
+  'Recepção Manhã', 'Recepção Noite', 'Recepção Fim de Semana', 'Gerente de Turno', 
+  'Operador de Pista', 'Atendente Balcão', 'Supervisor de Campo'
+];
+
+const ARENA_WORDS = [
+  'Arena', 'Limoeiro', 'Pelada', 'Craque', 'Artilheiro', 'Chuteira', 'Society', 
+  'Quadra', 'Gol', 'Drible', 'Vitoria', 'Campeao', 'Fut', 'Passe'
+];
+
+const PASS_SYMBOLS = ['!', '@', '#', '$', '*', '&'];
+
+function getRandomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Sorteia um nome novo a cada clique (sempre diferente do atual no campo)
+function randomizeAdminName(prefix) {
+  const nameEl = document.getElementById(`${prefix}Name`);
+  const currentVal = nameEl ? nameEl.value.trim() : '';
+  
+  let newName = '';
+  for (let i = 0; i < 20; i++) {
+    const isRole = Math.random() < 0.12;
+    if (isRole) {
+      newName = getRandomItem(RANDOM_ROLE_NAMES);
+    } else {
+      newName = `${getRandomItem(RANDOM_FIRST_NAMES)} ${getRandomItem(RANDOM_LAST_NAMES)}`;
+    }
+    if (newName !== currentVal) break;
+  }
+
+  if (nameEl) {
+    nameEl.value = newName;
+    nameEl.classList.add('ring-2', 'ring-emerald-500');
+    setTimeout(() => nameEl.classList.remove('ring-2', 'ring-emerald-500'), 400);
+  }
+}
+window.randomizeAdminName = randomizeAdminName;
+
+// Gera e-mail e senha usando o nome, mudando a cada clique
 function generateCredentialsFromName(isEdit = false) {
   const prefix = isEdit ? 'editAdmin' : 'newAdmin';
   const nameEl = document.getElementById(`${prefix}Name`);
   const emailEl = document.getElementById(`${prefix}Email`);
   const passEl = document.getElementById(`${prefix}Password`);
-  const rawName = nameEl ? nameEl.value.trim() : '';
+  let rawName = nameEl ? nameEl.value.trim() : '';
 
   if (!rawName) {
-    alert('Por favor, digite primeiro o Nome Completo do Gestor acima para gerar as credenciais com o nome dele.');
-    if (nameEl) nameEl.focus();
-    return;
+    randomizeAdminName(prefix);
+    rawName = nameEl ? nameEl.value.trim() : 'Gestor';
   }
 
   const clean = slugifyAdminName(rawName);
   const parts = clean.split(/\s+/).filter(Boolean);
   const first = parts[0] || 'gestor';
   const last = parts.length > 1 ? parts[parts.length - 1] : '';
-  const emailUser = last ? `${first}.${last}` : first;
-  const email = `${emailUser}@arenalimoeiro.com.br`;
 
+  // Variações aleatórias de formato de e-mail a cada clique
+  const emailStyles = [
+    last ? `${first}.${last}` : first,
+    last ? `${first}.${last}${Math.floor(10 + Math.random() * 89)}` : `${first}${Math.floor(10 + Math.random() * 89)}`,
+    last ? `${first.charAt(0)}${last}` : `${first}.arena`,
+    `${first}.${Math.floor(100 + Math.random() * 900)}`
+  ];
+  const chosenEmail = getRandomItem(emailStyles);
+  const email = `${chosenEmail}@arenalimoeiro.com.br`;
+
+  // Variações de senha dinâmica baseada no nome + registros
   const capFirst = first.charAt(0).toUpperCase() + first.slice(1);
-  const currentYear = new Date().getFullYear();
-  const password = `${capFirst}@${currentYear}!`;
+  const capLast = last ? (last.charAt(0).toUpperCase() + last.slice(1)) : 'Arena';
+  const sym = getRandomItem(PASS_SYMBOLS);
+  const sym2 = getRandomItem(PASS_SYMBOLS);
+  const num = Math.floor(100 + Math.random() * 900);
+  const year = new Date().getFullYear();
 
-  if (emailEl) emailEl.value = email;
-  if (passEl) passEl.value = password;
+  const passwordOptions = [
+    `${capFirst}${sym}${year}${sym2}`,
+    `${capLast}${sym}${num}${sym2}`,
+    `Arena${sym}${capFirst}${num}`,
+    `${capFirst}#${capLast}${sym}`,
+    `${getRandomItem(ARENA_WORDS)}${sym}${capFirst}${num}`
+  ];
+  const password = getRandomItem(passwordOptions);
+
+  if (emailEl) {
+    emailEl.value = email;
+    emailEl.classList.add('ring-2', 'ring-emerald-500');
+    setTimeout(() => emailEl.classList.remove('ring-2', 'ring-emerald-500'), 400);
+  }
+  if (passEl) {
+    passEl.value = password;
+    passEl.classList.add('ring-2', 'ring-emerald-500');
+    setTimeout(() => passEl.classList.remove('ring-2', 'ring-emerald-500'), 400);
+  }
 }
+window.generateCredentialsFromName = generateCredentialsFromName;
 
-// GERADOR DE E-MAIL E SENHA 100% ALEATÓRIOS
+// Gera credenciais 100% aleatórias e desvinculadas, mudando a cada clique
 function generateRandomCredentials(isEdit = false) {
   const prefix = isEdit ? 'editAdmin' : 'newAdmin';
   const emailEl = document.getElementById(`${prefix}Email`);
@@ -7492,16 +7752,44 @@ function generateRandomCredentials(isEdit = false) {
 
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
   let rand = '';
-  for (let i = 0; i < 4; i++) {
-    rand += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  const randomNum = Math.floor(1000 + Math.random() * 9000);
-  const email = `gerente.${rand}@arenalimoeiro.com.br`;
-  const password = `arena${randomNum}!`;
+  for (let i = 0; i < 4; i++) rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  
+  const prefixes = ['gestao', 'arena', 'atendimento', 'gerente', 'equipe', 'operacao'];
+  const pfx = getRandomItem(prefixes);
+  const email = `${pfx}.${rand}@arenalimoeiro.com.br`;
 
-  if (emailEl) emailEl.value = email;
-  if (passEl) passEl.value = password;
+  const word = getRandomItem(ARENA_WORDS);
+  const sym = getRandomItem(PASS_SYMBOLS);
+  const num = Math.floor(1000 + Math.random() * 9000);
+  const password = `${word}${sym}${num}!`;
+
+  if (emailEl) {
+    emailEl.value = email;
+    emailEl.classList.add('ring-2', 'ring-emerald-500');
+    setTimeout(() => emailEl.classList.remove('ring-2', 'ring-emerald-500'), 400);
+  }
+  if (passEl) {
+    passEl.value = password;
+    passEl.classList.add('ring-2', 'ring-emerald-500');
+    setTimeout(() => passEl.classList.remove('ring-2', 'ring-emerald-500'), 400);
+  }
 }
+window.generateRandomCredentials = generateRandomCredentials;
+
+// Gera apenas uma nova senha aleatória a cada clique
+function generateOnlyRandomPassword(prefix) {
+  const passEl = document.getElementById(`${prefix}Password`);
+  const word = getRandomItem(ARENA_WORDS);
+  const sym = getRandomItem(PASS_SYMBOLS);
+  const num = Math.floor(1000 + Math.random() * 9000);
+  const password = `${word}${sym}${num}!`;
+  if (passEl) {
+    passEl.value = password;
+    passEl.classList.add('ring-2', 'ring-emerald-500');
+    setTimeout(() => passEl.classList.remove('ring-2', 'ring-emerald-500'), 400);
+  }
+}
+window.generateOnlyRandomPassword = generateOnlyRandomPassword;
 
 // COPIAR CREDENCIAIS FORMATADAS PARA ÁREA DE TRANSFERÊNCIA
 function copyCredentials(prefix) {
@@ -7520,24 +7808,116 @@ function copyCredentials(prefix) {
     return;
   }
 
-  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}\n🌐 Link de Acesso: ${window.location.origin}`;
-
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('✅ Credenciais copiadas com sucesso! Você pode colar no WhatsApp do gestor.');
-    }).catch(() => {
-      prompt('Copie as credenciais abaixo:', text);
-    });
-  } else {
-    prompt('Copie as credenciais abaixo:', text);
-  }
+  copyCredentialsDirect(name, role, email, pass);
 }
+window.copyCredentials = copyCredentials;
 
 function copyGeneratedCredentials() {
   copyCredentials('newAdmin');
 }
+window.copyGeneratedCredentials = copyGeneratedCredentials;
 
-// MODAL DE CADASTRO DE NOVO GESTOR
+// GERA A GRADE 4 COLUNAS x 3 LINHAS (MATRIZ 4x3 COM AS 12 PERMISSÕES DO SISTEMA)
+function renderPermissionsMatrix(prefix, currentPermissions = null, currentRole = 'Gerente do Sistema') {
+  let activePerms = [];
+  if (Array.isArray(currentPermissions) && currentPermissions.length > 0) {
+    activePerms = [...currentPermissions];
+  } else {
+    activePerms = SYSTEM_PERMISSIONS
+      .filter(p => p.defaultRoles.includes(currentRole))
+      .map(p => p.id);
+  }
+
+  const cols = [1, 2, 3, 4];
+  
+  return `
+    <div class="space-y-2.5 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
+        <div>
+          <span class="text-xs font-black text-slate-900 uppercase flex items-center gap-1.5">
+            <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-600"></i>
+            Permissões do Gestor (Matriz 4x3: 4 Colunas com 3 Funções Cada)
+          </span>
+          <p class="text-[11px] text-slate-500 mt-0.5">Selecione o que esta conta poderá fazer. Caso a conta não tenha a permissão, <strong>as funções somem da tela</strong> do usuário.</p>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="toggleAllPermissions('${prefix}', true)" class="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg text-[10px] font-black cursor-pointer transition-all">
+            ✓ Marcar Todos
+          </button>
+          <button type="button" onclick="toggleAllPermissions('${prefix}', false)" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-[10px] font-bold cursor-pointer transition-all">
+            ✕ Desmarcar Todos
+          </button>
+        </div>
+      </div>
+
+      <!-- Grade 4 Colunas x 3 Linhas = 12 Permissões -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+        ${cols.map(colNum => {
+          const colPerms = SYSTEM_PERMISSIONS.filter(p => p.col === colNum);
+          const colTitle = colPerms[0] ? colPerms[0].colTitle : `Coluna ${colNum}`;
+          return `
+            <div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-2xs flex flex-col justify-between space-y-2">
+              <div class="text-[11px] font-black text-slate-800 pb-1.5 border-b border-slate-100 uppercase tracking-tight">
+                ${colTitle}
+              </div>
+              <div class="space-y-2 flex-1">
+                ${colPerms.map(p => {
+                  const isChecked = activePerms.includes(p.id);
+                  return `
+                    <label for="${prefix}_perm_${p.id}" class="flex items-start gap-2.5 p-2 rounded-xl hover:bg-emerald-50/60 transition-all cursor-pointer select-none group border border-slate-100 hover:border-emerald-200">
+                      <input type="checkbox" id="${prefix}_perm_${p.id}" value="${p.id}" ${isChecked ? 'checked' : ''} 
+                             onchange="handlePermissionCheckboxChange('${prefix}')"
+                             class="w-4 h-4 text-emerald-600 bg-white border-slate-300 rounded focus:ring-emerald-500 mt-0.5 cursor-pointer shrink-0">
+                      <div class="min-w-0">
+                        <span class="text-xs font-black text-slate-900 group-hover:text-emerald-950 block leading-tight">
+                          ${p.label}
+                        </span>
+                        <span class="text-[10px] text-slate-500 leading-tight block mt-0.5">
+                          ${p.desc}
+                        </span>
+                      </div>
+                    </label>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+window.renderPermissionsMatrix = renderPermissionsMatrix;
+
+function toggleAllPermissions(prefix, checkAll = true) {
+  SYSTEM_PERMISSIONS.forEach(p => {
+    const el = document.getElementById(`${prefix}_perm_${p.id}`);
+    if (el) el.checked = checkAll;
+  });
+}
+window.toggleAllPermissions = toggleAllPermissions;
+
+function handleRoleChange(prefix) {
+  const roleEl = document.getElementById(`${prefix}Role`);
+  if (!roleEl) return;
+  const role = roleEl.value;
+  if (role === 'Personalizado') return;
+
+  SYSTEM_PERMISSIONS.forEach(p => {
+    const el = document.getElementById(`${prefix}_perm_${p.id}`);
+    if (el) {
+      el.checked = p.defaultRoles.includes(role);
+    }
+  });
+}
+window.handleRoleChange = handleRoleChange;
+
+function handlePermissionCheckboxChange(prefix) {
+  // Chamado quando o usuário marca/desmarca qualquer checkbox individualmente
+}
+window.handlePermissionCheckboxChange = handlePermissionCheckboxChange;
+
+// MODAL DE CADASTRO DE NOVO GESTOR COM DESIGN MODERNO E MATRIZ 4x3
 function openNewAdminUserModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
@@ -7550,87 +7930,110 @@ function openNewAdminUserModal() {
   const initialGeneratedPassword = `arena${randomNum}!`;
 
   modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
-        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between shrink-0">
           <div class="flex items-center space-x-2.5">
-            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30">
               <i data-lucide="user-plus" class="w-5 h-5"></i>
             </div>
             <div>
               <h3 class="text-base font-black uppercase">Cadastrar Novo Gestor do Sistema</h3>
-              <p class="text-xs text-emerald-200">Defina o nome, e-mail e senha como desejar</p>
+              <p class="text-xs text-emerald-200">Configure o nome, cargo, permissões detalhadas e dados de acesso</p>
             </div>
           </div>
-          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-xl transition-all cursor-pointer">
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1.5 rounded-xl transition-all cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
 
-        <form onsubmit="handleNewAdminUserSubmit(event)" class="p-6 space-y-4">
+        <form onsubmit="handleNewAdminUserSubmit(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[calc(92vh-80px)]">
+          
+          <!-- Nome do Gestor com Botão de Sortear Nome -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo do Gestor *</label>
-            <input type="text" id="newAdminName" required placeholder="Ex: Carlos Eduardo Silva" 
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 uppercase">Nome Completo do Gestor *</label>
+              <button type="button" onclick="randomizeAdminName('newAdmin')" 
+                      class="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-xl text-[11px] font-black flex items-center space-x-1 cursor-pointer transition-all shadow-2xs" 
+                      title="Sorteia um nome brasileiro realista a cada clique">
+                <i data-lucide="shuffle" class="w-3 h-3 text-emerald-600"></i>
+                <span>🎲 Sortear Nome</span>
+              </button>
+            </div>
+            <input type="text" id="newAdminName" required placeholder="Ex: Lucas Santana ou Recepção Noite" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900">
-            <p class="text-[11px] text-slate-400 mt-1">Ao digitar o nome, você pode usar os botões abaixo para criar o e-mail e a senha com o nome dele, ou digitar livremente.</p>
+            <p class="text-[11px] text-slate-400 mt-1">Você pode digitar qualquer nome ou clicar em "🎲 Sortear Nome" para gerar nomes automaticamente a cada clique.</p>
           </div>
 
+          <!-- Nível de Acesso Base -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
-            <select id="newAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
-              <option value="Recepção & Atendimento">Recepção & Atendimento (Visualiza e opera jogos, comanda e bar)</option>
-              <option value="Gerente do Sistema" selected>Gerente do Sistema (Modifica tudo, apaga e gerencia jogos, exceto Supabase e Acessos)</option>
-              <option value="Administrador Geral">Administrador Geral (Acesso Total e Irrestrito)</option>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso Base / Perfil *</label>
+            <select id="newAdminRole" onchange="handleRoleChange('newAdmin')" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
+              <option value="Gerente do Sistema" selected>Gerente do Sistema (Pode apagar jogos, gerenciar quadras, bar e clientes)</option>
+              <option value="Recepção & Atendimento">Recepção & Atendimento (Visualiza e opera partidas e bar - NÃO pode apagar jogos)</option>
+              <option value="Administrador Geral">Administrador Geral (Acesso Total Irrestrito)</option>
+              <option value="Personalizado">Personalizado (Definir funções individualmente na matriz abaixo)</option>
             </select>
-            <p class="text-[11px] text-slate-500 mt-1"><strong>Recepção:</strong> visualiza jogos, libera/inicia, finaliza e anota pedidos do bar. <strong>Gerente:</strong> altera tudo na arena, apaga e gerencia jogos agendados sem mexer no Supabase e Acessos.</p>
+            <p class="text-[11px] text-slate-500 mt-1">Ao selecionar um cargo, as caixas de permissão abaixo são ajustadas automaticamente. Você pode marcar ou desmarcar livremente qualquer caixa.</p>
           </div>
 
-          <!-- Gerador e Customização Livre de E-mail e Senha -->
+          <!-- Matriz 4x3 de Permissões Granulares -->
+          ${renderPermissionsMatrix('newAdmin', null, 'Gerente do Sistema')}
+
+          <!-- Gerador Dinâmico de E-mail e Senha -->
           <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-emerald-200/70">
               <span class="text-xs font-black text-emerald-950 uppercase flex items-center gap-1.5">
                 <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i>
-                Credenciais de Acesso
+                Credenciais de Acesso (Gerador Dinâmico)
               </span>
               <div class="flex items-center gap-1.5 flex-wrap">
                 <button type="button" onclick="generateCredentialsFromName(false)" 
-                        class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha usando o nome digitado">
+                        class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha com o nome digitado, mudando a cada clique">
                   <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
                   <span>✨ Gerar c/ Nome</span>
                 </button>
                 <button type="button" onclick="generateRandomCredentials(false)" 
-                        class="px-2.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha aleatórios">
+                        class="px-2.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha 100% aleatórios a cada clique">
                   <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
-                  <span>🎲 Aleatório</span>
+                  <span>🎲 Aleatório s/ Nome</span>
+                </button>
+                <button type="button" onclick="generateOnlyRandomPassword('newAdmin')" 
+                        class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera apenas uma nova senha aleatória a cada clique">
+                  <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                  <span>🔑 Nova Senha</span>
                 </button>
               </div>
             </div>
 
-            <div>
-              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
-                <span>E-mail de Login *</span>
-                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou modificar livremente</span>
-              </label>
-              <input type="email" id="newAdminEmail" required value="${initialGeneratedEmail}" placeholder="nome@arenalimoeiro.com.br" 
-                     class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
-            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                  <span>E-mail de Login *</span>
+                  <span class="text-[10px] text-emerald-700 font-normal">Editável livremente</span>
+                </label>
+                <input type="email" id="newAdminEmail" required value="${initialGeneratedEmail}" placeholder="nome@arenalimoeiro.com.br" 
+                       class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
+              </div>
 
-            <div>
-              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
-                <span>Senha de Acesso *</span>
-                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou modificar livremente</span>
-              </label>
-              <input type="text" id="newAdminPassword" required value="${initialGeneratedPassword}" 
-                     class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                  <span>Senha de Acesso *</span>
+                  <span class="text-[10px] text-emerald-700 font-normal">Editável livremente</span>
+                </label>
+                <input type="text" id="newAdminPassword" required value="${initialGeneratedPassword}" 
+                       class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              </div>
             </div>
 
             <button type="button" onclick="copyCredentials('newAdmin')" class="w-full py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 transition-all shadow-2xs cursor-pointer">
               <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              <span>📋 Copiar Credenciais Deste Gestor</span>
+              <span>📋 Copiar Credenciais Deste Gestor para Enviar</span>
             </button>
           </div>
 
-          <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3">
+          <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3 shrink-0">
             <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
             <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Cadastrar e Liberar Acesso</button>
           </div>
@@ -7641,8 +8044,9 @@ function openNewAdminUserModal() {
 
   lucide.createIcons();
 }
+window.openNewAdminUserModal = openNewAdminUserModal;
 
-// MODAL DE EDIÇÃO DE GESTOR EXISTENTE
+// MODAL DE EDIÇÃO DE GESTOR EXISTENTE COM MATRIZ 4x3
 function openEditAdminUserModal(id) {
   const user = (state.adminUsers || []).find(u => u.id === id);
   if (!user) {
@@ -7656,86 +8060,110 @@ function openEditAdminUserModal(id) {
   const currentName = user.name || (user.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : '');
 
   modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
-        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between shrink-0">
           <div class="flex items-center space-x-2.5">
-            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-400/30">
               <i data-lucide="edit-3" class="w-5 h-5"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase">Editar Acesso do Gestor</h3>
-              <p class="text-xs text-emerald-200">Modifique o nome, e-mail e senha como desejar</p>
+              <h3 class="text-base font-black uppercase">Editar Gestor: ${currentName}</h3>
+              <p class="text-xs text-emerald-200">Ajuste o cargo, permissões da matriz 4x3 e credenciais de acesso</p>
             </div>
           </div>
-          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-xl transition-all cursor-pointer">
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1.5 rounded-xl transition-all cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
 
-        <form onsubmit="handleEditAdminUserSubmit(event, '${user.id}')" class="p-6 space-y-4">
+        <form onsubmit="handleEditAdminUserSubmit(event, '${user.id}')" class="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[calc(92vh-80px)]">
+          
+          <!-- Nome do Gestor -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo do Gestor *</label>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 uppercase">Nome Completo do Gestor *</label>
+              ${!isMaster ? `
+                <button type="button" onclick="randomizeAdminName('editAdmin')" 
+                        class="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-xl text-[11px] font-black flex items-center space-x-1 cursor-pointer transition-all shadow-2xs">
+                  <i data-lucide="shuffle" class="w-3 h-3 text-emerald-600"></i>
+                  <span>🎲 Sortear Outro Nome</span>
+                </button>
+              ` : ''}
+            </div>
             <input type="text" id="editAdminName" required value="${currentName.replace(/"/g, '&quot;')}" placeholder="Ex: Carlos Eduardo Silva" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900">
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-bold text-slate-900" ${isMaster ? 'readonly' : ''}>
           </div>
 
+          <!-- Nível de Acesso Base -->
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
-            <select id="editAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600" ${isMaster ? 'disabled' : ''}>
-              <option value="Recepção & Atendimento" ${user.role === 'Recepção & Atendimento' || (user.role && user.role.toLowerCase().includes('recep')) ? 'selected' : ''}>Recepção & Atendimento (Visualiza e opera jogos, comanda e bar)</option>
-              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Modifica tudo, apaga e gerencia jogos, exceto Supabase e Acessos)</option>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso Base / Perfil *</label>
+            <select id="editAdminRole" onchange="handleRoleChange('editAdmin')" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600" ${isMaster ? 'disabled' : ''}>
+              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Pode apagar jogos, gerenciar quadras, bar e clientes)</option>
+              <option value="Recepção & Atendimento" ${user.role === 'Recepção & Atendimento' || (user.role && user.role.toLowerCase().includes('recep')) ? 'selected' : ''}>Recepção & Atendimento (Visualiza e opera jogos e bar - NÃO pode apagar jogos)</option>
               <option value="Administrador Geral" ${user.role === 'Administrador Geral' ? 'selected' : ''}>Administrador Geral (Acesso Total e Irrestrito)</option>
+              <option value="Personalizado">Personalizado (Definir funções individualmente na matriz abaixo)</option>
             </select>
-            ${isMaster ? '<p class="text-[11px] text-emerald-700 font-bold mt-1">👑 Administrador Geral Principal mantém seu acesso total.</p>' : ''}
+            ${isMaster ? '<p class="text-[11px] text-emerald-700 font-bold mt-1">👑 Administrador Geral Principal mantém acesso total irrestrito.</p>' : ''}
           </div>
 
-          <!-- Gerador e Customização Livre de E-mail e Senha -->
+          <!-- Matriz 4x3 de Permissões Granulares -->
+          ${renderPermissionsMatrix('editAdmin', user.permissions || null, user.role || 'Gerente do Sistema')}
+
+          <!-- Gerador Dinâmico de E-mail e Senha -->
           <div class="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-emerald-200/70">
               <span class="text-xs font-black text-emerald-950 uppercase flex items-center gap-1.5">
                 <i data-lucide="sparkles" class="w-4 h-4 text-emerald-600"></i>
                 Credenciais de Acesso
               </span>
               <div class="flex items-center gap-1.5 flex-wrap">
                 <button type="button" onclick="generateCredentialsFromName(true)" 
-                        class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha usando o nome digitado">
+                        class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha com o nome digitado">
                   <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
                   <span>✨ Gerar c/ Nome</span>
                 </button>
                 <button type="button" onclick="generateRandomCredentials(true)" 
-                        class="px-2.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha aleatórios">
+                        class="px-2.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera e-mail e senha 100% aleatórios">
                   <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
-                  <span>🎲 Aleatório</span>
+                  <span>🎲 Aleatório s/ Nome</span>
+                </button>
+                <button type="button" onclick="generateOnlyRandomPassword('editAdmin')" 
+                        class="px-2.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-[11px] font-black flex items-center space-x-1 transition-all shadow-xs cursor-pointer" title="Gera apenas uma nova senha aleatória a cada clique">
+                  <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                  <span>🔑 Nova Senha</span>
                 </button>
               </div>
             </div>
 
-            <div>
-              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
-                <span>E-mail de Login *</span>
-                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou alterar livremente</span>
-              </label>
-              <input type="email" id="editAdminEmail" required value="${(user.email || '').replace(/"/g, '&quot;')}" placeholder="nome@arenalimoeiro.com.br" 
-                     class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
-            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                  <span>E-mail de Login *</span>
+                  <span class="text-[10px] text-emerald-700 font-normal">Editável livremente</span>
+                </label>
+                <input type="email" id="editAdminEmail" required value="${(user.email || '').replace(/"/g, '&quot;')}" placeholder="nome@arenalimoeiro.com.br" 
+                       class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
+              </div>
 
-            <div>
-              <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
-                <span>Senha de Acesso *</span>
-                <span class="text-[10px] text-emerald-700 font-normal">Pode digitar ou alterar livremente</span>
-              </label>
-              <input type="text" id="editAdminPassword" required value="${(user.password || '').replace(/"/g, '&quot;')}" 
-                     class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                  <span>Senha de Acesso *</span>
+                  <span class="text-[10px] text-emerald-700 font-normal">Editável livremente</span>
+                </label>
+                <input type="text" id="editAdminPassword" required value="${(user.password || '').replace(/"/g, '&quot;')}" 
+                       class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              </div>
             </div>
 
             <button type="button" onclick="copyCredentials('editAdmin')" class="w-full py-2 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 transition-all shadow-2xs cursor-pointer">
               <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-              <span>📋 Copiar Credenciais Deste Gestor</span>
+              <span>📋 Copiar Credenciais Deste Gestor para Enviar</span>
             </button>
           </div>
 
-          <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3">
+          <div class="pt-3 border-t border-slate-100 flex justify-end space-x-3 shrink-0">
             <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
             <button type="submit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Salvar Alterações</button>
           </div>
@@ -7746,6 +8174,7 @@ function openEditAdminUserModal(id) {
 
   lucide.createIcons();
 }
+window.openEditAdminUserModal = openEditAdminUserModal;
 
 async function handleEditAdminUserSubmit(event, id) {
   event.preventDefault();
@@ -7766,21 +8195,30 @@ async function handleEditAdminUserSubmit(event, id) {
     return;
   }
 
+  // Extrai as permissões marcadas na matriz 4x3
+  const permissions = SYSTEM_PERMISSIONS
+    .map(p => p.id)
+    .filter(permId => {
+      const el = document.getElementById(`editAdmin_perm_${permId}`);
+      return el ? el.checked : false;
+    });
+
   const updatedUser = {
     ...state.adminUsers[idx],
     name,
     email,
     role,
     password,
+    permissions,
     updated_at: new Date().toISOString()
   };
 
   state.adminUsers[idx] = updatedUser;
   localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
 
-  // Se o gestor logado for o mesmo sendo editado, atualiza a sessão imediatamente
+  // Se o gestor logado for o mesmo sendo editado, atualiza a sessão e permissões imediatamente
   if (state.currentUser && (state.currentUser.id === id || state.currentUser.email.toLowerCase() === email.toLowerCase())) {
-    state.currentUser = { ...state.currentUser, name, email, role, password };
+    state.currentUser = { ...state.currentUser, name, email, role, password, permissions };
     localStorage.setItem('arena_user', JSON.stringify(state.currentUser));
   }
 
@@ -7794,8 +8232,9 @@ async function handleEditAdminUserSubmit(event, id) {
     } catch(e) {}
   }
 
-  alert(`✅ Gestor "${name}" atualizado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}`);
+  alert(`✅ Gestor "${name}" atualizado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}\nPermissões ativas: ${permissions.length}/12`);
 }
+window.handleEditAdminUserSubmit = handleEditAdminUserSubmit;
 
 async function handleNewAdminUserSubmit(event) {
   event.preventDefault();
@@ -7809,12 +8248,21 @@ async function handleNewAdminUserSubmit(event) {
     return;
   }
 
+  // Extrai as permissões marcadas na matriz 4x3
+  const permissions = SYSTEM_PERMISSIONS
+    .map(p => p.id)
+    .filter(permId => {
+      const el = document.getElementById(`newAdmin_perm_${permId}`);
+      return el ? el.checked : false;
+    });
+
   const newUser = {
     id: 'admin-' + Date.now(),
     name,
     email,
     role,
     password,
+    permissions,
     created_at: new Date().toISOString()
   };
 
@@ -7831,8 +8279,9 @@ async function handleNewAdminUserSubmit(event) {
     } catch(e) {}
   }
 
-  alert(`✅ Gestor "${name}" cadastrado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}`);
+  alert(`✅ Gestor "${name}" cadastrado com sucesso!\n\nE-mail: ${email}\nSenha: ${password}\nCargo: ${role}\nPermissões ativas: ${permissions.length}/12`);
 }
+window.handleNewAdminUserSubmit = handleNewAdminUserSubmit;
 
 async function loadAdminUsers() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
