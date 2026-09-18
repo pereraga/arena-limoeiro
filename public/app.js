@@ -3782,8 +3782,9 @@ function renderLiveDashboardTab() {
                       </button>
 
                       ${!isRecep ? `
-                        <button onclick="handleCancelBooking('${match.id}')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer" title="Cancelar Agendamento">
-                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        <button onclick="handleCancelBooking('${match.id}')" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Apagar este jogo do sistema e liberar o horário imediatamente">
+                          <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
+                          <span>Apagar Jogo</span>
                         </button>
                       ` : ''}
                     </div>
@@ -3977,6 +3978,7 @@ function renderLiveDashboardTab() {
 
 // 2. ABA DE CONTROLE DE QUADRAS & MANUTENÇÃO
 function renderCourtsControlTab() {
+  const isRecep = isReceptionUser();
   const localMaint = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
   const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
   const uniqueMaint = [];
@@ -4146,17 +4148,33 @@ function renderCourtsControlTab() {
                     </div>
                   ` : (liveBooking ? `
                     <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-                      <div class="font-black flex items-center mb-0.5">
-                        <span class="w-2 h-2 rounded-full bg-amber-600 mr-1.5 animate-ping"></span>
-                        Partida ao Vivo em Andamento
+                      <div class="font-black flex items-center justify-between mb-0.5">
+                        <div class="flex items-center">
+                          <span class="w-2 h-2 rounded-full bg-amber-600 mr-1.5 animate-ping"></span>
+                          Partida ao Vivo em Andamento
+                        </div>
+                        ${!isRecep ? `
+                          <button onclick="handleCancelBooking('${liveBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all" title="Apagar este jogo do sistema">
+                            <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                            <span>Apagar Jogo</span>
+                          </button>
+                        ` : ''}
                       </div>
                       <p class="font-medium text-[11px] text-amber-800">${liveBooking.customer_name} (${liveBooking.start_time} às ${liveBooking.end_time})</p>
                     </div>
                   ` : (nextBooking ? `
                     <div class="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs">
-                      <div class="font-black flex items-center mb-0.5">
-                        <i data-lucide="clock" class="w-4 h-4 text-blue-600 mr-1.5"></i>
-                        Próxima Partida Hoje
+                      <div class="font-black flex items-center justify-between mb-0.5">
+                        <div class="flex items-center">
+                          <i data-lucide="clock" class="w-4 h-4 text-blue-600 mr-1.5"></i>
+                          Próxima Partida Hoje
+                        </div>
+                        ${!isRecep ? `
+                          <button onclick="handleCancelBooking('${nextBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all" title="Apagar este jogo do sistema">
+                            <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                            <span>Apagar Jogo</span>
+                          </button>
+                        ` : ''}
                       </div>
                       <p class="font-medium text-[11px] text-blue-800">${nextBooking.customer_name} às ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}</p>
                     </div>
@@ -4522,7 +4540,7 @@ function renderAdminTabContent() {
   const isMasterAdmin = userRole === 'Administrador Geral';
 
   // Se for 'settings' ou uma das abas técnicas legadas:
-  let activeSubTab = state.adminSubTab || (['spaces','categories','positions','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','products','users','customers','database'].includes(currentTab) ? currentTab : 'spaces');
   if (!isMasterAdmin && (activeSubTab === 'users' || activeSubTab === 'database')) {
     activeSubTab = 'spaces';
     state.adminSubTab = 'spaces';
@@ -4535,6 +4553,10 @@ function renderAdminTabContent() {
       <div class="flex items-center gap-2 pb-2 overflow-x-auto scrollbar-none">
         <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
           Espaços / Quadras
+        </button>
+
+        <button onclick="setAdminSubTab('bookings')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          ⚽ Jogos Agendados (${(state.bookings || []).length})
         </button>
 
         <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
@@ -4713,6 +4735,9 @@ function openCourtWithCategory(catId) {
 }
 
 function renderAdminSubTabContent(tab) {
+  if (tab === 'bookings') {
+    return renderAdminBookingsSubTab();
+  }
   if (tab === 'categories') {
     return renderAdminCategoriesTab();
   }
@@ -5096,11 +5121,16 @@ function renderAdminSubTabContent(tab) {
                     <i data-lucide="${isMaster ? 'crown' : 'user-check'}" class="w-5 h-5"></i>
                   </div>
                   <div>
-                    <div class="flex items-center space-x-2">
+                    <div class="flex items-center space-x-2 flex-wrap">
                       <h4 class="text-sm font-black text-slate-900">${uName}</h4>
                       <span class="text-[10px] font-black px-2 py-0.5 rounded-full ${isMaster ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-700 border border-slate-300'}">
                         ${u.role || 'Gerente do Sistema'}
                       </span>
+                      ${!isMaster ? `
+                        <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                          <i data-lucide="check" class="w-3 h-3 text-emerald-600"></i> Pode apagar e gerenciar jogos
+                        </span>
+                      ` : ''}
                     </div>
                     <p class="text-xs text-slate-500 mt-1 flex items-center flex-wrap gap-2">
                       <span><strong>E-mail:</strong> ${u.email}</span>
@@ -5168,6 +5198,261 @@ function renderAdminSubTabContent(tab) {
       <div id="adminMatrixContainer" class="rounded-2xl border border-slate-200 shadow-sm overflow-x-auto p-4">
         Carregando matriz de horários...
       </div>
+    </div>
+  `;
+}
+
+// ==============================================================================
+// ABA DEDICADA DE GESTÃO DE AGENDAMENTOS NO PAINEL ADMIN (APAGAR E GERENCIAR JOGOS)
+// ==============================================================================
+function renderSubtabBookingsItems(bookings) {
+  const isRecep = isReceptionUser();
+  if (!bookings || bookings.length === 0) {
+    return `
+      <div class="py-12 text-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+        <i data-lucide="calendar-x" class="w-10 h-10 mx-auto mb-2 text-slate-300"></i>
+        <p class="text-sm font-bold text-slate-700">Nenhum agendamento encontrado com os filtros selecionados.</p>
+        <p class="text-xs text-slate-400 mt-0.5">Tente alterar o termo pesquisado ou limpe os filtros de quadra/status.</p>
+      </div>
+    `;
+  }
+
+  return bookings.map(b => {
+    const court = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva' };
+    const cleanPhone = (b.customer_phone || '').replace(/\D/g, '');
+    const zapMsg = `Olá ${b.customer_name || 'Cliente'}! Falamos da Arena Limoeiro sobre o seu jogo no dia ${formatDisplayDate(b.date)} (${b.time || b.start_time}) na quadra ${court.name}.`;
+    const zapUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`;
+
+    let statusBadge = '';
+    if (b.status === 'in_progress' || b.status === 'live') {
+      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500 text-white shadow-xs animate-pulse">🟢 Em Andamento</span>';
+    } else if (b.status === 'finished') {
+      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">✅ Finalizado</span>';
+    } else if (b.status === 'cancelled') {
+      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">❌ Cancelado</span>';
+    } else {
+      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">🔵 Agendado</span>';
+    }
+
+    const price = Number(b.total_price || 0).toFixed(2).replace('.', ',');
+    const timeDisplay = b.time || `${b.start_time || '19:00'} às ${b.end_time || '20:00'}`;
+
+    return `
+      <div class="p-4 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+        
+        <!-- Bloco de Informações do Jogo -->
+        <div class="space-y-1.5 flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+              🏟️ ${court.name}
+            </span>
+            <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 flex items-center gap-1">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
+              ${formatDisplayDate(b.date)} • ${timeDisplay}
+            </span>
+            ${statusBadge}
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-700">
+            <div class="flex items-center space-x-1 font-black text-slate-900">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span>${b.customer_name || 'Cliente'}</span>
+            </div>
+            ${b.customer_cpf ? `
+              <span class="font-mono text-[11px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-600">
+                CPF: ${formatCPF(b.customer_cpf)}
+              </span>
+            ` : ''}
+            ${cleanPhone ? `
+              <a href="${zapUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 hover:underline">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>${formatPhone(b.customer_phone)}</span>
+              </a>
+            ` : ''}
+            <span class="font-black text-emerald-700 bg-emerald-50/50 px-2 py-0.5 rounded">
+              R$ ${price} (${(b.payment_method || 'PIX').toUpperCase()})
+            </span>
+          </div>
+        </div>
+
+        <!-- Botões de Ação do Jogo -->
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
+          <button onclick="goToMatchDate('${b.date}')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" title="Ver este jogo na movimentação do dia">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Ver no Dia</span>
+          </button>
+          
+          <button onclick="openAddBarItemsModal('${b.id}')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" title="Comanda do Bar para este jogo">
+            <i data-lucide="beer" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Comanda</span>
+          </button>
+
+          ${!isRecep ? `
+            <button onclick="handleCancelBooking('${b.id}')" class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Apagar este jogo do sistema e liberar o horário imediatamente">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+              <span>Apagar Jogo</span>
+            </button>
+          ` : ''}
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+function filterSubtabBookingsList() {
+  const searchEl = document.getElementById('subtabBookingSearchInput');
+  const courtEl = document.getElementById('subtabBookingCourtFilter');
+  const statusEl = document.getElementById('subtabBookingStatusFilter');
+  const container = document.getElementById('subtabBookingsListContainer');
+  if (!container) return;
+
+  const query = (searchEl ? searchEl.value : '').toLowerCase().trim();
+  const courtFilter = courtEl ? courtEl.value : 'all';
+  const statusFilter = statusEl ? statusEl.value : 'all';
+
+  let list = [...(state.bookings || [])];
+
+  list.sort((a, b) => {
+    if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+    const aTime = a.start_time || (a.time ? a.time.split(' ')[0] : '00:00');
+    const bTime = b.start_time || (b.time ? b.time.split(' ')[0] : '00:00');
+    return aTime.localeCompare(bTime);
+  });
+
+  if (courtFilter !== 'all') {
+    list = list.filter(b => (b.court_id || b.courtId) === courtFilter);
+  }
+
+  if (statusFilter !== 'all') {
+    if (statusFilter === 'live') {
+      list = list.filter(b => b.status === 'in_progress' || b.status === 'live');
+    } else if (statusFilter === 'upcoming') {
+      list = list.filter(b => b.status !== 'in_progress' && b.status !== 'live' && b.status !== 'finished' && b.status !== 'cancelled');
+    } else {
+      list = list.filter(b => b.status === statusFilter);
+    }
+  }
+
+  if (query) {
+    list = list.filter(b => {
+      const name = (b.customer_name || '').toLowerCase();
+      const phone = (b.customer_phone || '').replace(/\D/g, '');
+      const cpf = (b.customer_cpf || '').replace(/\D/g, '');
+      const court = ((state.courts || []).find(c => c.id === (b.court_id || b.courtId))?.name || '').toLowerCase();
+      const date = (b.date || '').toLowerCase();
+      return name.includes(query) || phone.includes(query) || cpf.includes(query) || court.includes(query) || date.includes(query);
+    });
+  }
+
+  container.innerHTML = renderSubtabBookingsItems(list);
+  if (window.lucide) lucide.createIcons();
+}
+window.filterSubtabBookingsList = filterSubtabBookingsList;
+
+function renderAdminBookingsSubTab() {
+  const isRecep = isReceptionUser();
+  const allBookings = [...(state.bookings || [])];
+
+  allBookings.sort((a, b) => {
+    if (a.date !== b.date) {
+      return (b.date || '').localeCompare(a.date || '');
+    }
+    const aTime = a.start_time || (a.time ? a.time.split(' ')[0] : '00:00');
+    const bTime = b.start_time || (b.time ? b.time.split(' ')[0] : '00:00');
+    return aTime.localeCompare(bTime);
+  });
+
+  const todayStr = getFormattedDate(new Date());
+  const bookingsToday = allBookings.filter(b => b.date === todayStr && b.status !== 'cancelled');
+  const upcomingBookings = allBookings.filter(b => b.date >= todayStr && b.status !== 'cancelled' && b.status !== 'finished');
+  const finishedBookings = allBookings.filter(b => b.status === 'finished');
+
+  return `
+    <div class="space-y-6">
+      
+      <!-- Cabeçalho explicativo -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center space-x-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shrink-0">
+              <i data-lucide="calendar-check" class="w-6 h-6 text-emerald-300"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gestão de Jogos</span>
+                <span class="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">${allBookings.length} partidas registradas</span>
+              </div>
+              <h3 class="text-xl font-black text-slate-900 mt-1">Todos os Agendamentos & Jogos Marcados</h3>
+              <p class="text-xs text-slate-500">Visualize todas as reservas da arena, pesquise por cliente ou quadra e apague jogos com liberação imediata do horário.</p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <button onclick="openDirectBookingModal()" title="Fazer Nova Reserva Direta" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap cursor-pointer">
+              <i data-lucide="plus" class="w-4 h-4 text-emerald-200"></i>
+              <span>+ Nova Reserva Balcão</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Métricas Rápidas -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-100">
+          <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Total de Reservas</span>
+            <div class="text-xl font-black text-slate-900 mt-0.5">${allBookings.length}</div>
+          </div>
+          <div class="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-100">
+            <span class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider block">Jogos Hoje</span>
+            <div class="text-xl font-black text-emerald-800 mt-0.5">${bookingsToday.length}</div>
+          </div>
+          <div class="bg-blue-50 p-3.5 rounded-2xl border border-blue-100">
+            <span class="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">Próximos / Ativos</span>
+            <div class="text-xl font-black text-blue-800 mt-0.5">${upcomingBookings.length}</div>
+          </div>
+          <div class="bg-amber-50 p-3.5 rounded-2xl border border-amber-100">
+            <span class="text-[10px] font-bold text-amber-700 uppercase tracking-wider block">Finalizados</span>
+            <div class="text-xl font-black text-amber-800 mt-0.5">${finishedBookings.length}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros e Barra de Pesquisa -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+          
+          <!-- Input Busca -->
+          <div class="relative w-full md:w-96">
+            <input type="text" id="subtabBookingSearchInput" oninput="filterSubtabBookingsList()" placeholder="Buscar por cliente, telefone, CPF ou quadra..."
+                   class="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          </div>
+
+          <!-- Filtros de Quadra e Status -->
+          <div class="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
+            <select id="subtabBookingCourtFilter" onchange="filterSubtabBookingsList()" class="p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+              <option value="all">🏟️ Todas as Quadras</option>
+              ${state.courts.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+            </select>
+
+            <select id="subtabBookingStatusFilter" onchange="filterSubtabBookingsList()" class="p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+              <option value="all">Todos os Status</option>
+              <option value="upcoming">🔵 Agendados</option>
+              <option value="live">🟢 Em Andamento</option>
+              <option value="finished">✅ Finalizados</option>
+              <option value="cancelled">❌ Cancelados</option>
+            </select>
+          </div>
+
+        </div>
+
+        <!-- Lista de Jogos Filtrável -->
+        <div id="subtabBookingsListContainer" class="space-y-3">
+          ${renderSubtabBookingsItems(allBookings)}
+        </div>
+
+      </div>
+
     </div>
   `;
 }
@@ -6120,19 +6405,18 @@ async function handleSaveBarItems(e, bookingId) {
   lucide.createIcons();
 }
 
-// Cancelamento de Agendamento
-// Cancelamento de Agendamento e Liberação Imediata da Grade de Horários
+// Exclusão / Cancelamento de Agendamento e Liberação Imediata da Grade de Horários
 async function handleCancelBooking(bookingId) {
   if (!bookingId) return;
-  if (!confirm('Deseja realmente cancelar esta reserva de jogo e liberar o horário para os clientes?')) return;
+  if (!confirm('Deseja realmente apagar esta reserva de jogo e liberar o horário imediatamente no sistema?')) return;
 
   // 1. Remove do estado em memória
-  state.bookings = (state.bookings || []).filter(b => b.id !== bookingId);
+  state.bookings = (state.bookings || []).filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
 
   // 2. Remove do localStorage local
   try {
     let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    local = local.filter(b => b && b.id !== bookingId);
+    local = local.filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
     localStorage.setItem('arena_local_bookings', JSON.stringify(local));
   } catch (e) {}
 
@@ -6180,6 +6464,13 @@ async function handleCancelBooking(bookingId) {
   if (typeof renderSearchResults === 'function' && document.getElementById('matchSearchResultsList')) {
     renderSearchResults();
   }
+
+  // Se estiver na sub-aba de gestão de agendamentos, atualiza a lista filtrada
+  if (typeof filterSubtabBookingsList === 'function' && document.getElementById('subtabBookingsListContainer')) {
+    filterSubtabBookingsList();
+  }
+
+  alert('Jogo apagado com sucesso! O horário foi liberado no sistema.');
 }
 window.handleCancelBooking = handleCancelBooking;
 
@@ -6778,6 +7069,7 @@ function handleMatchModalFilter() {
     return;
   }
 
+  const isRecep = isReceptionUser();
   container.innerHTML = filtered.map(m => {
     const cleanPhone = (m.customer_phone || '').replace(/\D/g, '');
     const zapMsg = `Olá ${m.customer_name}! Falamos da Arena Limoeiro sobre o seu jogo no dia ${formatDisplayDate(m.date)} (${m.time}) na quadra ${m.courtName}.`;
@@ -6900,10 +7192,10 @@ function handleMatchModalFilter() {
             <span>Comanda Bar</span>
           </button>
 
-          ${m.status !== 'cancelled' ? `
-            <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer" title="Cancelar Agendamento e Liberar Horário">
+          ${!isRecep ? `
+            <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs" title="Apagar este jogo permanentemente do sistema">
               <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
-              <span>Cancelar / Liberar Horário</span>
+              <span>Apagar Jogo</span>
             </button>
           ` : ''}
         </div>
@@ -7271,10 +7563,10 @@ function openNewAdminUserModal() {
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
             <select id="newAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
               <option value="Recepção & Atendimento">Recepção & Atendimento (Visualiza e opera jogos, comanda e bar)</option>
-              <option value="Gerente do Sistema" selected>Gerente do Sistema (Modifica tudo, exceto Supabase e Acessos)</option>
+              <option value="Gerente do Sistema" selected>Gerente do Sistema (Modifica tudo, apaga e gerencia jogos, exceto Supabase e Acessos)</option>
               <option value="Administrador Geral">Administrador Geral (Acesso Total e Irrestrito)</option>
             </select>
-            <p class="text-[11px] text-slate-500 mt-1"><strong>Recepção:</strong> visualiza jogos, libera/inicia, finaliza e anota pedidos do bar. <strong>Gerente:</strong> altera tudo na arena sem mexer no Supabase.</p>
+            <p class="text-[11px] text-slate-500 mt-1"><strong>Recepção:</strong> visualiza jogos, libera/inicia, finaliza e anota pedidos do bar. <strong>Gerente:</strong> altera tudo na arena, apaga e gerencia jogos agendados sem mexer no Supabase e Acessos.</p>
           </div>
 
           <!-- Gerador e Customização Livre de E-mail e Senha -->
@@ -7376,7 +7668,7 @@ function openEditAdminUserModal(id) {
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nível de Acesso / Função *</label>
             <select id="editAdminRole" class="w-full p-3 border border-slate-300 rounded-xl text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600" ${isMaster ? 'disabled' : ''}>
               <option value="Recepção & Atendimento" ${user.role === 'Recepção & Atendimento' || (user.role && user.role.toLowerCase().includes('recep')) ? 'selected' : ''}>Recepção & Atendimento (Visualiza e opera jogos, comanda e bar)</option>
-              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Modifica tudo, exceto Supabase e Acessos)</option>
+              <option value="Gerente do Sistema" ${user.role === 'Gerente do Sistema' ? 'selected' : ''}>Gerente do Sistema (Modifica tudo, apaga e gerencia jogos, exceto Supabase e Acessos)</option>
               <option value="Administrador Geral" ${user.role === 'Administrador Geral' ? 'selected' : ''}>Administrador Geral (Acesso Total e Irrestrito)</option>
             </select>
             ${isMaster ? '<p class="text-[11px] text-emerald-700 font-bold mt-1">👑 Administrador Geral Principal mantém seu acesso total.</p>' : ''}
