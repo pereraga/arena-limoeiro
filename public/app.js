@@ -616,9 +616,12 @@ function loadInitialData() {
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const cleanedLocal = localSaved.filter(b => b && b.id && b.status !== 'cancelled' && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
-    if (cleanedLocal.length !== localSaved.length) {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
-    }
+    cleanedLocal.forEach(b => {
+      if (b && (b.id === 'ARENA-6776' || b.id === 'ARENA-9247')) {
+        b.product_cart = {};
+      }
+    });
+    localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
     state.bookings = cleanedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
     state.matchDelays = JSON.parse(localStorage.getItem('arena_match_delays') || '{}');
