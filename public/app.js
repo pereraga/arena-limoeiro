@@ -4855,7 +4855,6 @@ function getWaterSupplyAnalytics() {
 
     if (bookingWaterQty > 0) {
       totalWaterSoldQty += bookingWaterQty;
-      totalWaterRevenue += bookingWaterPrice;
       paidWaterBookingsCount++;
 
       const bDate = b.date;
@@ -5285,18 +5284,18 @@ function renderWaterSupplySection(analytics) {
         </div>
       </div>
 
-      <!-- LINHA 2: Cards de Métricas Financeiras (Receitas & Custos do Fornecedor) -->
+      <!-- LINHA 2: Cards de Métricas Operacionais & Custos do Fornecedor -->
       <div>
         <div class="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
-          <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i>
-          <span>Controle Financeiro de Águas (Faturamento & Custos do Fornecedor)</span>
+          <i data-lucide="droplet" class="w-3.5 h-3.5"></i>
+          <span>Controle Operacional de Águas & Custos do Fornecedor</span>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <!-- 1. Faturamento Total de Águas (Campos) -->
-          <div class="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 shadow-xs">
-            <span class="text-[10px] font-black uppercase text-emerald-800 block mb-1">✓ Faturamento Águas (Campos)</span>
-            <div class="text-xl sm:text-2xl font-black text-emerald-700">R$ ${analytics.totalWaterRevenue.toFixed(2).replace('.', ',')}</div>
-            <p class="text-[10px] text-emerald-800 font-medium mt-0.5">${analytics.totalWaterSoldQty} águas demandadas</p>
+          <!-- 1. Águas nos Campos -->
+          <div class="bg-cyan-50/70 border border-cyan-200 rounded-2xl p-4 shadow-xs">
+            <span class="text-[10px] font-black uppercase text-cyan-800 block mb-1">🏟️ Águas nos Campos</span>
+            <div class="text-xl sm:text-2xl font-black text-cyan-900">${analytics.totalWaterSoldQty} un</div>
+            <p class="text-[10px] text-cyan-700 font-medium mt-0.5">${analytics.paidWaterBookingsCount} partidas atendidas</p>
           </div>
 
           <!-- 2. Fornecedor Quitado -->
@@ -5319,13 +5318,13 @@ function renderWaterSupplySection(analytics) {
             </p>
           </div>
 
-          <!-- 4. Saldo Líquido -->
-          <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-2xl p-4 shadow-xs">
-            <span class="text-[10px] font-black uppercase text-cyan-800 block mb-1">💰 Saldo Líquido de Água</span>
-            <div class="text-xl sm:text-2xl font-black ${analytics.netWaterProfit >= 0 ? 'text-cyan-950' : 'text-rose-700'}">
-              R$ ${analytics.netWaterProfit.toFixed(2).replace('.', ',')}
+          <!-- 4. Custo Total Fornecedor -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-xs">
+            <span class="text-[10px] font-black uppercase text-slate-600 block mb-1">📦 Custo Total Fornecedor</span>
+            <div class="text-xl sm:text-2xl font-black text-slate-900">
+              R$ ${(analytics.totalSupplyCostPaid + analytics.totalSupplyCostPending).toFixed(2).replace('.', ',')}
             </div>
-            <p class="text-[10px] text-cyan-700 font-medium mt-0.5">Receita - Custos totais</p>
+            <p class="text-[10px] text-slate-500 font-medium mt-0.5">Quitado + Pendente</p>
           </div>
         </div>
       </div>
@@ -5372,7 +5371,7 @@ function renderWaterSupplySection(analytics) {
                   <th class="p-3">Data / Horário</th>
                   <th class="p-3">Campo / Espaço</th>
                   <th class="p-3">Atleta / Contato</th>
-                  <th class="p-3 text-center">Águas / Valor</th>
+                  <th class="p-3 text-center">Águas no Campo</th>
                   <th class="p-3 text-center">Status Pagamento</th>
                   <th class="p-3 text-center">Status no Campo</th>
                   <th class="p-3 text-right">Ação de Liberação</th>
@@ -5399,8 +5398,8 @@ function renderWaterSupplySection(analytics) {
                         <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-cyan-100 text-cyan-950 border border-cyan-200">
                           💧 ${b.waterQty} un
                         </div>
-                        <div class="text-[11px] font-black text-emerald-700 mt-1">
-                          R$ ${b.waterPrice.toFixed(2).replace('.', ',')}
+                        <div class="text-[10px] font-bold text-cyan-700 mt-1">
+                          Incluso no Jogo
                         </div>
                       </td>
                       <td class="p-3 text-center">
@@ -5952,16 +5951,15 @@ function openWaterReportModal() {
 - Reservadas para os Campos (Próx. 2 Dias): ${analytics.reservedNext2Days} un
 - Saldo Livre para Balcão/Novas Reservas: ${analytics.freeForSale} un
 
-🏟️ CONTROLE & FATURAMENTO DOS CAMPOS:
+🏟️ CONTROLE DOS CAMPOS:
 - Total de Águas nos Campos: ${analytics.totalWaterSoldQty} un
-- Faturamento Total Água: R$ ${analytics.totalWaterRevenue.toFixed(2).replace('.', ',')}
-- Status dos Clientes: ✓ Incluso nos Jogos / Balcão (sem pendências de clientes)
+- Status dos Clientes: ✓ Incluso nos Jogos / Balcão (sem cobrança de valor aos clientes)
 
 🚚 FORNECEDOR / DISTRIBUIDORA:
 - Total de Águas Abastecidas: ${analytics.totalWaterSuppliedQty} un
 - Fornecedor Quitado: R$ ${analytics.totalSupplyCostPaid.toFixed(2).replace('.', ',')}
 - ⏳ PENDÊNCIA FORNECEDOR (A Pagar à Vista: Pix ou Dinheiro): R$ ${analytics.totalSupplyCostPending.toFixed(2).replace('.', ',')}
-- Saldo Líquido Operacional: R$ ${analytics.netWaterProfit.toFixed(2).replace('.', ',')}
+- Custo Total de Fornecedor: R$ ${(analytics.totalSupplyCostPaid + analytics.totalSupplyCostPending).toFixed(2).replace('.', ',')}
 `;
 
   const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(reportText)}`;
@@ -6024,24 +6022,24 @@ function openWaterReportModal() {
             </div>
           </div>
 
-          <!-- Bloco 2: Faturamento de Águas (Campos & Balcão) -->
-          <div class="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200 space-y-2.5">
-            <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2">
-              <span class="font-black text-emerald-950 uppercase flex items-center space-x-1.5">
-                <i data-lucide="badge-check" class="w-4 h-4 text-emerald-700"></i>
-                <span>Faturamento de Águas (Campos & Balcão)</span>
+          <!-- Bloco 2: Controle de Águas nos Campos -->
+          <div class="bg-cyan-50/60 p-4 rounded-2xl border border-cyan-200 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-cyan-200/60 pb-2">
+              <span class="font-black text-cyan-950 uppercase flex items-center space-x-1.5">
+                <i data-lucide="badge-check" class="w-4 h-4 text-cyan-700"></i>
+                <span>Controle de Águas nos Campos</span>
               </span>
-              <span class="text-slate-500 font-bold text-[10px]">${analytics.totalWaterSoldQty} águas consumidas</span>
+              <span class="text-cyan-800 font-bold text-[10px]">${analytics.totalWaterSoldQty} águas demandadas</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div class="bg-white p-3 rounded-xl border border-emerald-100">
-                <span class="text-emerald-800 text-[10px] font-black uppercase block">✓ Faturamento Total de Água</span>
-                <div class="text-lg font-black text-emerald-700">R$ ${analytics.totalWaterRevenue.toFixed(2).replace('.', ',')}</div>
-                <span class="text-[10px] text-slate-500 font-medium">Incluso no valor dos jogos ou acertado no balcão</span>
+              <div class="bg-white p-3 rounded-xl border border-cyan-100">
+                <span class="text-cyan-800 text-[10px] font-black uppercase block">💧 Total nos Campos</span>
+                <div class="text-lg font-black text-cyan-900">${analytics.totalWaterSoldQty} garrafas</div>
+                <span class="text-[10px] text-slate-500 font-medium">Incluso nas partidas (sem cobrança avulsa)</span>
               </div>
               <div class="bg-white p-3 rounded-xl border border-slate-200">
-                <span class="text-slate-700 text-[10px] font-black uppercase block">✓ Status Clientes</span>
-                <div class="text-lg font-black text-slate-800">${analytics.paidWaterBookingsCount + analytics.pendingWaterBookingsCount} jogos atendidos</div>
+                <span class="text-slate-700 text-[10px] font-black uppercase block">✓ Partidas Atendidas</span>
+                <div class="text-lg font-black text-slate-800">${analytics.paidWaterBookingsCount + analytics.pendingWaterBookingsCount} jogos</div>
                 <span class="text-[10px] text-emerald-700 font-bold">Sem pendências de clientes</span>
               </div>
             </div>
@@ -6076,17 +6074,17 @@ function openWaterReportModal() {
             </div>
           </div>
 
-          <!-- Bloco 4: Saldo Líquido Operacional -->
-          <div class="bg-gradient-to-r from-cyan-50 to-blue-50 p-4 rounded-2xl border border-cyan-200 flex items-center justify-between">
+          <!-- Bloco 4: Custo Operacional de Fornecedor -->
+          <div class="bg-gradient-to-r from-slate-100 to-slate-200 p-4 rounded-2xl border border-slate-300 flex items-center justify-between">
             <div>
-              <span class="text-cyan-800 text-[10px] font-black uppercase block">💰 Saldo Líquido de Água</span>
-              <div class="text-xl font-black ${analytics.netWaterProfit >= 0 ? 'text-cyan-950' : 'text-rose-700'}">
-                R$ ${analytics.netWaterProfit.toFixed(2).replace('.', ',')}
+              <span class="text-slate-700 text-[10px] font-black uppercase block">📦 Custo Total com Fornecedor</span>
+              <div class="text-xl font-black text-slate-900">
+                R$ ${(analytics.totalSupplyCostPaid + analytics.totalSupplyCostPending).toFixed(2).replace('.', ',')}
               </div>
-              <span class="text-[10px] text-cyan-700 font-medium">Receita de campos - Custos de fornecedor</span>
+              <span class="text-[10px] text-slate-600 font-medium">Quitado: R$ ${analytics.totalSupplyCostPaid.toFixed(2).replace('.', ',')} • Pendência: R$ ${analytics.totalSupplyCostPending.toFixed(2).replace('.', ',')}</span>
             </div>
-            <div class="w-12 h-12 rounded-2xl bg-cyan-100 flex items-center justify-center text-cyan-700">
-              <i data-lucide="wallet" class="w-6 h-6"></i>
+            <div class="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-slate-700 shadow-xs">
+              <i data-lucide="truck" class="w-6 h-6"></i>
             </div>
           </div>
 
