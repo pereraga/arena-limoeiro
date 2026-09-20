@@ -5046,10 +5046,6 @@ function renderWaterSupplyDashboardBanner() {
           </div>
         </div>
         <div class="flex items-center space-x-2 shrink-0">
-          <button onclick="triggerQuickWaterBaixa(4)" class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow flex items-center space-x-1" title="Registrar baixa de 4 garrafas consumidas no campo">
-            <i data-lucide="droplet" class="w-3.5 h-3.5"></i>
-            <span>Baixa 4 Águas</span>
-          </button>
           <button onclick="openWaterReportModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
             📊 Relatório
           </button>
@@ -5195,13 +5191,9 @@ function renderWaterSupplySection(analytics) {
             <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
             <span>📊 Relatório Geral</span>
           </button>
-          <button onclick="triggerQuickWaterBaixa(4)" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer" title="Registrar baixa de 4 garrafas consumidas no campo">
-            <i data-lucide="droplet" class="w-4 h-4"></i>
-            <span>💧 Baixa de 4 Águas</span>
-          </button>
-          <button onclick="openEmptyWaterModal(4)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer" title="Registrar consumo ou esvaziamento avulso">
+          <button onclick="openEmptyWaterModal(4)" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-            <span>Outras Vazias</span>
+            <span>🔄 Esvaziou no Campo</span>
           </button>
           ${!isRecep ? `
           <button onclick="openAdjustWaterSupplyModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer" title="Ajuste manual de estoque">
