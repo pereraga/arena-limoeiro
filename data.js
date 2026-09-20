@@ -288,52 +288,9 @@ export const initialProducts = [
   }
 ];
 
-export const initialMonthlyMembers = [
-  {
-    id: "mensal-1",
-    teamName: "Pelada dos Amigos da Terça",
-    responsibleName: "Carlos Eduardo",
-    phone: "(81) 99876-1122",
-    courtId: "court-society-1",
-    dayOfWeek: "terca",
-    dayOfWeekLabel: "Toda Terça-feira",
-    time: "19:00",
-    monthlyPrice: 500.00,
-    status: "active",
-    startMonth: "Setembro/2026"
-  },
-  {
-    id: "mensal-2",
-    teamName: "Galera do Futsal Noturno",
-    responsibleName: "Matheus Silveira",
-    phone: "(81) 98844-5566",
-    courtId: "court-gym-1",
-    dayOfWeek: "quinta",
-    dayOfWeekLabel: "Toda Quinta-feira",
-    time: "20:00",
-    monthlyPrice: 460.00,
-    status: "active",
-    startMonth: "Setembro/2026"
-  }
-];
+export const initialMonthlyMembers = [];
 
-export const initialBookings = [
-  {
-    id: "book-101",
-    courtId: "court-society-1",
-    date: "2026-09-01",
-    startTime: "19:00",
-    endTime: "20:00",
-    time: "19:00 às 20:00",
-    duration: 60,
-    customerName: "Carlos Eduardo (Mensalista Terça)",
-    customerPhone: "(81) 99876-1122",
-    status: "confirmed",
-    bookingType: "mensalista",
-    totalPrice: 140.00,
-    observation: "Horário fixo semanal"
-  }
-];
+export const initialBookings = [];
 
 export const coupons = {
   "LIMOEIRO10": { discountPercent: 10, description: "10% de desconto na Arena Limoeiro" },

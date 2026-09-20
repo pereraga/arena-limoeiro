@@ -588,12 +588,18 @@ function loadInitialData() {
     } else {
       state.products = d.initialProducts;
     }
-    const defaultMonthly = d.initialMonthlyMembers || [];
-    const localMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
-    const mergedMonthlyMap = new Map();
-    defaultMonthly.forEach(m => { if (m && m.id) mergedMonthlyMap.set(m.id, m); });
-    localMonthly.forEach(m => { if (m && m.id) mergedMonthlyMap.set(m.id, m); });
-    state.monthlyMembers = Array.from(mergedMonthlyMap.values());
+    // Limpeza completa de mensalistas fictícios antigos do cache local
+    const rawLocalMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+    const cleanLocalMonthly = (Array.isArray(rawLocalMonthly) ? rawLocalMonthly : []).filter(m => {
+      if (!m || !m.id) return false;
+      const idStr = String(m.id);
+      if (idStr.startsWith('arena-fixo-') || idStr.startsWith('mensal-')) return false;
+      const nameStr = (m.team_name || m.teamName || '').toLowerCase();
+      if (nameStr.includes('galácticos') || nameStr.includes('resenha & futebol') || nameStr.includes('churrasco & bola') || nameStr.includes('amigos da segunda')) return false;
+      return true;
+    });
+    localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
+    state.monthlyMembers = cleanLocalMonthly;
     const defaultAdmins = d.initialAdmins || [];
     const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
     const mergedAdminsMap = new Map();
@@ -12200,7 +12206,10 @@ async function syncDataFromSupabase(skipRender = false) {
       localStorage.setItem('arena_local_products', JSON.stringify(dbProducts));
     }
 
-    if (dbMembers) state.monthlyMembers = dbMembers;
+    if (dbMembers) {
+      state.monthlyMembers = dbMembers;
+      localStorage.setItem('arena_monthly_members', JSON.stringify(dbMembers));
+    }
 
     if (dbBookings) {
       const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
