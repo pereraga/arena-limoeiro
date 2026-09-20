@@ -2258,6 +2258,7 @@ function renderStep3Content() {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           ${consumptionProducts.map(prod => {
             const qty = state.productCart[prod.id] || 0;
+            const isWater = isWaterProduct(prod);
             return `
               <div class="bg-slate-50/80 hover:bg-white p-3.5 rounded-2xl border ${qty > 0 ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-500' : 'border-slate-200'} shadow-sm flex items-center justify-between transition-all">
                 <div class="flex items-center space-x-3 overflow-hidden">
@@ -2268,10 +2269,17 @@ function renderStep3Content() {
                   </div>
                   <div class="overflow-hidden">
                     <h4 class="text-xs sm:text-sm font-extrabold text-slate-800 truncate">${prod.name}</h4>
-                    <p class="text-xs font-bold text-slate-500 mt-0.5">
-                      R$ ${prod.price.toFixed(2).replace('.', ',')} /${prod.unit || 'unid'} 
-                      ${qty > 0 ? `<span class="text-[10px] font-black text-emerald-700 ml-1.5 bg-emerald-100 px-1.5 py-0.5 rounded">Guardar ${qty}x</span>` : ''}
-                    </p>
+                    <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                      <span class="text-xs font-bold text-slate-500">
+                        R$ ${prod.price.toFixed(2).replace('.', ',')} /${prod.unit || 'unid'} 
+                      </span>
+                      ${isWater ? `
+                        <button onclick="addWaterCombo(4, '${prod.id}')" type="button" class="text-[10px] font-black bg-cyan-100 hover:bg-cyan-200 text-cyan-900 border border-cyan-300 px-2 py-0.5 rounded-md transition-all shadow-xs cursor-pointer" title="Adicionar pacote padrão de 4 águas para a partida">
+                          + Lote 4 Águas
+                        </button>
+                      ` : ''}
+                      ${qty > 0 ? `<span class="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Guardar ${qty}x</span>` : ''}
+                    </div>
                   </div>
                 </div>
 
@@ -2509,6 +2517,30 @@ function updateCartQuantity(productId, delta) {
   renderBottomBar();
   lucide.createIcons();
 }
+
+function addWaterCombo(qty, productId) {
+  const prod = (state.products || []).find(p => p.id === productId);
+  if (isWaterProduct(prod) && typeof getWaterSupplyAnalytics === 'function') {
+    const analytics = getWaterSupplyAnalytics();
+    let currentWaterInCart = 0;
+    Object.entries(state.productCart || {}).forEach(([pId, q]) => {
+      const p = (state.products || []).find(x => x.id === pId);
+      if (isWaterProduct(p)) currentWaterInCart += q;
+    });
+
+    if (currentWaterInCart + qty > analytics.freeForSale) {
+      alert(`⚠️ Limite de Água Disponível no Estoque:\n\nA Arena possui atualmente ${analytics.freeForSale} água(s) livres para reserva.\nPara solicitar uma quantidade maior, procure a administração/bar da Arena.`);
+      return;
+    }
+  }
+
+  if (!state.productCart) state.productCart = {};
+  state.productCart[productId] = (state.productCart[productId] || 0) + qty;
+  renderStep3Content();
+  renderBottomBar();
+  lucide.createIcons();
+}
+window.addWaterCombo = addWaterCombo;
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return '';
@@ -4892,15 +4924,26 @@ function getWaterSupplyAnalytics() {
   });
 
   const freeForSale = Math.max(0, full - totalReservedAll);
-  // Quantidade de água no estoque que precisa abastecer: vazias a encher + demanda não coberta dos campos
-  const refillNeededCount = empty + Math.max(0, reservedNext2Days - full);
-  const needsRefill = (empty > 0) || (full < minAlert) || (freeForSale <= 3) || (reservedNext2Days >= full);
+  
+  // Regra Oficial Arena Limoeiro: O pedido de reabastecimento à distribuidora é feito com a baixa de 4 águas
+  const MIN_WATER_REFILL_BATCH = 4;
+  
+  // Quantidade de água que precisa abastecer (em lotes de 4 águas ou quando atinge baixa de 4 un)
+  const refillNeededCount = empty >= MIN_WATER_REFILL_BATCH 
+    ? empty 
+    : (reservedNext2Days > full ? (reservedNext2Days - full) : 0);
+
+  // O alerta preventivo de pedido só deve ser feito com a baixa de pelo menos 4 águas (empty >= 4)
+  // ou quando o estoque de cheias for insuficiente para a demanda confirmada dos próximos 2 dias
+  const needsRefill = (empty >= MIN_WATER_REFILL_BATCH) || (full < minAlert) || (reservedNext2Days > full && full < MIN_WATER_REFILL_BATCH);
 
   return {
     full,
     empty,
     totalStock: full + empty,
     minAlert,
+    minRefillBatch: MIN_WATER_REFILL_BATCH,
+    emptyRemainingForRefill: Math.max(0, MIN_WATER_REFILL_BATCH - empty),
     totalReservedAll,
     reservedNext2Days,
     freeForSale,
@@ -4981,6 +5024,9 @@ window.saveWaterSupplyToDatabase = saveWaterSupplyToDatabase;
 function renderWaterSupplyDashboardBanner() {
   const analytics = getWaterSupplyAnalytics();
   if (!analytics.needsRefill) {
+    const emptySubtext = analytics.empty > 0 
+      ? ` • Aguardando baixa de 4 águas para pedido (${analytics.empty}/4 vazias, faltam ${analytics.emptyRemainingForRefill} un)` 
+      : '';
     return `
       <div class="bg-gradient-to-r from-emerald-900 to-slate-900 text-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div class="flex items-center space-x-3">
@@ -4990,14 +5036,20 @@ function renderWaterSupplyDashboardBanner() {
           <div>
             <div class="flex items-center space-x-2">
               <span class="text-xs font-black uppercase text-emerald-300">Estoque de Água da Arena</span>
-              <span class="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">100% Abastecido</span>
+              <span class="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                ${analytics.empty > 0 ? `Operação Normal (${analytics.empty}/4 Vazias)` : '100% Abastecido'}
+              </span>
             </div>
             <p class="text-xs text-slate-300 mt-0.5">
-              <strong>${analytics.full} águas cheias</strong> em estoque. (${analytics.reservedNext2Days} águas guardadas para os próximos 2 dias | Saldo livre balcão: ${analytics.freeForSale}).
+              <strong>${analytics.full} águas cheias</strong> em estoque${emptySubtext}. (Demanda próx. 2 dias: ${analytics.reservedNext2Days} águas | Saldo livre balcão: ${analytics.freeForSale}).
             </p>
           </div>
         </div>
         <div class="flex items-center space-x-2 shrink-0">
+          <button onclick="triggerQuickWaterBaixa(4)" class="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow flex items-center space-x-1" title="Registrar baixa de 4 garrafas consumidas no campo">
+            <i data-lucide="droplet" class="w-3.5 h-3.5"></i>
+            <span>Baixa 4 Águas</span>
+          </button>
           <button onclick="openWaterReportModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
             📊 Relatório
           </button>
@@ -5017,14 +5069,16 @@ function renderWaterSupplyDashboardBanner() {
         </div>
         <div class="space-y-1">
           <div class="flex items-center space-x-2">
-            <span class="bg-rose-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Aviso Preventivo</span>
-            <span class="text-xs font-black uppercase text-rose-200">Reabastecimento de Água da Arena</span>
+            <span class="bg-rose-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Pedido de Água Liberado</span>
+            <span class="text-xs font-black uppercase text-rose-200">Baixa Mínima de 4 Águas Atingida</span>
           </div>
           <h4 class="text-sm font-black text-white">
-            ${analytics.empty > 0 ? `Existem <span class="text-rose-300 underline font-black">${analytics.empty} garrafas/galões vazios</span> precisando encher!` : `Estoque de água cheia em nível de alerta (${analytics.full} un)!`}
+            ${analytics.empty >= 4 
+              ? `Baixa de <span class="text-rose-300 underline font-black">${analytics.empty} garrafas/galões vazios</span> confirmada! Hora de pedir água ao fornecedor.` 
+              : `Estoque de água cheia em nível de alerta (${analytics.full} un)!`}
           </h4>
           <p class="text-xs text-slate-300">
-            Necessidade para abastecer: <strong class="text-rose-300">${analytics.refillNeededCount} unidades</strong>. Demanda dos próximos 2 dias: <strong class="text-amber-300">${analytics.reservedNext2Days} águas</strong>.
+            Lote sugerido para abastecer: <strong class="text-rose-300">${analytics.refillNeededCount} unidades</strong>. Demanda dos próximos 2 dias: <strong class="text-amber-300">${analytics.reservedNext2Days} águas</strong>.
             ${analytics.totalWaterRevenuePending > 0 ? `| Pendente receber: <strong class="text-amber-300">R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')}</strong>` : ''}
           </p>
         </div>
@@ -5032,7 +5086,7 @@ function renderWaterSupplyDashboardBanner() {
       <div class="flex items-center space-x-2 shrink-0 self-end sm:self-center">
         <button onclick="openAddWaterSupplyModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow transition-all cursor-pointer flex items-center space-x-1.5">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
-          <span>+ Abastecer</span>
+          <span>+ Fazer Pedido</span>
         </button>
         <button onclick="openWaterReportModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
           📊 Relatório
@@ -5062,10 +5116,10 @@ function checkAndShowWaterSupplyLoginNotice(force = false) {
     showToastNotification(`
       <div class="space-y-1.5">
         <div class="flex items-center space-x-1.5 font-black text-rose-300 uppercase tracking-wider text-[11px]">
-          <span>💧 Alerta de Água: Reabastecimento Necessário!</span>
+          <span>💧 Alerta de Água: Pedido Liberado (Baixa de 4 Águas)!</span>
         </div>
         <p class="text-slate-200 text-xs">
-          Existem <strong>${analytics.empty} garrafas/galões vazios</strong> para encher (total a abastecer: <strong>${analytics.refillNeededCount} un</strong>). Demanda nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong>.
+          Existem <strong>${analytics.empty} garrafas/galões vazios</strong> acumulados (baixa mínima de 4 unidades atingida). Hora de pedir água ao fornecedor.
         </p>
         <div class="pt-1 flex items-center justify-between text-[11px]">
           <span class="text-amber-400 font-bold">Falta Pagar Campos: R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')}</span>
@@ -5077,10 +5131,10 @@ function checkAndShowWaterSupplyLoginNotice(force = false) {
     showToastNotification(`
       <div class="space-y-1">
         <div class="flex items-center space-x-1.5 font-black text-emerald-300 uppercase tracking-wider text-[11px]">
-          <span>💧 Estoque de Água 100% Abastecido</span>
+          <span>💧 Estoque de Água Seguro</span>
         </div>
         <p class="text-slate-200 text-xs">
-          A Arena conta com <strong>${analytics.full} águas cheias</strong> disponíveis (${analytics.reservedNext2Days} já guardadas para os campos nos próximos 2 dias).
+          A Arena conta com <strong>${analytics.full} águas cheias</strong> disponíveis ${analytics.empty > 0 ? `(${analytics.empty}/4 vazias acumuladas para pedido)` : ''}.
         </p>
       </div>
     `, 5500);
@@ -5141,9 +5195,13 @@ function renderWaterSupplySection(analytics) {
             <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
             <span>📊 Relatório Geral</span>
           </button>
-          <button onclick="openEmptyWaterModal()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+          <button onclick="triggerQuickWaterBaixa(4)" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer" title="Registrar baixa de 4 garrafas consumidas no campo">
+            <i data-lucide="droplet" class="w-4 h-4"></i>
+            <span>💧 Baixa de 4 Águas</span>
+          </button>
+          <button onclick="openEmptyWaterModal(4)" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer" title="Registrar consumo ou esvaziamento avulso">
             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-            <span>🔄 Esvaziou no Campo</span>
+            <span>Outras Vazias</span>
           </button>
           ${!isRecep ? `
           <button onclick="openAdjustWaterSupplyModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer" title="Ajuste manual de estoque">
@@ -5160,12 +5218,12 @@ function renderWaterSupplySection(analytics) {
             <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
           </div>
           <div class="space-y-1 text-xs flex-1">
-            <h5 class="font-black text-sm text-rose-950 uppercase">Alerta Preventivo: Reabastecimento Necessário!</h5>
+            <h5 class="font-black text-sm text-rose-950 uppercase">🚨 Alerta: Pedido de Água Liberado (Baixa de ${analytics.empty} Águas Atingida!)</h5>
             <p>
-              Existem <strong>${analytics.empty} garrafas/galões vazios</strong> aguardando para encher. A quantidade total necessária para abastecer e suprir a demanda com folga é de <strong>${analytics.refillNeededCount} unidades</strong>.
+              Existem <strong>${analytics.empty} garrafas/galões vazios</strong> acumulados (regra de baixa mínima de 4 unidades atingida). O pedido de reposição junto à distribuidora já pode ser solicitado.
             </p>
             <p class="text-[11px] text-rose-700 font-medium">
-              Demanda confirmada nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong> reservadas nos campos.
+              Lote sugerido no pedido: <strong>${analytics.refillNeededCount} unidades</strong>. Demanda confirmada nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong>.
             </p>
           </div>
         </div>
@@ -5175,9 +5233,12 @@ function renderWaterSupplySection(analytics) {
             <i data-lucide="check-circle" class="w-5 h-5"></i>
           </div>
           <div class="text-xs">
-            <h5 class="font-black text-emerald-950 uppercase">Estoque de Água 100% Seguro</h5>
+            <h5 class="font-black text-emerald-950 uppercase">Estoque de Água Seguro • Aguardando Baixa de 4 Águas para Pedido</h5>
             <p>
-              A Arena possui <strong>${analytics.full} águas cheias</strong> disponíveis, quantidade suficiente para atender com folga as reservas dos próximos 2 dias (${analytics.reservedNext2Days} águas agendadas).
+              A Arena possui <strong>${analytics.full} águas cheias</strong> disponíveis, suficiente para atender com folga as reservas (${analytics.reservedNext2Days} águas agendadas).
+              ${analytics.empty > 0 
+                ? `Existem <strong>${analytics.empty} vasilhame(s) vazio(s)</strong> no momento. O pedido ao fornecedor é feito com a baixa de 4 águas (faltam <strong>${analytics.emptyRemainingForRefill} un</strong> para acionar o pedido).` 
+                : 'Nenhuma garrafa vazia no momento (100% abastecido).'}
             </p>
           </div>
         </div>
@@ -5206,8 +5267,10 @@ function renderWaterSupplySection(analytics) {
               <span class="text-[11px] font-black uppercase text-amber-800">Vazias p/ Encher</span>
               <span class="p-1 rounded-lg bg-amber-200/60 text-amber-800"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></span>
             </div>
-            <div class="text-2xl font-black ${analytics.empty > 0 ? 'text-rose-700' : 'text-amber-950'}">${analytics.empty} un</div>
-            <p class="text-[10px] text-amber-700 font-medium mt-0.5">Avisar 2 dias antes p/ encher</p>
+            <div class="text-2xl font-black ${analytics.empty >= 4 ? 'text-rose-700' : 'text-amber-950'}">${analytics.empty} un</div>
+            <p class="text-[10px] text-amber-700 font-medium mt-0.5">
+              ${analytics.empty >= 4 ? '✓ Baixa de 4 un atingida (pedir!)' : `Faltam ${analytics.emptyRemainingForRefill} un p/ lote de 4`}
+            </p>
           </div>
 
           <!-- 3. Reservadas Próximos 2 Dias -->
@@ -5221,13 +5284,13 @@ function renderWaterSupplySection(analytics) {
           </div>
 
           <!-- 4. Precisa Abastecer -->
-          <div class="bg-gradient-to-br ${analytics.refillNeededCount > 0 ? 'from-rose-50 to-pink-50 border-rose-200' : 'from-emerald-50 to-teal-50 border-emerald-200'} border rounded-2xl p-4 shadow-xs">
+          <div class="bg-gradient-to-br ${analytics.refillNeededCount >= 4 ? 'from-rose-50 to-pink-50 border-rose-200' : 'from-emerald-50 to-teal-50 border-emerald-200'} border rounded-2xl p-4 shadow-xs">
             <div class="flex items-center justify-between mb-1.5">
-              <span class="text-[11px] font-black uppercase ${analytics.refillNeededCount > 0 ? 'text-rose-800' : 'text-emerald-800'}">Precisa Abastecer</span>
-              <span class="p-1 rounded-lg ${analytics.refillNeededCount > 0 ? 'bg-rose-200/60 text-rose-800' : 'bg-emerald-200/60 text-emerald-800'}"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i></span>
+              <span class="text-[11px] font-black uppercase ${analytics.refillNeededCount >= 4 ? 'text-rose-800' : 'text-emerald-800'}">Pedido Distribuidora</span>
+              <span class="p-1 rounded-lg ${analytics.refillNeededCount >= 4 ? 'bg-rose-200/60 text-rose-800' : 'bg-emerald-200/60 text-emerald-800'}"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i></span>
             </div>
-            <div class="text-2xl font-black ${analytics.refillNeededCount > 0 ? 'text-rose-950' : 'text-emerald-950'}">${analytics.refillNeededCount} un</div>
-            <p class="text-[10px] ${analytics.refillNeededCount > 0 ? 'text-rose-700' : 'text-emerald-700'} font-medium mt-0.5">Saldo livre balcão: ${analytics.freeForSale}</p>
+            <div class="text-2xl font-black ${analytics.refillNeededCount >= 4 ? 'text-rose-950' : 'text-emerald-950'}">${analytics.refillNeededCount} un</div>
+            <p class="text-[10px] ${analytics.refillNeededCount >= 4 ? 'text-rose-700' : 'text-emerald-700'} font-medium mt-0.5">Lote mínimo: 4 unidades</p>
           </div>
         </div>
       </div>
@@ -5379,14 +5442,14 @@ function renderWaterSupplySection(analytics) {
                       </td>
                       <td class="p-3 text-right">
                         ${!b.isReleased ? `
-                          <button onclick="releaseWaterForCourt('${b.bookingId}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-black shadow transition-all cursor-pointer inline-flex items-center space-x-1">
+                          <button onclick="releaseWaterForCourt('${b.bookingId}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-black shadow transition-all cursor-pointer inline-flex items-center space-x-1" title="Liberar e dar baixa de ${b.waterQty || 4} águas no estoque">
                             <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                            <span>Liberar no Campo</span>
+                            <span>Liberar (${b.waterQty || 4} Águas)</span>
                           </button>
                         ` : `
                           <div class="flex items-center justify-end space-x-1">
-                            <span class="text-emerald-700 font-bold text-xs">✓ Entregue</span>
-                            <button onclick="openEmptyWaterModal()" class="text-[10px] text-amber-700 hover:underline ml-2" title="Registrar se garrafas esvaziaram">
+                            <span class="text-emerald-700 font-bold text-xs">✓ Entregue (${b.waterQty || 4} un)</span>
+                            <button onclick="openEmptyWaterModal(4)" class="text-[10px] text-amber-700 hover:underline ml-2" title="Registrar se garrafas esvaziaram">
                               (Esvaziou?)
                             </button>
                           </div>
@@ -5808,6 +5871,38 @@ async function releaseWaterForCourt(bookingId) {
   b.product_cart._water_released_at = new Date().toISOString();
   b.bar_status = 'delivered';
 
+  // Descobre a quantidade de águas deste agendamento (padrão Arena: baixa de 4 águas para partidas/campos)
+  let waterQty = 0;
+  Object.entries(b.product_cart).forEach(([id, q]) => {
+    if (id.startsWith('_') || typeof q !== 'number' || q <= 0) return;
+    const prod = (state.products || []).find(p => p.id === id);
+    if (isWaterProduct(prod)) waterQty += q;
+  });
+  const deductQty = waterQty > 0 ? waterQty : 4;
+
+  // Realiza a baixa imediata no estoque de água (subtrai de cheias, adiciona a vazias)
+  if (!state.waterSupply) {
+    state.waterSupply = { full: 20, empty: 0, min_alert: 5, history: [] };
+  }
+  state.waterSupply.full = Math.max(0, (state.waterSupply.full || 0) - deductQty);
+  state.waterSupply.empty = (state.waterSupply.empty || 0) + deductQty;
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  const courtObj = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Campo' };
+  state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
+    date: new Date().toISOString(),
+    type: 'esvaziou',
+    qtd: deductQty,
+    booking_id: b.id,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador Bar',
+    notes: `Baixa de ${deductQty} águas liberadas para ${courtObj.name} (#${b.id})`
+  });
+
+  b.product_cart._water_deducted_qty = deductQty;
+
+  await saveWaterSupplyToDatabase();
+
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const idx = localBookings.findIndex(x => x.id === bookingId);
   if (idx !== -1) {
@@ -5827,12 +5922,45 @@ async function releaseWaterForCourt(bookingId) {
 
   showToastNotification(`
     <div class="space-y-1">
-      <div class="font-black text-emerald-300 uppercase text-[11px]">🚀 Água Liberada para o Campo!</div>
-      <p class="text-xs text-white">As garrafas foram liberadas e entregues aos atletas na quadra.</p>
+      <div class="font-black text-emerald-300 uppercase text-[11px]">🚀 Água Liberada no Campo!</div>
+      <p class="text-xs text-white">Baixa de <strong>${deductQty} águas</strong> realizada no estoque. (Estoque atual: ${state.waterSupply.full} cheias / ${state.waterSupply.empty} vazias).</p>
+    </div>
+  `, 5000);
+}
+window.releaseWaterForCourt = releaseWaterForCourt;
+
+async function triggerQuickWaterBaixa(qty = 4) {
+  if (!confirm(`Confirmar a baixa de ${qty} águas consumidas no campo/arena?\n\n- ${qty} águas cheias serão subtraídas do estoque\n- ${qty} vasilhames vazios serão adicionados para controle de pedido ao fornecedor.`)) {
+    return;
+  }
+  if (!state.waterSupply) {
+    state.waterSupply = { full: 20, empty: 0, min_alert: 5, history: [] };
+  }
+  state.waterSupply.full = Math.max(0, (state.waterSupply.full || 0) - qty);
+  state.waterSupply.empty = (state.waterSupply.empty || 0) + qty;
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
+    date: new Date().toISOString(),
+    type: 'esvaziou',
+    qtd: qty,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador Bar',
+    notes: `Baixa rápida de ${qty} águas consumidas nos campos`
+  });
+
+  await saveWaterSupplyToDatabase();
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-amber-300 uppercase text-[11px]">✓ Baixa de ${qty} Águas Realizada!</div>
+      <p class="text-xs text-white">Estoque atualizado: <strong>${state.waterSupply.full} cheias</strong> e <strong>${state.waterSupply.empty} vazias</strong>.</p>
     </div>
   `, 4500);
 }
-window.releaseWaterForCourt = releaseWaterForCourt;
+window.triggerQuickWaterBaixa = triggerQuickWaterBaixa;
 
 function openWaterReportModal() {
   const modalRoot = document.getElementById('modalRoot');
@@ -5845,9 +5973,9 @@ function openWaterReportModal() {
 
 💧 ESTOQUE ATUAL:
 - Águas Cheias em Estoque: ${analytics.full} un
-- Garrafas Vazias para Encher: ${analytics.empty} un
+- Garrafas Vazias para Encher: ${analytics.empty} un (Regra: Pedido feito com baixa de 4 un)
 - Total de Vasilhames: ${analytics.totalStock} un
-- Quantidade que Precisa Abastecer: ${analytics.refillNeededCount} un
+- Status do Pedido ao Fornecedor: ${analytics.needsRefill ? `🚨 Liberado (${analytics.empty} vazias p/ reposição)` : `✓ Seguro (${analytics.empty}/4 vazias registradas)`}
 - Reservadas para os Campos (Próx. 2 Dias): ${analytics.reservedNext2Days} un
 - Saldo Livre para Balcão/Novas Reservas: ${analytics.freeForSale} un
 
@@ -5890,7 +6018,7 @@ function openWaterReportModal() {
                 <span>Estoque Físico & Necessidade</span>
               </span>
               <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${analytics.needsRefill ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
-                ${analytics.needsRefill ? `Abastecer ${analytics.refillNeededCount} un` : '100% Abastecido'}
+                ${analytics.needsRefill ? `🚨 Pedir ${analytics.refillNeededCount} un` : `✓ Seguro (${analytics.empty}/4 Vazias)`}
               </span>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
@@ -5900,7 +6028,7 @@ function openWaterReportModal() {
               </div>
               <div>
                 <span class="text-slate-500 text-[10px] font-bold uppercase block">Vazias p/ Encher</span>
-                <strong class="text-base font-black ${analytics.empty > 0 ? 'text-rose-600' : 'text-slate-900'}">${analytics.empty} un</strong>
+                <strong class="text-base font-black ${analytics.empty >= 4 ? 'text-rose-600' : 'text-slate-900'}">${analytics.empty} un</strong>
               </div>
               <div>
                 <span class="text-slate-500 text-[10px] font-bold uppercase block">Precisa Abastecer</span>
@@ -5983,11 +6111,12 @@ function openWaterReportModal() {
 }
 window.openWaterReportModal = openWaterReportModal;
 
-function openEmptyWaterModal() {
+function openEmptyWaterModal(defaultQty = 4) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
   const currentFull = (state.waterSupply && state.waterSupply.full) || 0;
+  const initialQty = Math.min(Math.max(1, currentFull), defaultQty);
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
@@ -5998,8 +6127,8 @@ function openEmptyWaterModal() {
               <i data-lucide="rotate-ccw" class="w-5 h-5 text-amber-300"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase">Esvaziou no Campo / Consumo</h3>
-              <p class="text-xs text-amber-200 font-medium">Registrar garrafas que foram consumidas</p>
+              <h3 class="text-base font-black uppercase">Baixa de Águas / Consumo no Campo</h3>
+              <p class="text-xs text-amber-200 font-medium">Registrar saída de cheias e entrada de garrafas vazias</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-amber-300 hover:text-white p-1 cursor-pointer">
@@ -6009,10 +6138,25 @@ function openEmptyWaterModal() {
 
         <form onsubmit="handleEmptyWaterSubmit(event)" class="p-6 space-y-4" autocomplete="off">
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantidade Esvaziada *</label>
-            <input type="number" id="waterEmptyQtd" required min="1" max="${Math.max(1, currentFull)}" value="1" 
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 uppercase">Quantidade de Baixa *</label>
+              <span class="text-[11px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">Regra Arena: Lote de 4 Águas</span>
+            </div>
+            <input type="number" id="waterEmptyQtd" required min="1" max="${Math.max(1, currentFull)}" value="${initialQty}" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-amber-600 focus:outline-none">
-            <span class="text-[11px] text-slate-500 mt-1 block">Estoque atual de cheias: ${currentFull}</span>
+            
+            <div class="flex flex-wrap items-center gap-1.5 mt-2">
+              <button type="button" onclick="document.getElementById('waterEmptyQtd').value=4" class="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-lg text-xs font-black transition-all">
+                4 Águas (Padrão)
+              </button>
+              <button type="button" onclick="document.getElementById('waterEmptyQtd').value=8" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-all">
+                8 Águas (2 Campos)
+              </button>
+              <button type="button" onclick="document.getElementById('waterEmptyQtd').value=1" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold transition-all">
+                1 Água
+              </button>
+            </div>
+            <span class="text-[11px] text-slate-500 mt-1.5 block">Estoque atual de cheias disponíveis: ${currentFull} un</span>
           </div>
 
           <div>
@@ -6027,7 +6171,7 @@ function openEmptyWaterModal() {
             </button>
             <button type="submit" id="btnSubmitWaterEmpty" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Registrar Vazia</span>
+              <span>Confirmar Baixa</span>
             </button>
           </div>
         </form>
