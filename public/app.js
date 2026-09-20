@@ -4789,40 +4789,80 @@ function getWaterSupplyAnalytics() {
   let reservedNext2Days = 0;
   const upcomingWaterBookings = [];
 
+  // Variáveis de Relatório Financeiro dos Campos (Vendas de Água)
+  let totalWaterSoldQty = 0;
+  let totalWaterRevenuePaid = 0;
+  let totalWaterRevenuePending = 0;
+  let paidWaterBookingsCount = 0;
+  let pendingWaterBookingsCount = 0;
+  let unreleasedWaterBookingsCount = 0;
+
+  // Busca preço padrão da água
+  const waterProduct = (state.products || []).find(p => isWaterProduct(p)) || { price: 4.00 };
+  const defaultWaterPrice = waterProduct.price || 4.00;
+
   allBookings.forEach(b => {
-    if (!b || b.status === 'cancelled' || b.status === 'finished') return;
+    if (!b || b.status === 'cancelled') return;
     const cart = b.product_cart || b.productCart || {};
     let bookingWaterQty = 0;
+    let bookingWaterPrice = 0;
 
     Object.entries(cart).forEach(([id, q]) => {
       if (id.startsWith('_') || typeof q !== 'number' || q <= 0) return;
       const prod = (state.products || []).find(p => p.id === id);
       if (isWaterProduct(prod)) {
         bookingWaterQty += q;
+        bookingWaterPrice += (prod.price || defaultWaterPrice) * q;
       }
     });
 
     if (bookingWaterQty > 0) {
-      totalReservedAll += bookingWaterQty;
+      totalWaterSoldQty += bookingWaterQty;
       const bDate = b.date;
       const isNext2Days = next2Days.includes(bDate);
-      if (isNext2Days) {
-        reservedNext2Days += bookingWaterQty;
+
+      // Status do pagamento da água: se marcado explicitamente como pago, ou se pagamento geral da reserva foi pago
+      const isPaid = cart._water_paid === true || (b.payment_status === 'paid' && cart._water_paid !== false);
+      const isReleased = cart._status === 'delivered' || cart._water_released === true;
+
+      if (isPaid) {
+        totalWaterRevenuePaid += bookingWaterPrice;
+        paidWaterBookingsCount++;
+      } else {
+        totalWaterRevenuePending += bookingWaterPrice;
+        pendingWaterBookingsCount++;
       }
 
-      if (bDate >= todayStr) {
-        const court = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva' };
-        upcomingWaterBookings.push({
-          bookingId: b.id,
-          date: bDate,
-          time: b.time || (b.start_time ? `${b.start_time} às ${b.end_time}` : ''),
-          customerName: b.customer_name || b.customerName || 'Cliente',
-          customerPhone: b.customer_phone || b.customerPhone || '',
-          courtName: court.name,
-          waterQty: bookingWaterQty,
-          status: (cart && cart._status) || b.bar_status || 'waiting',
-          isNext2Days: isNext2Days
-        });
+      if (!isReleased && b.status !== 'finished') {
+        unreleasedWaterBookingsCount++;
+      }
+
+      // Se for reserva ativa futura
+      if (b.status !== 'finished') {
+        totalReservedAll += bookingWaterQty;
+        if (isNext2Days) {
+          reservedNext2Days += bookingWaterQty;
+        }
+
+        if (bDate >= todayStr) {
+          const court = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva' };
+          upcomingWaterBookings.push({
+            bookingId: b.id,
+            date: bDate,
+            time: b.time || (b.start_time ? `${b.start_time} às ${b.end_time}` : ''),
+            customerName: b.customer_name || b.customerName || 'Cliente',
+            customerPhone: b.customer_phone || b.customerPhone || '',
+            courtName: court.name,
+            courtId: b.court_id || b.courtId,
+            waterQty: bookingWaterQty,
+            waterPrice: bookingWaterPrice,
+            isPaid: isPaid,
+            paidMethod: cart._water_paid_method || (isPaid ? 'Pix / Balcão' : 'Pendente'),
+            isReleased: isReleased,
+            status: cart._status || b.bar_status || 'waiting',
+            isNext2Days: isNext2Days
+          });
+        }
       }
     }
   });
@@ -4832,21 +4872,55 @@ function getWaterSupplyAnalytics() {
     return (a.time || '').localeCompare(b.time || '');
   });
 
+  // Cálculos de Abastecimento (Fornecedor) a partir do histórico
+  let totalWaterSuppliedQty = 0;
+  let totalSupplyCostPaid = 0;
+  let totalSupplyCostPending = 0;
+
+  const history = (state.waterSupply && Array.isArray(state.waterSupply.history)) ? state.waterSupply.history : [];
+  history.forEach(item => {
+    if (item.type === 'abastecimento') {
+      const q = typeof item.qtd === 'number' ? item.qtd : 0;
+      totalWaterSuppliedQty += q;
+      const cost = typeof item.cost === 'number' ? item.cost : 0;
+      if (item.payment_status === 'pending') {
+        totalSupplyCostPending += cost;
+      } else {
+        totalSupplyCostPaid += cost;
+      }
+    }
+  });
+
   const freeForSale = Math.max(0, full - totalReservedAll);
+  // Quantidade de água no estoque que precisa abastecer: vazias a encher + demanda não coberta dos campos
+  const refillNeededCount = empty + Math.max(0, reservedNext2Days - full);
   const needsRefill = (empty > 0) || (full < minAlert) || (freeForSale <= 3) || (reservedNext2Days >= full);
 
   return {
     full,
     empty,
+    totalStock: full + empty,
     minAlert,
     totalReservedAll,
     reservedNext2Days,
     freeForSale,
+    refillNeededCount,
     needsRefill,
     upcomingWaterBookings,
     todayStr,
     tomorrowStr,
-    dayAfterTomorrowStr
+    dayAfterTomorrowStr,
+    // Relatório Financeiro dos Campos (Vendas de Água)
+    totalWaterSoldQty,
+    totalWaterRevenuePaid,
+    totalWaterRevenuePending,
+    paidWaterBookingsCount,
+    pendingWaterBookingsCount,
+    unreleasedWaterBookingsCount,
+    // Relatório Fornecedor (Custos de Abastecimento)
+    totalWaterSuppliedQty,
+    totalSupplyCostPaid,
+    totalSupplyCostPending
   };
 }
 window.getWaterSupplyAnalytics = getWaterSupplyAnalytics;
@@ -4923,9 +4997,14 @@ function renderWaterSupplyDashboardBanner() {
             </p>
           </div>
         </div>
-        <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow">
-          Ver Registro de Água
-        </button>
+        <div class="flex items-center space-x-2 shrink-0">
+          <button onclick="openWaterReportModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
+            📊 Relatório
+          </button>
+          <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow">
+            Ver Registro
+          </button>
+        </div>
       </div>
     `;
   }
@@ -4945,7 +5024,8 @@ function renderWaterSupplyDashboardBanner() {
             ${analytics.empty > 0 ? `Existem <span class="text-rose-300 underline font-black">${analytics.empty} garrafas/galões vazios</span> precisando encher!` : `Estoque de água cheia em nível de alerta (${analytics.full} un)!`}
           </h4>
           <p class="text-xs text-slate-300">
-            Previsão dos próximos 2 dias: <strong class="text-amber-300">${analytics.reservedNext2Days} águas</strong> reservadas para jogos nos campos. Estoque livre para vendas: <strong class="text-emerald-300">${analytics.freeForSale}</strong>.
+            Necessidade para abastecer: <strong class="text-rose-300">${analytics.refillNeededCount} unidades</strong>. Demanda dos próximos 2 dias: <strong class="text-amber-300">${analytics.reservedNext2Days} águas</strong>.
+            ${analytics.totalWaterRevenuePending > 0 ? `| Pendente receber: <strong class="text-amber-300">R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')}</strong>` : ''}
           </p>
         </div>
       </div>
@@ -4953,6 +5033,9 @@ function renderWaterSupplyDashboardBanner() {
         <button onclick="openAddWaterSupplyModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow transition-all cursor-pointer flex items-center space-x-1.5">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>+ Abastecer</span>
+        </button>
+        <button onclick="openWaterReportModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
+          📊 Relatório
         </button>
         <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-all cursor-pointer">
           Ver Registro
@@ -4977,19 +5060,19 @@ function checkAndShowWaterSupplyLoginNotice(force = false) {
 
   if (analytics.needsRefill) {
     showToastNotification(`
-      <div class="space-y-1">
+      <div class="space-y-1.5">
         <div class="flex items-center space-x-1.5 font-black text-rose-300 uppercase tracking-wider text-[11px]">
           <span>💧 Alerta de Água: Reabastecimento Necessário!</span>
         </div>
         <p class="text-slate-200 text-xs">
-          Existem <strong>${analytics.empty} garrafas/galões vazios</strong> para encher. Demanda nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong> reservadas para as quadras.
+          Existem <strong>${analytics.empty} garrafas/galões vazios</strong> para encher (total a abastecer: <strong>${analytics.refillNeededCount} un</strong>). Demanda nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong>.
         </p>
         <div class="pt-1 flex items-center justify-between text-[11px]">
-          <span class="text-amber-400 font-bold">Estoque Livre Balcão: ${analytics.freeForSale}</span>
+          <span class="text-amber-400 font-bold">Falta Pagar Campos: R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')}</span>
           <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="text-cyan-300 underline font-extrabold hover:text-white">Ver Registro</button>
         </div>
       </div>
-    `, 9000);
+    `, 9500);
   } else {
     showToastNotification(`
       <div class="space-y-1">
@@ -4997,7 +5080,7 @@ function checkAndShowWaterSupplyLoginNotice(force = false) {
           <span>💧 Estoque de Água 100% Abastecido</span>
         </div>
         <p class="text-slate-200 text-xs">
-          A Arena conta com <strong>${analytics.full} águas cheias</strong> disponíveis para os campos e vendas (${analytics.reservedNext2Days} já guardadas para os próximos 2 dias).
+          A Arena conta com <strong>${analytics.full} águas cheias</strong> disponíveis (${analytics.reservedNext2Days} já guardadas para os campos nos próximos 2 dias).
         </p>
       </div>
     `, 5500);
@@ -5005,9 +5088,29 @@ function checkAndShowWaterSupplyLoginNotice(force = false) {
 }
 window.checkAndShowWaterSupplyLoginNotice = checkAndShowWaterSupplyLoginNotice;
 
+function setWaterCourtFilter(filter) {
+  state.waterCourtFilter = filter;
+  renderStepContent();
+  lucide.createIcons();
+}
+window.setWaterCourtFilter = setWaterCourtFilter;
+
 function renderWaterSupplySection(analytics) {
   const isRecep = isReceptionUser();
-  const history = (state.waterSupply && Array.isArray(state.waterSupply.history)) ? state.waterSupply.history.slice(-10).reverse() : [];
+  const currentCourtFilter = state.waterCourtFilter || 'all';
+  const history = (state.waterSupply && Array.isArray(state.waterSupply.history)) ? state.waterSupply.history.slice(-15).reverse() : [];
+
+  // Filtragem dos jogos com água
+  let filteredBookings = analytics.upcomingWaterBookings || [];
+  if (currentCourtFilter === 'unreleased') {
+    filteredBookings = filteredBookings.filter(b => !b.isReleased);
+  } else if (currentCourtFilter === 'pending_pay') {
+    filteredBookings = filteredBookings.filter(b => !b.isPaid);
+  } else if (currentCourtFilter === 'paid') {
+    filteredBookings = filteredBookings.filter(b => b.isPaid);
+  } else if (currentCourtFilter === 'released') {
+    filteredBookings = filteredBookings.filter(b => b.isReleased);
+  }
 
   return `
     <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
@@ -5021,11 +5124,11 @@ function renderWaterSupplySection(analytics) {
               <span>Registro de Água & Abastecimento da Arena</span>
             </span>
             <span class="text-xs font-black ${analytics.needsRefill ? 'text-rose-800 bg-rose-100' : 'text-emerald-800 bg-emerald-100'} px-2.5 py-0.5 rounded-full">
-              ${analytics.needsRefill ? '⚠️ Necessita Abastecimento' : '✓ 100% Abastecido'}
+              ${analytics.needsRefill ? `⚠️ Abastecer ${analytics.refillNeededCount} un` : '✓ 100% Abastecido'}
             </span>
           </div>
           <p class="text-xs text-slate-500 mt-1">
-            Controle de estoque de garrafas/galões cheios, vazios para encher, água reservada para os campos e saldo livre para vendas.
+            Controle de estoque, registro de pagamentos, custos com fornecedores e liberação de água nos campos e quadras.
           </p>
         </div>
 
@@ -5034,7 +5137,11 @@ function renderWaterSupplySection(analytics) {
             <i data-lucide="plus" class="w-4 h-4"></i>
             <span>+ Registrar Abastecimento</span>
           </button>
-          <button onclick="openEmptyWaterModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+          <button onclick="openWaterReportModal()" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
+            <span>📊 Relatório Geral</span>
+          </button>
+          <button onclick="openEmptyWaterModal()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
             <span>🔄 Esvaziou no Campo</span>
           </button>
@@ -5046,20 +5153,19 @@ function renderWaterSupplySection(analytics) {
         </div>
       </div>
 
-      <!-- Alerta de Status -->
+      <!-- Alerta de Status e Notificação Preventiva -->
       ${analytics.needsRefill ? `
         <div class="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 sm:p-5 flex items-start space-x-3.5 text-rose-900">
           <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
             <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
           </div>
           <div class="space-y-1 text-xs flex-1">
-            <h5 class="font-black text-sm text-rose-950 uppercase">Alerta: Reabastecimento Necessário!</h5>
+            <h5 class="font-black text-sm text-rose-950 uppercase">Alerta Preventivo: Reabastecimento Necessário!</h5>
             <p>
-              Existem <strong>${analytics.empty} garrafas/galões vazios</strong> aguardando para encher.
-              A demanda confirmada para os próximos 2 dias é de <strong>${analytics.reservedNext2Days} águas</strong> reservadas para as quadras e campos.
+              Existem <strong>${analytics.empty} garrafas/galões vazios</strong> aguardando para encher. A quantidade total necessária para abastecer e suprir a demanda com folga é de <strong>${analytics.refillNeededCount} unidades</strong>.
             </p>
             <p class="text-[11px] text-rose-700 font-medium">
-              Notificação preventiva ativada para garantir que os atletas tenham água gelada suficiente durante as partidas.
+              Demanda confirmada nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong> reservadas nos campos.
             </p>
           </div>
         </div>
@@ -5077,64 +5183,133 @@ function renderWaterSupplySection(analytics) {
         </div>
       `}
 
-      <!-- 4 Cards de Métricas / KPIs -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <!-- 1. Cheias -->
-        <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-black uppercase text-cyan-800">Águas Cheias</span>
-            <span class="p-1.5 rounded-lg bg-cyan-200/50 text-cyan-800"><i data-lucide="droplet" class="w-4 h-4"></i></span>
-          </div>
-          <div class="text-2xl sm:text-3xl font-black text-cyan-950">${analytics.full}</div>
-          <p class="text-[11px] text-cyan-700 font-medium mt-1">Prontas p/ consumo e jogos</p>
+      <!-- LINHA 1: Cards de Métricas de Estoque e Operação -->
+      <div>
+        <div class="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
+          <i data-lucide="box" class="w-3.5 h-3.5"></i>
+          <span>Estoque Físico & Autonomia</span>
         </div>
-
-        <!-- 2. Vazias -->
-        <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-black uppercase text-amber-800">Vazias p/ Encher</span>
-            <span class="p-1.5 rounded-lg bg-amber-200/50 text-amber-800"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></span>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <!-- 1. Cheias -->
+          <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-2xl p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[11px] font-black uppercase text-cyan-800">Águas Cheias</span>
+              <span class="p-1 rounded-lg bg-cyan-200/60 text-cyan-800"><i data-lucide="droplet" class="w-3.5 h-3.5"></i></span>
+            </div>
+            <div class="text-2xl font-black text-cyan-950">${analytics.full} un</div>
+            <p class="text-[10px] text-cyan-700 font-medium mt-0.5">Prontas p/ consumo e campos</p>
           </div>
-          <div class="text-2xl sm:text-3xl font-black ${analytics.empty > 0 ? 'text-rose-700' : 'text-amber-950'}">${analytics.empty}</div>
-          <p class="text-[11px] text-amber-700 font-medium mt-1">Avisar 2 dias antes p/ encher</p>
-        </div>
 
-        <!-- 3. Reservadas Próximos 2 Dias -->
-        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-black uppercase text-purple-800">Campos (2 Dias)</span>
-            <span class="p-1.5 rounded-lg bg-purple-200/50 text-purple-800"><i data-lucide="calendar" class="w-4 h-4"></i></span>
+          <!-- 2. Vazias -->
+          <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[11px] font-black uppercase text-amber-800">Vazias p/ Encher</span>
+              <span class="p-1 rounded-lg bg-amber-200/60 text-amber-800"><i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i></span>
+            </div>
+            <div class="text-2xl font-black ${analytics.empty > 0 ? 'text-rose-700' : 'text-amber-950'}">${analytics.empty} un</div>
+            <p class="text-[10px] text-amber-700 font-medium mt-0.5">Avisar 2 dias antes p/ encher</p>
           </div>
-          <div class="text-2xl sm:text-3xl font-black text-purple-950">${analytics.reservedNext2Days}</div>
-          <p class="text-[11px] text-purple-700 font-medium mt-1">Total geral reservado: ${analytics.totalReservedAll}</p>
-        </div>
 
-        <!-- 4. Saldo Livre Balcão -->
-        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 shadow-xs">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[11px] font-black uppercase text-emerald-800">Livre p/ Venda</span>
-            <span class="p-1.5 rounded-lg bg-emerald-200/50 text-emerald-800"><i data-lucide="shopping-bag" class="w-4 h-4"></i></span>
+          <!-- 3. Reservadas Próximos 2 Dias -->
+          <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[11px] font-black uppercase text-purple-800">Campos (2 Dias)</span>
+              <span class="p-1 rounded-lg bg-purple-200/60 text-purple-800"><i data-lucide="calendar" class="w-3.5 h-3.5"></i></span>
+            </div>
+            <div class="text-2xl font-black text-purple-950">${analytics.reservedNext2Days} un</div>
+            <p class="text-[10px] text-purple-700 font-medium mt-0.5">Total reservado: ${analytics.totalReservedAll} un</p>
           </div>
-          <div class="text-2xl sm:text-3xl font-black text-emerald-950">${analytics.freeForSale}</div>
-          <p class="text-[11px] text-emerald-700 font-medium mt-1">Limite máx. p/ novos pedidos</p>
+
+          <!-- 4. Precisa Abastecer -->
+          <div class="bg-gradient-to-br ${analytics.refillNeededCount > 0 ? 'from-rose-50 to-pink-50 border-rose-200' : 'from-emerald-50 to-teal-50 border-emerald-200'} border rounded-2xl p-4 shadow-xs">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-[11px] font-black uppercase ${analytics.refillNeededCount > 0 ? 'text-rose-800' : 'text-emerald-800'}">Precisa Abastecer</span>
+              <span class="p-1 rounded-lg ${analytics.refillNeededCount > 0 ? 'bg-rose-200/60 text-rose-800' : 'bg-emerald-200/60 text-emerald-800'}"><i data-lucide="alert-circle" class="w-3.5 h-3.5"></i></span>
+            </div>
+            <div class="text-2xl font-black ${analytics.refillNeededCount > 0 ? 'text-rose-950' : 'text-emerald-950'}">${analytics.refillNeededCount} un</div>
+            <p class="text-[10px] ${analytics.refillNeededCount > 0 ? 'text-rose-700' : 'text-emerald-700'} font-medium mt-0.5">Saldo livre balcão: ${analytics.freeForSale}</p>
+          </div>
         </div>
       </div>
 
-      <!-- Tabela de Agendamentos nos Campos com Água Reservada -->
-      <div class="space-y-3">
-        <div class="flex items-center justify-between">
-          <h4 class="text-sm font-black text-slate-800 flex items-center space-x-2 uppercase">
-            <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
-            <span>Águas Guardadas para os Campos & Quadras (${analytics.upcomingWaterBookings.length})</span>
-          </h4>
-          <span class="text-[11px] text-slate-500 font-bold">Aluguéis com solicitação de água</span>
+      <!-- LINHA 2: Cards de Métricas Financeiras (Pagos vs Falta Pagar) -->
+      <div>
+        <div class="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-2 flex items-center space-x-1.5">
+          <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i>
+          <span>Controle Financeiro de Águas (Pagamentos & Pendências)</span>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <!-- 1. Vendas Pagas (Clientes) -->
+          <div class="bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 shadow-xs">
+            <span class="text-[10px] font-black uppercase text-emerald-800 block mb-1">✓ Água Recebida / Paga</span>
+            <div class="text-xl sm:text-2xl font-black text-emerald-700">R$ ${analytics.totalWaterRevenuePaid.toFixed(2).replace('.', ',')}</div>
+            <p class="text-[10px] text-emerald-800 font-medium mt-0.5">${analytics.paidWaterBookingsCount} jogos quitados</p>
+          </div>
+
+          <!-- 2. Falta Pagar (Clientes) -->
+          <div class="bg-amber-50/70 border border-amber-200 rounded-2xl p-4 shadow-xs">
+            <span class="text-[10px] font-black uppercase text-amber-800 block mb-1">⏳ Falta Pagar (Clientes)</span>
+            <div class="text-xl sm:text-2xl font-black text-amber-700">R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')}</div>
+            <p class="text-[10px] text-amber-800 font-medium mt-0.5">${analytics.pendingWaterBookingsCount} jogos pendentes</p>
+          </div>
+
+          <!-- 3. Custo Pago ao Fornecedor -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-xs">
+            <span class="text-[10px] font-black uppercase text-slate-600 block mb-1">🚚 Fornecedor Pago</span>
+            <div class="text-xl sm:text-2xl font-black text-slate-800">R$ ${analytics.totalSupplyCostPaid.toFixed(2).replace('.', ',')}</div>
+            <p class="text-[10px] text-slate-500 font-medium mt-0.5">${analytics.totalWaterSuppliedQty} un abastecidas</p>
+          </div>
+
+          <!-- 4. Falta Pagar ao Fornecedor -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-xs">
+            <span class="text-[10px] font-black uppercase ${analytics.totalSupplyCostPending > 0 ? 'text-rose-700' : 'text-slate-600'} block mb-1">📦 Falta Pagar Fornecedor</span>
+            <div class="text-xl sm:text-2xl font-black ${analytics.totalSupplyCostPending > 0 ? 'text-rose-700' : 'text-slate-800'}">R$ ${analytics.totalSupplyCostPending.toFixed(2).replace('.', ',')}</div>
+            <p class="text-[10px] text-slate-500 font-medium mt-0.5">A prazo / Boletos</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEÇÃO DE CONTROLE DOS CAMPOS PARA LIBERAÇÃO DE ÁGUA -->
+      <div class="space-y-4 pt-2 border-t border-slate-100">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-black text-slate-800 flex items-center space-x-2 uppercase">
+              <i data-lucide="clipboard-check" class="w-4 h-4 text-emerald-600"></i>
+              <span>Controle dos Campos para Liberação de Água (${analytics.upcomingWaterBookings.length})</span>
+            </h4>
+            <p class="text-xs text-slate-500 mt-0.5">Gerencie a liberação de água nos campos e confirme o pagamento da água de cada partida.</p>
+          </div>
+
+          <!-- Filtros Rápidos de Quadra / Liberação -->
+          <div class="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none shrink-0">
+            <button onclick="setWaterCourtFilter('all')" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentCourtFilter === 'all' ? 'bg-slate-900 text-white font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+              Todos (${analytics.upcomingWaterBookings.length})
+            </button>
+            <button onclick="setWaterCourtFilter('unreleased')" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentCourtFilter === 'unreleased' ? 'bg-cyan-700 text-white font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+              ⏳ Aguardando (${analytics.unreleasedWaterBookingsCount})
+            </button>
+            <button onclick="setWaterCourtFilter('pending_pay')" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentCourtFilter === 'pending_pay' ? 'bg-amber-600 text-white font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+              ⚠️ Falta Pagar (${analytics.pendingWaterBookingsCount})
+            </button>
+            <button onclick="setWaterCourtFilter('paid')" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentCourtFilter === 'paid' ? 'bg-emerald-700 text-white font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+              ✓ Pagas (${analytics.paidWaterBookingsCount})
+            </button>
+            <button onclick="setWaterCourtFilter('released')" 
+                    class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentCourtFilter === 'released' ? 'bg-slate-900 text-white font-black' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+              🚀 Liberadas
+            </button>
+          </div>
         </div>
 
-        ${analytics.upcomingWaterBookings.length === 0 ? `
-          <div class="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+        ${filteredBookings.length === 0 ? `
+          <div class="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
             <i data-lucide="check" class="w-8 h-8 text-emerald-500 mx-auto mb-2"></i>
-            <p class="text-xs font-bold text-slate-700">Nenhum agendamento com água pendente</p>
-            <p class="text-[11px] text-slate-500 mt-0.5">Quando um atleta solicitar águas no agendamento do campo, elas aparecerão aqui para separação.</p>
+            <p class="text-xs font-bold text-slate-700">Nenhum agendamento neste filtro</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Todas as águas correspondentes aos critérios selecionados já foram atendidas.</p>
           </div>
         ` : `
           <div class="overflow-x-auto rounded-2xl border border-slate-200">
@@ -5142,53 +5317,79 @@ function renderWaterSupplySection(analytics) {
               <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px]">
                 <tr>
                   <th class="p-3">Data / Horário</th>
-                  <th class="p-3">Quadra / Espaço</th>
-                  <th class="p-3">Responsável</th>
-                  <th class="p-3 text-center">Águas</th>
-                  <th class="p-3 text-center">Status Gelamento</th>
-                  <th class="p-3 text-right">Ação</th>
+                  <th class="p-3">Campo / Espaço</th>
+                  <th class="p-3">Atleta / Contato</th>
+                  <th class="p-3 text-center">Águas / Valor</th>
+                  <th class="p-3 text-center">Pagamento Água</th>
+                  <th class="p-3 text-center">Status no Campo</th>
+                  <th class="p-3 text-right">Ação de Liberação</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
-                ${analytics.upcomingWaterBookings.map(b => {
-                  const statusMap = {
-                    waiting: { label: '⏳ Aguardando', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
-                    separated: { label: '📦 Separado', cls: 'bg-purple-100 text-purple-900 border-purple-300' },
-                    chilling: { label: '❄️ No Freezer', cls: 'bg-cyan-100 text-cyan-900 border-cyan-300' },
-                    delivered: { label: '✓ No Campo', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
-                  };
-                  const st = statusMap[b.status] || statusMap.waiting;
+                ${filteredBookings.map(b => {
                   return `
-                    <tr class="hover:bg-slate-50/80 transition-all ${b.isNext2Days ? 'bg-amber-50/30 font-medium' : ''}">
+                    <tr class="hover:bg-slate-50/80 transition-all ${b.isNext2Days ? 'bg-amber-50/20' : ''}">
                       <td class="p-3">
                         <div class="font-black text-slate-900">${b.date}</div>
                         <div class="text-[11px] text-slate-500">${b.time}</div>
                         ${b.isNext2Days ? `<span class="inline-block mt-0.5 text-[9px] font-black uppercase bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded">Próximos 2 dias</span>` : ''}
                       </td>
                       <td class="p-3">
-                        <span class="font-bold text-slate-800">${b.courtName}</span>
+                        <span class="font-bold text-slate-800 block">🏟️ ${b.courtName}</span>
+                        <span class="text-[10px] text-slate-400 font-mono">#${b.bookingId}</span>
                       </td>
                       <td class="p-3">
                         <div class="font-bold text-slate-900">${b.customerName}</div>
                         <div class="text-[11px] text-slate-500 font-mono">${b.customerPhone}</div>
                       </td>
                       <td class="p-3 text-center">
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-cyan-100 text-cyan-900 border border-cyan-200">
+                        <div class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-cyan-100 text-cyan-950 border border-cyan-200">
                           💧 ${b.waterQty} un
-                        </span>
+                        </div>
+                        <div class="text-[11px] font-black text-emerald-700 mt-1">
+                          R$ ${b.waterPrice.toFixed(2).replace('.', ',')}
+                        </div>
                       </td>
                       <td class="p-3 text-center">
-                        <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-lg border ${st.cls}">
-                          ${st.label}
-                        </span>
+                        ${b.isPaid ? `
+                          <span class="inline-block px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            ✓ Pago (${b.paidMethod})
+                          </span>
+                        ` : `
+                          <span class="inline-block px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">
+                            ⏳ Falta Pagar
+                          </span>
+                        `}
+                        <div class="mt-1">
+                          <button onclick="openWaterCourtPaymentModal('${b.bookingId}')" class="text-[10px] font-bold text-emerald-700 hover:underline cursor-pointer">
+                            Alterar Pagamento
+                          </button>
+                        </div>
+                      </td>
+                      <td class="p-3 text-center">
+                        ${b.isReleased ? `
+                          <span class="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            🚀 Liberada no Campo
+                          </span>
+                        ` : `
+                          <span class="inline-flex items-center px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                            ⏳ Pendente
+                          </span>
+                        `}
                       </td>
                       <td class="p-3 text-right">
-                        ${b.status !== 'delivered' ? `
-                          <button onclick="updateBarStatus('${b.bookingId}', 'delivered')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-xs transition-all cursor-pointer">
-                            Entregar no Campo
+                        ${!b.isReleased ? `
+                          <button onclick="releaseWaterForCourt('${b.bookingId}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[11px] font-black shadow transition-all cursor-pointer inline-flex items-center space-x-1">
+                            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                            <span>Liberar no Campo</span>
                           </button>
                         ` : `
-                          <span class="text-emerald-600 font-bold text-[11px]">✓ Entregue</span>
+                          <div class="flex items-center justify-end space-x-1">
+                            <span class="text-emerald-700 font-bold text-xs">✓ Entregue</span>
+                            <button onclick="openEmptyWaterModal()" class="text-[10px] text-amber-700 hover:underline ml-2" title="Registrar se garrafas esvaziaram">
+                              (Esvaziou?)
+                            </button>
+                          </div>
                         `}
                       </td>
                     </tr>
@@ -5200,38 +5401,68 @@ function renderWaterSupplySection(analytics) {
         `}
       </div>
 
-      <!-- Histórico Recente de Abastecimentos / Movimentações -->
+      <!-- SEÇÃO DE HISTÓRICO DE ABASTECIMENTOS & CUSTOS -->
       <div class="space-y-3 pt-4 border-t border-slate-100">
-        <h4 class="text-sm font-black text-slate-800 flex items-center space-x-2 uppercase">
-          <i data-lucide="history" class="w-4 h-4 text-slate-500"></i>
-          <span>Histórico de Movimentações de Água (${history.length})</span>
-        </h4>
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-black text-slate-800 flex items-center space-x-2 uppercase">
+            <i data-lucide="history" class="w-4 h-4 text-slate-500"></i>
+            <span>Histórico de Abastecimentos & Custos de Fornecedor (${history.length})</span>
+          </h4>
+          <span class="text-[11px] text-slate-500 font-bold">Total acumulado: ${analytics.totalWaterSuppliedQty} águas</span>
+        </div>
 
         ${history.length === 0 ? `
           <p class="text-xs text-slate-400 italic">Nenhum registro de abastecimento ou consumo anterior.</p>
         ` : `
           <div class="space-y-2">
-            ${history.map(item => {
+            ${history.map((item, idx) => {
               const isAbast = item.type === 'abastecimento';
               const isEsvaz = item.type === 'esvaziou';
+              const isPendingCost = item.payment_status === 'pending';
               const dateDisplay = item.date ? new Date(item.date).toLocaleString('pt-BR') : '';
+              // Index real no array state.waterSupply.history
+              const realIdx = (state.waterSupply.history || []).indexOf(item);
+
               return `
-                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
-                  <div class="flex items-center space-x-3">
-                    <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isAbast ? 'bg-emerald-100 text-emerald-700' : (isEsvaz ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-700')}">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs gap-3">
+                  <div class="flex items-start sm:items-center space-x-3">
+                    <span class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 sm:mt-0 ${isAbast ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : (isEsvaz ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-slate-200 text-slate-700')}">
                       <i data-lucide="${isAbast ? 'plus' : (isEsvaz ? 'rotate-ccw' : 'sliders')}" class="w-4 h-4"></i>
                     </span>
                     <div>
-                      <div class="font-black text-slate-900">
-                        ${isAbast ? `Abastecimento de +${item.qtd} águas cheias` : (isEsvaz ? `Consumo no Campo: ${item.qtd} garrafas esvaziadas` : `Ajuste manual de estoque`)}
+                      <div class="font-black text-slate-900 flex items-center space-x-2">
+                        <span>${isAbast ? `Abastecimento de +${item.qtd} águas cheias` : (isEsvaz ? `Consumo no Campo: ${item.qtd} garrafas esvaziadas` : `Ajuste manual de estoque`)}</span>
+                        ${isAbast && item.cost ? `<span class="text-emerald-700 font-black bg-emerald-100 px-2 py-0.5 rounded-md text-[10px]">Custo: R$ ${Number(item.cost).toFixed(2).replace('.', ',')}</span>` : ''}
                       </div>
-                      <div class="text-[11px] text-slate-500">
-                        ${item.notes || 'Sem observação'} • Por: <strong>${item.user || 'Operador Bar'}</strong>
+                      <div class="text-[11px] text-slate-500 mt-0.5">
+                        ${item.supplier ? `Fornecedor: <strong>${item.supplier}</strong> • ` : ''}
+                        ${item.notes ? `${item.notes} • ` : ''}Por: <strong>${item.user || 'Operador'}</strong>
                       </div>
                     </div>
                   </div>
-                  <div class="text-right text-[11px] text-slate-400 font-mono">
-                    ${dateDisplay}
+
+                  <div class="flex items-center justify-between sm:justify-end space-x-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200">
+                    ${isAbast && item.cost ? `
+                      <div class="text-right">
+                        ${isPendingCost ? `
+                          <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                            ⏳ Falta Pagar
+                          </span>
+                          ${realIdx !== -1 ? `
+                            <button onclick="settleSupplierPayment(${realIdx})" class="block mt-1 text-[10px] font-bold text-emerald-700 hover:underline cursor-pointer">
+                              Quitar Pagamento
+                            </button>
+                          ` : ''}
+                        ` : `
+                          <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            ✓ Pago (${item.payment_method || 'Pix'})
+                          </span>
+                        `}
+                      </div>
+                    ` : ''}
+                    <div class="text-right text-[11px] text-slate-400 font-mono">
+                      ${dateDisplay}
+                    </div>
                   </div>
                 </div>
               `;
@@ -5253,15 +5484,15 @@ function openAddWaterSupplyModal() {
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
         <div class="arena-header-bg p-5 text-white flex items-center justify-between">
           <div class="flex items-center space-x-2.5">
             <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center border border-cyan-400/30">
               <i data-lucide="plus-circle" class="w-5 h-5 text-cyan-300"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase">Registrar Abastecimento</h3>
-              <p class="text-xs text-cyan-200 font-medium">Entrada de águas/galões cheios na Arena</p>
+              <h3 class="text-base font-black uppercase">Registrar Abastecimento de Água</h3>
+              <p class="text-xs text-cyan-200 font-medium">Entrada de estoque, custo do lote e status de pagamento</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-cyan-300 hover:text-white p-1 cursor-pointer">
@@ -5270,25 +5501,59 @@ function openAddWaterSupplyModal() {
         </div>
 
         <form onsubmit="handleAddWaterSupplySubmit(event)" class="p-6 space-y-4" autocomplete="off">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantidade Recebida *</label>
+              <input type="number" id="waterAddQtd" required min="1" max="1000" value="10" 
+                     class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Total do Lote (R$) *</label>
+              <input type="number" id="waterAddCost" step="0.50" min="0" value="50.00" 
+                     class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Pagamento *</label>
+              <select id="waterAddPaymentStatus" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white">
+                <option value="paid">✓ Já foi Pago ao Fornecedor</option>
+                <option value="pending">⏳ Falta Pagar / A Prazo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Forma de Pagamento</label>
+              <select id="waterAddPaymentMethod" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white">
+                <option value="Pix">Pix da Arena</option>
+                <option value="Dinheiro">Dinheiro em Espécie</option>
+                <option value="Cartão de Débito">Cartão de Débito</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
+                <option value="Boleto">Boleto Bancário</option>
+                <option value="A Prazo">A Prazo</option>
+              </select>
+            </div>
+          </div>
+
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantidade de Águas Cheias Recebidas *</label>
-            <input type="number" id="waterAddQtd" required min="1" max="500" value="10" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fornecedor / Distribuidora</label>
+            <input type="text" id="waterAddSupplier" placeholder="Ex: Distribuidora São Geraldo / Indaiá" 
+                   class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-cyan-600 focus:outline-none">
           </div>
 
           ${currentEmpty > 0 ? `
-            <div class="bg-amber-50 p-3.5 rounded-xl border border-amber-200 flex items-start space-x-2.5">
+            <div class="bg-amber-50 p-3 rounded-xl border border-amber-200 flex items-start space-x-2.5">
               <input type="checkbox" id="waterReduceEmpty" checked class="w-4 h-4 mt-0.5 rounded text-cyan-600 focus:ring-cyan-500">
               <label for="waterReduceEmpty" class="text-xs text-amber-900 font-bold cursor-pointer">
-                Reduzir das ${currentEmpty} garrafas vazias em estoque? (Indica troca/reabastecimento das vazias)
+                Reduzir das ${currentEmpty} garrafas vazias em estoque? (Indica troca das vazias)
               </label>
             </div>
           ` : ''}
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nota / Observação</label>
-            <input type="text" id="waterAddNotes" placeholder="Ex: Entrega distribuidora São Geraldo" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+            <input type="text" id="waterAddNotes" placeholder="Ex: Entrega nota fiscal #1024 / Deixado no galpão" 
+                   class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-cyan-600 focus:outline-none">
           </div>
 
           <div class="pt-2 flex items-center justify-end space-x-2">
@@ -5297,7 +5562,7 @@ function openAddWaterSupplyModal() {
             </button>
             <button type="submit" id="btnSubmitWaterAdd" class="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Confirmar Entrada</span>
+              <span>Confirmar Abastecimento</span>
             </button>
           </div>
         </form>
@@ -5311,11 +5576,20 @@ window.openAddWaterSupplyModal = openAddWaterSupplyModal;
 async function handleAddWaterSupplySubmit(event) {
   event.preventDefault();
   const qtdInput = document.getElementById('waterAddQtd');
+  const costInput = document.getElementById('waterAddCost');
+  const statusSelect = document.getElementById('waterAddPaymentStatus');
+  const methodSelect = document.getElementById('waterAddPaymentMethod');
+  const supplierInput = document.getElementById('waterAddSupplier');
   const reduceCheckbox = document.getElementById('waterReduceEmpty');
   const notesInput = document.getElementById('waterAddNotes');
   const btn = document.getElementById('btnSubmitWaterAdd');
 
   const qtd = parseInt(qtdInput ? qtdInput.value : '0', 10);
+  const cost = parseFloat(costInput ? costInput.value : '0') || 0;
+  const paymentStatus = statusSelect ? statusSelect.value : 'paid';
+  const paymentMethod = methodSelect ? methodSelect.value : 'Pix';
+  const supplier = supplierInput ? supplierInput.value.trim() : '';
+
   if (isNaN(qtd) || qtd <= 0) return;
 
   if (btn) {
@@ -5334,9 +5608,14 @@ async function handleAddWaterSupplySubmit(event) {
 
   if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
   state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
     date: new Date().toISOString(),
     type: 'abastecimento',
     qtd: qtd,
+    cost: cost,
+    payment_status: paymentStatus,
+    payment_method: paymentMethod,
+    supplier: supplier,
     user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador Bar',
     notes: notesInput ? notesInput.value.trim() : ''
   });
@@ -5348,12 +5627,361 @@ async function handleAddWaterSupplySubmit(event) {
 
   showToastNotification(`
     <div class="space-y-1">
-      <div class="font-black text-emerald-300 uppercase text-[11px]">✓ Abastecimento Confirmado!</div>
-      <p class="text-xs text-white">Foram adicionadas <strong>${qtd} águas cheias</strong> ao estoque da Arena.</p>
+      <div class="font-black text-emerald-300 uppercase text-[11px]">✓ Abastecimento Registrado!</div>
+      <p class="text-xs text-white">Adicionadas <strong>${qtd} águas cheias</strong> (Custo: R$ ${cost.toFixed(2).replace('.', ',')} - ${paymentStatus === 'paid' ? 'Pago' : 'Falta Pagar'}).</p>
+    </div>
+  `, 4500);
+}
+window.handleAddWaterSupplySubmit = handleAddWaterSupplySubmit;
+
+async function settleSupplierPayment(historyIndex) {
+  if (!state.waterSupply || !Array.isArray(state.waterSupply.history)) return;
+  const item = state.waterSupply.history[historyIndex];
+  if (!item) return;
+
+  item.payment_status = 'paid';
+  item.settled_at = new Date().toISOString();
+  item.settled_by = (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Administrador';
+
+  await saveWaterSupplyToDatabase();
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-emerald-300 uppercase text-[11px]">✓ Pagamento do Fornecedor Quitado!</div>
+      <p class="text-xs text-white">O lote de <strong>${item.qtd} águas</strong> foi marcado como pago.</p>
     </div>
   `, 4000);
 }
-window.handleAddWaterSupplySubmit = handleAddWaterSupplySubmit;
+window.settleSupplierPayment = settleSupplierPayment;
+
+function openWaterCourtPaymentModal(bookingId) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const b = (state.bookings || []).find(x => x.id === bookingId);
+  if (!b) return;
+
+  const court = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva' };
+  const cart = b.product_cart || b.productCart || {};
+  let waterQty = 0;
+  let waterPrice = 0;
+  const defaultWaterPrice = 4.00;
+
+  Object.entries(cart).forEach(([id, q]) => {
+    if (id.startsWith('_') || typeof q !== 'number' || q <= 0) return;
+    const prod = (state.products || []).find(p => p.id === id);
+    if (isWaterProduct(prod)) {
+      waterQty += q;
+      waterPrice += (prod.price || defaultWaterPrice) * q;
+    }
+  });
+
+  const isCurrentlyPaid = cart._water_paid === true || (b.payment_status === 'paid' && cart._water_paid !== false);
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="dollar-sign" class="w-5 h-5 text-emerald-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">Pagamento de Água do Campo</h3>
+              <p class="text-xs text-emerald-200 font-medium">🏟️ ${court.name} • #${b.id}</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleWaterCourtPaymentSubmit(event, '${b.id}')" class="p-6 space-y-4" autocomplete="off">
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs space-y-2">
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-bold">Cliente / Responsável:</span>
+              <strong class="text-slate-900 font-black">${b.customer_name || b.customerName}</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-bold">Data & Horário:</span>
+              <strong class="text-slate-800">${b.date} às ${b.time}</strong>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-bold">Quantidade de Água:</span>
+              <span class="text-cyan-800 font-black">💧 ${waterQty} garrafa(s)</span>
+            </div>
+            <div class="flex justify-between pt-2 border-t border-slate-200">
+              <span class="text-slate-700 font-black">Valor Total da Água:</span>
+              <span class="text-emerald-700 text-base font-black">R$ ${waterPrice.toFixed(2).replace('.', ',')}</span>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Pagamento *</label>
+            <select id="waterCourtPaymentStatus" class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 bg-white">
+              <option value="paid" ${isCurrentlyPaid ? 'selected' : ''}>✓ Pago / Recebido</option>
+              <option value="pending" ${!isCurrentlyPaid ? 'selected' : ''}>⏳ Falta Pagar / Pendente de Cobrança</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Forma de Pagamento Utilizada</label>
+            <select id="waterCourtPaymentMethod" class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white">
+              <option value="Pix">Pix da Arena</option>
+              <option value="Dinheiro">Dinheiro em Espécie</option>
+              <option value="Cartão de Débito">Cartão de Débito</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Incluso no Pacote">Incluso no Pacote do Horário</option>
+            </select>
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnSubmitWaterPayment" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Salvar Pagamento</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+window.openWaterCourtPaymentModal = openWaterCourtPaymentModal;
+
+async function handleWaterCourtPaymentSubmit(event, bookingId) {
+  event.preventDefault();
+  const statusSelect = document.getElementById('waterCourtPaymentStatus');
+  const methodSelect = document.getElementById('waterCourtPaymentMethod');
+  const isPaid = (statusSelect && statusSelect.value === 'paid');
+  const method = methodSelect ? methodSelect.value : 'Pix';
+
+  const b = (state.bookings || []).find(x => x.id === bookingId);
+  if (b) {
+    if (!b.product_cart || typeof b.product_cart !== 'object') b.product_cart = {};
+    b.product_cart._water_paid = isPaid;
+    b.product_cart._water_paid_method = method;
+    b.product_cart._water_paid_at = new Date().toISOString();
+
+    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    const idx = localBookings.findIndex(x => x.id === bookingId);
+    if (idx !== -1) {
+      localBookings[idx] = b;
+      localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+    }
+
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        await client.from('bookings').update({ product_cart: b.product_cart }).eq('id', bookingId);
+      } catch(e) {}
+    }
+  }
+
+  closeModal();
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black ${isPaid ? 'text-emerald-300' : 'text-amber-300'} uppercase text-[11px]">
+        ${isPaid ? '✓ Pagamento de Água Registrado' : '⏳ Status de Pagamento: Pendente'}
+      </div>
+      <p class="text-xs text-white">${isPaid ? `Pagamento recebido via <strong>${method}</strong>.` : 'Água marcada como pendente de cobrança no balcão.'}</p>
+    </div>
+  `, 4000);
+}
+window.handleWaterCourtPaymentSubmit = handleWaterCourtPaymentSubmit;
+
+async function releaseWaterForCourt(bookingId) {
+  const b = (state.bookings || []).find(x => x.id === bookingId);
+  if (!b) return;
+
+  if (!b.product_cart || typeof b.product_cart !== 'object') b.product_cart = {};
+  b.product_cart._status = 'delivered';
+  b.product_cart._water_released = true;
+  b.product_cart._water_released_at = new Date().toISOString();
+  b.bar_status = 'delivered';
+
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const idx = localBookings.findIndex(x => x.id === bookingId);
+  if (idx !== -1) {
+    localBookings[idx] = b;
+    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+  }
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('bookings').update({ product_cart: b.product_cart }).eq('id', bookingId);
+    } catch(e) {}
+  }
+
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-emerald-300 uppercase text-[11px]">🚀 Água Liberada para o Campo!</div>
+      <p class="text-xs text-white">As garrafas foram liberadas e entregues aos atletas na quadra.</p>
+    </div>
+  `, 4500);
+}
+window.releaseWaterForCourt = releaseWaterForCourt;
+
+function openWaterReportModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const analytics = getWaterSupplyAnalytics();
+
+  const reportText = `📊 RELATÓRIO DE ÁGUAS DA ARENA LIMOEIRO
+📅 Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+
+💧 ESTOQUE ATUAL:
+- Águas Cheias em Estoque: ${analytics.full} un
+- Garrafas Vazias para Encher: ${analytics.empty} un
+- Total de Vasilhames: ${analytics.totalStock} un
+- Quantidade que Precisa Abastecer: ${analytics.refillNeededCount} un
+- Reservadas para os Campos (Próx. 2 Dias): ${analytics.reservedNext2Days} un
+- Saldo Livre para Balcão/Novas Reservas: ${analytics.freeForSale} un
+
+💰 FINANCEIRO - VENDAS NOS CAMPOS:
+- Total Recebido / Pago: R$ ${analytics.totalWaterRevenuePaid.toFixed(2).replace('.', ',')} (${analytics.paidWaterBookingsCount} jogos)
+- Total que Falta Pagar (Pendente): R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')} (${analytics.pendingWaterBookingsCount} jogos)
+
+🚚 FINANCEIRO - ABASTECIMENTO (FORNECEDORES):
+- Total de Águas Abastecidas: ${analytics.totalWaterSuppliedQty} un
+- Custo Pago a Fornecedores: R$ ${analytics.totalSupplyCostPaid.toFixed(2).replace('.', ',')}
+- Custo Pendente / A Pagar a Fornecedores: R$ ${analytics.totalSupplyCostPending.toFixed(2).replace('.', ',')}
+`;
+
+  const shareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(reportText)}`;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center border border-cyan-400/30">
+              <i data-lucide="bar-chart-3" class="w-5 h-5 text-cyan-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">Relatório Completo de Água</h3>
+              <p class="text-xs text-cyan-200 font-medium">Estoque, Pagamentos e Controle de Campos</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-cyan-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto space-y-5 text-xs text-slate-700">
+          <!-- Bloco 1: Estoque & Necessidade -->
+          <div class="bg-cyan-50/50 p-4 rounded-2xl border border-cyan-200 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-cyan-200/60 pb-2">
+              <span class="font-black text-cyan-900 uppercase flex items-center space-x-1.5">
+                <i data-lucide="droplets" class="w-4 h-4 text-cyan-700"></i>
+                <span>Estoque Físico & Necessidade</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${analytics.needsRefill ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}">
+                ${analytics.needsRefill ? `Abastecer ${analytics.refillNeededCount} un` : '100% Abastecido'}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
+              <div>
+                <span class="text-slate-500 text-[10px] font-bold uppercase block">Águas Cheias</span>
+                <strong class="text-base font-black text-slate-900">${analytics.full} un</strong>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] font-bold uppercase block">Vazias p/ Encher</span>
+                <strong class="text-base font-black ${analytics.empty > 0 ? 'text-rose-600' : 'text-slate-900'}">${analytics.empty} un</strong>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] font-bold uppercase block">Precisa Abastecer</span>
+                <strong class="text-base font-black ${analytics.refillNeededCount > 0 ? 'text-rose-700' : 'text-emerald-700'}">${analytics.refillNeededCount} un</strong>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] font-bold uppercase block">Campos (2 dias)</span>
+                <strong class="text-sm font-bold text-slate-800">${analytics.reservedNext2Days} un</strong>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] font-bold uppercase block">Livre Balcão</span>
+                <strong class="text-sm font-bold text-emerald-700">${analytics.freeForSale} un</strong>
+              </div>
+              <div>
+                <span class="text-slate-500 text-[10px] font-bold uppercase block">Total Vasilhames</span>
+                <strong class="text-sm font-bold text-slate-700">${analytics.totalStock} un</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloco 2: Financeiro de Vendas dos Campos -->
+          <div class="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-200 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+              <span class="font-black text-emerald-950 uppercase flex items-center space-x-1.5">
+                <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-700"></i>
+                <span>Vendas nos Campos & Reservas</span>
+              </span>
+              <span class="text-slate-500 font-bold text-[10px]">${analytics.totalWaterSoldQty} águas demandadas</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 pt-1">
+              <div class="bg-white p-3 rounded-xl border border-emerald-100">
+                <span class="text-emerald-800 text-[10px] font-black uppercase block">✓ Total Já Pago / Recebido</span>
+                <div class="text-lg font-black text-emerald-700">R$ ${analytics.totalWaterRevenuePaid.toFixed(2).replace('.', ',')}</div>
+                <span class="text-[10px] text-slate-500 font-medium">${analytics.paidWaterBookingsCount} jogos quitados</span>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-amber-100">
+                <span class="text-amber-800 text-[10px] font-black uppercase block">⏳ Falta Pagar / Pendente</span>
+                <div class="text-lg font-black text-amber-700">R$ ${analytics.totalWaterRevenuePending.toFixed(2).replace('.', ',')}</div>
+                <span class="text-[10px] text-slate-500 font-medium">${analytics.pendingWaterBookingsCount} jogos pendentes</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bloco 3: Custos com Fornecedores -->
+          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span class="font-black text-slate-800 uppercase flex items-center space-x-1.5">
+                <i data-lucide="truck" class="w-4 h-4 text-slate-600"></i>
+                <span>Abastecimentos (Fornecedores & Distribuidoras)</span>
+              </span>
+              <span class="text-slate-500 font-bold text-[10px]">${analytics.totalWaterSuppliedQty} águas abastecidas</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 pt-1">
+              <div class="bg-white p-3 rounded-xl border border-slate-200">
+                <span class="text-slate-600 text-[10px] font-bold uppercase block">Custo Fornecedor Pago</span>
+                <div class="text-base font-black text-slate-800">R$ ${analytics.totalSupplyCostPaid.toFixed(2).replace('.', ',')}</div>
+              </div>
+              <div class="bg-white p-3 rounded-xl border border-slate-200">
+                <span class="text-rose-700 text-[10px] font-bold uppercase block">Falta Pagar ao Fornecedor</span>
+                <div class="text-base font-black ${analytics.totalSupplyCostPending > 0 ? 'text-rose-700' : 'text-slate-800'}">R$ ${analytics.totalSupplyCostPending.toFixed(2).replace('.', ',')}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ações -->
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <a href="${shareUrl}" target="_blank" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center space-x-1.5 transition-all">
+              <i data-lucide="share-2" class="w-4 h-4"></i>
+              <span>Compartilhar Relatório no WhatsApp</span>
+            </a>
+            <button onclick="closeModal()" class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all">
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+window.openWaterReportModal = openWaterReportModal;
 
 function openEmptyWaterModal() {
   const modalRoot = document.getElementById('modalRoot');
@@ -5433,6 +6061,7 @@ async function handleEmptyWaterSubmit(event) {
 
   if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
   state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
     date: new Date().toISOString(),
     type: 'esvaziou',
     qtd: qtd,
@@ -5547,6 +6176,7 @@ async function handleAdjustWaterSupplySubmit(event) {
 
   if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
   state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
     date: new Date().toISOString(),
     type: 'ajuste',
     qtd: fullVal,
