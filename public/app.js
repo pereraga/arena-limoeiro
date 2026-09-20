@@ -149,6 +149,13 @@ let state = {
   systemLogs: [],
   systemLogsSearchQuery: '',
   systemLogsFilter: 'all',
+  waterSupply: {
+    full: 20,
+    empty: 5,
+    min_alert: 5,
+    history: []
+  },
+  barSubTab: 'menu',
   
   sortBy: 'default',
   currentUser: _savedArenaUser,
@@ -620,6 +627,10 @@ function loadInitialData() {
     } catch(e) {
       state.systemLogs = [];
     }
+    try {
+      const localWater = JSON.parse(localStorage.getItem('arena_water_supply') || 'null');
+      if (localWater && typeof localWater.full === 'number') state.waterSupply = localWater;
+    } catch(e) {}
   }
 }
 
@@ -629,6 +640,7 @@ function initCloudSync() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
     loadAdminUsers();
+    loadWaterSupplyFromDatabase();
   }
 }
 
@@ -2464,7 +2476,30 @@ function handleTimeChange(val, type) {
   lucide.createIcons();
 }
 
+function isWaterProduct(product) {
+  if (!product) return false;
+  const n = (product.name || '').toLowerCase();
+  const c = (product.category || '').toLowerCase();
+  return n.includes('água') || n.includes('agua') || n.includes('garrafa') || n.includes('galão') || n.includes('galao');
+}
+window.isWaterProduct = isWaterProduct;
+
 function updateCartQuantity(productId, delta) {
+  const prod = (state.products || []).find(p => p.id === productId);
+  if (delta > 0 && isWaterProduct(prod) && typeof getWaterSupplyAnalytics === 'function') {
+    const analytics = getWaterSupplyAnalytics();
+    let currentWaterInCart = 0;
+    Object.entries(state.productCart || {}).forEach(([pId, qty]) => {
+      const p = (state.products || []).find(x => x.id === pId);
+      if (isWaterProduct(p)) currentWaterInCart += qty;
+    });
+
+    if (currentWaterInCart + delta > analytics.freeForSale) {
+      alert(`⚠️ Limite de Água Disponível no Estoque:\n\nA Arena possui atualmente ${analytics.freeForSale} água(s) cheia(s) livres para reserva.\n(Estoque total: ${analytics.full} cheias, sendo ${analytics.totalReservedAll} já guardadas para outros jogos).\n\nPara solicitar uma quantidade maior, procure a administração/bar da Arena para providenciar o reabastecimento.`);
+      return;
+    }
+  }
+
   const current = state.productCart[productId] || 0;
   const next = Math.max(0, current + delta);
   if (next === 0) delete state.productCart[productId];
@@ -2891,6 +2926,12 @@ async function handleLoginSubmit(event) {
     state.adminTab = 'live_dashboard';
     renderApp();
 
+    setTimeout(() => {
+      if (typeof checkAndShowWaterSupplyLoginNotice === 'function') {
+        checkAndShowWaterSupplyLoginNotice();
+      }
+    }, 450);
+
     if (window._onLoginSuccess) {
       window._onLoginSuccess();
       window._onLoginSuccess = null;
@@ -3311,12 +3352,15 @@ function renderAdminView(container) {
 
         ${(canManageBar() || canManageProducts()) ? `
           <button onclick="setAdminTab('bar_control')" 
-                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer relative
                          ${currentTab === 'bar_control' ? 
                            'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                            'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <i data-lucide="beer" class="w-4 h-4 ${currentTab === 'bar_control' ? 'text-white' : 'text-amber-500'}"></i>
             <span>Bar & Lanchonete</span>
+            ${(typeof getWaterSupplyAnalytics === 'function' && getWaterSupplyAnalytics().needsRefill) ? `
+              <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" title="Alerta: Necessita reabastecimento de água"></span>
+            ` : ''}
           </button>
         ` : ''}
 
@@ -3880,6 +3924,7 @@ function renderLiveDashboardTab() {
 
   return `
     <div class="space-y-6">
+      ${typeof renderWaterSupplyDashboardBanner === 'function' ? renderWaterSupplyDashboardBanner() : ''}
       
       <!-- Cards de Métricas (KPIs Operacionais) -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -4722,6 +4767,807 @@ function renderCourtsControlTab() {
   `;
 }
 
+// ==========================================
+// MÓDULO DE GESTÃO E REGISTRO DE ÁGUA DA ARENA
+// ==========================================
+
+function getWaterSupplyAnalytics() {
+  const full = (state.waterSupply && typeof state.waterSupply.full === 'number') ? state.waterSupply.full : 20;
+  const empty = (state.waterSupply && typeof state.waterSupply.empty === 'number') ? state.waterSupply.empty : 0;
+  const minAlert = (state.waterSupply && typeof state.waterSupply.min_alert === 'number') ? state.waterSupply.min_alert : 5;
+
+  const todayStr = getFormattedDate(new Date());
+  const tomorrowStr = getFormattedDate(new Date(Date.now() + 86400000));
+  const dayAfterTomorrowStr = getFormattedDate(new Date(Date.now() + 86400000 * 2));
+  const next2Days = [todayStr, tomorrowStr, dayAfterTomorrowStr];
+
+  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+    ? state.bookings
+    : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+
+  let totalReservedAll = 0;
+  let reservedNext2Days = 0;
+  const upcomingWaterBookings = [];
+
+  allBookings.forEach(b => {
+    if (!b || b.status === 'cancelled' || b.status === 'finished') return;
+    const cart = b.product_cart || b.productCart || {};
+    let bookingWaterQty = 0;
+
+    Object.entries(cart).forEach(([id, q]) => {
+      if (id.startsWith('_') || typeof q !== 'number' || q <= 0) return;
+      const prod = (state.products || []).find(p => p.id === id);
+      if (isWaterProduct(prod)) {
+        bookingWaterQty += q;
+      }
+    });
+
+    if (bookingWaterQty > 0) {
+      totalReservedAll += bookingWaterQty;
+      const bDate = b.date;
+      const isNext2Days = next2Days.includes(bDate);
+      if (isNext2Days) {
+        reservedNext2Days += bookingWaterQty;
+      }
+
+      if (bDate >= todayStr) {
+        const court = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva' };
+        upcomingWaterBookings.push({
+          bookingId: b.id,
+          date: bDate,
+          time: b.time || (b.start_time ? `${b.start_time} às ${b.end_time}` : ''),
+          customerName: b.customer_name || b.customerName || 'Cliente',
+          customerPhone: b.customer_phone || b.customerPhone || '',
+          courtName: court.name,
+          waterQty: bookingWaterQty,
+          status: (cart && cart._status) || b.bar_status || 'waiting',
+          isNext2Days: isNext2Days
+        });
+      }
+    }
+  });
+
+  upcomingWaterBookings.sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return (a.time || '').localeCompare(b.time || '');
+  });
+
+  const freeForSale = Math.max(0, full - totalReservedAll);
+  const needsRefill = (empty > 0) || (full < minAlert) || (freeForSale <= 3) || (reservedNext2Days >= full);
+
+  return {
+    full,
+    empty,
+    minAlert,
+    totalReservedAll,
+    reservedNext2Days,
+    freeForSale,
+    needsRefill,
+    upcomingWaterBookings,
+    todayStr,
+    tomorrowStr,
+    dayAfterTomorrowStr
+  };
+}
+window.getWaterSupplyAnalytics = getWaterSupplyAnalytics;
+
+async function loadWaterSupplyFromDatabase() {
+  if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
+  try {
+    const client = window.ArenaSupabase.getClient();
+    const { data, error } = await client
+      .from('products')
+      .select('*')
+      .eq('id', 'arena-water-supply')
+      .maybeSingle();
+
+    if (data && data.image) {
+      const parsed = JSON.parse(data.image);
+      if (parsed && typeof parsed.full === 'number') {
+        state.waterSupply = {
+          full: parsed.full,
+          empty: typeof parsed.empty === 'number' ? parsed.empty : 0,
+          min_alert: typeof parsed.min_alert === 'number' ? parsed.min_alert : 5,
+          history: Array.isArray(parsed.history) ? parsed.history : []
+        };
+        localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+        if (state.currentMode === 'admin' && (state.adminTab === 'bar_control' || state.adminTab === 'live_dashboard')) {
+          renderStepContent();
+        }
+      }
+    }
+  } catch(err) {
+    console.warn('Erro ao carregar água do Supabase:', err);
+  }
+}
+window.loadWaterSupplyFromDatabase = loadWaterSupplyFromDatabase;
+
+async function saveWaterSupplyToDatabase() {
+  localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+  if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
+  try {
+    const client = window.ArenaSupabase.getClient();
+    const payload = {
+      id: 'arena-water-supply',
+      name: '💧 Controle Interno de Água Arena',
+      category: 'Bebidas',
+      price: 0,
+      description: 'Registro de águas cheias/vazias da Arena Limoeiro',
+      image: JSON.stringify(state.waterSupply),
+      is_available: true,
+      type: 'water_supply'
+    };
+    await client.from('products').upsert(payload);
+  } catch(err) {
+    console.warn('Erro ao salvar água no Supabase:', err);
+  }
+}
+window.saveWaterSupplyToDatabase = saveWaterSupplyToDatabase;
+
+function renderWaterSupplyDashboardBanner() {
+  const analytics = getWaterSupplyAnalytics();
+  if (!analytics.needsRefill) {
+    return `
+      <div class="bg-gradient-to-r from-emerald-900 to-slate-900 text-white p-4 rounded-2xl border border-emerald-500/30 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-400/20 shrink-0">
+            <i data-lucide="droplets" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-black uppercase text-emerald-300">Estoque de Água da Arena</span>
+              <span class="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">100% Abastecido</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5">
+              <strong>${analytics.full} águas cheias</strong> em estoque. (${analytics.reservedNext2Days} águas guardadas para os próximos 2 dias | Saldo livre balcão: ${analytics.freeForSale}).
+            </p>
+          </div>
+        </div>
+        <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer shadow">
+          Ver Registro de Água
+        </button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="bg-gradient-to-r from-amber-950 via-rose-950 to-slate-900 text-white p-4 sm:p-5 rounded-2xl border-2 border-rose-500/50 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-start space-x-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-400/30 shrink-0 mt-0.5">
+          <i data-lucide="alert-triangle" class="w-6 h-6 text-rose-400"></i>
+        </div>
+        <div class="space-y-1">
+          <div class="flex items-center space-x-2">
+            <span class="bg-rose-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider animate-pulse">Aviso Preventivo</span>
+            <span class="text-xs font-black uppercase text-rose-200">Reabastecimento de Água da Arena</span>
+          </div>
+          <h4 class="text-sm font-black text-white">
+            ${analytics.empty > 0 ? `Existem <span class="text-rose-300 underline font-black">${analytics.empty} garrafas/galões vazios</span> precisando encher!` : `Estoque de água cheia em nível de alerta (${analytics.full} un)!`}
+          </h4>
+          <p class="text-xs text-slate-300">
+            Previsão dos próximos 2 dias: <strong class="text-amber-300">${analytics.reservedNext2Days} águas</strong> reservadas para jogos nos campos. Estoque livre para vendas: <strong class="text-emerald-300">${analytics.freeForSale}</strong>.
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+        <button onclick="openAddWaterSupplyModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow transition-all cursor-pointer flex items-center space-x-1.5">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>+ Abastecer</span>
+        </button>
+        <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition-all cursor-pointer">
+          Ver Registro
+        </button>
+      </div>
+    </div>
+  `;
+}
+window.renderWaterSupplyDashboardBanner = renderWaterSupplyDashboardBanner;
+
+function checkAndShowWaterSupplyLoginNotice(force = false) {
+  const analytics = getWaterSupplyAnalytics();
+  const user = state.currentUser;
+  if (!user || !user.authenticated) return;
+
+  const isBarOrAdmin = user.role === 'Administrador Geral' ||
+                       user.role === 'Gerente do Sistema' ||
+                       user.role === 'Recepção & Atendimento' ||
+                       (user.permissions && user.permissions.includes('can_manage_bar'));
+
+  if (!isBarOrAdmin && !force) return;
+
+  if (analytics.needsRefill) {
+    showToastNotification(`
+      <div class="space-y-1">
+        <div class="flex items-center space-x-1.5 font-black text-rose-300 uppercase tracking-wider text-[11px]">
+          <span>💧 Alerta de Água: Reabastecimento Necessário!</span>
+        </div>
+        <p class="text-slate-200 text-xs">
+          Existem <strong>${analytics.empty} garrafas/galões vazios</strong> para encher. Demanda nos próximos 2 dias: <strong>${analytics.reservedNext2Days} águas</strong> reservadas para as quadras.
+        </p>
+        <div class="pt-1 flex items-center justify-between text-[11px]">
+          <span class="text-amber-400 font-bold">Estoque Livre Balcão: ${analytics.freeForSale}</span>
+          <button onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="text-cyan-300 underline font-extrabold hover:text-white">Ver Registro</button>
+        </div>
+      </div>
+    `, 9000);
+  } else {
+    showToastNotification(`
+      <div class="space-y-1">
+        <div class="flex items-center space-x-1.5 font-black text-emerald-300 uppercase tracking-wider text-[11px]">
+          <span>💧 Estoque de Água 100% Abastecido</span>
+        </div>
+        <p class="text-slate-200 text-xs">
+          A Arena conta com <strong>${analytics.full} águas cheias</strong> disponíveis para os campos e vendas (${analytics.reservedNext2Days} já guardadas para os próximos 2 dias).
+        </p>
+      </div>
+    `, 5500);
+  }
+}
+window.checkAndShowWaterSupplyLoginNotice = checkAndShowWaterSupplyLoginNotice;
+
+function renderWaterSupplySection(analytics) {
+  const isRecep = isReceptionUser();
+  const history = (state.waterSupply && Array.isArray(state.waterSupply.history)) ? state.waterSupply.history.slice(-10).reverse() : [];
+
+  return `
+    <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+      
+      <!-- Cabeçalho da Seção de Água -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="text-base font-black uppercase text-slate-900 flex items-center space-x-2">
+              <i data-lucide="droplets" class="w-5 h-5 text-cyan-600"></i>
+              <span>Registro de Água & Abastecimento da Arena</span>
+            </span>
+            <span class="text-xs font-black ${analytics.needsRefill ? 'text-rose-800 bg-rose-100' : 'text-emerald-800 bg-emerald-100'} px-2.5 py-0.5 rounded-full">
+              ${analytics.needsRefill ? '⚠️ Necessita Abastecimento' : '✓ 100% Abastecido'}
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">
+            Controle de estoque de garrafas/galões cheios, vazios para encher, água reservada para os campos e saldo livre para vendas.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <button onclick="openAddWaterSupplyModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>+ Registrar Abastecimento</span>
+          </button>
+          <button onclick="openEmptyWaterModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            <span>🔄 Esvaziou no Campo</span>
+          </button>
+          ${!isRecep ? `
+          <button onclick="openAdjustWaterSupplyModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer" title="Ajuste manual de estoque">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
+          </button>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Alerta de Status -->
+      ${analytics.needsRefill ? `
+        <div class="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 sm:p-5 flex items-start space-x-3.5 text-rose-900">
+          <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+            <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-600"></i>
+          </div>
+          <div class="space-y-1 text-xs flex-1">
+            <h5 class="font-black text-sm text-rose-950 uppercase">Alerta: Reabastecimento Necessário!</h5>
+            <p>
+              Existem <strong>${analytics.empty} garrafas/galões vazios</strong> aguardando para encher.
+              A demanda confirmada para os próximos 2 dias é de <strong>${analytics.reservedNext2Days} águas</strong> reservadas para as quadras e campos.
+            </p>
+            <p class="text-[11px] text-rose-700 font-medium">
+              Notificação preventiva ativada para garantir que os atletas tenham água gelada suficiente durante as partidas.
+            </p>
+          </div>
+        </div>
+      ` : `
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center space-x-3.5 text-emerald-900">
+          <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+            <i data-lucide="check-circle" class="w-5 h-5"></i>
+          </div>
+          <div class="text-xs">
+            <h5 class="font-black text-emerald-950 uppercase">Estoque de Água 100% Seguro</h5>
+            <p>
+              A Arena possui <strong>${analytics.full} águas cheias</strong> disponíveis, quantidade suficiente para atender com folga as reservas dos próximos 2 dias (${analytics.reservedNext2Days} águas agendadas).
+            </p>
+          </div>
+        </div>
+      `}
+
+      <!-- 4 Cards de Métricas / KPIs -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- 1. Cheias -->
+        <div class="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-black uppercase text-cyan-800">Águas Cheias</span>
+            <span class="p-1.5 rounded-lg bg-cyan-200/50 text-cyan-800"><i data-lucide="droplet" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-2xl sm:text-3xl font-black text-cyan-950">${analytics.full}</div>
+          <p class="text-[11px] text-cyan-700 font-medium mt-1">Prontas p/ consumo e jogos</p>
+        </div>
+
+        <!-- 2. Vazias -->
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-black uppercase text-amber-800">Vazias p/ Encher</span>
+            <span class="p-1.5 rounded-lg bg-amber-200/50 text-amber-800"><i data-lucide="rotate-ccw" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-2xl sm:text-3xl font-black ${analytics.empty > 0 ? 'text-rose-700' : 'text-amber-950'}">${analytics.empty}</div>
+          <p class="text-[11px] text-amber-700 font-medium mt-1">Avisar 2 dias antes p/ encher</p>
+        </div>
+
+        <!-- 3. Reservadas Próximos 2 Dias -->
+        <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-black uppercase text-purple-800">Campos (2 Dias)</span>
+            <span class="p-1.5 rounded-lg bg-purple-200/50 text-purple-800"><i data-lucide="calendar" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-2xl sm:text-3xl font-black text-purple-950">${analytics.reservedNext2Days}</div>
+          <p class="text-[11px] text-purple-700 font-medium mt-1">Total geral reservado: ${analytics.totalReservedAll}</p>
+        </div>
+
+        <!-- 4. Saldo Livre Balcão -->
+        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 shadow-xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-[11px] font-black uppercase text-emerald-800">Livre p/ Venda</span>
+            <span class="p-1.5 rounded-lg bg-emerald-200/50 text-emerald-800"><i data-lucide="shopping-bag" class="w-4 h-4"></i></span>
+          </div>
+          <div class="text-2xl sm:text-3xl font-black text-emerald-950">${analytics.freeForSale}</div>
+          <p class="text-[11px] text-emerald-700 font-medium mt-1">Limite máx. p/ novos pedidos</p>
+        </div>
+      </div>
+
+      <!-- Tabela de Agendamentos nos Campos com Água Reservada -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h4 class="text-sm font-black text-slate-800 flex items-center space-x-2 uppercase">
+            <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+            <span>Águas Guardadas para os Campos & Quadras (${analytics.upcomingWaterBookings.length})</span>
+          </h4>
+          <span class="text-[11px] text-slate-500 font-bold">Aluguéis com solicitação de água</span>
+        </div>
+
+        ${analytics.upcomingWaterBookings.length === 0 ? `
+          <div class="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+            <i data-lucide="check" class="w-8 h-8 text-emerald-500 mx-auto mb-2"></i>
+            <p class="text-xs font-bold text-slate-700">Nenhum agendamento com água pendente</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Quando um atleta solicitar águas no agendamento do campo, elas aparecerão aqui para separação.</p>
+          </div>
+        ` : `
+          <div class="overflow-x-auto rounded-2xl border border-slate-200">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10px]">
+                <tr>
+                  <th class="p-3">Data / Horário</th>
+                  <th class="p-3">Quadra / Espaço</th>
+                  <th class="p-3">Responsável</th>
+                  <th class="p-3 text-center">Águas</th>
+                  <th class="p-3 text-center">Status Gelamento</th>
+                  <th class="p-3 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${analytics.upcomingWaterBookings.map(b => {
+                  const statusMap = {
+                    waiting: { label: '⏳ Aguardando', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
+                    separated: { label: '📦 Separado', cls: 'bg-purple-100 text-purple-900 border-purple-300' },
+                    chilling: { label: '❄️ No Freezer', cls: 'bg-cyan-100 text-cyan-900 border-cyan-300' },
+                    delivered: { label: '✓ No Campo', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
+                  };
+                  const st = statusMap[b.status] || statusMap.waiting;
+                  return `
+                    <tr class="hover:bg-slate-50/80 transition-all ${b.isNext2Days ? 'bg-amber-50/30 font-medium' : ''}">
+                      <td class="p-3">
+                        <div class="font-black text-slate-900">${b.date}</div>
+                        <div class="text-[11px] text-slate-500">${b.time}</div>
+                        ${b.isNext2Days ? `<span class="inline-block mt-0.5 text-[9px] font-black uppercase bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded">Próximos 2 dias</span>` : ''}
+                      </td>
+                      <td class="p-3">
+                        <span class="font-bold text-slate-800">${b.courtName}</span>
+                      </td>
+                      <td class="p-3">
+                        <div class="font-bold text-slate-900">${b.customerName}</div>
+                        <div class="text-[11px] text-slate-500 font-mono">${b.customerPhone}</div>
+                      </td>
+                      <td class="p-3 text-center">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-black bg-cyan-100 text-cyan-900 border border-cyan-200">
+                          💧 ${b.waterQty} un
+                        </span>
+                      </td>
+                      <td class="p-3 text-center">
+                        <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded-lg border ${st.cls}">
+                          ${st.label}
+                        </span>
+                      </td>
+                      <td class="p-3 text-right">
+                        ${b.status !== 'delivered' ? `
+                          <button onclick="updateBarStatus('${b.bookingId}', 'delivered')" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold shadow-xs transition-all cursor-pointer">
+                            Entregar no Campo
+                          </button>
+                        ` : `
+                          <span class="text-emerald-600 font-bold text-[11px]">✓ Entregue</span>
+                        `}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+
+      <!-- Histórico Recente de Abastecimentos / Movimentações -->
+      <div class="space-y-3 pt-4 border-t border-slate-100">
+        <h4 class="text-sm font-black text-slate-800 flex items-center space-x-2 uppercase">
+          <i data-lucide="history" class="w-4 h-4 text-slate-500"></i>
+          <span>Histórico de Movimentações de Água (${history.length})</span>
+        </h4>
+
+        ${history.length === 0 ? `
+          <p class="text-xs text-slate-400 italic">Nenhum registro de abastecimento ou consumo anterior.</p>
+        ` : `
+          <div class="space-y-2">
+            ${history.map(item => {
+              const isAbast = item.type === 'abastecimento';
+              const isEsvaz = item.type === 'esvaziou';
+              const dateDisplay = item.date ? new Date(item.date).toLocaleString('pt-BR') : '';
+              return `
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                  <div class="flex items-center space-x-3">
+                    <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isAbast ? 'bg-emerald-100 text-emerald-700' : (isEsvaz ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-700')}">
+                      <i data-lucide="${isAbast ? 'plus' : (isEsvaz ? 'rotate-ccw' : 'sliders')}" class="w-4 h-4"></i>
+                    </span>
+                    <div>
+                      <div class="font-black text-slate-900">
+                        ${isAbast ? `Abastecimento de +${item.qtd} águas cheias` : (isEsvaz ? `Consumo no Campo: ${item.qtd} garrafas esvaziadas` : `Ajuste manual de estoque`)}
+                      </div>
+                      <div class="text-[11px] text-slate-500">
+                        ${item.notes || 'Sem observação'} • Por: <strong>${item.user || 'Operador Bar'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="text-right text-[11px] text-slate-400 font-mono">
+                    ${dateDisplay}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </div>
+
+    </div>
+  `;
+}
+window.renderWaterSupplySection = renderWaterSupplySection;
+
+function openAddWaterSupplyModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const currentEmpty = (state.waterSupply && state.waterSupply.empty) || 0;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/20 flex items-center justify-center border border-cyan-400/30">
+              <i data-lucide="plus-circle" class="w-5 h-5 text-cyan-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">Registrar Abastecimento</h3>
+              <p class="text-xs text-cyan-200 font-medium">Entrada de águas/galões cheios na Arena</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-cyan-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleAddWaterSupplySubmit(event)" class="p-6 space-y-4" autocomplete="off">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantidade de Águas Cheias Recebidas *</label>
+            <input type="number" id="waterAddQtd" required min="1" max="500" value="10" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+          </div>
+
+          ${currentEmpty > 0 ? `
+            <div class="bg-amber-50 p-3.5 rounded-xl border border-amber-200 flex items-start space-x-2.5">
+              <input type="checkbox" id="waterReduceEmpty" checked class="w-4 h-4 mt-0.5 rounded text-cyan-600 focus:ring-cyan-500">
+              <label for="waterReduceEmpty" class="text-xs text-amber-900 font-bold cursor-pointer">
+                Reduzir das ${currentEmpty} garrafas vazias em estoque? (Indica troca/reabastecimento das vazias)
+              </label>
+            </div>
+          ` : ''}
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nota / Observação</label>
+            <input type="text" id="waterAddNotes" placeholder="Ex: Entrega distribuidora São Geraldo" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnSubmitWaterAdd" class="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Confirmar Entrada</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+window.openAddWaterSupplyModal = openAddWaterSupplyModal;
+
+async function handleAddWaterSupplySubmit(event) {
+  event.preventDefault();
+  const qtdInput = document.getElementById('waterAddQtd');
+  const reduceCheckbox = document.getElementById('waterReduceEmpty');
+  const notesInput = document.getElementById('waterAddNotes');
+  const btn = document.getElementById('btnSubmitWaterAdd');
+
+  const qtd = parseInt(qtdInput ? qtdInput.value : '0', 10);
+  if (isNaN(qtd) || qtd <= 0) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Salvando...';
+  }
+
+  if (!state.waterSupply) {
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, history: [] };
+  }
+
+  state.waterSupply.full = (state.waterSupply.full || 0) + qtd;
+  if (reduceCheckbox && reduceCheckbox.checked) {
+    state.waterSupply.empty = Math.max(0, (state.waterSupply.empty || 0) - qtd);
+  }
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  state.waterSupply.history.push({
+    date: new Date().toISOString(),
+    type: 'abastecimento',
+    qtd: qtd,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador Bar',
+    notes: notesInput ? notesInput.value.trim() : ''
+  });
+
+  await saveWaterSupplyToDatabase();
+  closeModal();
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-emerald-300 uppercase text-[11px]">✓ Abastecimento Confirmado!</div>
+      <p class="text-xs text-white">Foram adicionadas <strong>${qtd} águas cheias</strong> ao estoque da Arena.</p>
+    </div>
+  `, 4000);
+}
+window.handleAddWaterSupplySubmit = handleAddWaterSupplySubmit;
+
+function openEmptyWaterModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const currentFull = (state.waterSupply && state.waterSupply.full) || 0;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-400/30">
+              <i data-lucide="rotate-ccw" class="w-5 h-5 text-amber-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">Esvaziou no Campo / Consumo</h3>
+              <p class="text-xs text-amber-200 font-medium">Registrar garrafas que foram consumidas</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-amber-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleEmptyWaterSubmit(event)" class="p-6 space-y-4" autocomplete="off">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantidade Esvaziada *</label>
+            <input type="number" id="waterEmptyQtd" required min="1" max="${Math.max(1, currentFull)}" value="1" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-amber-600 focus:outline-none">
+            <span class="text-[11px] text-slate-500 mt-1 block">Estoque atual de cheias: ${currentFull}</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Local / Campo de Consumo</label>
+            <input type="text" id="waterEmptyNotes" placeholder="Ex: Consumo Campo Society 1 ou Quadra de Areia" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-600 focus:outline-none">
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnSubmitWaterEmpty" class="px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Registrar Vazia</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+window.openEmptyWaterModal = openEmptyWaterModal;
+
+async function handleEmptyWaterSubmit(event) {
+  event.preventDefault();
+  const qtdInput = document.getElementById('waterEmptyQtd');
+  const notesInput = document.getElementById('waterEmptyNotes');
+  const btn = document.getElementById('btnSubmitWaterEmpty');
+
+  const qtd = parseInt(qtdInput ? qtdInput.value : '0', 10);
+  if (isNaN(qtd) || qtd <= 0) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Salvando...';
+  }
+
+  if (!state.waterSupply) {
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, history: [] };
+  }
+
+  state.waterSupply.full = Math.max(0, (state.waterSupply.full || 0) - qtd);
+  state.waterSupply.empty = (state.waterSupply.empty || 0) + qtd;
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  state.waterSupply.history.push({
+    date: new Date().toISOString(),
+    type: 'esvaziou',
+    qtd: qtd,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador Bar',
+    notes: notesInput ? notesInput.value.trim() : ''
+  });
+
+  await saveWaterSupplyToDatabase();
+  closeModal();
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-amber-300 uppercase text-[11px]">🔄 Registro de Consumo Feito</div>
+      <p class="text-xs text-white">Adicionadas <strong>${qtd} garrafas vazias</strong> ao controle para reabastecimento.</p>
+    </div>
+  `, 4000);
+}
+window.handleEmptyWaterSubmit = handleEmptyWaterSubmit;
+
+function openAdjustWaterSupplyModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const currentFull = (state.waterSupply && state.waterSupply.full) || 0;
+  const currentEmpty = (state.waterSupply && state.waterSupply.empty) || 0;
+  const currentMin = (state.waterSupply && state.waterSupply.min_alert) || 5;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center border border-slate-500/30">
+              <i data-lucide="sliders" class="w-5 h-5 text-slate-200"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase">Ajuste de Estoque de Água</h3>
+              <p class="text-xs text-slate-300 font-medium">Correção manual de cheias e vazias</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-slate-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleAdjustWaterSupplySubmit(event)" class="p-6 space-y-4" autocomplete="off">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cheias em Estoque</label>
+              <input type="number" id="waterAdjFull" required min="0" value="${currentFull}" 
+                     class="w-full p-3 border border-slate-300 rounded-xl text-base font-black text-slate-900 focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Vazias p/ Encher</label>
+              <input type="number" id="waterAdjEmpty" required min="0" value="${currentEmpty}" 
+                     class="w-full p-3 border border-slate-300 rounded-xl text-base font-black text-slate-900 focus:ring-2 focus:ring-amber-600 focus:outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Estoque Mínimo p/ Alerta Preventivo</label>
+            <input type="number" id="waterAdjMin" required min="1" value="${currentMin}" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <span class="text-[10px] text-slate-500 mt-1 block">Avisa a gerência quando o estoque de cheias cair abaixo deste valor.</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo do Ajuste</label>
+            <input type="text" id="waterAdjNotes" placeholder="Ex: Contagem física quinzenal" 
+                   class="w-full p-3 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-slate-600 focus:outline-none">
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnSubmitWaterAdj" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Salvar Contagem</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+window.openAdjustWaterSupplyModal = openAdjustWaterSupplyModal;
+
+async function handleAdjustWaterSupplySubmit(event) {
+  event.preventDefault();
+  const fullVal = parseInt(document.getElementById('waterAdjFull').value || '0', 10);
+  const emptyVal = parseInt(document.getElementById('waterAdjEmpty').value || '0', 10);
+  const minVal = parseInt(document.getElementById('waterAdjMin').value || '5', 10);
+  const notes = (document.getElementById('waterAdjNotes').value || '').trim();
+  const btn = document.getElementById('btnSubmitWaterAdj');
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Salvando...';
+  }
+
+  if (!state.waterSupply) {
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, history: [] };
+  }
+
+  state.waterSupply.full = Math.max(0, fullVal);
+  state.waterSupply.empty = Math.max(0, emptyVal);
+  state.waterSupply.min_alert = Math.max(1, minVal);
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  state.waterSupply.history.push({
+    date: new Date().toISOString(),
+    type: 'ajuste',
+    qtd: fullVal,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Administrador',
+    notes: `Contagem manual: ${fullVal} cheias, ${emptyVal} vazias (${notes || 'Sem detalhes'})`
+  });
+
+  await saveWaterSupplyToDatabase();
+  closeModal();
+  renderStepContent();
+  lucide.createIcons();
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-cyan-300 uppercase text-[11px]">⚙️ Ajuste de Estoque Atualizado</div>
+      <p class="text-xs text-white">Estoque fixado em <strong>${fullVal} cheias</strong> e <strong>${emptyVal} vazias</strong>.</p>
+    </div>
+  `, 4000);
+}
+window.handleAdjustWaterSupplySubmit = handleAdjustWaterSupplySubmit;
+
 // FUNÇÕES DE CONTROLE DO MÓDULO BAR & LANCHONETE
 function setBarSubTab(tab) {
   state.barSubTab = tab;
@@ -4829,6 +5675,9 @@ function renderBarControlTab() {
   const currentSubTab = state.barSubTab || 'menu';
   const currentCategory = state.barProductCategory || 'all';
   const totalProducts = (state.products || []).length;
+  const waterAnalytics = (typeof getWaterSupplyAnalytics === 'function')
+    ? getWaterSupplyAnalytics()
+    : { full: 20, empty: 0, needsRefill: false, reservedNext2Days: 0, totalReservedAll: 0, freeForSale: 20, upcomingWaterBookings: [] };
 
   return `
     <div class="space-y-6">
@@ -4873,6 +5722,17 @@ function renderBarControlTab() {
                        ${currentSubTab === 'orders' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
           <i data-lucide="list-checks" class="w-4 h-4 ${currentSubTab === 'orders' ? 'text-emerald-400' : 'text-slate-500'}"></i>
           <span>🍺 Fila de Pedidos (${barOrders.length})</span>
+        </button>
+
+        <button onclick="setBarSubTab('water')" 
+                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2 relative
+                       ${currentSubTab === 'water' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <i data-lucide="droplets" class="w-4 h-4 ${currentSubTab === 'water' ? 'text-cyan-400' : 'text-cyan-600'}"></i>
+          <span>💧 Registro de Água (${waterAnalytics.full} cheias)</span>
+          ${waterAnalytics.needsRefill ? `
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping inline-block" title="Atenção: Necessita reabastecimento de água"></span>
+            <span class="w-2 h-2 rounded-full bg-rose-500 inline-block -ml-3" title="Atenção: Necessita reabastecimento de água"></span>
+          ` : ''}
         </button>
 
         <button onclick="setBarSubTab('all')" 
@@ -5061,6 +5921,11 @@ function renderBarControlTab() {
             </div>
           `}
         </div>
+      ` : ''}
+
+      <!-- SEÇÃO REGISTRO DE ÁGUA & ABASTECIMENTO -->
+      ${(currentSubTab === 'water' || currentSubTab === 'all') ? `
+        ${renderWaterSupplySection(waterAnalytics)}
       ` : ''}
 
     </div>
@@ -11386,6 +12251,22 @@ async function submitBooking(grandTotal) {
     }
   }
 
+  // Validação preventiva do estoque de água da Arena
+  let bookingWaterTotal = 0;
+  Object.entries(cleanProductCart).forEach(([pId, qty]) => {
+    const prod = (state.products || []).find(p => p.id === pId);
+    if (isWaterProduct(prod)) bookingWaterTotal += qty;
+  });
+  if (bookingWaterTotal > 0 && typeof getWaterSupplyAnalytics === 'function') {
+    const analytics = getWaterSupplyAnalytics();
+    if (bookingWaterTotal > analytics.freeForSale) {
+      alert(`⚠️ Limite de Água no Estoque:\n\nA Arena Limoeiro possui atualmente ${analytics.freeForSale} água(s) cheia(s) disponíveis para novos agendamentos.\n(Estoque total: ${analytics.full} cheias, sendo ${analytics.totalReservedAll} já guardadas para outras partidas).\n\nPor favor, reduza a quantidade de água no carrinho para até ${analytics.freeForSale} unidade(s) ou consulte a recepção/bar.`);
+      const btn = document.getElementById('btnSubmitBooking');
+      if (btn) { btn.disabled = false; btn.innerText = 'Confirmar Agendamento'; }
+      return;
+    }
+  }
+
   const cpfObs = cpf ? `[CPF: ${formatCPF(cpf)}]` : '';
   const healthObs = healthNotes ? `[Saúde: ${healthNotes}]` : '';
   const emergencyObs = emergency ? `[Emergência: ${emergency}]` : '';
@@ -11606,6 +12487,21 @@ function showConfirmationSuccessModal(booking) {
                 (typeof booking.totalPrice === 'number' ? booking.totalPrice : 
                 (typeof booking.monthly_price === 'number' ? booking.monthly_price : 0));
 
+  const analytics = (typeof getWaterSupplyAnalytics === 'function') ? getWaterSupplyAnalytics() : { full: 20, empty: 0 };
+  let waterCountInBooking = 0;
+  const rawCart = booking.product_cart || booking.productCart || state.productCart || {};
+  Object.entries(rawCart).forEach(([id, qty]) => {
+    if (id.startsWith('_') || typeof qty !== 'number' || qty <= 0) return;
+    const prod = (state.products || []).find(p => p.id === id);
+    if (isWaterProduct(prod)) {
+      waterCountInBooking += qty;
+    }
+  });
+
+  const waterReceiptNote = (waterCountInBooking > 0)
+    ? `💧 Águas p/ o Jogo: ${waterCountInBooking} un | Estoque Arena: ${analytics.full} cheias disponíveis p/ campos e venda`
+    : `💧 Estoque de Água Arena: ${analytics.full} cheias disponíveis para os campos e para venda`;
+
   const savedItemsText = Object.entries(state.productCart || {}).map(([id, qty]) => {
     if (id.startsWith('_') || typeof qty !== 'number' || qty <= 0) return '';
     const prod = state.products.find(p => p.id === id);
@@ -11617,6 +12513,7 @@ function showConfirmationSuccessModal(booking) {
 📅 Data: ${booking.date}
 ⏰ Horário: ${booking.time} (${state.selectedDuration} min)${savedItemsText ? `
 🥤 Itens Guardados no Bar: ${savedItemsText}` : ''}
+${waterReceiptNote}
 Código: #${booking.id}
 Bora pro jogo!`);
 
@@ -11654,6 +12551,10 @@ Bora pro jogo!`);
               <p class="text-slate-700 font-semibold">${savedItemsText} (Pagar no consumo)</p>
             </div>
           ` : ''}
+          <div class="flex justify-between items-center pt-2 border-t border-slate-200 text-xs">
+            <span class="text-slate-500 font-bold">Controle de Água:</span>
+            <strong class="text-cyan-800 text-right text-[11px] sm:text-xs font-black">${waterReceiptNote}</strong>
+          </div>
           <div class="flex justify-between pt-2 border-t border-slate-200"><span class="text-slate-500 font-bold">Total do Horário:</span><strong class="text-emerald-700 font-black">R$ ${price.toFixed(2).replace('.', ',')}</strong></div>
         </div>
 
@@ -12202,8 +13103,24 @@ async function syncDataFromSupabase(skipRender = false) {
     }
 
     if (dbProducts && dbProducts.length > 0) {
-      state.products = dbProducts;
-      localStorage.setItem('arena_local_products', JSON.stringify(dbProducts));
+      const waterRow = dbProducts.find(p => p.id === 'arena-water-supply' || p.type === 'water_supply');
+      if (waterRow) {
+        try {
+          const parsed = JSON.parse(waterRow.image || '{}');
+          if (parsed && typeof parsed.full === 'number') {
+            state.waterSupply = {
+              full: parsed.full,
+              empty: typeof parsed.empty === 'number' ? parsed.empty : 0,
+              min_alert: typeof parsed.min_alert === 'number' ? parsed.min_alert : 5,
+              history: Array.isArray(parsed.history) ? parsed.history : []
+            };
+            localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+          }
+        } catch(e) {}
+      }
+      const filteredProducts = dbProducts.filter(p => p.id !== 'arena-water-supply' && p.type !== 'water_supply');
+      state.products = filteredProducts;
+      localStorage.setItem('arena_local_products', JSON.stringify(filteredProducts));
     }
 
     if (dbMembers) {
