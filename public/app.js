@@ -5576,15 +5576,6 @@ function openAddWaterSupplyModal() {
                    class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-cyan-600 focus:outline-none">
           </div>
 
-          ${currentEmpty > 0 ? `
-            <div class="bg-amber-50 p-3 rounded-xl border border-amber-200 flex items-start space-x-2.5">
-              <input type="checkbox" id="waterReduceEmpty" checked class="w-4 h-4 mt-0.5 rounded text-cyan-600 focus:ring-cyan-500">
-              <label for="waterReduceEmpty" class="text-xs text-amber-900 font-bold cursor-pointer">
-                Reduzir das ${currentEmpty} garrafas vazias em estoque? (Indica troca das vazias)
-              </label>
-            </div>
-          ` : ''}
-
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nota / Observação</label>
             <input type="text" id="waterAddNotes" placeholder="Ex: Entrega nota fiscal #1024 / Deixado no galpão" 
@@ -5615,7 +5606,6 @@ async function handleAddWaterSupplySubmit(event) {
   const statusSelect = document.getElementById('waterAddPaymentStatus');
   const methodSelect = document.getElementById('waterAddPaymentMethod');
   const supplierInput = document.getElementById('waterAddSupplier');
-  const reduceCheckbox = document.getElementById('waterReduceEmpty');
   const notesInput = document.getElementById('waterAddNotes');
   const btn = document.getElementById('btnSubmitWaterAdd');
 
@@ -5637,9 +5627,7 @@ async function handleAddWaterSupplySubmit(event) {
   }
 
   state.waterSupply.full = (state.waterSupply.full || 0) + qtd;
-  if (reduceCheckbox && reduceCheckbox.checked) {
-    state.waterSupply.empty = Math.max(0, (state.waterSupply.empty || 0) - qtd);
-  }
+  state.waterSupply.empty = Math.max(0, (state.waterSupply.empty || 0) - qtd);
 
   if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
   state.waterSupply.history.push({
