@@ -628,8 +628,15 @@ function loadInitialData() {
       state.systemLogs = [];
     }
     try {
-      const localWater = JSON.parse(localStorage.getItem('arena_water_supply') || 'null');
-      if (localWater && typeof localWater.full === 'number') state.waterSupply = localWater;
+      const resetKey = 'arena_water_reset_v4837_zero';
+      if (!localStorage.getItem(resetKey)) {
+        state.waterSupply = { full: 0, empty: 0, min_alert: 5, history: [] };
+        localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+        localStorage.setItem(resetKey, 'true');
+      } else {
+        const localWater = JSON.parse(localStorage.getItem('arena_water_supply') || 'null');
+        if (localWater && typeof localWater.full === 'number') state.waterSupply = localWater;
+      }
     } catch(e) {}
   }
 }
@@ -4804,7 +4811,7 @@ function renderCourtsControlTab() {
 // ==========================================
 
 function getWaterSupplyAnalytics() {
-  const full = (state.waterSupply && typeof state.waterSupply.full === 'number') ? state.waterSupply.full : 20;
+  const full = (state.waterSupply && typeof state.waterSupply.full === 'number') ? state.waterSupply.full : 0;
   const empty = (state.waterSupply && typeof state.waterSupply.empty === 'number') ? state.waterSupply.empty : 0;
   const minAlert = (state.waterSupply && typeof state.waterSupply.min_alert === 'number') ? state.waterSupply.min_alert : 5;
 
@@ -5848,7 +5855,7 @@ async function releaseWaterForCourt(bookingId) {
 
   // Realiza a baixa imediata no estoque de água (subtrai de cheias, adiciona a vazias)
   if (!state.waterSupply) {
-    state.waterSupply = { full: 20, empty: 0, min_alert: 5, history: [] };
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, history: [] };
   }
   state.waterSupply.full = Math.max(0, (state.waterSupply.full || 0) - deductQty);
   state.waterSupply.empty = (state.waterSupply.empty || 0) + deductQty;
@@ -5900,7 +5907,7 @@ async function triggerQuickWaterBaixa(qty = 4) {
     return;
   }
   if (!state.waterSupply) {
-    state.waterSupply = { full: 20, empty: 0, min_alert: 5, history: [] };
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, history: [] };
   }
   state.waterSupply.full = Math.max(0, (state.waterSupply.full || 0) - qty);
   state.waterSupply.empty = (state.waterSupply.empty || 0) + qty;
@@ -6268,6 +6275,13 @@ function openAdjustWaterSupplyModal() {
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo do Ajuste</label>
             <input type="text" id="waterAdjNotes" placeholder="Ex: Contagem física quinzenal" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-slate-600 focus:outline-none">
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button type="button" onclick="document.getElementById('waterAdjFull').value = '0'; document.getElementById('waterAdjEmpty').value = '0'; document.getElementById('waterAdjNotes').value = 'Zerar para abastecimento manual';" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer flex items-center space-x-1">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Zerar Estoque (0 Cheias e 0 Vazias)</span>
+            </button>
           </div>
 
           <div class="pt-2 flex items-center justify-end space-x-2">
@@ -13251,7 +13265,7 @@ function showConfirmationSuccessModal(booking) {
                 (typeof booking.totalPrice === 'number' ? booking.totalPrice : 
                 (typeof booking.monthly_price === 'number' ? booking.monthly_price : 0));
 
-  const analytics = (typeof getWaterSupplyAnalytics === 'function') ? getWaterSupplyAnalytics() : { full: 20, empty: 0 };
+  const analytics = (typeof getWaterSupplyAnalytics === 'function') ? getWaterSupplyAnalytics() : { full: 0, empty: 0 };
   let waterCountInBooking = 0;
   const rawCart = booking.product_cart || booking.productCart || state.productCart || {};
   Object.entries(rawCart).forEach(([id, qty]) => {
