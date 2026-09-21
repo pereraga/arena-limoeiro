@@ -5080,16 +5080,16 @@ function renderWaterSupplyDashboardBanner() {
           </div>
 
           <div class="space-y-1.5 flex-1 min-w-0">
-            <!-- Linha 1: Badges Superiores e Gatilho Mínimo Clicável -->
+            <!-- Linha 1: Badges Superiores e Gatilho Mínimo Clicável que abre o Ajuste de Preço e Estoque -->
             <div class="flex flex-wrap items-center gap-2">
               <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-rose-950/90 text-rose-300 border border-rose-500/40">
                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span>
                 ABAIXO DO LIMITE MÍNIMO
               </span>
-              <button type="button" onclick="openQuickSetMinWaterModal()" title="Clique para alterar o gatilho de estado mínimo do pedido" class="inline-flex items-center space-x-1.5 text-xs text-rose-200/90 hover:text-white transition-colors cursor-pointer bg-slate-800/60 px-2.5 py-0.5 rounded-full border border-rose-500/30 group">
+              <button type="button" onclick="openAdjustWaterSupplyModal()" title="Clique para abrir ajuste de estoque, preço e gatilho mínimo" class="inline-flex items-center space-x-1.5 text-xs text-rose-200/90 hover:text-white transition-colors cursor-pointer bg-slate-800/60 px-2.5 py-0.5 rounded-full border border-rose-500/30 group">
                 <i data-lucide="bell" class="w-3.5 h-3.5 text-rose-400"></i>
                 <span>Gatilho automático: estoque &lt; <strong class="text-white underline group-hover:text-rose-300">${minAlert} garrafões de 20L</strong></span>
-                <i data-lucide="sliders-horizontal" class="w-3 h-3 text-rose-300 opacity-70 group-hover:opacity-100"></i>
+                <i data-lucide="sliders" class="w-3 h-3 text-rose-300 opacity-70 group-hover:opacity-100"></i>
               </button>
             </div>
 
@@ -5129,15 +5129,14 @@ function renderWaterSupplyDashboardBanner() {
           </div>
         </div>
 
-        <!-- Botões de Ação -->
+        <!-- Botões de Ação: Fazer Pedido, Ícone de Ajuste (Preço/Gatilho/Estoque) e Ver Registro -->
         <div class="flex flex-row md:flex-col lg:flex-row items-center gap-2 shrink-0 self-end md:self-center w-full md:w-auto justify-end">
           <button type="button" onclick="openAddWaterSupplyModal()" class="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>+ Fazer Pedido</span>
           </button>
-          <button type="button" onclick="openQuickSetMinWaterModal()" title="Configurar gatilho de estado mínimo" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1">
-            <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-            <span>Gatilho Mínimo</span>
+          <button type="button" onclick="openAdjustWaterSupplyModal()" title="Ajuste de estoque, preço e gatilho mínimo" class="w-10 h-10 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0">
+            <i data-lucide="sliders" class="w-4 h-4"></i>
           </button>
           <button type="button" onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
             Ver Registro
@@ -5175,10 +5174,10 @@ function renderWaterSupplyDashboardBanner() {
               <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
               ESTOQUE DE SEGURANÇA ATINGIDO
             </span>
-            <button type="button" onclick="openQuickSetMinWaterModal()" title="Clique para alterar o gatilho de estado mínimo do pedido" class="inline-flex items-center space-x-1.5 text-xs text-amber-200/90 hover:text-white transition-colors cursor-pointer bg-slate-800/60 px-2.5 py-0.5 rounded-full border border-amber-500/30 group">
+            <button type="button" onclick="openAdjustWaterSupplyModal()" title="Clique para abrir ajuste de estoque, preço e gatilho mínimo" class="inline-flex items-center space-x-1.5 text-xs text-amber-200/90 hover:text-white transition-colors cursor-pointer bg-slate-800/60 px-2.5 py-0.5 rounded-full border border-amber-500/30 group">
               <i data-lucide="package" class="w-3.5 h-3.5 text-amber-400"></i>
               <span>Restam apenas <strong class="text-white font-bold">${full} unidades</strong> no depósito central</span>
-              <i data-lucide="sliders-horizontal" class="w-3 h-3 text-amber-300 opacity-70 group-hover:opacity-100"></i>
+              <i data-lucide="sliders" class="w-3 h-3 text-amber-300 opacity-70 group-hover:opacity-100"></i>
             </button>
           </div>
 
@@ -5218,15 +5217,14 @@ function renderWaterSupplyDashboardBanner() {
         </div>
       </div>
 
-      <!-- Botões de Ação -->
+      <!-- Botões de Ação: Fazer Pedido, Ícone de Ajuste (Preço/Gatilho/Estoque) e Ver Registro -->
       <div class="flex flex-row md:flex-col lg:flex-row items-center gap-2 shrink-0 self-end md:self-center w-full md:w-auto justify-end">
         <button type="button" onclick="openAddWaterSupplyModal()" class="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>+ Fazer Pedido</span>
         </button>
-        <button type="button" onclick="openQuickSetMinWaterModal()" title="Configurar gatilho de estado mínimo" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer flex items-center justify-center space-x-1">
-          <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-          <span>Gatilho Mínimo</span>
+        <button type="button" onclick="openAdjustWaterSupplyModal()" title="Ajuste de estoque, preço e gatilho mínimo" class="w-10 h-10 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl border border-slate-700/80 flex items-center justify-center transition-all cursor-pointer shadow-sm shrink-0">
+          <i data-lucide="sliders" class="w-4 h-4"></i>
         </button>
         <button type="button" onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
           Ver Registro
@@ -5237,113 +5235,11 @@ function renderWaterSupplyDashboardBanner() {
 }
 window.renderWaterSupplyDashboardBanner = renderWaterSupplyDashboardBanner;
 
-// Modal para configurar rapidamente o estado mínimo do pedido
+// Redireciona qualquer chamada de gatilho diretamente para o modal de Ajuste de Estoque e Preço
 function openQuickSetMinWaterModal() {
-  const currentMin = (state.waterSupply && typeof state.waterSupply.min_alert === 'number') ? state.waterSupply.min_alert : 4;
-  const idealCap = (state.waterSupply && typeof state.waterSupply.ideal_capacity === 'number') ? state.waterSupply.ideal_capacity : 35;
-  
-  const modalHtml = `
-    <div id="quickSetMinWaterModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div class="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl p-6 space-y-5 text-white">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div class="flex items-center space-x-2.5">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-              <i data-lucide="sliders-horizontal" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <h3 class="text-base font-black text-white">Gatilho Mínimo do Pedido</h3>
-              <p class="text-xs text-slate-400">Configure o estado mínimo para alertar reposição</p>
-            </div>
-          </div>
-          <button onclick="closeQuickSetMinWaterModal()" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 cursor-pointer">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-
-        <form onsubmit="handleQuickSetMinWaterSubmit(event)" class="space-y-4">
-          <div>
-            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              Estoque Mínimo de Alerta (Garrafões cheios)
-            </label>
-            <div class="relative">
-              <input type="number" id="quickMinAlertInput" min="1" max="50" value="${currentMin}" required
-                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-base font-bold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500" />
-              <span class="absolute right-3.5 top-3 text-xs font-semibold text-slate-400">unidades</span>
-            </div>
-            <p class="text-[11px] text-slate-400 mt-1.5">
-              Quando as águas cheias atingirem ou caírem abaixo deste valor, o sistema ativará o alerta de reposição automaticamente.
-            </p>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
-              Capacidade Ideal da Arena (Galões)
-            </label>
-            <div class="relative">
-              <input type="number" id="quickIdealCapInput" min="10" max="200" value="${idealCap}" required
-                class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-base font-bold focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500" />
-              <span class="absolute right-3.5 top-3 text-xs font-semibold text-slate-400">unidades</span>
-            </div>
-            <p class="text-[11px] text-slate-400 mt-1.5">
-              Base para a barra de reserva no complexo e cálculo de lote ideal.
-            </p>
-          </div>
-
-          <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
-            <button type="button" onclick="closeQuickSetMinWaterModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer">
-              Cancelar
-            </button>
-            <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow transition-all cursor-pointer flex items-center space-x-1.5">
-              <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Salvar Gatilho</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  `;
-
-  const existing = document.getElementById('quickSetMinWaterModal');
-  if (existing) existing.remove();
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-  if (window.lucide) window.lucide.createIcons();
+  openAdjustWaterSupplyModal();
 }
 window.openQuickSetMinWaterModal = openQuickSetMinWaterModal;
-
-function closeQuickSetMinWaterModal() {
-  const modal = document.getElementById('quickSetMinWaterModal');
-  if (modal) modal.remove();
-}
-window.closeQuickSetMinWaterModal = closeQuickSetMinWaterModal;
-
-async function handleQuickSetMinWaterSubmit(event) {
-  event.preventDefault();
-  const minInput = document.getElementById('quickMinAlertInput');
-  const capInput = document.getElementById('quickIdealCapInput');
-  if (!minInput) return;
-
-  const minVal = parseInt(minInput.value, 10);
-  const capVal = capInput ? parseInt(capInput.value, 10) : 35;
-
-  if (isNaN(minVal) || minVal < 1) {
-    showToastNotification('Por favor, informe um valor mínimo válido.', 3500);
-    return;
-  }
-
-  if (!state.waterSupply) {
-    state.waterSupply = { full: 0, empty: 0, min_alert: 4, unit_price: 5.0, courts: {}, orders: [], history: [] };
-  }
-  state.waterSupply.min_alert = minVal;
-  if (!isNaN(capVal) && capVal >= 10) {
-    state.waterSupply.ideal_capacity = capVal;
-  }
-
-  await saveWaterSupplyToDatabase();
-  closeQuickSetMinWaterModal();
-  renderStepContent();
-  showToastNotification(`Gatilho mínimo do pedido atualizado para < ${minVal} galões!`, 4000);
-}
-window.handleQuickSetMinWaterSubmit = handleQuickSetMinWaterSubmit;
 
 function checkAndShowWaterSupplyLoginNotice(force = false) {
   const analytics = getWaterSupplyAnalytics();
