@@ -5086,10 +5086,6 @@ function renderWaterSupplyDashboardBanner() {
                 <span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-pulse"></span>
                 ABAIXO DO LIMITE MÍNIMO
               </span>
-              <span class="inline-flex items-center space-x-1.5 text-xs text-rose-200/90 bg-slate-800/60 px-2.5 py-0.5 rounded-full border border-rose-500/30">
-                <i data-lucide="bell" class="w-3.5 h-3.5 text-rose-400"></i>
-                <span>Gatilho automático: estoque &lt; <strong class="text-white">${minAlert} garrafões de 20L</strong></span>
-              </span>
             </div>
 
             <!-- Linha 2: Título do Alerta e Badge de Quantidade -->
