@@ -7131,54 +7131,153 @@ async function handleEmptyWaterSubmit(event) {
 }
 window.handleEmptyWaterSubmit = handleEmptyWaterSubmit;
 
+window._waterAdjActiveItem = '5l';
+
+function selectWaterAdjItem(type) {
+  window._waterAdjActiveItem = type;
+  const btn5L = document.getElementById('btnWaterItem5L');
+  const btn500ml = document.getElementById('btnWaterItem500ml');
+  const priceInput = document.getElementById('waterAdjUnitPrice');
+  const minInput = document.getElementById('waterAdjMin');
+
+  if (type === '500ml') {
+    if (btn5L) {
+      btn5L.className = "p-2.5 rounded-xl border border-transparent hover:bg-white/60 font-bold text-xs flex items-center justify-center space-x-1.5 text-slate-600 transition-all cursor-pointer";
+    }
+    if (btn500ml) {
+      btn500ml.className = "p-2.5 rounded-xl border-2 border-slate-900 bg-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-sm text-slate-900 transition-all cursor-pointer";
+    }
+    if (priceInput && (priceInput.value === '5.00' || !priceInput.value)) {
+      priceInput.value = '2.50';
+    }
+    if (minInput && minInput.value === '5') {
+      minInput.value = '10';
+    }
+  } else {
+    if (btn5L) {
+      btn5L.className = "p-2.5 rounded-xl border-2 border-slate-900 bg-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-sm text-slate-900 transition-all cursor-pointer";
+    }
+    if (btn500ml) {
+      btn500ml.className = "p-2.5 rounded-xl border border-transparent hover:bg-white/60 font-bold text-xs flex items-center justify-center space-x-1.5 text-slate-600 transition-all cursor-pointer";
+    }
+    if (priceInput && (priceInput.value === '2.50' || !priceInput.value)) {
+      const defPrice = (state.waterSupply && typeof state.waterSupply.unit_price === 'number') ? state.waterSupply.unit_price : 5.00;
+      priceInput.value = defPrice.toFixed(2);
+    }
+    if (minInput && minInput.value === '10') {
+      minInput.value = '5';
+    }
+  }
+  updateWaterAdjCalc();
+}
+window.selectWaterAdjItem = selectWaterAdjItem;
+
+function updateWaterAdjCalc() {
+  const emptyVal = parseInt(document.getElementById('waterAdjEmpty')?.value || '0', 10);
+  const unitPriceVal = parseFloat(document.getElementById('waterAdjUnitPrice')?.value || '0') || 0;
+  const total = emptyVal * unitPriceVal;
+
+  const totalEl = document.getElementById('waterAdjCalcTotal');
+  if (totalEl) {
+    totalEl.innerText = `R$ ${total.toFixed(2).replace('.', ',')} (${emptyVal} un x R$ ${unitPriceVal.toFixed(2).replace('.', ',')})`;
+  }
+  const displayEl = document.getElementById('waterAdjTotalDisplay');
+  if (displayEl) {
+    displayEl.innerHTML = `Total p/ encher: <strong class="text-slate-800">${emptyVal} un.</strong>`;
+  }
+}
+window.updateWaterAdjCalc = updateWaterAdjCalc;
+
 function openAdjustWaterSupplyModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
-  const currentFull = (state.waterSupply && state.waterSupply.full) || 0;
-  const currentEmpty = (state.waterSupply && state.waterSupply.empty) || 0;
+  const currentEmpty = (state.waterSupply && typeof state.waterSupply.empty === 'number') ? state.waterSupply.empty : 0;
   const currentMin = (state.waterSupply && state.waterSupply.min_alert) || 5;
   const currentUnitPrice = (state.waterSupply && typeof state.waterSupply.unit_price === 'number') ? state.waterSupply.unit_price : 5.00;
+  const activeItem = state.waterSupply?.activeItem || '5l';
+  window._waterAdjActiveItem = activeItem;
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+        
+        <!-- Topo Escuro idêntico à Imagem 2 -->
         <div class="arena-header-bg p-5 text-white flex items-center justify-between">
           <div class="flex items-center space-x-2.5">
-            <div class="w-10 h-10 rounded-xl bg-slate-700 flex items-center justify-center border border-slate-500/30">
+            <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center border border-slate-700 shadow-sm">
               <i data-lucide="sliders" class="w-5 h-5 text-slate-200"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase">Ajuste de Estoque e Preço</h3>
-              <p class="text-xs text-slate-300 font-medium">Correção manual de cheias, vazias e preço unitário</p>
+              <h3 class="text-base font-black uppercase tracking-wide">Ajuste de Estoque e Preço</h3>
+              <p class="text-xs text-slate-300 font-medium">Correção manual de garrafas a encher e preço unitário</p>
             </div>
           </div>
-          <button onclick="closeModal()" class="text-slate-300 hover:text-white p-1 cursor-pointer">
+          <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 cursor-pointer transition-colors">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
 
         <form onsubmit="handleAdjustWaterSupplySubmit(event)" class="p-6 space-y-4 overflow-y-auto" autocomplete="off">
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Cheias no Depósito</label>
-              <input type="number" id="waterAdjFull" required min="0" value="${currentFull}" 
-                     class="w-full p-3 border border-slate-300 rounded-xl text-base font-black text-slate-900 focus:ring-2 focus:ring-cyan-600 focus:outline-none">
+          
+          <!-- ITEM DO CARDÁPIO (Inspirado exatamente na Foto 2) -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Item do Cardápio:</span>
+              <span class="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Galão / Garrafão
+              </span>
             </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Vazias p/ Encher</label>
-              <input type="number" id="waterAdjEmpty" required min="0" value="${currentEmpty}" 
-                     class="w-full p-3 border border-slate-300 rounded-xl text-base font-black text-slate-900 focus:ring-2 focus:ring-amber-600 focus:outline-none">
+            <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl">
+              <button type="button" onclick="selectWaterAdjItem('5l')" id="btnWaterItem5L" 
+                      class="p-2.5 rounded-xl border-2 border-slate-900 bg-white font-bold text-xs flex items-center justify-center space-x-1.5 shadow-sm text-slate-900 transition-all cursor-pointer">
+                <i data-lucide="cylinder" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                <span class="truncate">Água Mineral 5L</span>
+              </button>
+              <button type="button" onclick="selectWaterAdjItem('500ml')" id="btnWaterItem500ml" 
+                      class="p-2.5 rounded-xl border border-transparent hover:bg-white/60 font-bold text-xs flex items-center justify-center space-x-1.5 text-slate-600 transition-all cursor-pointer">
+                <i data-lucide="cup-soda" class="w-4 h-4 text-cyan-600 shrink-0"></i>
+                <span class="truncate">Água Mineral 500ml</span>
+              </button>
             </div>
           </div>
 
+          <div class="border-t border-slate-100 pt-3"></div>
+
+          <!-- QUANTIDADE P/ ENCHER (Apenas Garrafas p/ Encher, sem a opção de cheias) -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 uppercase">Vazias p/ Encher (Garrafas)</label>
+              <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                Apenas p/ Encher
+              </span>
+            </div>
+            <input type="number" id="waterAdjEmpty" required min="0" value="${currentEmpty}" oninput="updateWaterAdjCalc()"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-amber-600 focus:outline-none"
+                   placeholder="Ex: 10">
+            <span class="text-[10px] text-slate-500 mt-1 block">Quantidade de garrafas que serão enviadas para reabastecimento.</span>
+          </div>
+
+          <!-- VALOR UNITÁRIO POR GARRAFA (R$) E CÁLCULO AUTOMÁTICO DO LOTE -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Unitário por Garrafa (R$)</label>
-            <input type="number" id="waterAdjUnitPrice" step="0.10" min="0" value="${currentUnitPrice.toFixed(2)}" 
-                   class="w-full p-3 border border-slate-300 rounded-xl text-base font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <input type="number" id="waterAdjUnitPrice" step="0.10" min="0" value="${currentUnitPrice.toFixed(2)}" oninput="updateWaterAdjCalc()"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            
+            <!-- Resumo Dinâmico do Lote -->
+            <div class="mt-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs font-bold text-emerald-900">
+              <span class="flex items-center space-x-1.5">
+                <i data-lucide="calculator" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+                <span>Total a Pagar no Lote:</span>
+              </span>
+              <span id="waterAdjCalcTotal" class="text-xs font-black text-emerald-950">
+                R$ ${(currentEmpty * currentUnitPrice).toFixed(2).replace('.', ',')} (${currentEmpty} un x R$ ${currentUnitPrice.toFixed(2).replace('.', ',')})
+              </span>
+            </div>
             <span class="text-[10px] text-slate-500 mt-1 block">Valor padrão pré-carregado nos novos pedidos ao fornecedor.</span>
           </div>
 
+          <!-- ESTOQUE MÍNIMO P/ ALERTA PREVENTIVO (GATILHO) -->
           <div>
             <div class="flex items-center justify-between mb-1">
               <label class="block text-xs font-bold text-slate-700 uppercase">Estoque Mínimo p/ Alerta Preventivo (Gatilho)</label>
@@ -7189,26 +7288,33 @@ function openAdjustWaterSupplyModal() {
             <span class="text-[10px] text-slate-500 mt-1 block">Avisa a equipe quando as cheias caírem abaixo deste valor.</span>
           </div>
 
+          <!-- MOTIVO DO AJUSTE -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo do Ajuste</label>
             <input type="text" id="waterAdjNotes" placeholder="Ex: Contagem física quinzenal" 
                    class="w-full p-3 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-slate-600 focus:outline-none">
           </div>
 
-          <div class="flex items-center justify-between pt-1">
-            <button type="button" onclick="document.getElementById('waterAdjFull').value = '0'; document.getElementById('waterAdjEmpty').value = '0'; document.getElementById('waterAdjNotes').value = 'Zerar para abastecimento manual';" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer flex items-center space-x-1">
+          <!-- AÇÕES DO RODAPÉ (Zerar e Contador Físico) -->
+          <div class="flex items-center justify-between pt-1 border-t border-slate-100 text-xs">
+            <button type="button" onclick="document.getElementById('waterAdjEmpty').value = '0'; updateWaterAdjCalc();" 
+                    class="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer flex items-center space-x-1">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              <span>Zerar Estoque (0 Cheias e 0 Vazias)</span>
+              <span>Zerar Quantidade p/ Encher</span>
             </button>
+            <span id="waterAdjTotalDisplay" class="text-[11px] text-slate-500 font-medium">
+              Total p/ encher: <strong class="text-slate-800">${currentEmpty} un.</strong>
+            </span>
           </div>
 
-          <div class="pt-2 flex items-center justify-end space-x-2">
-            <button type="button" onclick="closeModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
+          <!-- BOTÕES DE SUBMIT (Inspirados na Imagem 2) -->
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <button type="button" onclick="closeModal()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer">
               Cancelar
             </button>
-            <button type="submit" id="btnSubmitWaterAdj" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+            <button type="submit" id="btnSubmitWaterAdj" class="px-5 py-2.5 bg-slate-950 hover:bg-slate-900 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Salvar Alterações</span>
+              <span>Salvar Ajustes</span>
             </button>
           </div>
         </form>
@@ -7221,11 +7327,12 @@ window.openAdjustWaterSupplyModal = openAdjustWaterSupplyModal;
 
 async function handleAdjustWaterSupplySubmit(event) {
   event.preventDefault();
-  const fullVal = parseInt(document.getElementById('waterAdjFull').value || '0', 10);
   const emptyVal = parseInt(document.getElementById('waterAdjEmpty').value || '0', 10);
   const minVal = parseInt(document.getElementById('waterAdjMin').value || '5', 10);
   const unitPriceVal = parseFloat(document.getElementById('waterAdjUnitPrice')?.value || '5.00') || 5.00;
   const notes = (document.getElementById('waterAdjNotes').value || '').trim();
+  const activeItem = window._waterAdjActiveItem || '5l';
+  const itemName = activeItem === '500ml' ? 'Água Mineral 500ml' : 'Água Mineral 5L';
   const btn = document.getElementById('btnSubmitWaterAdj');
 
   if (btn) {
@@ -7237,19 +7344,21 @@ async function handleAdjustWaterSupplySubmit(event) {
     state.waterSupply = { full: 0, empty: 0, min_alert: 5, unit_price: 5.00, courts: {}, orders: [], history: [] };
   }
 
-  state.waterSupply.full = Math.max(0, fullVal);
   state.waterSupply.empty = Math.max(0, emptyVal);
   state.waterSupply.min_alert = Math.max(1, minVal);
   state.waterSupply.unit_price = unitPriceVal;
+  state.waterSupply.activeItem = activeItem;
+
+  const totalCost = emptyVal * unitPriceVal;
 
   if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
   state.waterSupply.history.push({
     id: 'mov-' + Date.now(),
     date: new Date().toISOString(),
     type: 'ajuste',
-    qtd: fullVal,
+    qtd: emptyVal,
     user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Administrador',
-    notes: `Contagem manual: ${fullVal} cheias, ${emptyVal} vazias, R$ ${unitPriceVal.toFixed(2).replace('.', ',')}/un (${notes || 'Sem detalhes'})`
+    notes: `Ajuste (${itemName}): ${emptyVal} garrafas p/ encher a R$ ${unitPriceVal.toFixed(2).replace('.', ',')}/un (Total R$ ${totalCost.toFixed(2).replace('.', ',')}) • ${notes || 'Contagem manual'}`
   });
 
   await saveWaterSupplyToDatabase();
@@ -7259,8 +7368,8 @@ async function handleAdjustWaterSupplySubmit(event) {
 
   showToastNotification(`
     <div class="space-y-1">
-      <div class="font-black text-cyan-300 uppercase text-[11px]">⚙️ Ajuste de Estoque Atualizado</div>
-      <p class="text-xs text-white">Estoque fixado em <strong>${fullVal} cheias</strong>, <strong>${emptyVal} vazias</strong> e preço <strong>R$ ${unitPriceVal.toFixed(2).replace('.', ',')}</strong>.</p>
+      <div class="font-black text-cyan-300 uppercase text-[11px]">⚙️ Ajuste de Estoque Salvo</div>
+      <p class="text-xs text-white">Registrado <strong>${emptyVal} garrafas p/ encher</strong> (${itemName}) a <strong>R$ ${unitPriceVal.toFixed(2).replace('.', ',')}</strong> (Total: R$ ${totalCost.toFixed(2).replace('.', ',')}).</p>
     </div>
   `, 4000);
 }
