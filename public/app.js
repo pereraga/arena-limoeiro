@@ -4934,7 +4934,16 @@ function getWaterSupplyAnalytics() {
 
   const netWaterProfit = totalWaterRevenue - (totalSupplyCostPaid + totalSupplyCostPending);
 
-  const freeForSale = Math.max(0, full - totalReservedAll);
+  // Galões Fixos destinados a pessoas/cadastros
+  const fixedAllocations = (state.waterSupply && Array.isArray(state.waterSupply.fixed_allocations))
+    ? state.waterSupply.fixed_allocations
+    : [];
+  const totalFixedGallons = fixedAllocations.reduce((acc, item) => acc + (Number(item.gallons) || 0), 0);
+  
+  // Saldo real que pode ser enviado aos campos (descontando os galões fixos)
+  const availableForCourts = Math.max(0, full - totalFixedGallons);
+
+  const freeForSale = Math.max(0, availableForCourts - totalReservedAll);
   
   // Regra Oficial Arena Limoeiro: O pedido de reabastecimento à distribuidora é feito com a baixa de 4 águas
   const MIN_WATER_REFILL_BATCH = 4;
@@ -4953,6 +4962,9 @@ function getWaterSupplyAnalytics() {
     empty,
     totalStock: full + empty,
     totalInCourts,
+    fixedAllocations,
+    totalFixedGallons,
+    availableForCourts,
     unitPrice: (state.waterSupply && typeof state.waterSupply.unit_price === 'number') ? state.waterSupply.unit_price : 5.00,
     minAlert,
     minRefillBatch: MIN_WATER_REFILL_BATCH,
@@ -5494,6 +5506,10 @@ function renderWaterSupplySection(analytics) {
             <i data-lucide="truck" class="w-4 h-4"></i>
             <span>⚡ Repor Campo</span>
           </button>
+          <button onclick="openFixedWaterGallonsModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer" title="Destinar galão fixo para pessoas cadastradas">
+            <i data-lucide="user-check" class="w-4 h-4"></i>
+            <span>👤 Galão Fixo ${analytics.totalFixedGallons > 0 ? `<span class="bg-white/25 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">${analytics.totalFixedGallons} un</span>` : ''}</span>
+          </button>
           <button onclick="openWaterReportModal()" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
             <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
             <span>📊 Relatório</span>
@@ -5516,7 +5532,11 @@ function renderWaterSupplySection(analytics) {
             <span class="p-1 rounded-lg bg-cyan-200/60 text-cyan-800"><i data-lucide="box" class="w-3.5 h-3.5"></i></span>
           </div>
           <div class="text-2xl font-black text-cyan-950">${analytics.full} un</div>
-          <p class="text-[10px] text-cyan-700 font-medium mt-0.5">No depósito central</p>
+          <p class="text-[10px] text-cyan-700 font-medium mt-0.5">
+            ${analytics.totalFixedGallons > 0 
+              ? `<strong class="text-slate-900">${analytics.availableForCourts} p/ campos</strong> • <span class="text-indigo-800 font-bold">${analytics.totalFixedGallons} fixo(s)</span>`
+              : 'No depósito central'}
+          </p>
         </div>
 
         <!-- KPI 2: Vazios p/ Encher -->
@@ -6434,18 +6454,33 @@ function openRefillCourtModal(preselectedCourtId = '') {
 
           <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
             <div class="flex justify-between items-center">
-              <span class="text-slate-500 font-bold">Depósito Central (Cheias):</span>
-              <strong class="text-slate-900 font-black text-sm">${analytics.full} galões disponíveis</strong>
+              <span class="text-slate-500 font-bold">Depósito Central (Total Cheio):</span>
+              <strong class="text-slate-900 font-black text-sm">${analytics.full} galões</strong>
             </div>
-            <div class="flex justify-between items-center" id="refillCourtCurrentStatus">
-              <span class="text-slate-500 font-bold">Disponível no Campo:</span>
+            ${analytics.totalFixedGallons > 0 ? `
+            <div class="flex justify-between items-center text-indigo-700 font-bold">
+              <span>Galões Fixos Reservados (Pessoas):</span>
+              <span>-${analytics.totalFixedGallons} galões</span>
+            </div>
+            <div class="flex justify-between items-center border-t border-slate-200 pt-1.5">
+              <span class="text-slate-800 font-black">Saldo Livre para os Campos:</span>
+              <span class="text-emerald-700 font-black text-sm">${analytics.availableForCourts} galões livres</span>
+            </div>
+            ` : `
+            <div class="flex justify-between items-center">
+              <span class="text-slate-500 font-bold">Saldo Disponível para os Campos:</span>
+              <strong class="text-emerald-700 font-black text-sm">${analytics.availableForCourts} galões livres</strong>
+            </div>
+            `}
+            <div class="flex justify-between items-center border-t border-slate-100 pt-1" id="refillCourtCurrentStatus">
+              <span class="text-slate-500 font-bold">Disponível no Campo Selecionado:</span>
               <span class="text-cyan-800 font-black">${cw.available} / ${cw.capacity || 4} galões</span>
             </div>
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quantidade de Galões a Enviar *</label>
-            <input type="number" id="refillCourtQty" required min="1" max="${Math.max(1, analytics.full)}" value="${Math.min(analytics.full, Math.max(1, (cw.capacity || 4) - cw.available))}"
+            <input type="number" id="refillCourtQty" required min="1" max="${Math.max(0, analytics.availableForCourts)}" value="${Math.min(analytics.availableForCourts, Math.max(1, (cw.capacity || 4) - cw.available))}"
                    class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-cyan-600 focus:outline-none">
             
             <div class="flex flex-wrap items-center gap-1.5 mt-2">
@@ -6521,8 +6556,9 @@ async function handleRefillCourtSubmit(event) {
   const qty = parseInt(qtyInput.value, 10);
   if (isNaN(qty) || qty <= 0) return;
 
-  if ((state.waterSupply.full || 0) < qty) {
-    alert(`Estoque central insuficiente! Disponíveis apenas ${state.waterSupply.full || 0} águas cheias no depósito central.`);
+  const analytics = getWaterSupplyAnalytics();
+  if (analytics.availableForCourts < qty) {
+    alert(`Saldo livre para os campos insuficiente! O estoque total é de ${analytics.full} galões, porém ${analytics.totalFixedGallons} galão(ões) estão destinados como Galão Fixo para clientes. Saldo livre para quadras: ${analytics.availableForCourts} galões.`);
     return;
   }
 
@@ -15083,3 +15119,314 @@ async function checkAndSyncBookingsBackground() {
     _isSyncingBg = false;
   }
 }
+
+// ==========================================
+// MÓDULO DE GALÃO FIXO (PESSOAS & CADASTROS)
+// ==========================================
+
+function getRegisteredPeopleList() {
+  const peopleMap = new Map();
+
+  // Usuários do sistema
+  (state.users || []).forEach(u => {
+    if (u && u.name) {
+      const trimmed = u.name.trim();
+      peopleMap.set(trimmed.toLowerCase(), {
+        name: trimmed,
+        phone: u.phone || '',
+        category: u.role || 'Usuário do Sistema'
+      });
+    }
+  });
+
+  // Mensalistas
+  (state.recurringBookings || []).forEach(r => {
+    const name = (r.customer_name || r.customerName || '').trim();
+    if (name) {
+      const key = name.toLowerCase();
+      if (!peopleMap.has(key)) {
+        peopleMap.set(key, {
+          name: name,
+          phone: r.customer_phone || r.customerPhone || '',
+          category: 'Mensalista'
+        });
+      }
+    }
+  });
+
+  // Clientes com agendamentos recentes
+  (state.bookings || []).forEach(b => {
+    const name = (b.customer_name || b.customerName || '').trim();
+    if (name && name !== 'Cliente' && name !== 'Treino Reservado') {
+      const key = name.toLowerCase();
+      if (!peopleMap.has(key)) {
+        peopleMap.set(key, {
+          name: name,
+          phone: b.customer_phone || b.customerPhone || '',
+          category: 'Cliente / Atleta'
+        });
+      }
+    }
+  });
+
+  return Array.from(peopleMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+window.getRegisteredPeopleList = getRegisteredPeopleList;
+
+function openFixedWaterGallonsModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const analytics = getWaterSupplyAnalytics();
+  const people = getRegisteredPeopleList();
+  const allocations = analytics.fixedAllocations || [];
+  const totalFixed = analytics.totalFixedGallons || 0;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
+        
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950 p-5 text-white flex items-center justify-between border-b border-indigo-900/50">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/30">
+              <i data-lucide="user-check" class="w-5 h-5 text-indigo-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-tight">Gestão de Galão Fixo</h3>
+              <p class="text-xs text-indigo-200 font-medium">Destine galões a pessoas cadastradas (interfere no saldo das quadras)</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-indigo-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-5 overflow-y-auto">
+          
+          <!-- Card Informativo de Impacto nos Campos -->
+          <div class="grid grid-cols-3 gap-3 p-3.5 bg-indigo-50/70 border border-indigo-200/80 rounded-2xl text-center">
+            <div class="p-2 bg-white rounded-xl shadow-xs border border-indigo-100">
+              <span class="text-[10px] font-bold text-slate-500 uppercase block">Depósito Total</span>
+              <strong class="text-base font-black text-slate-900">${analytics.full} un</strong>
+            </div>
+            <div class="p-2 bg-indigo-600 text-white rounded-xl shadow-xs">
+              <span class="text-[10px] font-black uppercase block text-indigo-200">Galões Fixos</span>
+              <strong class="text-base font-black">${totalFixed} un</strong>
+            </div>
+            <div class="p-2 bg-white rounded-xl shadow-xs border border-indigo-100">
+              <span class="text-[10px] font-bold text-slate-500 uppercase block">Saldo p/ Campos</span>
+              <strong class="text-base font-black ${analytics.availableForCourts <= 2 ? 'text-rose-600' : 'text-emerald-700'}">${analytics.availableForCourts} un</strong>
+            </div>
+          </div>
+
+          <div class="bg-amber-50 border border-amber-200/80 rounded-xl p-3 flex items-start space-x-2.5 text-xs text-amber-900">
+            <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+            <div>
+              <strong>Regra Operacional:</strong> Cada galão fixo cadastrado aqui deduz diretamente da cota disponível para reabastecer as quadras (${totalFixed} a menos para os campos). Ao pedir água ao fornecedor para encher, o lote abastecerá todos.
+            </div>
+          </div>
+
+          <!-- Formulário para Adicionar Galão Fixo -->
+          <form onsubmit="handleFixedWaterGallonSubmit(event)" class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3.5" autocomplete="off">
+            <div class="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+              <span>➕</span>
+              <span>Cadastrar Novo Galão Fixo</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome da Pessoa / Cadastro *</label>
+                <div class="relative">
+                  <input type="text" id="fixedWaterPersonName" list="fixedWaterDatalist" required placeholder="Digite ou selecione do cadastro..."
+                         class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white">
+                  <datalist id="fixedWaterDatalist">
+                    ${people.map(p => `<option value="${p.name}">${p.category ? `(${p.category})` : ''}</option>`).join('')}
+                  </datalist>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Qtd Galões *</label>
+                <input type="number" id="fixedWaterQty" min="1" max="50" value="1" required
+                       class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-black text-indigo-950 focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observação / Finalidade</label>
+              <input type="text" id="fixedWaterNotes" placeholder="Ex: Professor de Beach Tennis, Treino Especial, Mensalista Terça..."
+                     class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white">
+            </div>
+
+            <div class="pt-1 flex justify-end">
+              <button type="submit" id="btnSubmitFixedWater" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Destinar Galão Fixo</span>
+              </button>
+            </div>
+          </form>
+
+          <!-- Lista de Galões Fixos Ativos -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h4 class="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center space-x-1.5">
+                <span>📋</span>
+                <span>Pessoas com Galão Fixo Ativo (${allocations.length})</span>
+              </h4>
+              <span class="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                Total: ${totalFixed} galão(ões) fixo(s)
+              </span>
+            </div>
+
+            ${allocations.length === 0 ? `
+              <div class="text-center py-6 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 space-y-1">
+                <div class="text-2xl">💧</div>
+                <p class="text-xs font-bold">Nenhum galão fixo destinado no momento.</p>
+                <p class="text-[11px] text-slate-400">Todos os galões cheios estão 100% disponíveis para uso nos campos esportivos.</p>
+              </div>
+            ` : `
+              <div class="space-y-2 max-h-60 overflow-y-auto pr-1">
+                ${allocations.map(item => `
+                  <div class="p-3.5 bg-white rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-3 hover:border-indigo-300 transition-colors">
+                    <div class="flex items-center space-x-3 min-w-0">
+                      <div class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center font-black text-sm shrink-0 border border-indigo-200">
+                        👤
+                      </div>
+                      <div class="min-w-0">
+                        <div class="flex items-center space-x-2">
+                          <strong class="text-xs font-black text-slate-900 truncate">${item.person_name}</strong>
+                          <span class="px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full text-[10px] font-black shrink-0">
+                            ${item.gallons} ${item.gallons > 1 ? 'galões' : 'galão'}
+                          </span>
+                        </div>
+                        ${item.notes ? `<p class="text-[11px] text-slate-500 truncate mt-0.5 font-medium">💬 ${item.notes}</p>` : ''}
+                        <span class="text-[9px] text-slate-400 block mt-0.5">Cadastrado em: ${new Date(item.created_at || Date.now()).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    </div>
+                    
+                    <button type="button" onclick="removeFixedWaterAllocation('${item.id}')" title="Liberar e devolver galões para os campos"
+                            class="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-all cursor-pointer flex items-center space-x-1 shrink-0">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                      <span>Liberar</span>
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- Rodapé do Modal -->
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end">
+            <button type="button" onclick="closeModal()" class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer">
+              Concluir e Fechar
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  `;
+  lucide.createIcons();
+}
+window.openFixedWaterGallonsModal = openFixedWaterGallonsModal;
+
+async function handleFixedWaterGallonSubmit(event) {
+  event.preventDefault();
+  const nameInput = document.getElementById('fixedWaterPersonName');
+  const qtyInput = document.getElementById('fixedWaterQty');
+  const notesInput = document.getElementById('fixedWaterNotes');
+  const btn = document.getElementById('btnSubmitFixedWater');
+  if (!nameInput || !qtyInput) return;
+
+  const personName = nameInput.value.trim();
+  const gallons = parseInt(qtyInput.value, 10);
+  const notes = notesInput ? notesInput.value.trim() : '';
+
+  if (!personName) {
+    alert('Por favor, informe o nome da pessoa.');
+    return;
+  }
+  if (isNaN(gallons) || gallons <= 0) {
+    alert('Por favor, informe uma quantidade válida de galões.');
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Salvando...';
+  }
+
+  if (!state.waterSupply) {
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, unit_price: 5.00, courts: {}, orders: [], history: [], fixed_allocations: [] };
+  }
+  if (!Array.isArray(state.waterSupply.fixed_allocations)) {
+    state.waterSupply.fixed_allocations = [];
+  }
+
+  const newAllocation = {
+    id: 'fix-' + Date.now(),
+    person_name: personName,
+    gallons: gallons,
+    notes: notes,
+    created_at: new Date().toISOString(),
+    created_by: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador'
+  };
+
+  state.waterSupply.fixed_allocations.push(newAllocation);
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
+    date: new Date().toISOString(),
+    type: 'galao_fixo',
+    qtd: gallons,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador',
+    notes: `Galão Fixo: destinado ${gallons} galão(ões) para ${personName} (${notes || 'Sem observação'}). Reduzido do saldo dos campos.`
+  });
+
+  await saveWaterSupplyToDatabase();
+  renderStepContent();
+  openFixedWaterGallonsModal(); // Reabre com a lista atualizada
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-indigo-300 uppercase text-[11px]">👤 Galão Fixo Registrado!</div>
+      <p class="text-xs text-white">Destinado <strong>${gallons} galão(ões)</strong> para <strong>${personName}</strong>. Saldo disponível para os campos atualizado.</p>
+    </div>
+  `, 4500);
+}
+window.handleFixedWaterGallonSubmit = handleFixedWaterGallonSubmit;
+
+async function removeFixedWaterAllocation(allocationId) {
+  if (!state.waterSupply || !Array.isArray(state.waterSupply.fixed_allocations)) return;
+  const item = state.waterSupply.fixed_allocations.find(a => a.id === allocationId);
+  if (!item) return;
+
+  const confirmed = confirm(`Deseja realmente liberar o galão fixo de "${item.person_name}" (${item.gallons} galões)? Os galões voltarão a ficar disponíveis para os campos.`);
+  if (!confirmed) return;
+
+  state.waterSupply.fixed_allocations = state.waterSupply.fixed_allocations.filter(a => a.id !== allocationId);
+
+  if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
+  state.waterSupply.history.push({
+    id: 'mov-' + Date.now(),
+    date: new Date().toISOString(),
+    type: 'galao_fixo_removido',
+    qtd: item.gallons,
+    user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Operador',
+    notes: `Liberação de Galão Fixo: ${item.gallons} galão(ões) de ${item.person_name} retornaram ao saldo livre dos campos.`
+  });
+
+  await saveWaterSupplyToDatabase();
+  renderStepContent();
+  openFixedWaterGallonsModal(); // Reabre com a lista atualizada
+
+  showToastNotification(`
+    <div class="space-y-1">
+      <div class="font-black text-emerald-300 uppercase text-[11px]">✓ Galão Fixo Liberado!</div>
+      <p class="text-xs text-white">Os <strong>${item.gallons} galões</strong> de ${item.person_name} voltaram a ficar disponíveis para os campos.</p>
+    </div>
+  `, 4000);
+}
+window.removeFixedWaterAllocation = removeFixedWaterAllocation;
