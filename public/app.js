@@ -5992,7 +5992,7 @@ function openNewWaterOrderModal() {
             </div>
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Unitário por Garrafa (R$) *</label>
-              <input type="number" id="waterOrderUnitPrice" step="0.10" min="0" value="${currentUnitPrice.toFixed(2)}" oninput="recalcWaterOrderTotal()"
+              <input type="number" id="waterOrderUnitPrice" step="0.01" min="0" value="${currentUnitPrice.toFixed(2)}" oninput="recalcWaterOrderTotal()"
                      class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             </div>
           </div>
@@ -7261,7 +7261,7 @@ function openAdjustWaterSupplyModal() {
           <!-- VALOR UNITÁRIO POR GARRAFA (R$) E CÁLCULO AUTOMÁTICO DO LOTE -->
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Unitário por Garrafa (R$)</label>
-            <input type="number" id="waterAdjUnitPrice" step="0.10" min="0" value="${currentUnitPrice.toFixed(2)}" oninput="updateWaterAdjCalc()"
+            <input type="number" id="waterAdjUnitPrice" step="0.01" min="0" value="${currentUnitPrice.toFixed(2)}" oninput="updateWaterAdjCalc()"
                    class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
             
             <!-- Resumo Dinâmico do Lote -->
