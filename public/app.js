@@ -3353,26 +3353,26 @@ function renderAdminView(container) {
         </div>
       </div>
 
-      <!-- Abas Principais de Operação (flex-wrap para sobrepor em linhas caso não caiba tudo em uma linha) -->
-      <div class="flex flex-wrap items-center gap-2.5 mb-6 pb-2">
+      <!-- Abas Principais de Operação (Grid 2 colunas no mobile, 3 no tablet, flex no desktop) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap items-center gap-2 sm:gap-2.5 mb-6 pb-2 w-full">
         <button onclick="setAdminTab('live_dashboard')" 
-                class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer
                        ${currentTab === 'live_dashboard' ? 
                          'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                          'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="gamepad-2" class="w-4 h-4 ${currentTab === 'live_dashboard' ? 'text-white' : 'text-emerald-600'}"></i>
-          <span>Movimentação dos Jogos</span>
+          <i data-lucide="gamepad-2" class="w-4 h-4 shrink-0 ${currentTab === 'live_dashboard' ? 'text-white' : 'text-emerald-600'}"></i>
+          <span class="truncate">Movimentação</span>
         </button>
 
         ${canEditCourts() ? `
           <button onclick="setAdminTab('courts_control')" 
-                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                  class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer
                          ${currentTab === 'courts_control' ? 
                            'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                            'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            <i data-lucide="layout-grid" class="w-4 h-4 ${currentTab === 'courts_control' ? 'text-white' : 'text-emerald-600'}"></i>
-            <span>Controle de Quadras</span>
-            <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'courts_control' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+            <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 ${currentTab === 'courts_control' ? 'text-white' : 'text-emerald-600'}"></i>
+            <span class="truncate">Quadras</span>
+            <span class="px-2 py-0.5 text-[10px] font-black rounded-full shrink-0 ${currentTab === 'courts_control' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
               ${state.courts.length}
             </span>
           </button>
@@ -3380,13 +3380,13 @@ function renderAdminView(container) {
 
         ${canManageCategories() ? `
           <button onclick="setAdminTab('categories')" 
-                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                  class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer
                          ${currentTab === 'categories' ? 
                            'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                            'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            <i data-lucide="tag" class="w-4 h-4 ${currentTab === 'categories' ? 'text-white' : 'text-emerald-600'}"></i>
-            <span>Categorias de Espaços</span>
-            <span class="px-2 py-0.5 text-[10px] font-black rounded-full ${currentTab === 'categories' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+            <i data-lucide="tag" class="w-4 h-4 shrink-0 ${currentTab === 'categories' ? 'text-white' : 'text-emerald-600'}"></i>
+            <span class="truncate">Modalidades</span>
+            <span class="px-2 py-0.5 text-[10px] font-black rounded-full shrink-0 ${currentTab === 'categories' ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
               ${(state.categories || []).filter(c => c.id !== 'all').length}
             </span>
           </button>
@@ -3394,12 +3394,12 @@ function renderAdminView(container) {
 
         ${(canManageBar() || canManageProducts()) ? `
           <button onclick="setAdminTab('bar_control')" 
-                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer relative
+                  class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer relative
                          ${currentTab === 'bar_control' ? 
                            'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                            'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            <i data-lucide="beer" class="w-4 h-4 ${currentTab === 'bar_control' ? 'text-white' : 'text-amber-500'}"></i>
-            <span>Bar & Lanchonete</span>
+            <i data-lucide="beer" class="w-4 h-4 shrink-0 ${currentTab === 'bar_control' ? 'text-white' : 'text-amber-500'}"></i>
+            <span class="truncate">Bar & Lanchonete</span>
             ${(typeof getWaterSupplyAnalytics === 'function' && getWaterSupplyAnalytics().needsRefill) ? `
               <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" title="Alerta: Necessita reabastecimento de água"></span>
             ` : ''}
@@ -3408,12 +3408,12 @@ function renderAdminView(container) {
 
         ${(canManageSettings() || canManageCustomers() || canManageMonthly()) ? `
           <button onclick="setAdminTab('settings')" 
-                  class="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 whitespace-nowrap transition-all cursor-pointer
+                  class="col-span-2 sm:col-span-1 lg:col-auto w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer
                          ${currentTab === 'settings' ? 
                            'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
                            'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            <i data-lucide="settings" class="w-4 h-4 ${currentTab === 'settings' ? 'text-white' : 'text-slate-600'}"></i>
-            <span>Cadastros & Ajustes</span>
+            <i data-lucide="settings" class="w-4 h-4 shrink-0 ${currentTab === 'settings' ? 'text-white' : 'text-slate-600'}"></i>
+            <span class="truncate">Cadastros & Ajustes</span>
           </button>
         ` : ''}
       </div>
@@ -4477,14 +4477,14 @@ function renderCourtsControlTab() {
           <p class="text-xs text-slate-500 mt-1">Defina horários de início e término para treinos reservados ou manutenção pontual sem comprometer os demais horários nem as outras quadras.</p>
         </div>
 
-        <div class="flex items-center flex-wrap gap-2">
-          <button onclick="openMaintenanceModal()" class="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
-            <i data-lucide="clock" class="w-4 h-4"></i>
-            <span>Agendar Treino / Manutenção</span>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-2 w-full sm:w-auto">
+          <button onclick="openMaintenanceModal()" class="w-full sm:w-auto justify-center text-center px-3.5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+            <i data-lucide="clock" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">Agendar Treino / Manutenção</span>
           </button>
-          <button onclick="openCourtModal()" class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap">
-            <i data-lucide="plus" class="w-4 h-4 text-emerald-200"></i>
-            <span>Nova Quadra</span>
+          <button onclick="openCourtModal()" class="w-full sm:w-auto justify-center text-center px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all">
+            <i data-lucide="plus" class="w-4 h-4 text-emerald-200 shrink-0"></i>
+            <span class="truncate">Nova Quadra</span>
           </button>
         </div>
       </div>
@@ -5492,31 +5492,32 @@ function renderWaterSupplySection(analytics) {
           </div>
         </div>
 
-        <!-- Ações Rápidas de Topo -->
-        <div class="flex flex-wrap items-center gap-2 shrink-0">
-          <button onclick="openNewWaterOrderModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>+ Novo Pedido</span>
+        <!-- Ações Rápidas de Topo (Grid 2 colunas no mobile, 3 no tablet, flex no desktop) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap items-center gap-2 w-full lg:w-auto shrink-0">
+          <button onclick="openNewWaterOrderModal()" class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 lg:py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="plus" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">+ Novo Pedido</span>
           </button>
-          <button onclick="openPaySupplierModal()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
-            <i data-lucide="receipt" class="w-4 h-4"></i>
-            <span>🧾 Pagar Fornecedor</span>
+          <button onclick="openPaySupplierModal()" class="w-full lg:w-auto justify-center text-center px-3 sm:px-3.5 py-2.5 lg:py-2 bg-amber-600 hover:bg-amber-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="receipt" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">🧾 Pagar Forn.</span>
           </button>
-          <button onclick="openRefillCourtModal()" class="px-3.5 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
-            <i data-lucide="truck" class="w-4 h-4"></i>
-            <span>⚡ Repor Campo</span>
+          <button onclick="openRefillCourtModal()" class="w-full lg:w-auto justify-center text-center px-3 sm:px-3.5 py-2.5 lg:py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="truck" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">⚡ Repor Campo</span>
           </button>
-          <button onclick="openFixedWaterGallonsModal()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer" title="Destinar galão fixo para pessoas cadastradas">
-            <i data-lucide="user-check" class="w-4 h-4"></i>
-            <span>👤 Galão Fixo ${analytics.totalFixedGallons > 0 ? `<span class="bg-white/25 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">${analytics.totalFixedGallons} un</span>` : ''}</span>
+          <button onclick="openFixedWaterGallonsModal()" class="w-full lg:w-auto justify-center text-center px-3 sm:px-3.5 py-2.5 lg:py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer" title="Destinar galão fixo para pessoas cadastradas">
+            <i data-lucide="user-check" class="w-4 h-4 shrink-0"></i>
+            <span class="truncate">👤 Galão Fixo ${analytics.totalFixedGallons > 0 ? `<span class="bg-white/25 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full ml-1">${analytics.totalFixedGallons}</span>` : ''}</span>
           </button>
-          <button onclick="openWaterReportModal()" class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
-            <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
-            <span>📊 Relatório</span>
+          <button onclick="openWaterReportModal()" class="w-full lg:w-auto justify-center text-center px-3 sm:px-3.5 py-2.5 lg:py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-sm flex items-center space-x-1.5 transition-all cursor-pointer">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+            <span class="truncate">📊 Relatório</span>
           </button>
           ${!isRecep ? `
-          <button onclick="openAdjustWaterSupplyModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer" title="Ajuste de Estoque, Preço e Gatilho Mínimo">
-            <i data-lucide="sliders" class="w-4 h-4"></i>
+          <button onclick="openAdjustWaterSupplyModal()" class="w-full lg:w-auto justify-center text-center px-3 py-2.5 lg:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer flex items-center space-x-1.5" title="Ajuste de Estoque, Preço e Gatilho Mínimo">
+            <i data-lucide="sliders" class="w-4 h-4 shrink-0"></i>
+            <span class="lg:hidden text-xs font-bold">⚙️ Ajustes</span>
           </button>
           ` : ''}
         </div>
@@ -5591,20 +5592,20 @@ function renderWaterSupplySection(analytics) {
 
       </div>
 
-      <!-- SUB-NAVEGAÇÃO POR ABAS PILL (Inspirado nas Imagens 1, 2 e 3) -->
+      <!-- SUB-NAVEGAÇÃO POR ABAS PILL (Grid 3 colunas no mobile, flex no tablet/desktop) -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div class="flex items-center space-x-1.5 p-1 bg-slate-100 rounded-2xl">
+        <div class="grid grid-cols-3 sm:flex items-center gap-1 sm:space-x-1.5 p-1 bg-slate-100 rounded-2xl w-full sm:w-auto">
           <button onclick="setWaterSubTab('courts')" 
-                  class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentSubTab === 'courts' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'}">
-            ⚽ Campos e Quadras
+                  class="w-full sm:w-auto text-center justify-center px-1.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${currentSubTab === 'courts' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'}">
+            <span class="truncate">⚽ Campos</span>
           </button>
           <button onclick="setWaterSubTab('suppliers')" 
-                  class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentSubTab === 'suppliers' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'}">
-            🚚 Fornecedor & Finanças ${analytics.totalSupplyCostPending > 0 ? `<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-200 text-rose-900 font-black">!</span>` : ''}
+                  class="w-full sm:w-auto text-center justify-center px-1.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${currentSubTab === 'suppliers' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'}">
+            <span class="truncate">🚚 Finanças</span> ${analytics.totalSupplyCostPending > 0 ? `<span class="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-200 text-rose-900 font-black">!</span>` : ''}
           </button>
           <button onclick="setWaterSubTab('history')" 
-                  class="px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${currentSubTab === 'history' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'}">
-            🕒 Histórico Geral
+                  class="w-full sm:w-auto text-center justify-center px-1.5 sm:px-4 py-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${currentSubTab === 'history' ? 'bg-white text-slate-900 shadow-sm font-black' : 'text-slate-600 hover:text-slate-900'}">
+            <span class="truncate">🕒 Histórico</span>
           </button>
         </div>
 
@@ -7410,38 +7411,37 @@ function renderBarControlTab() {
         ` : ''}
       </div>
 
-      <!-- Sub-navegação interna de Bar & Lanchonete -->
-      <div class="flex flex-wrap items-center gap-2 pb-1">
+      <!-- Sub-navegação interna de Bar & Lanchonete (Grid 2 colunas no mobile, 4 no tablet, flex no desktop) -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap items-center gap-2 pb-1 w-full">
         <button onclick="setBarSubTab('menu')" 
-                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
+                class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2
                        ${currentSubTab === 'menu' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="utensils" class="w-4 h-4 ${currentSubTab === 'menu' ? 'text-amber-400' : 'text-slate-500'}"></i>
-          <span>🍔 Cardápio de Produtos (${totalProducts})</span>
+          <i data-lucide="utensils" class="w-4 h-4 shrink-0 ${currentSubTab === 'menu' ? 'text-amber-400' : 'text-slate-500'}"></i>
+          <span class="truncate">🍔 Cardápio (${totalProducts})</span>
         </button>
 
         <button onclick="setBarSubTab('orders')" 
-                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
+                class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2
                        ${currentSubTab === 'orders' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="list-checks" class="w-4 h-4 ${currentSubTab === 'orders' ? 'text-emerald-400' : 'text-slate-500'}"></i>
-          <span>🍺 Fila de Pedidos (${barOrders.length})</span>
+          <i data-lucide="list-checks" class="w-4 h-4 shrink-0 ${currentSubTab === 'orders' ? 'text-emerald-400' : 'text-slate-500'}"></i>
+          <span class="truncate">🍺 Pedidos (${barOrders.length})</span>
         </button>
 
         <button onclick="setBarSubTab('water')" 
-                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2 relative
+                class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2 relative
                        ${currentSubTab === 'water' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="droplets" class="w-4 h-4 ${currentSubTab === 'water' ? 'text-cyan-400' : 'text-cyan-600'}"></i>
-          <span>💧 Registro de Água (${waterAnalytics.full} cheias)</span>
+          <i data-lucide="droplets" class="w-4 h-4 shrink-0 ${currentSubTab === 'water' ? 'text-cyan-400' : 'text-cyan-600'}"></i>
+          <span class="truncate">💧 Água (${waterAnalytics.full})</span>
           ${waterAnalytics.needsRefill ? `
-            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping inline-block" title="Atenção: Necessita reabastecimento de água"></span>
-            <span class="w-2 h-2 rounded-full bg-rose-500 inline-block -ml-3" title="Atenção: Necessita reabastecimento de água"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping inline-block shrink-0" title="Atenção: Necessita reabastecimento de água"></span>
           ` : ''}
         </button>
 
         <button onclick="setBarSubTab('all')" 
-                class="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center space-x-2
+                class="w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center space-x-2
                        ${currentSubTab === 'all' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="layout-grid" class="w-4 h-4 ${currentSubTab === 'all' ? 'text-cyan-400' : 'text-slate-500'}"></i>
-          <span>📋 Visão Completa</span>
+          <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 ${currentSubTab === 'all' ? 'text-cyan-400' : 'text-slate-500'}"></i>
+          <span class="truncate">📋 Visão Geral</span>
         </button>
       </div>
 
@@ -7675,54 +7675,54 @@ function renderAdminTabContent() {
   return `
     <div class="space-y-6">
       
-      <!-- Sub-navegação de Cadastros (flex-wrap para sobrepor em linhas e mostrar o nome completo de todos os botões sem cortar) -->
-      <div class="flex flex-wrap items-center gap-2 pb-2">
+      <!-- Sub-navegação de Cadastros (Grid 2 colunas no mobile, 3 ou 4 no tablet, flex no desktop) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:flex xl:flex-wrap items-center gap-2 pb-2 w-full">
         ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('spaces')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            Espaços / Quadras
+          <button onclick="setAdminSubTab('spaces')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">Espaços / Quadras</span>
           </button>
         ` : ''}
 
         ${(canDeleteBookings() || canStartMatches()) ? `
-          <button onclick="setAdminSubTab('bookings')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            ⚽ Jogos Agendados (${(state.bookings || []).length})
+          <button onclick="setAdminSubTab('bookings')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">⚽ Jogos (${(state.bookings || []).length})</span>
           </button>
         ` : ''}
 
         ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('positions')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            Posições dos Jogos
+          <button onclick="setAdminSubTab('positions')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">Posições dos Jogos</span>
           </button>
         ` : ''}
 
         ${canManageMonthly() ? `
-          <button onclick="setAdminSubTab('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            Horários Fixos (${state.monthlyMembers.length})
+          <button onclick="setAdminSubTab('monthly')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">Horários Fixos (${state.monthlyMembers.length})</span>
           </button>
         ` : ''}
 
         ${canManageSettings() ? `
-          <button onclick="setAdminSubTab('users')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            👑 Gestores & Acessos
+          <button onclick="setAdminSubTab('users')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">👑 Gestores & Acessos</span>
           </button>
         ` : ''}
 
         ${canManageCustomers() ? `
-          <button onclick="setAdminSubTab('customers')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            Clientes Cadastrados
+          <button onclick="setAdminSubTab('customers')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">Clientes Cadastrados</span>
           </button>
         ` : ''}
 
         ${canManageSettings() ? `
-          <button onclick="setAdminSubTab('database')" class="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            Conexão Supabase
+          <button onclick="setAdminSubTab('database')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <span class="truncate">Conexão Supabase</span>
           </button>
         ` : ''}
 
         ${isMasterAdmin ? `
-          <button onclick="setAdminSubTab('audit_logs')" class="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all cursor-pointer flex items-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
-            <i data-lucide="shield-alert" class="w-3.5 h-3.5 ${activeSubTab === 'audit_logs' ? 'text-white' : 'text-amber-700'}"></i>
-            <span>📜 Logs do Sistema</span>
+          <button onclick="setAdminSubTab('audit_logs')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
+            <i data-lucide="shield-alert" class="w-3.5 h-3.5 shrink-0 ${activeSubTab === 'audit_logs' ? 'text-white' : 'text-amber-700'}"></i>
+            <span class="truncate">📜 Logs</span>
           </button>
         ` : ''}
       </div>
@@ -7764,9 +7764,9 @@ function renderAdminCategoriesTab() {
             </div>
           </div>
 
-          <div class="flex items-center space-x-2">
-            <button onclick="openCategoryModal()" title="Cadastrar Nova Modalidade" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all whitespace-nowrap cursor-pointer">
-              <i data-lucide="plus" class="w-4 h-4 text-emerald-200"></i>
+          <div class="w-full sm:w-auto flex items-center justify-center">
+            <button onclick="openCategoryModal()" title="Cadastrar Nova Modalidade" class="w-full sm:w-auto justify-center text-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="plus" class="w-4 h-4 text-emerald-200 shrink-0"></i>
               <span>Nova Modalidade</span>
             </button>
           </div>
