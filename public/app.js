@@ -5128,15 +5128,11 @@ function renderWaterSupplyDashboardBanner() {
           </div>
         </div>
 
-        <!-- Botões de Ação do Banner: Fazer Pedido, Relatório e Ver Registro -->
+        <!-- Botões de Ação do Banner: Fazer Pedido e Ver Registro -->
         <div class="flex flex-row items-center gap-2 shrink-0 self-end md:self-center w-full md:w-auto justify-end">
           <button type="button" onclick="openAddWaterSupplyModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>+ Fazer Pedido</span>
-          </button>
-          <button type="button" onclick="openWaterReportModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer flex items-center space-x-1">
-            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-            <span>Relatório</span>
           </button>
           <button type="button" onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
             Ver Registro
@@ -5216,15 +5212,11 @@ function renderWaterSupplyDashboardBanner() {
         </div>
       </div>
 
-      <!-- Botões de Ação do Banner: Fazer Pedido, Relatório e Ver Registro -->
+      <!-- Botões de Ação do Banner: Fazer Pedido e Ver Registro -->
       <div class="flex flex-row items-center gap-2 shrink-0 self-end md:self-center w-full md:w-auto justify-end">
         <button type="button" onclick="openAddWaterSupplyModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer flex items-center justify-center space-x-1.5">
           <i data-lucide="plus-circle" class="w-4 h-4"></i>
           <span>+ Fazer Pedido</span>
-        </button>
-        <button type="button" onclick="openWaterReportModal()" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer flex items-center space-x-1">
-          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-          <span>Relatório</span>
         </button>
         <button type="button" onclick="state.adminTab='bar_control'; state.barSubTab='water'; renderApp();" class="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700 cursor-pointer">
           Ver Registro
