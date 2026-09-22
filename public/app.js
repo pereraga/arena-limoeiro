@@ -346,6 +346,91 @@ function normalizeCustomer(raw) {
   };
 }
 
+// ==============================================================================
+// 🗑️ GESTÃO DE CLIENTES EXCLUÍDOS / BLACKLIST PERSISTENTE (EVITA RESSURREIÇÃO)
+// ==============================================================================
+function getDeletedCustomerIdentifiers() {
+  let stored = { phones: [], cpfs: [], ids: [] };
+  try {
+    const raw = localStorage.getItem('arena_deleted_customers');
+    if (raw) stored = JSON.parse(raw);
+  } catch(e) {}
+  return {
+    phones: new Set(Array.isArray(stored.phones) ? stored.phones : []),
+    cpfs: new Set(Array.isArray(stored.cpfs) ? stored.cpfs : []),
+    ids: new Set(Array.isArray(stored.ids) ? stored.ids : [])
+  };
+}
+
+function saveDeletedCustomerIdentifiers(setObj) {
+  try {
+    const data = {
+      phones: Array.from(setObj.phones || []),
+      cpfs: Array.from(setObj.cpfs || []),
+      ids: Array.from(setObj.ids || [])
+    };
+    localStorage.setItem('arena_deleted_customers', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function isCustomerDeleted(id, phone, cpf) {
+  const deleted = getDeletedCustomerIdentifiers();
+  const cleanPhone = String(phone || '').replace(/\D/g, '');
+  const cleanCpf = String(cpf || '').replace(/\D/g, '');
+  const cleanId = String(id || '');
+
+  if (cleanId && deleted.ids.has(cleanId)) return true;
+  if (cleanPhone) {
+    if (deleted.phones.has(cleanPhone)) return true;
+    if (cleanPhone.length >= 8) {
+      for (const p of deleted.phones) {
+        if (p.length >= 8 && (p.endsWith(cleanPhone.slice(-8)) || cleanPhone.endsWith(p.slice(-8)))) {
+          return true;
+        }
+      }
+    }
+  }
+  if (cleanCpf && cleanCpf.length === 11 && deleted.cpfs.has(cleanCpf)) return true;
+  return false;
+}
+
+function markCustomerAsDeleted(id, phone, cpf) {
+  const deleted = getDeletedCustomerIdentifiers();
+  const cleanPhone = String(phone || '').replace(/\D/g, '');
+  const cleanCpf = String(cpf || '').replace(/\D/g, '');
+  const cleanId = String(id || '');
+
+  if (cleanId) deleted.ids.add(cleanId);
+  if (cleanPhone) deleted.phones.add(cleanPhone);
+  if (cleanCpf && cleanCpf.length === 11) deleted.cpfs.add(cleanCpf);
+  saveDeletedCustomerIdentifiers(deleted);
+}
+
+function unmarkCustomerAsDeleted(id, phone, cpf) {
+  const deleted = getDeletedCustomerIdentifiers();
+  const cleanPhone = String(phone || '').replace(/\D/g, '');
+  const cleanCpf = String(cpf || '').replace(/\D/g, '');
+  const cleanId = String(id || '');
+
+  if (cleanId) deleted.ids.delete(cleanId);
+  if (cleanPhone) {
+    deleted.phones.delete(cleanPhone);
+    for (const p of Array.from(deleted.phones)) {
+      if (cleanPhone.length >= 8 && p.length >= 8 && (p.endsWith(cleanPhone.slice(-8)) || cleanPhone.endsWith(p.slice(-8)))) {
+        deleted.phones.delete(p);
+      }
+    }
+  }
+  if (cleanCpf) deleted.cpfs.delete(cleanCpf);
+  saveDeletedCustomerIdentifiers(deleted);
+}
+
+window.getDeletedCustomerIdentifiers = getDeletedCustomerIdentifiers;
+window.saveDeletedCustomerIdentifiers = saveDeletedCustomerIdentifiers;
+window.isCustomerDeleted = isCustomerDeleted;
+window.markCustomerAsDeleted = markCustomerAsDeleted;
+window.unmarkCustomerAsDeleted = unmarkCustomerAsDeleted;
+
 // ⭐ Retorna o badge / destaque da quadra (calculado automaticamente ou definido manualmente)
 function getCourtDisplayBadge(court) {
   if (!court) return '';
@@ -8201,20 +8286,43 @@ function renderAdminSubTabContent(tab) {
     try { localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]'); } catch (e) {}
 
     const mapByPhone = new Map();
+    const mapByCpf = new Map();
 
     function mergeCustomerIntoMap(rawCust, isHighPriority = false) {
-      if (!rawCust || !rawCust.phone) return;
-      const clean = String(rawCust.phone).replace(/\D/g, '');
-      if (!clean) return;
-      const norm = normalizeCustomer(rawCust);
-      if (!norm) return;
+      if (!rawCust) return;
+      if (rawCust.name === '__DELETED_CUSTOMER__' || (rawCust.id && String(rawCust.id).startsWith('deleted_'))) return;
 
-      if (!mapByPhone.has(clean)) {
-        mapByPhone.set(clean, norm);
+      const cleanPhone = String(rawCust.phone || '').replace(/\D/g, '');
+      const rawCpf = rawCust.cpf || rawCust.customer_cpf || rawCust.customerCPF || rawCust.document || '';
+      const cleanCpf = String(rawCpf).replace(/\D/g, '');
+      const custId = rawCust.id || '';
+
+      // Se foi excluído pelo operador, NUNCA adiciona / NUNCA ressuscita
+      if (isCustomerDeleted(custId, cleanPhone, cleanCpf)) {
         return;
       }
 
-      const existing = mapByPhone.get(clean);
+      if (!cleanPhone && (!cleanCpf || cleanCpf.length !== 11)) return;
+      const norm = normalizeCustomer(rawCust);
+      if (!norm) return;
+
+      // Deduplicação inteligente por Telefone e por CPF
+      let targetKey = cleanPhone;
+      if (!targetKey && cleanCpf.length === 11) targetKey = 'cpf_' + cleanCpf;
+
+      if (cleanCpf && cleanCpf.length === 11 && mapByCpf.has(cleanCpf)) {
+        targetKey = mapByCpf.get(cleanCpf);
+      }
+
+      if (!mapByPhone.has(targetKey)) {
+        mapByPhone.set(targetKey, norm);
+        if (cleanCpf && cleanCpf.length === 11) {
+          mapByCpf.set(cleanCpf, targetKey);
+        }
+        return;
+      }
+
+      const existing = mapByPhone.get(targetKey);
       const mergedCpf = isHighPriority ? (norm.cpf || existing.cpf) : (existing.cpf || norm.cpf);
       const mergedEmerg = isHighPriority ? (norm.emergency_contact || existing.emergency_contact) : (existing.emergency_contact || norm.emergency_contact);
       const mergedHealth = isHighPriority
@@ -8224,7 +8332,7 @@ function renderAdminSubTabContent(tab) {
       const mergedEmail = isHighPriority ? (norm.email || existing.email) : (existing.email || norm.email);
       const mergedName = isHighPriority ? (norm.name || existing.name) : (existing.name || norm.name);
 
-      mapByPhone.set(clean, {
+      mapByPhone.set(targetKey, {
         ...existing,
         ...norm,
         id: existing.id || norm.id,
@@ -8240,6 +8348,11 @@ function renderAdminSubTabContent(tab) {
         birth_date: mergedBirth,
         birthDate: mergedBirth
       });
+
+      if (mergedCpf) {
+        const cCleanCpf = mergedCpf.replace(/\D/g, '');
+        if (cCleanCpf.length === 11) mapByCpf.set(cCleanCpf, targetKey);
+      }
     }
 
     // 1. Supabase
@@ -8248,17 +8361,24 @@ function renderAdminSubTabContent(tab) {
     // 2. localStorage
     localCusts.forEach(c => mergeCustomerIntoMap(c, true));
 
-    // 3. Histórico de reservas
+    // 3. Histórico de reservas (apenas se o cliente não tiver sido excluído)
     (state.bookings || []).forEach(b => {
       const p = b.customer_phone || b.customerPhone;
       if (p) {
         const parsedObs = parseCustomerFromObservation(b.observation || '');
+        const cpf = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || '';
+        const bCustId = b.customer_id || b.customerId;
+
+        if (isCustomerDeleted(bCustId, p, cpf)) {
+          return;
+        }
+
         mergeCustomerIntoMap({
-          id: b.customer_id || b.customerId,
+          id: bCustId,
           name: b.customer_name || b.customerName,
           phone: p,
           email: b.customer_email || b.customerEmail || '',
-          cpf: b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || '',
+          cpf: cpf,
           emergency_contact: b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || '',
           health_notes: b.health_notes || b.healthNotes || parsedObs.health_notes || '',
           birth_date: b.birth_date || b.birthDate || ''
@@ -8310,12 +8430,16 @@ function renderAdminSubTabContent(tab) {
                       <div class="font-bold text-slate-900">${cust.name}</div>
                       <div class="text-[11px] text-slate-400">${cust.email || 'Sem e-mail'}</div>
                     </td>
-                    <td class="py-3 font-mono text-slate-700 font-semibold">${cust.cpf ? formatCPF(cust.cpf) : '<span class="text-slate-300 italic">Não informado</span>'}</td>
-                    <td class="py-3 font-mono text-slate-700 font-bold">${formatPhone(cust.phone)}</td>
-                    <td class="py-3 text-slate-700 font-medium">
+                    <td class="py-3 font-mono font-bold text-slate-700">
+                      ${cust.cpf ? formatCPF(cust.cpf) : '<span class="text-slate-300 italic">-</span>'}
+                    </td>
+                    <td class="py-3 font-mono font-bold text-slate-700">
+                      ${cust.phone ? formatPhone(cust.phone) : '<span class="text-slate-300 italic">-</span>'}
+                    </td>
+                    <td class="py-3">
                       ${cust.emergency_contact ? `
-                        <span class="inline-flex items-center gap-1 text-slate-800">
-                          <i data-lucide="phone-call" class="w-3 h-3 text-rose-500 shrink-0"></i>
+                        <span class="inline-flex items-center gap-1 text-slate-700 font-medium">
+                          <i data-lucide="phone-call" class="w-3 h-3 text-rose-500"></i>
                           <span>${cust.emergency_contact}</span>
                         </span>
                       ` : '<span class="text-slate-300 italic">-</span>'}
@@ -8340,7 +8464,7 @@ function renderAdminSubTabContent(tab) {
                       <a href="https://wa.me/55${cleanPhone}" target="_blank" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] rounded-lg mr-1.5 transition-all">
                         WhatsApp
                       </a>
-                      <button onclick="deleteCustomer('${cust.id || cust.phone}', '${encodeURIComponent(cust.name || '')}', '${cust.phone}')" class="inline-flex items-center px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[11px] rounded-lg transition-all" title="Remover atleta da base">
+                      <button onclick="deleteCustomer('${cust.id || ''}', '${encodeURIComponent(cust.name || '')}', '${cust.phone || ''}', '${cust.cpf || cust.document || ''}')" class="inline-flex items-center px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold text-[11px] rounded-lg transition-all cursor-pointer" title="Remover atleta da base">
                         <i data-lucide="trash-2" class="w-3 h-3 mr-1 text-rose-500"></i>
                         <span>Excluir</span>
                       </button>
@@ -13691,6 +13815,9 @@ function findCustomerByPhone(phone) {
   if (!phone) return null;
   const clean = String(phone).replace(/\D/g, '');
   if (clean.length < 10) return null;
+  if (typeof isCustomerDeleted === 'function' && isCustomerDeleted(null, clean, null)) {
+    return null;
+  }
   const last8 = clean.slice(-8);
   const last9 = clean.length >= 9 ? clean.slice(-9) : null;
 
@@ -14233,6 +14360,19 @@ async function saveCustomerFromAdminModal(event, existingId) {
 
   const finalCustomer = normalizeCustomer(savedCust ? { ...customerData, ...savedCust } : customerData);
 
+  // Se o cliente estava na lista de excluídos, remove da exclusão ao salvar novo cadastro
+  unmarkCustomerAsDeleted(finalCustomer.id, cleanPhone, customerData.cpf);
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      await client.from('customers').delete().eq('id', 'deleted_' + cleanPhone);
+      if (customerData.cpf) {
+        const cCpf = customerData.cpf.replace(/\D/g, '');
+        if (cCpf.length === 11) await client.from('customers').delete().eq('id', 'deleted_' + cCpf);
+      }
+    } catch(e) {}
+  }
+
   if (state.supabaseCustomers) {
     const sIdx = state.supabaseCustomers.findIndex(c => (c.phone || '').replace(/\D/g, '') === cleanPhone || (existingId && c.id === existingId));
     if (sIdx >= 0) {
@@ -14247,40 +14387,38 @@ async function saveCustomerFromAdminModal(event, existingId) {
   if (typeof showNotification === 'function') showNotification('Ficha do atleta salva com sucesso!', 'success');
 }
 
-async function deleteCustomer(targetIdOrPhone, encodedName, phone) {
+async function deleteCustomer(targetIdOrPhone, encodedName, phone, optionalCpf = '') {
   const customerName = decodeURIComponent(encodedName || 'Atleta');
-  if (!confirm(`Deseja realmente excluir o atleta "${customerName}" da base de cadastro?\n\nEsta ação removerá o atleta do banco de dados.`)) {
+  if (!confirm(`Deseja realmente excluir o atleta "${customerName}" da base de cadastro?\n\nEsta ação removerá o atleta do banco de dados e ele não voltará a aparecer na lista ao atualizar a página.`)) {
     return;
   }
 
-  const clean = String(phone || targetIdOrPhone || '').replace(/\D/g, '');
+  const cleanPhone = String(phone || targetIdOrPhone || '').replace(/\D/g, '');
+  let foundCpf = String(optionalCpf || '').replace(/\D/g, '');
+  let foundId = (targetIdOrPhone && !targetIdOrPhone.includes('(') && !targetIdOrPhone.startsWith('81')) ? targetIdOrPhone : null;
 
-  // 1. Remove do Supabase
-  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-    try {
-      const client = window.ArenaSupabase.getClient();
-      if (targetIdOrPhone && targetIdOrPhone.startsWith('cust-')) {
-        await client.from('customers').delete().eq('id', targetIdOrPhone);
-      }
-      if (clean) {
-        await client.from('customers').delete().eq('phone', clean);
-        await client.from('customers').delete().eq('phone', formatPhone(clean));
-        if (clean.length >= 8) {
-          await client.from('customers').delete().ilike('phone', `%${clean.slice(-8)}%`);
-        }
-      }
-    } catch (err) {
-      console.warn('Aviso ao excluir cliente do Supabase:', err);
-    }
+  // Procura no state e no cache para capturar dados completos caso faltem
+  const existingCust = (state.supabaseCustomers || []).find(c => {
+    const cPhone = (c.phone || '').replace(/\D/g, '');
+    return (foundId && c.id === foundId) || (cleanPhone && cPhone === cleanPhone);
+  });
+  if (existingCust) {
+    if (!foundId && existingCust.id) foundId = existingCust.id;
+    if (!foundCpf) foundCpf = (existingCust.cpf || existingCust.document || '').replace(/\D/g, '');
   }
+
+  // 1. Marca imediatamente no registro de excluídos local (EVITA QUALQUER RESSURREIÇÃO)
+  markCustomerAsDeleted(foundId, cleanPhone, foundCpf);
 
   // 2. Remove da memória local do estado
   if (state.supabaseCustomers) {
     state.supabaseCustomers = state.supabaseCustomers.filter(c => {
       const cClean = (c.phone || '').replace(/\D/g, '');
-      const matchId = targetIdOrPhone && c.id === targetIdOrPhone;
-      const matchPhone = clean && (cClean === clean || (cClean.length >= 8 && clean.length >= 8 && cClean.endsWith(clean.slice(-8))));
-      return !matchId && !matchPhone;
+      const cCpf = (c.cpf || c.document || '').replace(/\D/g, '');
+      const matchId = foundId && c.id === foundId;
+      const matchPhone = cleanPhone && (cClean === cleanPhone || (cClean.length >= 8 && cleanPhone.length >= 8 && cClean.endsWith(cleanPhone.slice(-8))));
+      const matchCpf = foundCpf && foundCpf.length === 11 && cCpf === foundCpf;
+      return !matchId && !matchPhone && !matchCpf;
     });
   }
 
@@ -14289,12 +14427,115 @@ async function deleteCustomer(targetIdOrPhone, encodedName, phone) {
     let localCusts = JSON.parse(localStorage.getItem('arena_customers') || '[]');
     localCusts = localCusts.filter(c => {
       const cClean = (c.phone || '').replace(/\D/g, '');
-      const matchId = targetIdOrPhone && c.id === targetIdOrPhone;
-      const matchPhone = clean && (cClean === clean || (cClean.length >= 8 && clean.length >= 8 && cClean.endsWith(clean.slice(-8))));
-      return !matchId && !matchPhone;
+      const cCpf = (c.cpf || c.document || '').replace(/\D/g, '');
+      const matchId = foundId && c.id === foundId;
+      const matchPhone = cleanPhone && (cClean === cleanPhone || (cClean.length >= 8 && cleanPhone.length >= 8 && cClean.endsWith(cleanPhone.slice(-8))));
+      const matchCpf = foundCpf && foundCpf.length === 11 && cCpf === foundCpf;
+      return !matchId && !matchPhone && !matchCpf;
     });
     localStorage.setItem('arena_customers', JSON.stringify(localCusts));
   } catch (e) {}
+
+  // 4. Limpa vínculo e tags de atleta nas reservas locais
+  (state.bookings || []).forEach(b => {
+    const bp = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+    const bObs = b.observation || '';
+    const parsed = parseCustomerFromObservation(bObs);
+    const bCpf = (b.customer_cpf || b.customerCpf || b.customerCPF || parsed.cpf || '').replace(/\D/g, '');
+    const matchId = foundId && (b.customer_id === foundId || b.customerId === foundId);
+    const matchP = cleanPhone && (bp === cleanPhone || (bp.length >= 8 && cleanPhone.length >= 8 && bp.endsWith(cleanPhone.slice(-8))));
+    const matchC = foundCpf && foundCpf.length === 11 && bCpf === foundCpf;
+
+    if (matchId || matchP || matchC) {
+      b.customer_id = null;
+      b.customerId = null;
+      const cleanedObs = bObs
+        .replace(/\[CPF:\s*[^\]]+\]/gi, '')
+        .replace(/\[Emergência:\s*[^\]]+\]/gi, '')
+        .replace(/\[Saúde:\s*[^\]]+\]/gi, '')
+        .replace(/\|\s*\|/g, '|')
+        .trim()
+        .replace(/^\|\s*/, '')
+        .replace(/\s*\|$/, '');
+      b.observation = cleanedObs;
+    }
+  });
+  try {
+    localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+  } catch(e) {}
+
+  // 5. Exclui no Supabase (Nuvem) com Tombstone Sincronizado
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+
+      // Desvincula reservas com customer_id
+      if (foundId) {
+        await client.from('bookings').update({ customer_id: null }).eq('customer_id', foundId);
+        await client.from('monthly_members').update({ customer_id: null }).eq('customer_id', foundId);
+        await client.from('customers').delete().eq('id', foundId);
+      }
+
+      if (cleanPhone) {
+        await client.from('customers').delete().eq('phone', cleanPhone);
+        await client.from('customers').delete().eq('phone', formatPhone(cleanPhone));
+        if (cleanPhone.length >= 8) {
+          await client.from('customers').delete().ilike('phone', `%${cleanPhone.slice(-8)}%`);
+        }
+      }
+
+      if (foundCpf && foundCpf.length === 11) {
+        await client.from('customers').delete().eq('document', foundCpf);
+      }
+
+      // Limpa dados de atleta das observações das reservas no Supabase
+      try {
+        const { data: bList } = await client.from('bookings').select('id, observation, customer_phone');
+        if (bList && bList.length > 0) {
+          for (const b of bList) {
+            const bp = (b.customer_phone || '').replace(/\D/g, '');
+            const bObs = b.observation || '';
+            const parsed = parseCustomerFromObservation(bObs);
+            const bCpf = (parsed.cpf || '').replace(/\D/g, '');
+            const matchP = cleanPhone && (bp === cleanPhone || (bp.length >= 8 && cleanPhone.length >= 8 && bp.endsWith(cleanPhone.slice(-8))));
+            const matchC = foundCpf && foundCpf.length === 11 && bCpf === foundCpf;
+            if (matchP || matchC) {
+              const cleanedObs = bObs
+                .replace(/\[CPF:\s*[^\]]+\]/gi, '')
+                .replace(/\[Emergência:\s*[^\]]+\]/gi, '')
+                .replace(/\[Saúde:\s*[^\]]+\]/gi, '')
+                .replace(/\|\s*\|/g, '|')
+                .trim()
+                .replace(/^\|\s*/, '')
+                .replace(/\s*\|$/, '');
+              await client.from('bookings').update({ customer_id: null, observation: cleanedObs }).eq('id', b.id);
+            }
+          }
+        }
+      } catch(bErr) {
+        console.warn('Aviso ao desvincular reservas no Supabase:', bErr);
+      }
+
+      // Salva Tombstone no Supabase para sincronizar a exclusão com todos os outros celulares/tablets
+      if (cleanPhone || foundCpf) {
+        const tombKey = cleanPhone || foundCpf;
+        await client.from('customers').upsert([{
+          id: 'deleted_' + tombKey,
+          name: '__DELETED_CUSTOMER__',
+          phone: cleanPhone || '0000000000',
+          document: foundCpf || null,
+          notes: JSON.stringify({
+            deletedAt: new Date().toISOString(),
+            originalName: customerName,
+            phone: cleanPhone,
+            cpf: foundCpf
+          })
+        }]);
+      }
+    } catch (err) {
+      console.warn('Aviso ao excluir cliente do Supabase:', err);
+    }
+  }
 
   if (typeof showNotification === 'function') {
     showNotification(`Atleta "${customerName}" excluído com sucesso!`, 'info');
@@ -15182,7 +15423,26 @@ async function loadSupabaseCustomers() {
       const client = window.ArenaSupabase.getClient();
       const { data, error } = await client.from('customers').select('*').order('created_at', { ascending: false });
       if (data && !error) {
-        state.supabaseCustomers = (data || []).map(normalizeCustomer);
+        // 1. Sincroniza tombstones de clientes excluídos
+        const deletedTombstones = (data || []).filter(c => c.name === '__DELETED_CUSTOMER__' || (c.id && String(c.id).startsWith('deleted_')));
+        if (deletedTombstones.length > 0) {
+          const deletedList = getDeletedCustomerIdentifiers();
+          deletedTombstones.forEach(t => {
+            const p = (t.phone || '').replace(/\D/g, '');
+            const doc = (t.document || '').replace(/\D/g, '');
+            if (p && p !== '0000000000') deletedList.phones.add(p);
+            if (doc && doc.length === 11) deletedList.cpfs.add(doc);
+            if (t.id) deletedList.ids.add(t.id);
+          });
+          saveDeletedCustomerIdentifiers(deletedList);
+        }
+
+        // 2. Filtra tombstones e qualquer cliente que tenha sido excluído
+        state.supabaseCustomers = (data || [])
+          .filter(c => c.name !== '__DELETED_CUSTOMER__' && !(c.id && String(c.id).startsWith('deleted_')))
+          .filter(c => !isCustomerDeleted(c.id, c.phone, c.document || c.cpf))
+          .map(normalizeCustomer);
+
         try {
           localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
         } catch(e) {}
@@ -15508,7 +15768,26 @@ async function syncDataFromSupabase(skipRender = false) {
     }
 
     if (dbCustomers && !errCust) {
-      state.supabaseCustomers = (dbCustomers || []).map(normalizeCustomer);
+      // 1. Sincroniza tombstones de clientes excluídos
+      const deletedTombstones = (dbCustomers || []).filter(c => c.name === '__DELETED_CUSTOMER__' || (c.id && String(c.id).startsWith('deleted_')));
+      if (deletedTombstones.length > 0) {
+        const deletedList = getDeletedCustomerIdentifiers();
+        deletedTombstones.forEach(t => {
+          const p = (t.phone || '').replace(/\D/g, '');
+          const doc = (t.document || '').replace(/\D/g, '');
+          if (p && p !== '0000000000') deletedList.phones.add(p);
+          if (doc && doc.length === 11) deletedList.cpfs.add(doc);
+          if (t.id) deletedList.ids.add(t.id);
+        });
+        saveDeletedCustomerIdentifiers(deletedList);
+      }
+
+      // 2. Filtra tombstones e qualquer cliente que tenha sido excluído
+      state.supabaseCustomers = (dbCustomers || [])
+        .filter(c => c.name !== '__DELETED_CUSTOMER__' && !(c.id && String(c.id).startsWith('deleted_')))
+        .filter(c => !isCustomerDeleted(c.id, c.phone, c.document || c.cpf))
+        .map(normalizeCustomer);
+
       try {
         localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
       } catch(e) {}
