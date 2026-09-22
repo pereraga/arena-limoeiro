@@ -10238,6 +10238,191 @@ async function handleCancelBooking(bookingId) {
 }
 window.handleCancelBooking = handleCancelBooking;
 
+// HELPER PARA RESERVA DIRETA (BALCÃO): Grade visual de horários e seleção de Início e Término
+function updateDirectBookingSlots() {
+  const courtSelect = document.getElementById('directCourtSelect');
+  const dateInput = document.getElementById('directDateInput');
+  const grid = document.getElementById('directSlotsGrid');
+  const badge = document.getElementById('directSlotsCountBadge');
+  if (!courtSelect || !dateInput || !grid) return;
+
+  const courtId = courtSelect.value;
+  const date = dateInput.value;
+  if (!courtId || !date) return;
+
+  const slots = calculateLocalSchedule(courtId, date);
+  const freeSlots = slots.filter(s => s.status === 'available');
+
+  if (badge) {
+    if (freeSlots.length > 0) {
+      badge.textContent = `${freeSlots.length} horário(s) livre(s)`;
+      badge.className = 'text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300';
+    } else {
+      badge.textContent = '0 horários livres';
+      badge.className = 'text-[10px] font-black px-2.5 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-300';
+    }
+  }
+
+  const selectedStartTime = document.getElementById('directTimeSelect')?.value || '19:00';
+
+  grid.innerHTML = slots.map(s => {
+    const isFree = s.status === 'available';
+    const isSelected = s.time === selectedStartTime;
+    const isPast = s.status === 'past';
+    const isMaint = s.status === 'maintenance';
+
+    if (isFree) {
+      return `
+        <button type="button" onclick="selectDirectSlotTimes('${s.time}')" 
+                id="direct-slot-${s.time.replace(':', '')}"
+                title="${s.time} - Livre para agendar"
+                class="py-1.5 px-1 rounded-xl text-[11px] font-black transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs ${
+                  isSelected 
+                    ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 scale-105' 
+                    : 'bg-emerald-50 text-emerald-950 border border-emerald-200 hover:bg-emerald-500 hover:text-white hover:scale-105'
+                }">
+          <span>${s.time}</span>
+          <span class="text-[9px] opacity-80 font-bold">Livre</span>
+        </button>
+      `;
+    } else if (isMaint) {
+      return `
+        <div title="${s.time} - ${s.customerName || 'Treino / Manutenção'}" 
+             class="py-1.5 px-1 rounded-xl text-[11px] font-bold bg-amber-50 text-amber-900 border border-amber-200 flex flex-col items-center justify-center opacity-70 cursor-not-allowed">
+          <span>${s.time}</span>
+          <span class="text-[9px] truncate max-w-[48px] text-amber-800">Treino</span>
+        </div>
+      `;
+    } else {
+      return `
+        <div title="${s.time} - ${isPast ? 'Horário já passou hoje' : ('Ocupado: ' + (s.customerName || 'Reservado'))}" 
+             class="py-1.5 px-1 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-400 border border-slate-200 flex flex-col items-center justify-center opacity-60 cursor-not-allowed">
+          <span>${s.time}</span>
+          <span class="text-[9px] truncate max-w-[48px]">${isPast ? 'Passou' : 'Ocupado'}</span>
+        </div>
+      `;
+    }
+  }).join('');
+
+  updateDirectDurationDisplay();
+  if (window.lucide) lucide.createIcons();
+}
+
+function selectDirectSlotTimes(startTime) {
+  const timeSelect = document.getElementById('directTimeSelect');
+  if (timeSelect) {
+    timeSelect.value = startTime;
+    handleDirectTimeChange();
+  }
+}
+
+function handleDirectTimeChange() {
+  const timeSelect = document.getElementById('directTimeSelect');
+  const endSelect = document.getElementById('directEndTimeSelect');
+  if (!timeSelect || !endSelect) return;
+
+  const sTime = timeSelect.value;
+  const sMin = timeToMinutes(sTime);
+  let eMin = timeToMinutes(endSelect.value);
+
+  // Se término for menor ou igual ao início, empurra término para início + 60 min
+  if (isNaN(eMin) || eMin <= sMin) {
+    const newEndMin = sMin + 60;
+    const h = Math.floor(newEndMin / 60) % 24;
+    const m = newEndMin % 60;
+    const newEndTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+    
+    // Adiciona opção se não existir
+    if (!Array.from(endSelect.options).some(o => o.value === newEndTime)) {
+      const opt = new Option(newEndTime, newEndTime);
+      endSelect.add(opt);
+    }
+    endSelect.value = newEndTime;
+  }
+
+  highlightSelectedDirectSlot(sTime);
+  updateDirectDurationDisplay();
+}
+
+function handleDirectEndTimeChange() {
+  const timeSelect = document.getElementById('directTimeSelect');
+  const endSelect = document.getElementById('directEndTimeSelect');
+  if (!timeSelect || !endSelect) return;
+
+  const sMin = timeToMinutes(timeSelect.value);
+  let eMin = timeToMinutes(endSelect.value);
+  if (endSelect.value === '00:00') eMin = 1440;
+  else if (endSelect.value === '00:30') eMin = 1470;
+  else if (endSelect.value === '01:00') eMin = 1500;
+  else if (endSelect.value === '02:00') eMin = 1560;
+
+  if (eMin <= sMin) {
+    const newEndMin = sMin + 60;
+    const h = Math.floor(newEndMin / 60) % 24;
+    const m = newEndMin % 60;
+    endSelect.value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  }
+
+  updateDirectDurationDisplay();
+}
+
+function highlightSelectedDirectSlot(time) {
+  const allSlotBtns = document.querySelectorAll('#directSlotsGrid button');
+  allSlotBtns.forEach(btn => {
+    btn.className = 'py-1.5 px-1 rounded-xl text-[11px] font-black transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs bg-emerald-50 text-emerald-950 border border-emerald-200 hover:bg-emerald-500 hover:text-white hover:scale-105';
+  });
+  const currentBtn = document.getElementById(`direct-slot-${time.replace(':', '')}`);
+  if (currentBtn) {
+    currentBtn.className = 'py-1.5 px-1 rounded-xl text-[11px] font-black transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 scale-105';
+  }
+}
+
+function updateDirectDurationDisplay() {
+  const courtSelect = document.getElementById('directCourtSelect');
+  const timeSelect = document.getElementById('directTimeSelect');
+  const endSelect = document.getElementById('directEndTimeSelect');
+  const durText = document.getElementById('directDurationText');
+  const priceText = document.getElementById('directPriceText');
+  if (!timeSelect || !endSelect || !durText || !priceText) return;
+
+  const courtId = courtSelect ? courtSelect.value : null;
+  const sTime = timeSelect.value;
+  const eTime = endSelect.value;
+  const sMin = timeToMinutes(sTime);
+  let eMin = timeToMinutes(eTime);
+  if (eTime === '00:00') eMin = 1440;
+  else if (eTime === '00:30') eMin = 1470;
+  else if (eTime === '01:00') eMin = 1500;
+  else if (eTime === '02:00') eMin = 1560;
+
+  let durationMin = eMin - sMin;
+  if (durationMin <= 0) durationMin = 60;
+
+  const hours = Math.floor(durationMin / 60);
+  const mins = durationMin % 60;
+  let durLabel = '';
+  if (hours > 0 && mins > 0) {
+    durLabel = `${hours}h ${mins}min (${durationMin} min)`;
+  } else if (hours > 0) {
+    durLabel = `${hours} hora${hours > 1 ? 's' : ''} (${durationMin} min)`;
+  } else {
+    durLabel = `${mins} minutos`;
+  }
+  durText.textContent = `⏱️ Duração: ${durLabel}`;
+
+  const court = (state.courts || []).find(c => c.id === courtId) || { basePricePerHour: 140 };
+  const rate = Number(court.basePricePerHour || court.base_price_per_hour || 140);
+  const courtPrice = rate * (durationMin / 60);
+  priceText.textContent = `Quadra: R$ ${courtPrice.toFixed(2).replace('.', ',')}`;
+}
+
+window.updateDirectBookingSlots = updateDirectBookingSlots;
+window.selectDirectSlotTimes = selectDirectSlotTimes;
+window.handleDirectTimeChange = handleDirectTimeChange;
+window.handleDirectEndTimeChange = handleDirectEndTimeChange;
+window.highlightSelectedDirectSlot = highlightSelectedDirectSlot;
+window.updateDirectDurationDisplay = updateDirectDurationDisplay;
+
 // 6. MODAL DE FAZER RESERVA DIRETA (BALCÃO / WHATSAPP)
 function openDirectBookingModal() {
   const modalRoot = document.getElementById('modalRoot');
@@ -10268,7 +10453,7 @@ function openDirectBookingModal() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quadra Desejada *</label>
-              <select id="directCourtSelect" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              <select id="directCourtSelect" onchange="updateDirectBookingSlots()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
                 ${state.courts.map(c => {
                   const specs = typeof c.specs === 'string' ? JSON.parse(c.specs || '{}') : (c.specs || {});
                   const isM = c.isMaintenance || specs.status === 'maintenance';
@@ -10279,12 +10464,12 @@ function openDirectBookingModal() {
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data do Jogo *</label>
-              <input type="date" id="directDateInput" required value="${selectedDefaultDate}" min="${realToday}" 
+              <input type="date" id="directDateInput" onchange="updateDirectBookingSlots()" required value="${selectedDefaultDate}" min="${realToday}" 
                      class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
               <div class="flex items-center justify-between gap-1 mt-1.5 flex-wrap">
                 <span class="text-[10px] text-emerald-700 font-black">✓ Balcão Totalmente Liberado para Qualquer Mês</span>
                 <div class="flex items-center gap-1">
-                  <button type="button" onclick="document.getElementById('directDateInput').value = '${realToday}'" 
+                  <button type="button" onclick="document.getElementById('directDateInput').value = '${realToday}'; updateDirectBookingSlots();" 
                           class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black hover:bg-emerald-200">
                     Hoje
                   </button>
@@ -10296,11 +10481,11 @@ function openDirectBookingModal() {
                     dNextM.setMonth(dNextM.getMonth() + 1);
                     const nextM = getFormattedDate(dNextM);
                     return `
-                      <button type="button" onclick="document.getElementById('directDateInput').value = '${in7}'" 
+                      <button type="button" onclick="document.getElementById('directDateInput').value = '${in7}'; updateDirectBookingSlots();" 
                               class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-[10px] font-bold">
                         +7 dias
                       </button>
-                      <button type="button" onclick="document.getElementById('directDateInput').value = '${nextM}'" 
+                      <button type="button" onclick="document.getElementById('directDateInput').value = '${nextM}'; updateDirectBookingSlots();" 
                               class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[10px] font-bold">
                         Próximo Mês
                       </button>
@@ -10311,22 +10496,65 @@ function openDirectBookingModal() {
             </div>
           </div>
 
+          <!-- Grade Visual de Horários Livres (Estilo Agendamento Cliente) -->
+          <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5">
+                <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+                Horários Livres da Quadra nesta Data
+              </span>
+              <span id="directSlotsCountBadge" class="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Carregando horários...
+              </span>
+            </div>
+            
+            <p class="text-[11px] text-slate-500 font-medium">
+              Toque em qualquer horário verde abaixo para preencher o início automaticamente ou escolha manualmente nos campos:
+            </p>
+
+            <!-- Container com os chips de horários -->
+            <div id="directSlotsGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto p-1.5 bg-white rounded-xl border border-slate-200">
+              <div class="col-span-full py-4 text-center text-xs text-slate-400 font-bold">Carregando horários da quadra...</div>
+            </div>
+
+            <div class="flex items-center gap-3 text-[10px] text-slate-600 font-bold pt-1 border-t border-slate-200/60 flex-wrap">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Livre</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-300 inline-block"></span> Ocupado / Encerrado</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block"></span> Treino / Manutenção</span>
+            </div>
+          </div>
+
+          <!-- Seleção de Início e Fim (Término) com Cálculo Dinâmico de Duração -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Horário de Início *</label>
-              <select id="directTimeSelect" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                <span>Hora de Início *</span>
+                <span class="text-[10px] text-emerald-700 font-bold">Começo da Partida</span>
+              </label>
+              <select id="directTimeSelect" onchange="handleDirectTimeChange()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
                 ${["06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30"].map(t => `<option value="${t}" ${t === '19:00' ? 'selected' : ''}>${t}</option>`).join('')}
               </select>
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Duração *</label>
-              <select id="directDurationSelect" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
-                <option value="30">⏱️ 30 Minutos (Meia Hora)</option>
-                <option value="60" selected>⏱️ 1 Hora (60 min)</option>
-                <option value="90">⏱️ 1h 30min (90 min)</option>
-                <option value="120">⏱️ 2 Horas (120 min)</option>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                <span>Hora de Fim (Término) *</span>
+                <span class="text-[10px] text-emerald-700 font-bold">Término da Partida</span>
+              </label>
+              <select id="directEndTimeSelect" onchange="handleDirectEndTimeChange()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+                ${["06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30","23:59","00:00","00:30","01:00","02:00"].map(t => `<option value="${t}" ${t === '20:00' ? 'selected' : ''}>${t}</option>`).join('')}
               </select>
+            </div>
+          </div>
+
+          <!-- Resumo de Duração e Valor Calculado -->
+          <div id="directTimeSummaryBox" class="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-300/80 rounded-xl text-xs">
+            <div class="flex items-center gap-2 font-black text-emerald-950">
+              <i data-lucide="clock-4" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
+              <span id="directDurationText">⏱️ Duração: 1 hora (60 min)</span>
+            </div>
+            <div class="font-black text-emerald-900 text-right">
+              <span id="directPriceText">Quadra: R$ 140,00</span>
             </div>
           </div>
 
@@ -10442,6 +10670,9 @@ function openDirectBookingModal() {
     </div>
   `;
   lucide.createIcons();
+  setTimeout(() => {
+    updateDirectBookingSlots();
+  }, 40);
 }
 
 function toggleDirectBookingRecurrence(val) {
@@ -10462,7 +10693,24 @@ async function handleDirectBookingSubmit(e) {
   const courtId = document.getElementById('directCourtSelect').value;
   const date = document.getElementById('directDateInput').value;
   const startTime = document.getElementById('directTimeSelect').value;
-  const duration = parseInt(document.getElementById('directDurationSelect').value, 10);
+  const endSelect = document.getElementById('directEndTimeSelect');
+  const endTimeVal = endSelect ? endSelect.value : '';
+
+  const sMin = timeToMinutes(startTime);
+  let eMin = endTimeVal ? timeToMinutes(endTimeVal) : (sMin + 60);
+  if (endTimeVal === '00:00') eMin = 1440;
+  else if (endTimeVal === '00:30') eMin = 1470;
+  else if (endTimeVal === '01:00') eMin = 1500;
+  else if (endTimeVal === '02:00') eMin = 1560;
+
+  if (eMin <= sMin) {
+    eMin = sMin + 60;
+  }
+  const duration = eMin - sMin;
+  const endHours = Math.floor((eMin % 1440) / 60).toString().padStart(2, '0');
+  const endMins = (eMin % 60).toString().padStart(2, '0');
+  const endTime = endTimeVal || `${endHours}:${endMins}`;
+
   const name = document.getElementById('directCustomerName').value.trim();
   const phone = document.getElementById('directCustomerPhone').value.trim();
   const rawCpf = (document.getElementById('directCustomerCpf')?.value || '').trim();
@@ -10478,13 +10726,6 @@ async function handleDirectBookingSubmit(e) {
   if (emergency && !obs.includes('[Emergência:')) {
     obs = obs ? `${obs} [Emergência: ${emergency}]` : `[Emergência: ${emergency}]`;
   }
-
-  // Calcula end_time
-  const sMin = timeToMinutes(startTime);
-  const eMin = sMin + duration;
-  const endHours = Math.floor(eMin / 60).toString().padStart(2, '0');
-  const endMins = (eMin % 60).toString().padStart(2, '0');
-  const endTime = `${endHours}:${endMins}`;
 
   // ANTI-CHOQUE NA RESERVA DIRETA: Verifica sobreposição antes de salvar sem bloquear arbitrariamente o Balcão
   const conflict = checkScheduleConflict(courtId, date, startTime, endTime);
