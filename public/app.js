@@ -1585,6 +1585,39 @@ function renderStep2(container) {
   }
 
   if (state.bookingType === 'mensalista') {
+    if (state.currentMode !== 'admin') {
+      container.innerHTML = `
+        <div class="max-w-4xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
+          <div class="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm mb-6">
+            <div class="flex items-center space-x-3 mb-4">
+              <span class="p-2.5 rounded-2xl bg-amber-100 text-amber-800 shadow-sm"><i data-lucide="crown" class="w-6 h-6"></i></span>
+              <div>
+                <h3 class="text-base sm:text-lg font-black text-slate-900">Horários Fixos & Mensalistas</h3>
+                <p class="text-xs text-slate-500">Agendamento exclusivo diretamente no Balcão da Arena ou via WhatsApp</p>
+              </div>
+            </div>
+            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2">
+              <p class="font-bold">⚠️ Conforme as regras da Arena Limoeiro, agendamentos recorrentes e para os próximos meses são realizados exclusivamente pela equipe no Balcão ou via WhatsApp.</p>
+              <p>Dessa forma, garantimos a disponibilidade contínua do seu horário sem choques de reservas e com condições personalizadas para o seu time.</p>
+            </div>
+            <div class="mt-6 flex flex-col sm:flex-row items-center gap-3">
+              <a href="https://wa.me/5581999999999?text=${encodeURIComponent('Olá! Gostaria de consultar e agendar horários fixos/mensalistas para os próximos meses na Arena Limoeiro.')}" target="_blank"
+                 class="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs flex items-center justify-center space-x-2 shadow-md transition-all">
+                <i data-lucide="message-circle" class="w-4 h-4"></i>
+                <span>Contratar Horário Fixo no WhatsApp</span>
+              </a>
+              <button type="button" onclick="state.bookingType = 'avulso'; renderStepContent(); renderBottomBar();" 
+                      class="w-full sm:w-auto px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all">
+                Agendar Jogo Avulso no Mês Atual
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      lucide.createIcons();
+      return;
+    }
+
     const weekDays = [
       { id: "segunda", name: "Segunda-feira" },
       { id: "terca", name: "Terça-feira" },
@@ -1601,8 +1634,8 @@ function renderStep2(container) {
           <div class="flex items-center space-x-3 mb-5">
             <span class="p-2.5 rounded-2xl bg-amber-100 text-amber-800 shadow-sm"><i data-lucide="crown" class="w-6 h-6"></i></span>
             <div>
-              <h3 class="text-base sm:text-lg font-black text-slate-900">Configuração do Dia do Horário Fixo</h3>
-              <p class="text-xs text-slate-500">Selecione o dia fixo da semana para o seu time jogar toda semana no mês</p>
+              <h3 class="text-base sm:text-lg font-black text-slate-900">Configuração do Dia do Horário Fixo (Balcão)</h3>
+              <p class="text-xs text-slate-500">Selecione o dia fixo da semana para o time jogar toda semana no mês</p>
             </div>
           </div>
 
@@ -1722,6 +1755,22 @@ function renderCalendarHTML() {
   const isDbConnected = window.ArenaSupabase && window.ArenaSupabase.isReady();
 
   let html = `
+    <!-- Banner de Regra Oficial Arena Limoeiro -->
+    <div class="mb-3.5 p-3 sm:p-3.5 rounded-2xl bg-amber-50 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-xs">
+      <div class="flex items-center space-x-2">
+        <span class="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-amber-700"></i>
+        </span>
+        <div>
+          <span class="text-xs font-black text-amber-950 block leading-tight">Agendamento Online: Mês Atual (${currentMonthYearName})</span>
+          <span class="text-[11px] text-amber-800 font-medium">Jogos para os próximos meses são agendados exclusivamente no Balcão da Arena ou via WhatsApp.</span>
+        </div>
+      </div>
+      <span class="text-[10px] font-black uppercase tracking-wider bg-amber-200/80 text-amber-950 px-2.5 py-1 rounded-lg shrink-0 self-start sm:self-auto">
+        Exclusivo Balcão
+      </span>
+    </div>
+
     <!-- Cabeçalho do Mês -->
     <div class="calendar-header flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100">
       <div class="flex items-center space-x-2.5">
@@ -1773,6 +1822,18 @@ function renderCalendarHTML() {
         <button disabled 
                 class="h-11 sm:h-12 w-full rounded-2xl text-xs sm:text-sm font-bold text-slate-300 bg-slate-50/60 border border-slate-100 flex flex-col items-center justify-center cursor-not-allowed opacity-40 select-none">
           <span>${day}</span>
+        </button>
+      `;
+      continue;
+    }
+
+    const isFutureMonthDay = (year > now.getFullYear()) || (year === now.getFullYear() && month > now.getMonth());
+    if (isFutureMonthDay && state.currentMode !== 'admin') {
+      html += `
+        <button disabled title="Reservas para os próximos meses são feitas exclusivamente no Balcão da Arena"
+                class="h-11 sm:h-12 w-full rounded-2xl text-xs sm:text-sm font-bold text-slate-400 bg-slate-100/70 border border-slate-200/60 flex flex-col items-center justify-center cursor-not-allowed opacity-50 select-none">
+          <span>${day}</span>
+          <span class="text-[8px] font-bold text-amber-700 leading-none mt-0.5">Balcão</span>
         </button>
       `;
       continue;
@@ -1867,6 +1928,18 @@ function selectDate(dateStr) {
     alert('Não é possível selecionar uma data que já passou.');
     return;
   }
+
+  // REGRA ARENA LIMOEIRO: Clientes online só podem agendar no mês atual. Próximos meses apenas na Reserva no Balcão.
+  if (state.currentMode !== 'admin' && dateStr) {
+    const [y, m] = dateStr.split('-').map(Number);
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0 a 11
+    if (y > currentYear || (y === currentYear && m - 1 > currentMonth)) {
+      alert('⚠️ Agendamento Exclusivo no Balcão!\n\nNo momento, o agendamento online está aberto apenas para as datas do mês atual.\n\nPara agendar partidas nos próximos meses, por favor realize sua reserva diretamente no Balcão da Arena Limoeiro ou fale com nossa equipe pelo WhatsApp!');
+      return;
+    }
+  }
+
   state.selectedDate = dateStr;
   if (dateStr) {
     const [y, m] = dateStr.split('-').map(Number);
@@ -10144,8 +10217,9 @@ function openDirectBookingModal() {
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data do Jogo *</label>
-              <input type="date" id="directDateInput" required value="${todayStr}" 
+              <input type="date" id="directDateInput" required value="${todayStr}" min="${todayStr}" 
                      class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
+              <span class="text-[10px] text-emerald-700 font-bold mt-1 block">✓ Balcão Liberado: Agende livremente para qualquer data dos próximos meses sem bloqueio.</span>
             </div>
           </div>
 
@@ -10199,9 +10273,9 @@ function openDirectBookingModal() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Agendamento</label>
-              <select id="directTypeSelect" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white">
-                <option value="avulso">Jogo Avulso</option>
-                <option value="mensalista">Mensalista Fixo</option>
+              <select id="directTypeSelect" onchange="toggleDirectBookingRecurrence(this.value)" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white">
+                <option value="avulso">Jogo Avulso (Data Única)</option>
+                <option value="mensalista">Mensalista Fixo (Recorrente nos Próximos Meses)</option>
               </select>
             </div>
 
@@ -10212,6 +10286,36 @@ function openDirectBookingModal() {
                 <option value="sinal_50">🟡 Sinal de 50% Pago</option>
                 <option value="pagar_local">⚪ Pagar na Chegada do Jogo</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Configuração de Recorrência nos Próximos Meses para Mensalistas -->
+          <div id="directRecurrenceBox" class="hidden p-3.5 bg-emerald-50 border border-emerald-300 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-emerald-950 uppercase flex items-center">
+                <i data-lucide="repeat" class="w-4 h-4 text-emerald-600 mr-1.5"></i>
+                Repetir Agendamento nos Próximos Meses (Semanal)
+              </span>
+              <span class="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full">Exclusivo Balcão</span>
+            </div>
+            <p class="text-[11px] text-emerald-800 font-medium">Quantos meses de jogos você deseja agendar automaticamente no sistema?</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <label class="flex items-center space-x-2 text-xs text-slate-800 font-bold p-2 bg-white rounded-xl border border-emerald-200 cursor-pointer shadow-xs hover:border-emerald-400">
+                <input type="radio" name="directRepeatPeriod" value="1" checked class="text-emerald-600 focus:ring-emerald-500">
+                <span>1 Mês (4 jogos)</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-800 font-bold p-2 bg-white rounded-xl border border-emerald-200 cursor-pointer shadow-xs hover:border-emerald-400">
+                <input type="radio" name="directRepeatPeriod" value="2" class="text-emerald-600 focus:ring-emerald-500">
+                <span>2 Meses (8 jogos)</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-800 font-bold p-2 bg-white rounded-xl border border-emerald-200 cursor-pointer shadow-xs hover:border-emerald-400">
+                <input type="radio" name="directRepeatPeriod" value="3" class="text-emerald-600 focus:ring-emerald-500">
+                <span>3 Meses (12 jogos)</span>
+              </label>
+              <label class="flex items-center space-x-2 text-xs text-slate-800 font-bold p-2 bg-white rounded-xl border border-emerald-200 cursor-pointer shadow-xs hover:border-emerald-400">
+                <input type="radio" name="directRepeatPeriod" value="6" class="text-emerald-600 focus:ring-emerald-500">
+                <span>6 Meses (24 jogos)</span>
+              </label>
             </div>
           </div>
 
@@ -10252,6 +10356,18 @@ function openDirectBookingModal() {
   lucide.createIcons();
 }
 
+function toggleDirectBookingRecurrence(val) {
+  const box = document.getElementById('directRecurrenceBox');
+  if (box) {
+    if (val === 'mensalista') {
+      box.classList.remove('hidden');
+    } else {
+      box.classList.add('hidden');
+    }
+  }
+}
+window.toggleDirectBookingRecurrence = toggleDirectBookingRecurrence;
+
 async function handleDirectBookingSubmit(e) {
   e.preventDefault();
 
@@ -10282,11 +10398,12 @@ async function handleDirectBookingSubmit(e) {
   const endMins = (eMin % 60).toString().padStart(2, '0');
   const endTime = `${endHours}:${endMins}`;
 
-  // ANTI-CHOQUE NA RESERVA DIRETA: Verifica sobreposição antes de salvar
+  // ANTI-CHOQUE NA RESERVA DIRETA: Verifica sobreposição antes de salvar sem bloquear arbitrariamente o Balcão
   const conflict = checkScheduleConflict(courtId, date, startTime, endTime);
   if (conflict.conflict) {
-    alert('⚠️ Não é possível realizar esta reserva direta!\n\nMotivo: ' + conflict.reason + '\n\nPor favor, altere o horário ou selecione outro campo livre.');
-    return;
+    if (!confirm(`⚠️ Aviso de Conflito de Horário:\n\n${conflict.reason}\n\nVocê está realizando esta reserva diretamente no Balcão. Deseja confirmar e prosseguir com o agendamento mesmo assim?`)) {
+      return;
+    }
   }
 
   const court = state.courts.find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 140 };
@@ -10315,55 +10432,117 @@ async function handleDirectBookingSubmit(e) {
     }
   }
 
-  // Payload limpo com apenas as colunas existentes na tabela 'bookings' do Supabase
-  const dbBookingPayload = {
-    id: newBookingId,
-    court_id: courtId,
-    customer_id: (savedCust && savedCust.id) ? savedCust.id : null,
-    date,
-    start_time: startTime,
-    end_time: endTime,
-    time: `${startTime} às ${endTime}`,
-    duration,
-    customer_name: name,
-    customer_phone: phone,
-    total_price: totalPrice,
-    status: 'confirmed',
-    booking_type: bookingType,
-    payment_method: paymentMethod,
-    product_cart: productCart,
-    observation: extraObs
-  };
+  const newBookingId = 'ARENA-' + Math.floor(1000 + Math.random() * 9000);
+  const totalPrice = courtPrice + barTotal;
 
-  const bookingPayload = {
-    ...dbBookingPayload,
-    customer_cpf: customerCpf,
-    customerCPF: customerCpf,
-    emergency_contact: emergency
-  };
+  // Se for Mensalista Fixo com repetição nos próximos meses
+  let repeatMonths = 1;
+  let totalWeeks = 1;
+  if (bookingType === 'mensalista') {
+    repeatMonths = parseInt(document.querySelector('input[name="directRepeatPeriod"]:checked')?.value || '1', 10);
+    totalWeeks = Math.max(1, repeatMonths * 4);
+  }
 
-  // Salva no estado
-  state.bookings.push(bookingPayload);
+  const [sy, sm, sd] = date.split('-').map(Number);
+  const bookingsToCreate = [];
+
+  for (let w = 0; w < totalWeeks; w++) {
+    const curGameDateObj = new Date(sy, sm - 1, sd + (w * 7));
+    const curGameDate = getFormattedDate(curGameDateObj);
+    const bId = w === 0 ? newBookingId : ('ARENA-' + Math.floor(1000 + Math.random() * 9000));
+
+    const dbPayload = {
+      id: bId,
+      court_id: courtId,
+      customer_id: (savedCust && savedCust.id) ? savedCust.id : null,
+      date: curGameDate,
+      start_time: startTime,
+      end_time: endTime,
+      time: `${startTime} às ${endTime}`,
+      duration,
+      customer_name: name,
+      customer_phone: phone,
+      total_price: courtPrice + (w === 0 ? barTotal : 0),
+      status: 'confirmed',
+      booking_type: bookingType,
+      payment_method: paymentMethod,
+      product_cart: w === 0 ? productCart : {},
+      observation: totalWeeks > 1 
+        ? `${extraObs} (Jogo ${w + 1}/${totalWeeks} - Mensalista)`.trim() 
+        : extraObs
+    };
+
+    bookingsToCreate.push({
+      ...dbPayload,
+      customer_cpf: customerCpf,
+      customerCPF: customerCpf,
+      emergency_contact: emergency
+    });
+  }
+
+  // Adiciona ao estado local
+  bookingsToCreate.forEach(b => state.bookings.push(b));
 
   // Salva no localStorage
   const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  local.push(bookingPayload);
+  bookingsToCreate.forEach(b => local.push(b));
   localStorage.setItem('arena_local_bookings', JSON.stringify(local));
 
-  // Salva no Supabase
+  // Se for mensalista, adiciona ao cadastro de mensalistas fixos
+  if (bookingType === 'mensalista') {
+    const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+    const baseDateObj = new Date(sy, sm - 1, sd);
+    const dayOfWeekId = weekDaysMap[baseDateObj.getDay()];
+    const memberRecord = {
+      id: 'mensal-' + Date.now(),
+      team_name: name,
+      responsible_name: name,
+      phone: phone,
+      customer_id: (savedCust && savedCust.id) ? savedCust.id : null,
+      court_id: courtId,
+      day_of_week: dayOfWeekId,
+      day_of_week_label: 'Toda ' + dayOfWeekId + '-feira',
+      time: startTime,
+      start_time: startTime,
+      end_time: endTime,
+      monthly_price: courtPrice * 4,
+      status: 'active',
+      observation: extraObs ? `${extraObs} (Contratado para ${repeatMonths} mês/meses)` : `Contratado para ${repeatMonths} mês/meses`
+    };
+
+    if (!state.monthlyMembers) state.monthlyMembers = [];
+    state.monthlyMembers.push(memberRecord);
+    localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        await client.from('monthly_members').insert([memberRecord]);
+      } catch(e) {
+        console.warn('Aviso inserção mensalista Supabase:', e);
+      }
+    }
+  }
+
+  // Salva no Supabase (Nuvem)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      const { error: insErr } = await client.from('bookings').insert([dbBookingPayload]);
+      const supabaseDbPayloads = bookingsToCreate.map(b => {
+        const { customer_cpf, customerCPF, emergency_contact, ...cleanDb } = b;
+        return cleanDb;
+      });
+
+      const { error: insErr } = await client.from('bookings').insert(supabaseDbPayloads);
       if (insErr) {
         console.warn('Aviso inserção booking admin Supabase:', insErr);
         if (insErr.code === '23503') {
-          dbBookingPayload.customer_id = null;
-          await client.from('bookings').insert([dbBookingPayload]);
+          supabaseDbPayloads.forEach(p => p.customer_id = null);
+          await client.from('bookings').insert(supabaseDbPayloads);
         }
       }
       if (window.ArenaSupabase.broadcastBooking) {
-        window.ArenaSupabase.broadcastBooking(bookingPayload);
+        bookingsToCreate.forEach(b => window.ArenaSupabase.broadcastBooking(b));
       }
     } catch(err) {
       console.warn('Erro ao salvar no Supabase:', err);
@@ -10378,16 +10557,16 @@ async function handleDirectBookingSubmit(e) {
     id: (savedCust && savedCust.id) ? savedCust.id : ('cust-' + Date.now()), 
     name, 
     phone, 
-    cpf: customerCpf,
+    cpf: customerCpf, 
     document: customerCpf, 
-    emergency_contact: emergency,
-    emergencyContact: emergency
+    emergency_contact: emergency, 
+    emergencyContact: emergency 
   });
 
   if (exIdx >= 0) {
     state.supabaseCustomers[exIdx] = normalizeCustomer({ 
       ...state.supabaseCustomers[exIdx], 
-      ...updatedCust,
+      ...updatedCust, 
       cpf: customerCpf || state.supabaseCustomers[exIdx].cpf, 
       emergency_contact: emergency || state.supabaseCustomers[exIdx].emergency_contact 
     });
@@ -10400,12 +10579,12 @@ async function handleDirectBookingSubmit(e) {
 
   // Dispara notificação imediata
   try {
-    triggerBookingNotification(bookingPayload);
+    triggerBookingNotification(bookingsToCreate[0]);
   } catch(e) {}
 
   // Transmite broadcast instantâneo via WebSocket para todos os outros aparelhos/celulares
   if (window.ArenaSupabase && window.ArenaSupabase.broadcastBooking) {
-    window.ArenaSupabase.broadcastBooking(bookingPayload);
+    window.ArenaSupabase.broadcastBooking(bookingsToCreate[0]);
   }
 
   // Registra no Log de Auditoria do Sistema
@@ -10413,7 +10592,9 @@ async function handleDirectBookingSubmit(e) {
     actionType: 'CREATE_BOOKING',
     actionLabel: 'Reserva no Balcão',
     courtName: court ? court.name : 'Quadra',
-    details: `Reserva no balcão confirmada para ${name} (${phone}) na ${court ? court.name : 'Quadra'} - ${formatDisplayDate(date)} às ${startTime} às ${endTime}. Valor: R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
+    details: totalWeeks > 1 
+      ? `Reserva no balcão: ${totalWeeks} jogos de Mensalista confirmados para ${name} (${phone}) na ${court ? court.name : 'Quadra'} a partir de ${formatDisplayDate(date)} às ${startTime}.` 
+      : `Reserva no balcão confirmada para ${name} (${phone}) na ${court ? court.name : 'Quadra'} - ${formatDisplayDate(date)} às ${startTime} às ${endTime}. Valor: R$ ${totalPrice.toFixed(2).replace('.', ',')}`,
     targetId: newBookingId
   });
 
@@ -10424,11 +10605,15 @@ async function handleDirectBookingSubmit(e) {
 
   // Abre confirmação de envio WhatsApp
   const cleanPhone = phone.replace(/\D/g, '');
-  const zapMsg = `🏟️ *ARENA LIMOEIRO - RESERVA CONFIRMADA*\n\nOlá ${name}! Sua partida foi confirmada com sucesso:\n📍 Quadra: ${court.name}\n📅 Data: ${formatDisplayDate(date)}\n⏰ Horário: ${startTime} às ${endTime}\n💳 Valor Total: R$ ${totalPrice.toFixed(2).replace('.', ',')}\n\nAguardamos sua equipe na Arena Limoeiro!`;
+  const zapMsg = totalWeeks > 1
+    ? `🏟️ *ARENA LIMOEIRO - MENSALISTA FIXO CONFIRMADO*\n\nOlá ${name}! Seu horário fixo foi reservado com sucesso:\n📍 Quadra: ${court.name}\n📅 Início: ${formatDisplayDate(date)} (${totalWeeks} jogos nos próximos ${repeatMonths} meses)\n⏰ Horário: ${startTime} às ${endTime}\n💳 Valor Mensal: R$ ${(courtPrice * 4).toFixed(2).replace('.', ',')}\n\nAguardamos seu time na Arena Limoeiro!`
+    : `🏟️ *ARENA LIMOEIRO - RESERVA CONFIRMADA*\n\nOlá ${name}! Sua partida foi confirmada com sucesso:\n📍 Quadra: ${court.name}\n📅 Data: ${formatDisplayDate(date)}\n⏰ Horário: ${startTime} às ${endTime}\n💳 Valor Total: R$ ${totalPrice.toFixed(2).replace('.', ',')}\n\nAguardamos sua equipe na Arena Limoeiro!`;
   const zapUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`;
 
   setTimeout(() => {
-    if (confirm('Reserva confirmada e salva com sucesso no sistema!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?')) {
+    if (confirm(totalWeeks > 1 
+      ? `Horário Fixo com ${totalWeeks} jogos nos próximos ${repeatMonths} meses agendado com sucesso!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?`
+      : 'Reserva confirmada e salva com sucesso no sistema!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?')) {
       window.open(zapUrl, '_blank');
     }
   }, 300);
@@ -14002,6 +14187,21 @@ async function submitBooking(grandTotal) {
 
   state.customerName = name;
   state.customerPhone = formatPhone(phone);
+
+  // Regra Oficial Arena Limoeiro: Clientes online só agendam no mês atual
+  if (state.currentMode !== 'admin' && state.selectedDate) {
+    const [y, m] = state.selectedDate.split('-').map(Number);
+    const now = new Date();
+    if (y > now.getFullYear() || (y === now.getFullYear() && m - 1 > now.getMonth())) {
+      alert('⚠️ Agendamento Exclusivo no Balcão!\n\nAs reservas para os próximos meses são realizadas exclusivamente pela administração no Balcão da Arena ou via WhatsApp.\n\nPor favor, escolha uma data dentro do mês atual ou fale com nossa equipe!');
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i><span>Confirmar e Reservar</span>`;
+        if (window.lucide) lucide.createIcons();
+      }
+      return;
+    }
+  }
 
   // 1. ANTI-CHOQUE RIGOROSO: Verifica conflito antes de salvar
   const localCheck = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
