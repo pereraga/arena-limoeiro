@@ -5040,9 +5040,12 @@ async function saveWaterSupplyToDatabase() {
       unit: 'unid.',
       image: JSON.stringify(state.waterSupply)
     };
-    const { error } = await client.from('products').upsert(payload);
-    if (error) {
-      console.warn('Erro ao salvar água no Supabase:', error);
+    const { error: upsertErr } = await client.from('products').upsert(payload, { onConflict: 'id' });
+    if (upsertErr) {
+      const { error: updateErr } = await client.from('products').update(payload).eq('id', 'arena-water-supply');
+      if (updateErr) {
+        console.warn('Erro ao atualizar água no Supabase:', updateErr);
+      }
     }
   } catch(err) {
     console.warn('Erro ao salvar água no Supabase:', err);
@@ -15122,6 +15125,11 @@ async function syncDataFromSupabase(skipRender = false) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, async () => {
           await loadSupabaseCustomers();
         })
+        // ──── Estoque de Água e Produtos em Tempo Real ────
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+          await loadWaterSupplyFromDatabase();
+          _refreshAllUI();
+        })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log('✅ Arena Limoeiro – Realtime ativo.');
@@ -15162,11 +15170,34 @@ async function checkAndSyncBookingsBackground() {
   try {
     const [
       { data: dbBookings, error },
-      { data: dbCourts }
+      { data: dbCourts },
+      { data: dbWaterProduct }
     ] = await Promise.all([
       client.from('bookings').select('*'),
-      client.from('courts').select('*').order('order_index', { ascending: true })
+      client.from('courts').select('*').order('order_index', { ascending: true }),
+      client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle()
     ]);
+
+    // Sincroniza estoque de água em segundo plano
+    if (dbWaterProduct && dbWaterProduct.image) {
+      try {
+        const parsedW = JSON.parse(dbWaterProduct.image);
+        if (parsedW && (typeof parsedW.full === 'number' || typeof parsedW.empty === 'number')) {
+          const prevFull = state.waterSupply ? state.waterSupply.full : null;
+          const prevEmpty = state.waterSupply ? state.waterSupply.empty : null;
+          if (prevFull !== parsedW.full || prevEmpty !== parsedW.empty) {
+            state.waterSupply = {
+              ...state.waterSupply,
+              ...parsedW,
+              full: typeof parsedW.full === 'number' ? parsedW.full : (state.waterSupply?.full || 0),
+              empty: typeof parsedW.empty === 'number' ? parsedW.empty : 0
+            };
+            localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+            _refreshAllUI();
+          }
+        }
+      } catch(e) {}
+    }
 
     if (dbBookings && !error) {
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
