@@ -1771,22 +1771,40 @@ function renderCalendarHTML() {
       </span>
     </div>
 
-    <!-- Cabeçalho do Mês -->
-    <div class="calendar-header flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100">
+    <!-- Cabeçalho do Mês com Navegação Completa -->
+    <div class="calendar-header flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100 flex-wrap gap-2">
       <div class="flex items-center space-x-2.5">
         <span class="p-2 sm:p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 shadow-sm flex items-center justify-center">
           <i data-lucide="calendar" class="w-5 h-5"></i>
         </span>
         <div>
-          <h4 class="text-base sm:text-lg font-black text-slate-900">
-            ${currentMonthYearName}
+          <h4 class="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+            <span>${currentMonthYearName}</span>
+            ${(year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth())) ? `
+              <span class="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full uppercase">Próximo Mês</span>
+            ` : `
+              <span class="text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full uppercase">Mês Atual</span>
+            `}
           </h4>
-          <p class="text-xs text-slate-500">Escolha o dia da sua partida</p>
+          <p class="text-xs text-slate-500">Navegue pelos meses e escolha o dia da sua partida</p>
         </div>
       </div>
-      <div class="bg-emerald-50 border border-emerald-200/80 px-3 py-1.5 rounded-xl text-right hidden sm:block">
-        <span class="text-[10px] font-bold text-emerald-700 block uppercase">Calendário</span>
-        <span class="text-xs font-black text-emerald-900">${currentMonthYearName}</span>
+      <div class="flex items-center space-x-1.5 self-end sm:self-auto">
+        <button type="button" onclick="changeCalendarMonth(-1)" 
+                class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" 
+                title="Mês Anterior">
+          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </button>
+        <button type="button" onclick="goToTodayCalendar()" 
+                class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-2xs" 
+                title="Voltar ao Mês Atual">
+          Hoje
+        </button>
+        <button type="button" onclick="changeCalendarMonth(1)" 
+                class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" 
+                title="Próximo Mês">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
       </div>
     </div>
 
@@ -1830,10 +1848,11 @@ function renderCalendarHTML() {
     const isFutureMonthDay = (year > now.getFullYear()) || (year === now.getFullYear() && month > now.getMonth());
     if (isFutureMonthDay && state.currentMode !== 'admin') {
       html += `
-        <button disabled title="Reservas para os próximos meses são feitas exclusivamente no Balcão da Arena"
-                class="h-11 sm:h-12 w-full rounded-2xl text-xs sm:text-sm font-bold text-slate-400 bg-slate-100/70 border border-slate-200/60 flex flex-col items-center justify-center cursor-not-allowed opacity-50 select-none">
+        <button type="button" onclick="showFutureMonthBalcaoNotice('${currentDayStr}')" 
+                title="Reservas para os próximos meses são feitas no Balcão da Arena ou WhatsApp. Clique para reservar!"
+                class="h-11 sm:h-12 w-full rounded-2xl text-xs sm:text-sm font-black text-amber-900 bg-amber-50/80 hover:bg-amber-100 border border-amber-300/80 hover:border-amber-400 flex flex-col items-center justify-center transition-all cursor-pointer shadow-2xs select-none">
           <span>${day}</span>
-          <span class="text-[8px] font-bold text-amber-700 leading-none mt-0.5">Balcão</span>
+          <span class="text-[8px] font-black text-amber-800 leading-none mt-0.5">🔒 Balcão</span>
         </button>
       `;
       continue;
@@ -1899,27 +1918,50 @@ function renderCalendarHTML() {
   return html;
 }
 
+function showFutureMonthBalcaoNotice(dateStr) {
+  const displayD = dateStr ? formatDisplayDate(dateStr) : 'datas dos próximos meses';
+  const cleanArenaPhone = '81999999999';
+  const zapMsg = `Olá! Gostaria de agendar uma partida para ${displayD} na Arena Limoeiro (Reserva no Balcão / WhatsApp).`;
+  const zapUrl = `https://wa.me/55${cleanArenaPhone}?text=${encodeURIComponent(zapMsg)}`;
+  if (confirm(`⚠️ Agendamento Exclusivo no Balcão!\n\nAs reservas para os próximos meses (${displayD}) são realizadas exclusivamente com nossa equipe no Balcão da Arena ou via WhatsApp.\n\nDeseja abrir o WhatsApp agora para consultar e reservar seu horário para ${displayD}?`)) {
+    window.open(zapUrl, '_blank');
+  }
+}
+window.showFutureMonthBalcaoNotice = showFutureMonthBalcaoNotice;
+
 function changeCalendarMonth(delta) {
   if (!state.currentMonthDate) state.currentMonthDate = new Date();
+  const now = new Date();
+  const currentYM = now.getFullYear() * 12 + now.getMonth();
+  const targetYM = state.currentMonthDate.getFullYear() * 12 + state.currentMonthDate.getMonth() + delta;
+  
+  if (targetYM < currentYM) {
+    alert('Não é possível navegar para meses anteriores ao mês atual.');
+    return;
+  }
+  
   const d = new Date(state.currentMonthDate.getFullYear(), state.currentMonthDate.getMonth() + delta, 1);
   state.currentMonthDate = d;
   renderStepContent();
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 }
+window.changeCalendarMonth = changeCalendarMonth;
 
 function handleMonthInputChange(val) {
   if (!val) return;
   const [y, m] = val.split('-').map(Number);
   state.currentMonthDate = new Date(y, m - 1, 1);
   renderStepContent();
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 }
+window.handleMonthInputChange = handleMonthInputChange;
 
 function goToTodayCalendar() {
   const now = new Date();
   state.currentMonthDate = new Date(now.getFullYear(), now.getMonth(), 1);
   selectDate(getFormattedDate(now));
 }
+window.goToTodayCalendar = goToTodayCalendar;
 
 function selectDate(dateStr) {
   const now = new Date();
@@ -1935,7 +1977,7 @@ function selectDate(dateStr) {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth(); // 0 a 11
     if (y > currentYear || (y === currentYear && m - 1 > currentMonth)) {
-      alert('⚠️ Agendamento Exclusivo no Balcão!\n\nNo momento, o agendamento online está aberto apenas para as datas do mês atual.\n\nPara agendar partidas nos próximos meses, por favor realize sua reserva diretamente no Balcão da Arena Limoeiro ou fale com nossa equipe pelo WhatsApp!');
+      showFutureMonthBalcaoNotice(dateStr);
       return;
     }
   }
@@ -3532,6 +3574,16 @@ function navigateAdminFilterDate(offsetDays) {
   lucide.createIcons();
 }
 
+function navigateAdminFilterMonth(deltaMonths) {
+  const currentStr = state.adminFilterDate || getFormattedDate(new Date());
+  const [y, m, d] = currentStr.split('-').map(Number);
+  const curDate = new Date(y, m - 1 + deltaMonths, d);
+  state.adminFilterDate = getFormattedDate(curDate);
+  renderStepContent();
+  if (window.lucide) lucide.createIcons();
+}
+window.navigateAdminFilterMonth = navigateAdminFilterMonth;
+
 function setAdminFilterDate(dateStr) {
   state.adminFilterDate = dateStr;
   renderStepContent();
@@ -3816,11 +3868,17 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
             ⚡ Hoje
           </button>
           <div class="flex items-center space-x-1">
+            <button type="button" onclick="navigateAdminFilterMonth(-1)" class="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs text-[10px] font-bold" title="Mês Anterior (-30d)">
+              « Mês
+            </button>
             <button type="button" onclick="navigateAdminFilterDate(-1)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" title="Dia Anterior">
               <i data-lucide="chevron-left" class="w-4 h-4"></i>
             </button>
             <button type="button" onclick="navigateAdminFilterDate(1)" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" title="Próximo Dia">
               <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+            <button type="button" onclick="navigateAdminFilterMonth(1)" class="px-2 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs text-[10px] font-bold" title="Próximo Mês (+30d)">
+              Mês »
             </button>
           </div>
           <div class="relative flex-1 sm:flex-initial min-w-[130px]">
@@ -10185,7 +10243,8 @@ function openDirectBookingModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
-  const todayStr = state.adminFilterDate || getFormattedDate(new Date());
+  const realToday = getFormattedDate(new Date());
+  const selectedDefaultDate = state.adminFilterDate || realToday;
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
@@ -10220,9 +10279,35 @@ function openDirectBookingModal() {
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data do Jogo *</label>
-              <input type="date" id="directDateInput" required value="${todayStr}" min="${todayStr}" 
+              <input type="date" id="directDateInput" required value="${selectedDefaultDate}" min="${realToday}" 
                      class="w-full p-2.5 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600">
-              <span class="text-[10px] text-emerald-700 font-bold mt-1 block">✓ Balcão Liberado: Agende livremente para qualquer data dos próximos meses sem bloqueio.</span>
+              <div class="flex items-center justify-between gap-1 mt-1.5 flex-wrap">
+                <span class="text-[10px] text-emerald-700 font-black">✓ Balcão Totalmente Liberado para Qualquer Mês</span>
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="document.getElementById('directDateInput').value = '${realToday}'" 
+                          class="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black hover:bg-emerald-200">
+                    Hoje
+                  </button>
+                  ${(() => {
+                    const d7 = new Date();
+                    d7.setDate(d7.getDate() + 7);
+                    const in7 = getFormattedDate(d7);
+                    const dNextM = new Date();
+                    dNextM.setMonth(dNextM.getMonth() + 1);
+                    const nextM = getFormattedDate(dNextM);
+                    return `
+                      <button type="button" onclick="document.getElementById('directDateInput').value = '${in7}'" 
+                              class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-[10px] font-bold">
+                        +7 dias
+                      </button>
+                      <button type="button" onclick="document.getElementById('directDateInput').value = '${nextM}'" 
+                              class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 text-[10px] font-bold">
+                        Próximo Mês
+                      </button>
+                    `;
+                  })()}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -10601,10 +10686,14 @@ async function handleDirectBookingSubmit(e) {
     targetId: newBookingId
   });
 
+  // Sincroniza a data do painel para a data do jogo agendado para o operador visualizar imediatamente
+  state.adminFilterDate = date;
+  state.selectedDate = date;
+
   closeModal();
   requestSchedule();
   renderStepContent();
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 
   // Abre confirmação de envio WhatsApp
   const cleanPhone = phone.replace(/\D/g, '');
@@ -10615,11 +10704,11 @@ async function handleDirectBookingSubmit(e) {
 
   setTimeout(() => {
     if (confirm(totalWeeks > 1 
-      ? `Horário Fixo com ${totalWeeks} jogos nos próximos ${repeatMonths} meses agendado com sucesso!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?`
-      : 'Reserva confirmada e salva com sucesso no sistema!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?')) {
+      ? `✓ Horário Fixo com ${totalWeeks} jogos nos próximos ${repeatMonths} meses agendado com sucesso!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?`
+      : `✓ Reserva no Balcão confirmada com sucesso para ${formatDisplayDate(date)} às ${startTime}!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?`)) {
       window.open(zapUrl, '_blank');
     }
-  }, 300);
+  }, 250);
 }
 
 // ==============================================================================
