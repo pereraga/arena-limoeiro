@@ -693,9 +693,15 @@ function loadInitialData() {
     localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
     state.monthlyMembers = cleanLocalMonthly;
     const defaultAdmins = (d.initialAdmins || []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
-    const localAdmins = (JSON.parse(localStorage.getItem('arena_admin_users') || '[]') || []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
+    const rawLocalAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
+    const localAdmins = (Array.isArray(rawLocalAdmins) ? rawLocalAdmins : []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br' && u.id !== 'admin-2');
     if (localAdmins.length > 0) {
-      state.adminUsers = localAdmins;
+      state.adminUsers = localAdmins.map(u => {
+        if (u.email === 'vinicius.melo@arenalimoeiro.com.br') {
+          return { ...u, password: 'vinicius@2026!' };
+        }
+        return u;
+      });
     } else {
       state.adminUsers = defaultAdmins;
     }
@@ -3078,13 +3084,13 @@ async function handleLoginSubmit(event) {
           const uEmail = (u.email || '').trim().toLowerCase();
           const uPass = String(u.password || '').trim();
           if (uEmail !== cleanEmail) return false;
-          if (uPass === cleanPassword) return true;
+          if (uPass === cleanPassword || uPass.toLowerCase() === cleanPassword.toLowerCase()) return true;
           // Credenciais mestras aceitas para Gabriel Alves
-          if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword === 'Alves@157620' || cleanPassword === 'admin123')) return true;
+          if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword.toLowerCase() === 'alves@157620' || cleanPassword === 'admin123')) return true;
+          // Credenciais aceitas para Vinicius Melo / Gerente do Sistema
+          if ((cleanEmail === 'vinicius.melo@arenalimoeiro.com.br' || cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('vinicius') || cleanEmail.includes('gerente')) && (cleanPassword.toLowerCase() === 'vinicius@2026!' || cleanPassword === 'gerente123')) return true;
           // Credenciais aceitas para Recepção
-          if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword === 'Recepcao@2026!')) return true;
-          // Credenciais aceitas para Gerente
-          if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('gerente')) && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) return true;
+          if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword.toLowerCase() === 'recepcao@2026!')) return true;
           return false;
         });
 
@@ -3111,10 +3117,10 @@ async function handleLoginSubmit(event) {
       const uEmail = u.email.trim().toLowerCase();
       const uPass = String(u.password || '').trim();
       if (uEmail !== cleanEmail) return false;
-      if (uPass === cleanPassword) return true;
-      if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword === 'Alves@157620' || cleanPassword === 'admin123')) return true;
-      if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword === 'Recepcao@2026!')) return true;
-      if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('gerente')) && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) return true;
+      if (uPass === cleanPassword || uPass.toLowerCase() === cleanPassword.toLowerCase()) return true;
+      if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword.toLowerCase() === 'alves@157620' || cleanPassword === 'admin123')) return true;
+      if ((cleanEmail === 'vinicius.melo@arenalimoeiro.com.br' || cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('vinicius') || cleanEmail.includes('gerente')) && (cleanPassword.toLowerCase() === 'vinicius@2026!' || cleanPassword === 'gerente123')) return true;
+      if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword.toLowerCase() === 'recepcao@2026!')) return true;
       return false;
     });
     if (found) authenticatedUser = { ...found };
@@ -3122,7 +3128,7 @@ async function handleLoginSubmit(event) {
 
   // 3. Fallback de administradores pré-configurados garantidos
   if (!authenticatedUser) {
-    if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword === 'Alves@157620' || cleanPassword === 'admin123')) {
+    if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword.toLowerCase() === 'alves@157620' || cleanPassword === 'admin123')) {
       authenticatedUser = {
         id: "admin-1",
         name: "Gabriel Alves",
@@ -3130,21 +3136,21 @@ async function handleLoginSubmit(event) {
         password: cleanPassword,
         role: "Administrador Geral"
       };
-    } else if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail === 'recepcao.atendimento@arenalimoeiro.com.br') && (cleanPassword === 'arena123' || cleanPassword === 'Recepcao@2026!')) {
-      authenticatedUser = {
-        id: "admin-2",
-        name: "Recepção & Atendimento",
-        email: "recepcao@arenalimoeiro.com.br",
-        password: cleanPassword,
-        role: "Recepção & Atendimento"
-      };
-    } else if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail === 'vinicius.melo@arenalimoeiro.com.br') && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) {
+    } else if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail === 'vinicius.melo@arenalimoeiro.com.br' || cleanEmail.includes('vinicius') || cleanEmail.includes('gerente')) && (cleanPassword.toLowerCase() === 'vinicius@2026!' || cleanPassword === 'gerente123')) {
       authenticatedUser = {
         id: "admin-1788989952703",
         name: "Vinicius Melo",
         email: cleanEmail === 'gerente@arenalimoeiro.com.br' ? 'vinicius.melo@arenalimoeiro.com.br' : cleanEmail,
         password: cleanPassword,
         role: "Gerente do Sistema"
+      };
+    } else if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail === 'recepcao.atendimento@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword.toLowerCase() === 'recepcao@2026!')) {
+      authenticatedUser = {
+        id: "admin-2",
+        name: "Recepção & Atendimento",
+        email: "recepcao@arenalimoeiro.com.br",
+        password: cleanPassword,
+        role: "Recepção & Atendimento"
       };
     }
   }
@@ -3154,10 +3160,14 @@ async function handleLoginSubmit(event) {
       authenticatedUser.name = 'Gabriel Alves';
       authenticatedUser.role = 'Administrador Geral';
       authenticatedUser.permissions = SYSTEM_PERMISSIONS.map(p => p.id); // Todas as 12 permissões
+    } else if (authenticatedUser.email.toLowerCase() === 'vinicius.melo@arenalimoeiro.com.br' || authenticatedUser.name === 'Vinicius Melo' || authenticatedUser.role === 'Gerente do Sistema') {
+      authenticatedUser.name = 'Vinicius Melo';
+      authenticatedUser.role = 'Gerente do Sistema';
+      if (!authenticatedUser.permissions || authenticatedUser.permissions.length === 0) {
+        authenticatedUser.permissions = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id); // 11 permissões
+      }
     } else if (!authenticatedUser.permissions || authenticatedUser.permissions.length === 0) {
-      if (authenticatedUser.role === 'Gerente do Sistema') {
-        authenticatedUser.permissions = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id);
-      } else if (authenticatedUser.role === 'Recepção & Atendimento' || isReceptionUser()) {
+      if (authenticatedUser.role === 'Recepção & Atendimento' || isReceptionUser()) {
         authenticatedUser.permissions = ['can_start_matches', 'can_finish_matches', 'can_manage_bar', 'can_direct_booking'];
       }
     }
@@ -8623,6 +8633,13 @@ function renderAdminSubTabContent(tab) {
               <h3 class="text-base sm:text-lg font-black text-slate-900">Gestores e Acessos Administrativos</h3>
             </div>
             <p class="text-xs text-slate-500 mt-0.5">Gerencie os usuários autorizados a acessar e modificar o sistema da Arena Limoeiro</p>
+            <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                🌐 Ecossistema Unificado (Mobile • Tablet • PC • APK)
+              </span>
+              <span class="text-[10px] text-slate-500 font-bold">Autenticação e Permissões Sincronizadas na Nuvem</span>
+            </div>
           </div>
           <button onclick="openNewAdminUserModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer">
             <i data-lucide="user-plus" class="w-4 h-4"></i>
@@ -11723,7 +11740,9 @@ function openAdminUserModal() {
 }
 
 function copyCredentialsDirect(name, role, email, pass) {
-  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}\n🌐 Link de Acesso: ${window.location.origin}`;
+  const isLocalOrApp = !window.location.origin || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'capacitor:';
+  const accessUrl = isLocalOrApp ? 'https://arenalimoeiro.vercel.app' : window.location.origin;
+  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}\n🌐 Link de Acesso: ${accessUrl}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
       alert(`✅ Credenciais de "${name}" copiadas com sucesso! Você pode colar no WhatsApp.`);
@@ -15691,13 +15710,15 @@ async function syncDataFromSupabase(skipRender = false) {
       { data: dbProducts },
       { data: dbMembers },
       { data: dbBookings },
-      { data: dbCustomers, error: errCust }
+      { data: dbCustomers, error: errCust },
+      { data: dbAdmins }
     ] = await Promise.all([
       client.from('courts').select('*').order('order_index', { ascending: true }),
       client.from('products').select('*'),
       client.from('monthly_members').select('*'),
       client.from('bookings').select('*'),
-      client.from('customers').select('*').order('created_at', { ascending: false })
+      client.from('customers').select('*').order('created_at', { ascending: false }),
+      client.from('admin_users').select('*').order('created_at', { ascending: true })
     ]);
 
     if (dbCourts && dbCourts.length > 0) {
@@ -15790,6 +15811,36 @@ async function syncDataFromSupabase(skipRender = false) {
 
       try {
         localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
+      } catch(e) {}
+    }
+
+    if (dbAdmins && dbAdmins.length > 0) {
+      const normalizedAdmins = dbAdmins.map(u => {
+        let roleName = u.role || 'Gerente do Sistema';
+        let perms = [];
+        if (roleName.includes('::perms:')) {
+          const parts = roleName.split('::perms:');
+          roleName = parts[0];
+          perms = parts[1].split(',').filter(Boolean);
+        } else {
+          if (roleName === 'Administrador Geral' || (u.email && u.email.toLowerCase() === 'admin@arenalimoeiro.com.br')) {
+            perms = SYSTEM_PERMISSIONS.map(p => p.id);
+          } else if (roleName === 'Gerente do Sistema' || (u.email && u.email.toLowerCase().includes('vinicius'))) {
+            perms = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id);
+          } else {
+            perms = ['can_start_matches', 'can_finish_matches', 'can_manage_bar', 'can_direct_booking'];
+          }
+        }
+        return {
+          ...u,
+          role: roleName,
+          permissions: perms
+        };
+      }).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
+
+      state.adminUsers = normalizedAdmins;
+      try {
+        localStorage.setItem('arena_admin_users', JSON.stringify(normalizedAdmins));
       } catch(e) {}
     }
 
@@ -15937,6 +15988,11 @@ async function syncDataFromSupabase(skipRender = false) {
         // ──── Estoque de Água e Produtos em Tempo Real ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
           await loadWaterSupplyFromDatabase();
+          _refreshAllUI();
+        })
+        // ──── Gestores & Acessos Administrativos em Tempo Real ────
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_users' }, async () => {
+          await loadAdminUsers();
           _refreshAllUI();
         })
         .subscribe((status) => {

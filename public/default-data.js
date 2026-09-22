@@ -33,24 +33,10 @@ const initialAdmins = [
     createdAt: "01/09/2026"
   },
   {
-    id: "admin-2",
-    name: "Recepção & Atendimento",
-    email: "recepcao@arenalimoeiro.com.br",
-    password: "arena123",
-    role: "Recepção & Atendimento",
-    permissions: [
-      "can_start_matches",
-      "can_finish_matches",
-      "can_direct_booking",
-      "can_manage_bar"
-    ],
-    createdAt: "01/09/2026"
-  },
-  {
     id: "admin-1788989952703",
     name: "Vinicius Melo",
     email: "vinicius.melo@arenalimoeiro.com.br",
-    password: "Vinicius@2026!",
+    password: "vinicius@2026!",
     role: "Gerente do Sistema",
     permissions: [
       "can_delete_bookings",
