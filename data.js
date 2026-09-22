@@ -46,10 +46,10 @@ export const initialAdmins = [
     createdAt: "01/09/2026"
   },
   {
-    id: "admin-3",
+    id: "admin-1788989952703",
     name: "Vinicius Melo",
-    email: "gerente@arenalimoeiro.com.br",
-    password: "gerente123",
+    email: "vinicius.melo@arenalimoeiro.com.br",
+    password: "Vinicius@2026!",
     role: "Gerente do Sistema",
     permissions: [
       "can_delete_bookings",
@@ -64,7 +64,7 @@ export const initialAdmins = [
       "can_manage_customers",
       "can_manage_monthly"
     ],
-    createdAt: "01/09/2026"
+    createdAt: "09/09/2026"
   }
 ];
 

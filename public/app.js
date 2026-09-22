@@ -607,12 +607,14 @@ function loadInitialData() {
     });
     localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
     state.monthlyMembers = cleanLocalMonthly;
-    const defaultAdmins = d.initialAdmins || [];
-    const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
-    const mergedAdminsMap = new Map();
-    defaultAdmins.forEach(u => { if (u && (u.id || u.email)) mergedAdminsMap.set(u.id || u.email, u); });
-    localAdmins.forEach(u => { if (u && (u.id || u.email)) mergedAdminsMap.set(u.id || u.email, u); });
-    state.adminUsers = Array.from(mergedAdminsMap.values());
+    const defaultAdmins = (d.initialAdmins || []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
+    const localAdmins = (JSON.parse(localStorage.getItem('arena_admin_users') || '[]') || []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
+    if (localAdmins.length > 0) {
+      state.adminUsers = localAdmins;
+    } else {
+      state.adminUsers = defaultAdmins;
+    }
+    localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
     state.coupons = d.coupons;
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const cleanedLocal = localSaved.filter(b => b && b.id && b.status !== 'cancelled' && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
@@ -2938,9 +2940,9 @@ async function handleLoginSubmit(event) {
       };
     } else if ((cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail === 'vinicius.melo@arenalimoeiro.com.br') && (cleanPassword === 'gerente123' || cleanPassword === 'Vinicius@2026!')) {
       authenticatedUser = {
-        id: "admin-3",
+        id: "admin-1788989952703",
         name: "Vinicius Melo",
-        email: "gerente@arenalimoeiro.com.br",
+        email: cleanEmail === 'gerente@arenalimoeiro.com.br' ? 'vinicius.melo@arenalimoeiro.com.br' : cleanEmail,
         password: cleanPassword,
         role: "Gerente do Sistema"
       };
@@ -4999,13 +5001,16 @@ async function loadWaterSupplyFromDatabase() {
 
     if (data && data.image) {
       const parsed = JSON.parse(data.image);
-      if (parsed && typeof parsed.full === 'number') {
+      if (parsed && (typeof parsed.full === 'number' || typeof parsed.empty === 'number')) {
         state.waterSupply = {
-          full: parsed.full,
+          ...state.waterSupply,
+          ...parsed,
+          full: typeof parsed.full === 'number' ? parsed.full : (state.waterSupply?.full || 0),
           empty: typeof parsed.empty === 'number' ? parsed.empty : 0,
           min_alert: typeof parsed.min_alert === 'number' ? parsed.min_alert : 5,
-          unit_price: typeof parsed.unit_price === 'number' ? parsed.unit_price : 5.00,
-          courts: (parsed.courts && typeof parsed.courts === 'object') ? parsed.courts : {},
+          unit_price: typeof parsed.unit_price === 'number' ? parsed.unit_price : 0.75,
+          fixed_allocations: Array.isArray(parsed.fixed_allocations) ? parsed.fixed_allocations : (state.waterSupply?.fixed_allocations || []),
+          courts: (parsed.courts && typeof parsed.courts === 'object') ? parsed.courts : (state.waterSupply?.courts || {}),
           orders: Array.isArray(parsed.orders) ? parsed.orders : [],
           history: Array.isArray(parsed.history) ? parsed.history : []
         };
@@ -5029,14 +5034,16 @@ async function saveWaterSupplyToDatabase() {
     const payload = {
       id: 'arena-water-supply',
       name: '💧 Controle Interno de Água Arena',
-      category: 'Bebidas',
+      category: 'Estoque',
+      type: 'water_supply',
       price: 0,
-      description: 'Registro de águas cheias/vazias da Arena Limoeiro',
-      image: JSON.stringify(state.waterSupply),
-      is_available: true,
-      type: 'water_supply'
+      unit: 'unid.',
+      image: JSON.stringify(state.waterSupply)
     };
-    await client.from('products').upsert(payload);
+    const { error } = await client.from('products').upsert(payload);
+    if (error) {
+      console.warn('Erro ao salvar água no Supabase:', error);
+    }
   } catch(err) {
     console.warn('Erro ao salvar água no Supabase:', err);
   }
@@ -7183,7 +7190,7 @@ function updateWaterAdjCalc() {
   }
   const displayEl = document.getElementById('waterAdjTotalDisplay');
   if (displayEl) {
-    displayEl.innerHTML = `Total p/ encher: <strong class="text-slate-800">${emptyVal} un.</strong>`;
+    displayEl.innerHTML = `Total de garrafas: <strong class="text-slate-800">${emptyVal} un.</strong>`;
   }
 }
 window.updateWaterAdjCalc = updateWaterAdjCalc;
@@ -7192,9 +7199,11 @@ function openAdjustWaterSupplyModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
-  const currentEmpty = (state.waterSupply && typeof state.waterSupply.empty === 'number') ? state.waterSupply.empty : 0;
+  const currentQty = (state.waterSupply && typeof state.waterSupply.full === 'number' && state.waterSupply.full > 0)
+    ? state.waterSupply.full
+    : ((state.waterSupply && typeof state.waterSupply.empty === 'number') ? state.waterSupply.empty : 12);
   const currentMin = (state.waterSupply && state.waterSupply.min_alert) || 5;
-  const currentUnitPrice = (state.waterSupply && typeof state.waterSupply.unit_price === 'number') ? state.waterSupply.unit_price : 5.00;
+  const currentUnitPrice = (state.waterSupply && typeof state.waterSupply.unit_price === 'number') ? state.waterSupply.unit_price : 0.75;
   const activeItem = state.waterSupply?.activeItem || '5l';
   window._waterAdjActiveItem = activeItem;
 
@@ -7210,7 +7219,7 @@ function openAdjustWaterSupplyModal() {
             </div>
             <div>
               <h3 class="text-base font-black uppercase tracking-wide">Ajuste de Estoque e Preço</h3>
-              <p class="text-xs text-slate-300 font-medium">Correção manual de garrafas a encher e preço unitário</p>
+              <p class="text-xs text-slate-300 font-medium">Correção manual de garrafas e preço unitário</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 cursor-pointer transition-colors">
@@ -7244,18 +7253,18 @@ function openAdjustWaterSupplyModal() {
 
           <div class="border-t border-slate-100 pt-3"></div>
 
-          <!-- QUANTIDADE P/ ENCHER (Apenas Garrafas p/ Encher, sem a opção de cheias) -->
+          <!-- QUANTIDADE P/ ENCHER / ESTOQUE -->
           <div>
             <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-bold text-slate-700 uppercase">Vazias p/ Encher (Garrafas)</label>
-              <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
-                Apenas p/ Encher
+              <label class="block text-xs font-bold text-slate-700 uppercase">Garrafas / Galões (p/ Encher / Estoque)</label>
+              <span class="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200">
+                Lote de Água
               </span>
             </div>
-            <input type="number" id="waterAdjEmpty" required min="0" value="${currentEmpty}" oninput="updateWaterAdjCalc()"
-                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-amber-600 focus:outline-none"
+            <input type="number" id="waterAdjEmpty" required min="0" value="${currentQty}" oninput="updateWaterAdjCalc()"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-lg font-black text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                    placeholder="Ex: 10">
-            <span class="text-[10px] text-slate-500 mt-1 block">Quantidade de garrafas que serão enviadas para reabastecimento.</span>
+            <span class="text-[10px] text-slate-500 mt-1 block">Quantidade total de garrafas abastecidas/disponíveis na arena.</span>
           </div>
 
           <!-- VALOR UNITÁRIO POR GARRAFA (R$) E CÁLCULO AUTOMÁTICO DO LOTE -->
@@ -7271,7 +7280,7 @@ function openAdjustWaterSupplyModal() {
                 <span>Total a Pagar no Lote:</span>
               </span>
               <span id="waterAdjCalcTotal" class="text-xs font-black text-emerald-950">
-                R$ ${(currentEmpty * currentUnitPrice).toFixed(2).replace('.', ',')} (${currentEmpty} un x R$ ${currentUnitPrice.toFixed(2).replace('.', ',')})
+                R$ ${(currentQty * currentUnitPrice).toFixed(2).replace('.', ',')} (${currentQty} un x R$ ${currentUnitPrice.toFixed(2).replace('.', ',')})
               </span>
             </div>
             <span class="text-[10px] text-slate-500 mt-1 block">Valor padrão pré-carregado nos novos pedidos ao fornecedor.</span>
@@ -7300,10 +7309,10 @@ function openAdjustWaterSupplyModal() {
             <button type="button" onclick="document.getElementById('waterAdjEmpty').value = '0'; updateWaterAdjCalc();" 
                     class="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline cursor-pointer flex items-center space-x-1">
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              <span>Zerar Quantidade p/ Encher</span>
+              <span>Zerar Quantidade</span>
             </button>
             <span id="waterAdjTotalDisplay" class="text-[11px] text-slate-500 font-medium">
-              Total p/ encher: <strong class="text-slate-800">${currentEmpty} un.</strong>
+              Total de garrafas: <strong class="text-slate-800">${currentQty} un.</strong>
             </span>
           </div>
 
@@ -7327,9 +7336,9 @@ window.openAdjustWaterSupplyModal = openAdjustWaterSupplyModal;
 
 async function handleAdjustWaterSupplySubmit(event) {
   event.preventDefault();
-  const emptyVal = parseInt(document.getElementById('waterAdjEmpty').value || '0', 10);
+  const qtyVal = parseInt(document.getElementById('waterAdjEmpty').value || '0', 10);
   const minVal = parseInt(document.getElementById('waterAdjMin').value || '5', 10);
-  const unitPriceVal = parseFloat(document.getElementById('waterAdjUnitPrice')?.value || '5.00') || 5.00;
+  const unitPriceVal = parseFloat(document.getElementById('waterAdjUnitPrice')?.value || '0.75') || 0.75;
   const notes = (document.getElementById('waterAdjNotes').value || '').trim();
   const activeItem = window._waterAdjActiveItem || '5l';
   const itemName = activeItem === '500ml' ? 'Água Mineral 500ml' : 'Água Mineral 5L';
@@ -7341,24 +7350,25 @@ async function handleAdjustWaterSupplySubmit(event) {
   }
 
   if (!state.waterSupply) {
-    state.waterSupply = { full: 0, empty: 0, min_alert: 5, unit_price: 5.00, courts: {}, orders: [], history: [] };
+    state.waterSupply = { full: 0, empty: 0, min_alert: 5, unit_price: 0.75, courts: {}, orders: [], history: [], fixed_allocations: [] };
   }
 
-  state.waterSupply.empty = Math.max(0, emptyVal);
+  state.waterSupply.full = Math.max(0, qtyVal);
+  state.waterSupply.empty = 0;
   state.waterSupply.min_alert = Math.max(1, minVal);
   state.waterSupply.unit_price = unitPriceVal;
   state.waterSupply.activeItem = activeItem;
 
-  const totalCost = emptyVal * unitPriceVal;
+  const totalCost = qtyVal * unitPriceVal;
 
   if (!Array.isArray(state.waterSupply.history)) state.waterSupply.history = [];
   state.waterSupply.history.push({
     id: 'mov-' + Date.now(),
     date: new Date().toISOString(),
     type: 'ajuste',
-    qtd: emptyVal,
+    qtd: qtyVal,
     user: (state.currentUser && state.currentUser.name) ? state.currentUser.name : 'Administrador',
-    notes: `Ajuste (${itemName}): ${emptyVal} garrafas p/ encher a R$ ${unitPriceVal.toFixed(2).replace('.', ',')}/un (Total R$ ${totalCost.toFixed(2).replace('.', ',')}) • ${notes || 'Contagem manual'}`
+    notes: `Ajuste (${itemName}): ${qtyVal} garrafas a R$ ${unitPriceVal.toFixed(2).replace('.', ',')}/un (Total R$ ${totalCost.toFixed(2).replace('.', ',')}) • ${notes || 'Contagem manual'}`
   });
 
   await saveWaterSupplyToDatabase();
@@ -11801,11 +11811,9 @@ async function loadAdminUsers() {
           };
         });
 
-        const mergedMap = new Map();
-        (state.adminUsers || []).forEach(u => { if (u && (u.id || u.email)) mergedMap.set(u.id || u.email, u); });
-        normalizedFromDb.forEach(u => { if (u && (u.id || u.email)) mergedMap.set(u.id || u.email, u); });
-        state.adminUsers = Array.from(mergedMap.values());
-        localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
+        const validAdmins = normalizedFromDb.filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
+        state.adminUsers = validAdmins;
+        localStorage.setItem('arena_admin_users', JSON.stringify(validAdmins));
         if (state.currentMode === 'admin' && state.adminTab === 'users') renderStepContent();
       }
     } catch(e) {
@@ -14913,13 +14921,16 @@ async function syncDataFromSupabase(skipRender = false) {
       if (waterRow) {
         try {
           const parsed = JSON.parse(waterRow.image || '{}');
-          if (parsed && typeof parsed.full === 'number') {
+          if (parsed && (typeof parsed.full === 'number' || typeof parsed.empty === 'number')) {
             state.waterSupply = {
-              full: parsed.full,
+              ...state.waterSupply,
+              ...parsed,
+              full: typeof parsed.full === 'number' ? parsed.full : (state.waterSupply?.full || 0),
               empty: typeof parsed.empty === 'number' ? parsed.empty : 0,
               min_alert: typeof parsed.min_alert === 'number' ? parsed.min_alert : 5,
-              unit_price: typeof parsed.unit_price === 'number' ? parsed.unit_price : 5.00,
-              courts: (parsed.courts && typeof parsed.courts === 'object') ? parsed.courts : {},
+              unit_price: typeof parsed.unit_price === 'number' ? parsed.unit_price : 0.75,
+              fixed_allocations: Array.isArray(parsed.fixed_allocations) ? parsed.fixed_allocations : (state.waterSupply?.fixed_allocations || []),
+              courts: (parsed.courts && typeof parsed.courts === 'object') ? parsed.courts : (state.waterSupply?.courts || {}),
               orders: Array.isArray(parsed.orders) ? parsed.orders : [],
               history: Array.isArray(parsed.history) ? parsed.history : []
             };
