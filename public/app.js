@@ -900,6 +900,32 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   return { conflict: false };
 }
 
+function isMensalistaBooking(b) {
+  if (!b) return false;
+  if (b.isMensalista === true) return true;
+  const bType = (b.booking_type || b.bookingType || '').toLowerCase();
+  if (bType === 'mensalista' || bType === 'fixo') return true;
+  const pMethod = (b.payment_method || b.paymentMethod || '').toLowerCase();
+  if (pMethod === 'mensalidade' || pMethod === 'fixo') return true;
+  if (b.monthly_member_id) return true;
+  if (String(b.id || '').startsWith('monthly-')) return true;
+  const obs = (b.observation || '').toLowerCase();
+  if (obs.includes('mensalista') || obs.includes('horário fixo') || obs.includes('horario fixo')) return true;
+  if (state.monthlyMembers && state.monthlyMembers.length > 0) {
+    const custName = (b.customer_name || b.customerName || '').toLowerCase();
+    const custPhone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+    const found = state.monthlyMembers.some(m => {
+      if (m.team_name && custName.includes(m.team_name.toLowerCase())) return true;
+      if (m.responsible_name && custName.includes(m.responsible_name.toLowerCase())) return true;
+      if (custPhone && m.phone && m.phone.replace(/\D/g, '') === custPhone) return true;
+      return false;
+    });
+    if (found) return true;
+  }
+  return false;
+}
+window.isMensalistaBooking = isMensalistaBooking;
+
 function calculateLocalSchedule(courtId, date) {
   const allHours = [
     "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
@@ -1044,7 +1070,7 @@ function calculateLocalSchedule(courtId, date) {
         status: isM ? "maintenance" : "booked",
         statusLabel: isM ? (booking.observation || "Treino Reservado / Manutenção") : "Reservado",
         isMaintenance: isM,
-        isMensalista: booking.bookingType === 'mensalista' || booking.booking_type === 'mensalista',
+        isMensalista: isMensalistaBooking(booking),
         isPast: isSlotPast,
         customerName: booking.customer_name || booking.customerName || (isM ? "Treino Reservado" : "Cliente"),
         isAvailable: false
@@ -4047,6 +4073,7 @@ function renderLiveDashboardTab() {
       const cpfVal = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || (custObj ? custObj.cpf : '');
       const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
       const healthVal = b.health_notes || b.healthNotes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
+      const isMensal = isMensalistaBooking(b);
 
       matchesList.push({
         id: b.id,
@@ -4062,8 +4089,8 @@ function renderLiveDashboardTab() {
         time: b.time || (startT + ' às ' + endT),
         total_price: parseFloat(b.total_price || b.totalPrice || 0),
         status: b.status || 'confirmed',
-        booking_type: b.booking_type || b.bookingType || 'avulso',
-        isMensalista: false,
+        booking_type: b.booking_type || b.bookingType || (isMensal ? 'mensalista' : 'avulso'),
+        isMensalista: isMensal,
         payment_method: b.payment_method || b.paymentMethod || 'pix',
         product_cart: b.product_cart || b.productCart || {},
         observation: b.observation || ''
@@ -4416,8 +4443,8 @@ function renderLiveDashboardTab() {
 
                         <div class="flex flex-wrap items-center gap-2">
                           ${match.isMensalista ? `
-                            <span class="text-[11px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
-                              <i data-lucide="crown" class="w-3.5 h-3.5 text-amber-600 mr-1"></i> Horário Fixo Semanal
+                            <span class="text-[11px] font-black text-indigo-950 bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
+                              <i data-lucide="crown" class="w-3.5 h-3.5 text-indigo-600 mr-1"></i> ⭐ Mensalista / Horário Fixo
                             </span>
                           ` : `
                             <span class="text-[11px] font-black text-sky-900 bg-sky-100 border border-sky-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
@@ -4492,9 +4519,14 @@ function renderLiveDashboardTab() {
                   <div class="bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div class="space-y-1">
                       <div class="flex flex-wrap items-center gap-2">
-                        <div class="flex items-center space-x-1.5">
+                        <div class="flex items-center space-x-1.5 flex-wrap">
                           <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
                           <span class="text-sm sm:text-base font-black text-slate-900">${match.customer_name}</span>
+                          ${(match.isMensalista || isMensalistaBooking(match)) ? `
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-1 shadow-2xs">
+                              ⭐ Mensalista
+                            </span>
+                          ` : ''}
                         </div>
                         ${match.customer_cpf ? `<span class="text-[11px] font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">CPF: ${formatCPF(match.customer_cpf)}</span>` : ''}
                       </div>
@@ -4857,7 +4889,7 @@ function renderCourtsControlTab() {
                           </button>
                         ` : ''}
                       </div>
-                      <p class="font-medium text-[11px] text-amber-800">${liveBooking.customer_name} (${liveBooking.start_time} às ${liveBooking.end_time})</p>
+                      <p class="font-medium text-[11px] text-amber-800 flex items-center gap-1.5 flex-wrap"><span>${liveBooking.customer_name}</span> ${isMensalistaBooking(liveBooking) ? '<span class="font-black text-indigo-900 bg-indigo-100 px-1.5 py-0.5 rounded text-[9px] border border-indigo-200">⭐ Mensalista</span>' : ''} <span>(${liveBooking.start_time} às ${liveBooking.end_time})</span></p>
                     </div>
                   ` : (nextBooking ? `
                     <div class="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs">
@@ -4873,7 +4905,7 @@ function renderCourtsControlTab() {
                           </button>
                         ` : ''}
                       </div>
-                      <p class="font-medium text-[11px] text-blue-800">${nextBooking.customer_name} às ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}</p>
+                      <p class="font-medium text-[11px] text-blue-800 flex items-center gap-1.5 flex-wrap"><span>${nextBooking.customer_name}</span> ${isMensalistaBooking(nextBooking) ? '<span class="font-black text-indigo-900 bg-indigo-100 px-1.5 py-0.5 rounded text-[9px] border border-indigo-200">⭐ Mensalista</span>' : ''} <span>às ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}</span></p>
                     </div>
                   ` : `
                     <div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs">
@@ -9180,12 +9212,14 @@ function renderSubtabBookingsItems(bookings) {
               ${formatDisplayDate(b.date)} • ${timeDisplay}
             </span>
             ${statusBadge}
+            ${isMensalistaBooking(b) ? '<span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-1 shadow-2xs">⭐ Mensalista</span>' : ''}
           </div>
 
           <div class="flex flex-wrap items-center gap-3 text-xs text-slate-700">
-            <div class="flex items-center space-x-1 font-black text-slate-900">
+            <div class="flex items-center space-x-1.5 font-black text-slate-900 flex-wrap">
               <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
               <span>${b.customer_name || 'Cliente'}</span>
+              ${isMensalistaBooking(b) ? '<span class="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">⭐ Mensalista</span>' : ''}
             </div>
             ${b.customer_cpf ? `
               <span class="font-mono text-[11px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-600">
@@ -10242,7 +10276,7 @@ function openAddBarItemsModal(bookingId) {
             <i data-lucide="beer" class="w-6 h-6 text-amber-300"></i>
             <div>
               <h3 class="text-base font-black uppercase">Adicionar Bebidas ao Jogo</h3>
-              <p class="text-xs text-emerald-300 font-medium">${b.customer_name || b.customerName} (${b.time})</p>
+              <p class="text-xs text-emerald-300 font-medium">${b.customer_name || b.customerName} ${isMensalistaBooking(b) ? '⭐ (Mensalista)' : ''} (${b.time})</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1">
@@ -10356,72 +10390,199 @@ async function handleCancelBooking(bookingId) {
   const bTime = bToDelete ? (bToDelete.time || `${bToDelete.start_time} às ${bToDelete.end_time}`) : '';
   const bPrice = bToDelete ? Number(bToDelete.total_price || 0).toFixed(2).replace('.', ',') : '0,00';
 
-  // 1. Remove do estado em memória
-  state.bookings = (state.bookings || []).filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
-
-  // 2. Remove do localStorage local
-  try {
-    let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    local = local.filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
-    localStorage.setItem('arena_local_bookings', JSON.stringify(local));
-  } catch (e) {}
-
-  // 3. Transmissão imediata via WebSocket / Broadcast para TODOS os outros aparelhos (Celular e PC)
-  const devContext = getDeviceContext();
-  let currentAuthor = 'Administrador Geral (Gabriel Alves)';
-  if (state.currentUser) {
-    currentAuthor = (state.currentUser.name && state.currentUser.name !== 'Administrador Geral') 
-      ? state.currentUser.name 
-      : (state.currentUser.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser.name || state.currentUser.email));
+  // Verifica se este jogo pertence a um mensalista
+  const isMensal = isMensalistaBooking(bToDelete) || String(bookingId).startsWith('monthly-');
+  let matchedMember = null;
+  if (bToDelete) {
+    if (bToDelete.monthly_member_id) {
+      matchedMember = (state.monthlyMembers || []).find(m => m.id === bToDelete.monthly_member_id);
+    }
+    if (!matchedMember && String(bookingId).startsWith('monthly-')) {
+      const mId = String(bookingId).replace('monthly-', '');
+      matchedMember = (state.monthlyMembers || []).find(m => m.id === mId);
+    }
+    if (!matchedMember && isMensal) {
+      matchedMember = (state.monthlyMembers || []).find(m => {
+        const cName = (bToDelete.customer_name || bToDelete.customerName || '').toLowerCase();
+        const obs = (bToDelete.observation || '').toLowerCase();
+        const cPhone = (bToDelete.customer_phone || bToDelete.customerPhone || '').replace(/\D/g, '');
+        const mPhone = (m.phone || '').replace(/\D/g, '');
+        if (m.team_name && cName.includes(m.team_name.toLowerCase())) return true;
+        if (m.responsible_name && cName.includes(m.responsible_name.toLowerCase())) return true;
+        if (m.team_name && obs.includes(m.team_name.toLowerCase())) return true;
+        if (cPhone && mPhone && cPhone === mPhone) return true;
+        return false;
+      });
+    }
   }
 
-  const deletePayload = {
-    id: bookingId,
-    courtName,
-    customerName: custName,
-    date: bDate,
-    time: bTime,
-    userName: currentAuthor,
-    deviceType: devContext.label
-  };
-
-  if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
-    window.ArenaSupabase.broadcastBookingDelete(deletePayload);
-  }
-  if (window.arenaSyncChannel) {
-    try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: deletePayload }); } catch(e) {}
+  let deleteAllMensalista = false;
+  if (isMensal || matchedMember) {
+    const memberNameDisplay = matchedMember ? (matchedMember.team_name || matchedMember.responsible_name) : custName;
+    deleteAllMensalista = confirm(
+      `⭐ ATENÇÃO: Este jogo pertence ao MENSALISTA "${memberNameDisplay}"!\n\n` +
+      `Deseja excluir TODOS OS JOGOS gerados para este mensalista e cancelar o contrato dele também?\n\n` +
+      `• [OK] = Excluir TODOS os jogos deste mensalista e cancelar o contrato\n` +
+      `• [Cancelar] = Apagar APENAS este jogo de hoje`
+    );
   }
 
-  // 4. Registra no Log do Sistema com quem apagou, quadra, horário, data e dispositivo (Mobile ou PC)
-  logSystemAction({
-    actionType: 'DELETE_BOOKING',
-    actionLabel: 'Exclusão de Jogo',
-    courtName,
-    details: `Jogo agendado de ${custName} (${bDate} às ${bTime} • R$ ${bPrice}) foi apagado e o horário liberado no sistema.`,
-    targetId: bookingId
-  });
+  if (deleteAllMensalista) {
+    const memberId = matchedMember ? matchedMember.id : (bToDelete ? bToDelete.monthly_member_id : null);
 
-  // 5. Se for um horário fixo (monthly-...), lida com a tabela monthly_members
-  if (String(bookingId).startsWith('monthly-')) {
-    const memberId = String(bookingId).replace('monthly-', '');
-    state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
+    // Identifica todos os jogos deste mensalista
+    const bookingsToRemove = (state.bookings || []).filter(b => {
+      if (!b) return false;
+      if (b.id === bookingId || String(b.id) === String(bookingId)) return true;
+      if (memberId && (b.monthly_member_id === memberId || String(b.id).startsWith('monthly-' + memberId))) return true;
+      if (matchedMember) {
+        const cName = (b.customer_name || b.customerName || '').toLowerCase();
+        const obs = (b.observation || '').toLowerCase();
+        const cPhone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+        const mPhone = (matchedMember.phone || '').replace(/\D/g, '');
+        if (matchedMember.team_name && cName.includes(matchedMember.team_name.toLowerCase())) return true;
+        if (matchedMember.responsible_name && cName.includes(matchedMember.responsible_name.toLowerCase())) return true;
+        if (matchedMember.team_name && obs.includes(matchedMember.team_name.toLowerCase())) return true;
+        if (cPhone && mPhone && cPhone === mPhone) return true;
+      } else if (bToDelete) {
+        const cName = (b.customer_name || b.customerName || '').toLowerCase();
+        const refName = (bToDelete.customer_name || bToDelete.customerName || '').toLowerCase();
+        if (refName && cName === refName) return true;
+      }
+      return false;
+    });
+
+    const idsToRemove = bookingsToRemove.map(b => b.id);
+    if (!idsToRemove.includes(bookingId)) idsToRemove.push(bookingId);
+
+    // 1. Remove do estado em memória
+    state.bookings = (state.bookings || []).filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+
+    // 2. Remove do localStorage local
+    try {
+      let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+      local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+    } catch(e) {}
+
+    // 3. Cancela em monthlyMembers
+    if (memberId) {
+      state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
+      localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+    }
+
+    // 4. Deleta do Supabase
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       try {
         const client = window.ArenaSupabase.getClient();
-        await client.from('monthly_members').delete().eq('id', memberId);
+        if (memberId) {
+          await client.from('monthly_members').delete().eq('id', memberId);
+        }
+        await client.from('bookings').update({ status: 'cancelled' }).in('id', idsToRemove);
+        await client.from('bookings').delete().in('id', idsToRemove);
       } catch(e) {
-        console.warn('Erro ao remover monthly_members:', e);
+        console.warn('Erro ao deletar mensalista/jogos no Supabase:', e);
       }
     }
-  } else if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+
+    // 5. Transmissão imediata via WebSocket / Broadcast para todos os aparelhos
+    idsToRemove.forEach(bId => {
+      const bObj = bookingsToRemove.find(x => x.id === bId);
+      const delPayload = {
+        id: bId,
+        courtName,
+        customerName: bObj ? (bObj.customer_name || custName) : custName,
+        date: bObj ? formatDisplayDate(bObj.date) : bDate,
+        time: bObj ? (bObj.time || bObj.start_time) : bTime,
+        userName: state.currentUser ? (state.currentUser.name || 'Gestor') : 'Gestor',
+        deviceType: getDeviceContext ? getDeviceContext().label : 'Sistema'
+      };
+      if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
+        window.ArenaSupabase.broadcastBookingDelete(delPayload);
+      }
+      if (window.arenaSyncChannel) {
+        try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: delPayload }); } catch(e) {}
+      }
+    });
+
+    logSystemAction({
+      actionType: 'DELETE_BOOKING',
+      actionLabel: 'Exclusão Total de Mensalista',
+      courtName,
+      details: `Todos os ${idsToRemove.length} jogos do mensalista "${custName}" foram excluídos e o contrato cancelado no sistema.`,
+      targetId: bookingId
+    });
+
+    alert(`✅ Todos os ${idsToRemove.length} jogos do mensalista "${custName}" foram excluídos e o horário liberado com sucesso!`);
+  } else {
+    // 1. Remove do estado em memória
+    state.bookings = (state.bookings || []).filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
+
+    // 2. Remove do localStorage local
     try {
-      const client = window.ArenaSupabase.getClient();
-      // Atualiza primeiro para cancelled para propagar Realtime instantâneo para todos os clientes
-      await client.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
-      // E remove da tabela para liberação definitiva
-      await client.from('bookings').delete().eq('id', bookingId);
-    } catch(e) {
-      console.warn('Erro ao deletar booking no Supabase:', e);
+      let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+      local = local.filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
+      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+    } catch (e) {}
+
+    // 3. Transmissão imediata via WebSocket / Broadcast para TODOS os outros aparelhos (Celular e PC)
+    const devContext = getDeviceContext();
+    let currentAuthor = 'Administrador Geral (Gabriel Alves)';
+    if (state.currentUser) {
+      currentAuthor = (state.currentUser.name && state.currentUser.name !== 'Administrador Geral') 
+        ? state.currentUser.name 
+        : (state.currentUser.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser.name || state.currentUser.email));
+    }
+
+    const deletePayload = {
+      id: bookingId,
+      courtName,
+      customerName: custName,
+      date: bDate,
+      time: bTime,
+      userName: currentAuthor,
+      deviceType: devContext.label
+    };
+
+    if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
+      window.ArenaSupabase.broadcastBookingDelete(deletePayload);
+    }
+    if (window.arenaSyncChannel) {
+      try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: deletePayload }); } catch(e) {}
+    }
+
+    // 4. Registra no Log do Sistema com quem apagou, quadra, horário, data e dispositivo (Mobile ou PC)
+    logSystemAction({
+      actionType: 'DELETE_BOOKING',
+      actionLabel: 'Exclusão de Jogo',
+      courtName,
+      details: `Jogo agendado de ${custName} (${bDate} às ${bTime} • R$ ${bPrice}) foi apagado e o horário liberado no sistema.`,
+      targetId: bookingId
+    });
+
+    // 5. Se for um horário fixo (monthly-...), lida com a tabela monthly_members
+    if (String(bookingId).startsWith('monthly-')) {
+      const memberId = String(bookingId).replace('monthly-', '');
+      state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
+      localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+      if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+        try {
+          const client = window.ArenaSupabase.getClient();
+          await client.from('monthly_members').delete().eq('id', memberId);
+        } catch(e) {
+          console.warn('Erro ao remover monthly_members:', e);
+        }
+      }
+    } else if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        // Atualiza primeiro para cancelled para propagar Realtime instantâneo para todos os clientes
+        await client.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
+        // E remove da tabela para liberação definitiva
+        await client.from('bookings').delete().eq('id', bookingId);
+      } catch(e) {
+        console.warn('Erro ao deletar booking no Supabase:', e);
+      }
     }
   }
 
@@ -11494,7 +11655,10 @@ function handleMatchModalFilter() {
               ${formatDisplayDate(m.date)} • ${m.time}
             </span>
           </div>
-          <div>${statusBadge}</div>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            ${statusBadge}
+            ${isMensalistaBooking(m) ? '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-black bg-indigo-100 text-indigo-900 border border-indigo-200 shadow-2xs">⭐ MENSALISTA</span>' : ''}
+          </div>
         </div>
 
         <!-- Dados do Cliente & Pagamento -->
@@ -11503,7 +11667,10 @@ function handleMatchModalFilter() {
           <!-- Cliente & CPF -->
           <div>
             <span class="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Cliente / Peladeiro</span>
-            <div class="text-xs sm:text-sm font-black text-slate-900 truncate mt-0.5">${m.customer_name}</div>
+            <div class="text-xs sm:text-sm font-black text-slate-900 truncate mt-0.5 flex items-center gap-1.5 flex-wrap">
+              <span>${m.customer_name}</span>
+              ${isMensalistaBooking(m) ? '<span class="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">⭐ Mensalista</span>' : ''}
+            </div>
             <div class="mt-1 flex items-center gap-1.5 flex-wrap">
               ${m.customer_cpf ? `
                 <span class="inline-flex items-center text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
@@ -12181,11 +12348,13 @@ async function handleMonthlySubmit(event, editId) {
               end_time: endTime,
               duration: eMin - sMin,
               price: monthlyPrice / 4,
+              total_price: monthlyPrice / 4,
               status: 'confirmed',
               payment_status: 'paid',
               payment_method: 'mensalidade',
               customer_name: `${teamName} (${responsibleName})`,
               customer_phone: phone,
+              monthly_member_id: memberId,
               booking_type: 'mensalista',
               bookingType: 'mensalista',
               observation: `Contrato de Horário Fixo Semanal (${teamName})`
@@ -12234,17 +12403,97 @@ async function handleMonthlySubmit(event, editId) {
 window.handleMonthlySubmit = handleMonthlySubmit;
 
 async function deleteMonthlyMember(id) {
-  if (!confirm('Cancelar este contrato de horário fixo?')) return;
-  state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== id);
-  renderStepContent();
-  requestSchedule();
+  const member = (state.monthlyMembers || []).find(m => m.id === id);
+  const memberName = member ? (member.team_name || member.responsible_name || 'este mensalista') : 'este mensalista';
 
+  if (!confirm(`Deseja realmente cancelar o contrato de horário fixo de "${memberName}"?\n\n⚠️ Atenção: Todos os jogos agendados deste mensalista no calendário também serão excluídos automaticamente!`)) return;
+
+  // 1. Identifica todos os jogos deste mensalista
+  const bookingsToRemove = (state.bookings || []).filter(b => {
+    if (!b) return false;
+    if (b.monthly_member_id === id) return true;
+    if (String(b.id).startsWith('monthly-' + id)) return true;
+    if (member) {
+      const isMensal = isMensalistaBooking(b);
+      if (isMensal) {
+        const cName = (b.customer_name || b.customerName || '').toLowerCase();
+        const obs = (b.observation || '').toLowerCase();
+        const cPhone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+        const mPhone = (member.phone || '').replace(/\D/g, '');
+        if (member.team_name && cName.includes(member.team_name.toLowerCase())) return true;
+        if (member.responsible_name && cName.includes(member.responsible_name.toLowerCase())) return true;
+        if (member.team_name && obs.includes(member.team_name.toLowerCase())) return true;
+        if (cPhone && mPhone && cPhone === mPhone) return true;
+      }
+    }
+    return false;
+  });
+
+  const idsToRemove = bookingsToRemove.map(b => b.id);
+
+  // 2. Remove o mensalista do state e localStorage
+  state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== id);
+  localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+
+  // 3. Remove os agendamentos do state e localStorage
+  if (idsToRemove.length > 0) {
+    state.bookings = (state.bookings || []).filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+    try {
+      let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+      local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+    } catch(e) {}
+  }
+
+  // 4. Deleta do Supabase (monthly_members e bookings)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
       await client.from('monthly_members').delete().eq('id', id);
-    } catch(e) {}
+      if (idsToRemove.length > 0) {
+        await client.from('bookings').update({ status: 'cancelled' }).in('id', idsToRemove);
+        await client.from('bookings').delete().in('id', idsToRemove);
+      }
+    } catch(e) {
+      console.warn('Erro ao deletar mensalista/jogos no Supabase:', e);
+    }
   }
+
+  // 5. Transmissão imediata via WebSocket / Broadcast para todos os aparelhos
+  idsToRemove.forEach(bId => {
+    const bObj = bookingsToRemove.find(x => x.id === bId) || {};
+    const deletePayload = {
+      id: bId,
+      courtName: 'Quadra',
+      customerName: bObj.customer_name || memberName,
+      date: bObj.date ? formatDisplayDate(bObj.date) : '',
+      time: bObj.time || bObj.start_time || '',
+      userName: state.currentUser ? (state.currentUser.name || 'Gestor') : 'Gestor',
+      deviceType: getDeviceContext ? getDeviceContext().label : 'Sistema'
+    };
+    if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
+      window.ArenaSupabase.broadcastBookingDelete(deletePayload);
+    }
+    if (window.arenaSyncChannel) {
+      try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: deletePayload }); } catch(e) {}
+    }
+  });
+
+  // 6. Registra ação no log
+  logSystemAction({
+    actionType: 'DELETE_MONTHLY_MEMBER',
+    actionLabel: 'Cancelamento de Mensalista',
+    courtName: 'Geral',
+    details: `Contrato de mensalista "${memberName}" cancelado e ${idsToRemove.length} jogos vinculados foram excluídos da grade.`,
+    targetId: id
+  });
+
+  renderStepContent();
+  requestSchedule();
+  if (typeof _refreshAllUI === 'function') _refreshAllUI();
+  if (window.lucide) lucide.createIcons();
+
+  alert(`✅ Contrato do mensalista "${memberName}" e todos os ${idsToRemove.length} jogo(s) vinculado(s) foram excluídos com sucesso!`);
 }
 window.deleteMonthlyMember = deleteMonthlyMember;
 
