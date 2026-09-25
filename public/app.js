@@ -8585,23 +8585,99 @@ function renderAdminSubTabContent(tab) {
   }
 
   if (tab === 'monthly') {
+    const list = state.monthlyMembers || [];
     return `
       <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="text-base font-black text-slate-800">Contratos de Horários Fixos (Mensalistas)</h3>
-          <button onclick="openMonthlyModal()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">+ Novo Horário Fixo</button>
-        </div>
-        <div class="space-y-2">
-          ${state.monthlyMembers.map(m => `
-            <div class="p-4 border border-slate-200 rounded-2xl flex items-center justify-between">
-              <div>
-                <h4 class="text-sm font-black text-slate-900">${m.team_name || m.teamName}</h4>
-                <p class="text-xs text-slate-500">${m.responsible_name || m.responsibleName} - ${m.phone} | ${m.day_of_week_label || m.dayOfWeekLabel} às ${m.time}</p>
-              </div>
-              <button onclick="deleteMonthlyMember('${m.id}')" class="text-slate-400 hover:text-rose-600 p-1.5"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="calendar-clock" class="w-5 h-5"></i></span>
+              <h3 class="text-base sm:text-lg font-black text-slate-900">Contratos de Horários Fixos (Mensalistas)</h3>
             </div>
-          `).join('')}
+            <p class="text-xs text-slate-500 mt-0.5">Gerencie os times e atletas com dias e horários fixos reservados toda semana na Arena</p>
+          </div>
+          <button onclick="openMonthlyModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+            <span>+ Novo Horário Fixo</span>
+          </button>
         </div>
+
+        ${list.length === 0 ? `
+          <div class="text-center py-12 px-4 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3.5 shadow-xs">
+              <i data-lucide="calendar-plus" class="w-7 h-7"></i>
+            </div>
+            <h4 class="text-base font-black text-slate-800 mb-1">Nenhum Horário Fixo Cadastrado</h4>
+            <p class="text-xs text-slate-500 max-w-md mx-auto mb-4">Cadastre times mensalistas para reservar automaticamente seus horários semanais e proteger contra agendamentos avulsos.</p>
+            <button onclick="openMonthlyModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl shadow cursor-pointer transition-all inline-flex items-center space-x-2">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>Cadastrar Primeiro Mensalista</span>
+            </button>
+          </div>
+        ` : `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            ${list.map(m => {
+              const court = (state.courts || []).find(c => c.id === (m.court_id || m.courtId));
+              const courtName = court ? court.name : (m.court_name || 'Quadra da Arena');
+              const dayLabel = m.day_of_week_label || m.dayOfWeekLabel || (m.day_of_week ? 'Toda ' + m.day_of_week : 'Semanal');
+              const timeDisplay = (m.start_time && m.end_time) ? `${m.start_time} às ${m.end_time}` : (m.time || 'Horário a definir');
+              const priceDisplay = Number(m.monthly_price || m.monthlyPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+              return `
+                <div class="p-4 sm:p-5 border border-slate-200 bg-white hover:border-emerald-300 rounded-2xl sm:rounded-3xl flex flex-col justify-between gap-3 shadow-2xs transition-all">
+                  <div class="flex items-start justify-between gap-2">
+                    <div class="space-y-1">
+                      <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                          <i data-lucide="map-pin" class="w-3 h-3"></i>
+                          ${courtName}
+                        </span>
+                        <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                          ${m.status === 'inactive' ? 'Inativo' : 'Ativo'}
+                        </span>
+                      </div>
+                      <h4 class="text-base font-black text-slate-900 pt-1">${m.team_name || m.teamName || 'Time Mensalista'}</h4>
+                      <p class="text-xs text-slate-600 flex items-center space-x-1.5 flex-wrap gap-1">
+                        <span class="inline-flex items-center space-x-1">
+                          <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+                          <span>${m.responsible_name || m.responsibleName || 'Responsável'}</span>
+                        </span>
+                        <span class="text-slate-300">•</span>
+                        <span class="inline-flex items-center space-x-1">
+                          <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
+                          <span class="font-mono">${m.phone || '-'}</span>
+                        </span>
+                      </p>
+                    </div>
+
+                    <div class="text-right shrink-0">
+                      <div class="text-[10px] font-bold text-slate-400 uppercase">Mensalidade</div>
+                      <div class="text-sm sm:text-base font-black text-emerald-700">${priceDisplay}</div>
+                    </div>
+                  </div>
+
+                  <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                    <div class="flex items-center space-x-1.5 text-slate-700 font-bold">
+                      <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
+                      <span>${dayLabel}</span>
+                      <span class="text-slate-300">•</span>
+                      <span class="text-emerald-800 font-black">${timeDisplay}</span>
+                    </div>
+
+                    <div class="flex items-center space-x-1">
+                      <button onclick="openMonthlyModal('${m.id}')" class="p-1.5 rounded-lg text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer" title="Editar Contrato">
+                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                      </button>
+                      <button onclick="deleteMonthlyMember('${m.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer" title="Cancelar Horário Fixo">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
       </div>
     `;
   }
@@ -11700,9 +11776,466 @@ async function deleteProduct(id) {
   }
 }
 
+// ==============================================================================
+// GESTÃO DE HORÁRIOS FIXOS / MENSALISTAS
+// ==============================================================================
+
+function openMonthlyModal(memberId = null) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const existing = memberId ? (state.monthlyMembers || []).find(m => m.id === memberId) : null;
+  const isEditing = !!existing;
+
+  const courts = state.courts || [];
+  const selectedCourtId = existing ? (existing.court_id || existing.courtId) : (courts[0]?.id || '');
+  const selectedCourt = courts.find(c => c.id === selectedCourtId) || courts[0];
+  const defaultPrice = selectedCourt ? (selectedCourt.monthlyPrice || (selectedCourt.basePricePerHour * 4) || 400) : 400;
+
+  const daysOfWeek = [
+    { id: 'segunda', label: 'Toda Segunda-feira' },
+    { id: 'terca', label: 'Toda Terça-feira' },
+    { id: 'quarta', label: 'Toda Quarta-feira' },
+    { id: 'quinta', label: 'Toda Quinta-feira' },
+    { id: 'sexta', label: 'Toda Sexta-feira' },
+    { id: 'sabado', label: 'Todo Sábado' },
+    { id: 'domingo', label: 'Todo Domingo' }
+  ];
+
+  const timeSlots = [];
+  for (let h = 6; h <= 23; h++) {
+    const hh = String(h).padStart(2, '0');
+    timeSlots.push(`${hh}:00`);
+    if (h < 23) timeSlots.push(`${hh}:30`);
+  }
+
+  const currentStartTime = existing ? (existing.start_time || existing.startTime || existing.time || '19:00') : '19:00';
+  const currentEndTime = existing ? (existing.end_time || existing.endTime || '20:00') : '20:00';
+  const currentDay = existing ? (existing.day_of_week || existing.dayOfWeek || 'segunda') : 'segunda';
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col my-auto max-h-[92vh]">
+        
+        <!-- Header -->
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between shrink-0">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="${isEditing ? 'edit-3' : 'calendar-clock'}" class="w-5 h-5 text-emerald-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-wide">${isEditing ? 'Editar Horário Fixo (Mensalista)' : 'Novo Horário Fixo (Mensalista)'}</h3>
+              <p class="text-xs text-emerald-300 font-medium">${isEditing ? 'Altere os dados do contrato, dia ou horário' : 'Reserve um horário semanal garantido para um time ou grupo'}</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <!-- Form Body -->
+        <form onsubmit="handleMonthlySubmit(event, '${isEditing ? existing.id : ''}')" class="p-5 sm:p-6 space-y-4 overflow-y-auto" autocomplete="off">
+          
+          <!-- Quadra e Dia da Semana -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quadra / Espaço *</label>
+              <select id="monthlyCourtId" onchange="handleMonthlyCourtChange()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                ${courts.map(c => `
+                  <option value="${c.id}" ${c.id === selectedCourtId ? 'selected' : ''}>
+                    ${c.name}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dia da Semana Fixo *</label>
+              <select id="monthlyDayOfWeek" required class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                ${daysOfWeek.map(d => `
+                  <option value="${d.id}" ${d.id === currentDay ? 'selected' : ''}>
+                    ${d.label}
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Horários de Início e Fim -->
+          <div class="grid grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Horário de Início *</label>
+              <select id="monthlyStartTime" onchange="handleMonthlyStartTimeChange()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                ${timeSlots.map(t => `
+                  <option value="${t}" ${t === currentStartTime ? 'selected' : ''}>${t}</option>
+                `).join('')}
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Horário de Fim *</label>
+              <select id="monthlyEndTime" required class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                ${timeSlots.map(t => `
+                  <option value="${t}" ${t === currentEndTime ? 'selected' : ''}>${t}</option>
+                `).join('')}
+              </select>
+            </div>
+          </div>
+
+          <!-- Nome do Time e Responsável -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Time / Pelada *</label>
+              <input type="text" id="monthlyTeamName" required placeholder="Ex: Galácticos FC, Pelada das Quintas"
+                     value="${existing ? (existing.team_name || existing.teamName || '').replace(/"/g, '&quot;') : ''}"
+                     class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Responsável *</label>
+              <input type="text" id="monthlyResponsibleName" required placeholder="Ex: Gabriel Alves"
+                     value="${existing ? (existing.responsible_name || existing.responsibleName || '').replace(/"/g, '&quot;') : ''}"
+                     class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Telefone e CPF -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                <span>WhatsApp / Celular *</span>
+                <span id="monthlyCustomerFoundTag" class="hidden text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">Atleta Encontrado</span>
+              </label>
+              <input type="tel" id="monthlyPhone" required placeholder="(81) 98765-4321" maxlength="15"
+                     oninput="handleMonthlyPhoneInput(this.value)"
+                     value="${existing ? (existing.phone || '') : ''}"
+                     class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CPF do Responsável (Opcional)</label>
+              <input type="text" id="monthlyCPF" placeholder="000.000.000-00" maxlength="14"
+                     oninput="this.value = formatCPF(this.value)"
+                     value="${existing ? (existing.cpf || existing.document || '') : ''}"
+                     class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm font-mono focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Preço Mensal e Status -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mensalidade Total (R$) *</label>
+              <div class="relative">
+                <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">R$</span>
+                <input type="number" step="10" id="monthlyPrice" required placeholder="500.00"
+                       value="${existing ? (Number(existing.monthly_price || existing.monthlyPrice || defaultPrice).toFixed(2)) : (Number(defaultPrice).toFixed(2))}"
+                       class="w-full pl-9 pr-3 py-3 border border-slate-300 rounded-xl text-sm font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Contrato</label>
+              <select id="monthlyStatus" class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm bg-white font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                <option value="active" ${!existing || existing.status !== 'inactive' ? 'selected' : ''}>✅ Ativo (Bloqueia Horário Semanal)</option>
+                <option value="inactive" ${existing && existing.status === 'inactive' ? 'selected' : ''}>⏸️ Inativo / Pausado</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Opção de gerar reservas automáticas no calendário -->
+          <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex items-start space-x-3">
+            <input type="checkbox" id="monthlyGenerateBookings" checked class="mt-0.5 w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+            <label for="monthlyGenerateBookings" class="text-xs text-emerald-950 font-medium cursor-pointer">
+              <strong class="font-black text-emerald-900 block">Gerar agendamentos das próximas 4 semanas no calendário</strong>
+              Cria automaticamente as partidas semanais no sistema para aparecer na agenda e evitar conflito com agendamentos avulsos.
+            </label>
+          </div>
+
+          <!-- Observações -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do Contrato</label>
+            <textarea id="monthlyObservation" rows="2" placeholder="Ex: Mensalidade vence todo dia 10. Pagamento via Pix com Gabriel."
+                      class="w-full p-3 border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none resize-none">${existing ? (existing.observation || '') : ''}</textarea>
+          </div>
+
+          <!-- Botões -->
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-end space-x-3">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="monthlySubmitBtn" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow cursor-pointer transition-all flex items-center space-x-1.5">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>${isEditing ? 'Salvar Alterações' : 'Confirmar Horário Fixo'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openMonthlyModal = openMonthlyModal;
+
+function handleMonthlyCourtChange() {
+  const courtSelect = document.getElementById('monthlyCourtId');
+  const priceInput = document.getElementById('monthlyPrice');
+  if (!courtSelect || !priceInput) return;
+  const court = (state.courts || []).find(c => c.id === courtSelect.value);
+  if (court) {
+    const suggested = court.monthlyPrice || (court.basePricePerHour * 4) || 400;
+    priceInput.value = Number(suggested).toFixed(2);
+  }
+}
+window.handleMonthlyCourtChange = handleMonthlyCourtChange;
+
+function handleMonthlyStartTimeChange() {
+  const startSelect = document.getElementById('monthlyStartTime');
+  const endSelect = document.getElementById('monthlyEndTime');
+  if (!startSelect || !endSelect) return;
+  const sMin = timeToMinutes(startSelect.value);
+  const eMin = sMin + 60;
+  endSelect.value = minutesToTime(Math.min(eMin, 23 * 60));
+}
+window.handleMonthlyStartTimeChange = handleMonthlyStartTimeChange;
+
+function handleMonthlyPhoneInput(val) {
+  const phoneInput = document.getElementById('monthlyPhone');
+  if (!phoneInput) return;
+  const formatted = formatPhone(val);
+  phoneInput.value = formatted;
+
+  const clean = val.replace(/\D/g, '');
+  const tag = document.getElementById('monthlyCustomerFoundTag');
+  if (clean.length >= 10 && typeof findCustomerByPhone === 'function') {
+    const cust = findCustomerByPhone(clean);
+    if (cust) {
+      if (tag) tag.classList.remove('hidden');
+      const respInput = document.getElementById('monthlyResponsibleName');
+      const cpfInput = document.getElementById('monthlyCPF');
+      const teamInput = document.getElementById('monthlyTeamName');
+      if (respInput && (!respInput.value || respInput.value.trim() === '')) {
+        respInput.value = cust.name || '';
+      }
+      if (cpfInput && (!cpfInput.value || cpfInput.value.trim() === '') && cust.document) {
+        cpfInput.value = formatCPF(cust.document);
+      }
+      if (teamInput && (!teamInput.value || teamInput.value.trim() === '')) {
+        teamInput.value = cust.name || '';
+      }
+    } else {
+      if (tag) tag.classList.add('hidden');
+    }
+  } else {
+    if (tag) tag.classList.add('hidden');
+  }
+}
+window.handleMonthlyPhoneInput = handleMonthlyPhoneInput;
+
+async function handleMonthlySubmit(event, editId) {
+  event.preventDefault();
+  const courtId = document.getElementById('monthlyCourtId').value;
+  const dayOfWeek = document.getElementById('monthlyDayOfWeek').value;
+  const startTime = document.getElementById('monthlyStartTime').value;
+  const endTime = document.getElementById('monthlyEndTime').value;
+  const teamName = document.getElementById('monthlyTeamName').value.trim();
+  const responsibleName = document.getElementById('monthlyResponsibleName').value.trim();
+  const phone = document.getElementById('monthlyPhone').value.trim();
+  const cpf = document.getElementById('monthlyCPF') ? document.getElementById('monthlyCPF').value.trim() : '';
+  const monthlyPrice = parseFloat(document.getElementById('monthlyPrice').value) || 0;
+  const status = document.getElementById('monthlyStatus').value || 'active';
+  const generateBookings = document.getElementById('monthlyGenerateBookings')?.checked || false;
+  const observation = document.getElementById('monthlyObservation')?.value.trim() || '';
+
+  if (!courtId || !dayOfWeek || !startTime || !endTime || !teamName || !responsibleName || !phone) {
+    alert('Por favor, preencha todos os campos obrigatórios marcados com (*).');
+    return;
+  }
+
+  const sMin = timeToMinutes(startTime);
+  const eMin = timeToMinutes(endTime);
+  if (eMin <= sMin) {
+    alert('O horário de término deve ser posterior ao horário de início.');
+    return;
+  }
+
+  // Validação Anti-Choque com outros contratos de Horário Fixo ativos
+  const conflict = (state.monthlyMembers || []).find(mm => {
+    if (editId && mm.id === editId) return false;
+    const mmCourtId = mm.court_id || mm.courtId;
+    if (mmCourtId !== courtId) return false;
+    if ((mm.day_of_week || mm.dayOfWeek) !== dayOfWeek) return false;
+    if (mm.status && mm.status !== 'active') return false;
+
+    const mmS = timeToMinutes(mm.start_time || mm.startTime || mm.time);
+    const mmE = timeToMinutes(mm.end_time || mm.endTime || minutesToTime(mmS + 60));
+    return Math.max(sMin, mmS) < Math.min(eMin, mmE);
+  });
+
+  if (conflict && status === 'active') {
+    alert(`⚠️ Conflito de Horário:\nA quadra selecionada já possui um contrato ativo neste mesmo dia e horário reservado para o time "${conflict.team_name || conflict.teamName}"!`);
+    return;
+  }
+
+  const submitBtn = document.getElementById('monthlySubmitBtn');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="animate-spin inline-block mr-1.5">⏳</span> Gravando contrato...';
+  }
+
+  const dayLabels = {
+    segunda: 'Toda Segunda-feira',
+    terca: 'Toda Terça-feira',
+    quarta: 'Toda Quarta-feira',
+    quinta: 'Toda Quinta-feira',
+    sexta: 'Toda Sexta-feira',
+    sabado: 'Todo Sábado',
+    domingo: 'Todo Domingo'
+  };
+
+  const memberId = editId || ('monthly-' + Date.now());
+  const memberRecord = {
+    id: memberId,
+    team_name: teamName,
+    teamName: teamName,
+    responsible_name: responsibleName,
+    responsibleName: responsibleName,
+    phone: phone,
+    court_id: courtId,
+    courtId: courtId,
+    day_of_week: dayOfWeek,
+    dayOfWeek: dayOfWeek,
+    day_of_week_label: dayLabels[dayOfWeek] || 'Semanal',
+    dayOfWeekLabel: dayLabels[dayOfWeek] || 'Semanal',
+    time: startTime,
+    start_time: startTime,
+    startTime: startTime,
+    end_time: endTime,
+    endTime: endTime,
+    monthly_price: monthlyPrice,
+    monthlyPrice: monthlyPrice,
+    status: status,
+    observation: observation
+  };
+
+  if (!state.monthlyMembers) state.monthlyMembers = [];
+  if (editId) {
+    const idx = state.monthlyMembers.findIndex(m => m.id === editId);
+    if (idx !== -1) state.monthlyMembers[idx] = memberRecord;
+    else state.monthlyMembers.push(memberRecord);
+  } else {
+    state.monthlyMembers.push(memberRecord);
+  }
+
+  localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+
+  // Salva no Supabase (Nuvem)
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      const dbPayload = {
+        id: memberId,
+        team_name: teamName,
+        responsible_name: responsibleName,
+        phone: phone,
+        court_id: courtId,
+        day_of_week: dayOfWeek,
+        day_of_week_label: dayLabels[dayOfWeek] || 'Semanal',
+        time: startTime,
+        start_time: startTime,
+        end_time: endTime,
+        monthly_price: monthlyPrice,
+        status: status,
+        observation: observation
+      };
+      await client.from('monthly_members').upsert([dbPayload]);
+    } catch (e) {
+      console.warn('Erro ao salvar no Supabase monthly_members:', e);
+    }
+  }
+
+  // Gera reservas para as próximas 4 semanas no calendário se solicitado
+  if (generateBookings && status === 'active') {
+    try {
+      const dayIndexMap = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
+      const targetDay = dayIndexMap[dayOfWeek];
+      const today = new Date();
+      const bookingsToCreate = [];
+
+      for (let i = 0; i < 28; i++) {
+        const d = new Date();
+        d.setDate(today.getDate() + i);
+        if (d.getDay() === targetDay) {
+          const dateStr = getFormattedDate(d);
+          // Verifica se já não existe reserva idêntica
+          const alreadyExists = (state.bookings || []).some(b => 
+            b.court_id === courtId && b.date === dateStr && b.start_time === startTime && b.status !== 'cancelled'
+          );
+          if (!alreadyExists) {
+            const bId = 'ARENA-M' + Math.floor(1000 + Math.random() * 9000);
+            const newBooking = {
+              id: bId,
+              court_id: courtId,
+              date: dateStr,
+              start_time: startTime,
+              end_time: endTime,
+              duration: eMin - sMin,
+              price: monthlyPrice / 4,
+              status: 'confirmed',
+              payment_status: 'paid',
+              payment_method: 'mensalidade',
+              customer_name: `${teamName} (${responsibleName})`,
+              customer_phone: phone,
+              booking_type: 'mensalista',
+              bookingType: 'mensalista',
+              observation: `Contrato de Horário Fixo Semanal (${teamName})`
+            };
+            bookingsToCreate.push(newBooking);
+          }
+        }
+      }
+
+      if (bookingsToCreate.length > 0) {
+        if (!state.bookings) state.bookings = [];
+        bookingsToCreate.forEach(b => state.bookings.push(b));
+        const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+        bookingsToCreate.forEach(b => local.push(b));
+        localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+
+        if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+          const client = window.ArenaSupabase.getClient();
+          await client.from('bookings').insert(bookingsToCreate);
+        }
+      }
+    } catch(err) {
+      console.warn('Aviso ao gerar reservas de mensalista:', err);
+    }
+  }
+
+  // Registra/atualiza na ficha de clientes
+  try {
+    if (typeof saveCustomerFromBooking === 'function') {
+      saveCustomerFromBooking({
+        customer_name: responsibleName,
+        customer_phone: phone,
+        customer_cpf: cpf,
+        observation: `Mensalista do time "${teamName}"`
+      });
+    }
+  } catch(e) {}
+
+  closeModal();
+  renderStepContent();
+  requestSchedule();
+  if (window.lucide) lucide.createIcons();
+
+  alert(`✅ Contrato de Horário Fixo do time "${teamName}" salvo com sucesso!`);
+}
+window.handleMonthlySubmit = handleMonthlySubmit;
+
 async function deleteMonthlyMember(id) {
   if (!confirm('Cancelar este contrato de horário fixo?')) return;
-  state.monthlyMembers = state.monthlyMembers.filter(m => m.id !== id);
+  state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== id);
   renderStepContent();
   requestSchedule();
 
@@ -11713,6 +12246,7 @@ async function deleteMonthlyMember(id) {
     } catch(e) {}
   }
 }
+window.deleteMonthlyMember = deleteMonthlyMember;
 
 async function deleteAdminUser(id) {
   const target = state.adminUsers.find(u => u.id === id);
