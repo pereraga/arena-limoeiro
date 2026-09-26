@@ -3707,6 +3707,7 @@ window.navigateAdminFilterMonth = navigateAdminFilterMonth;
 
 function setAdminFilterDate(dateStr) {
   state.adminFilterDate = dateStr;
+  state.adminTab = 'live_dashboard';
   renderStepContent();
   lucide.createIcons();
 }
@@ -4012,7 +4013,7 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
       <!-- Barra de Rolagem Horizontal de Dias -->
       <div id="horizontalDaysContainer" class="flex items-center gap-2 overflow-x-auto pb-2 scroll-smooth scrollbar-thin">
         ${daysList.map(day => `
-          <button type="button" onclick="setAdminFilterDate('${day.dateStr}')" 
+          <button type="button" data-date="${day.dateStr}" onclick="setAdminFilterDate('${day.dateStr}')" 
                   class="flex-shrink-0 flex flex-col items-center justify-between p-2.5 sm:p-3 rounded-2xl border transition-all duration-200 min-w-[76px] sm:min-w-[85px] text-center ${day.isSelected ? 'bg-emerald-600 text-white border-emerald-600 shadow-md ring-2 ring-emerald-400/50 scale-[1.03]' : (day.isToday ? 'bg-emerald-50/70 border-emerald-300 text-slate-900 hover:border-emerald-500' : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50')}">
             
             <div class="flex items-center gap-1">
@@ -11749,8 +11750,52 @@ function handleMatchModalFilter() {
 }
 
 function goToMatchDate(dateStr) {
+  if (!dateStr) return;
+
+  // Normaliza a data para YYYY-MM-DD caso venha em outro formato (ex: DD/MM/YYYY)
+  let cleanDate = String(dateStr).trim();
+  if (cleanDate.includes('/')) {
+    const parts = cleanDate.split('/');
+    if (parts.length === 3) {
+      cleanDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+
+  // 1. Fecha modais abertos (como pesquisa de jogos ou detalhes)
   closeModal();
-  setAdminFilterDate(dateStr);
+
+  // 2. Garante modo admin e muda a aba para "live_dashboard" (Movimentação do Dia)
+  state.currentMode = 'admin';
+  state.adminTab = 'live_dashboard';
+
+  // 3. Define a data do filtro para o dia da partida
+  state.adminFilterDate = cleanDate;
+
+  // 4. Reseta filtros para garantir que os jogos daquele dia apareçam
+  state.adminFilterCourt = 'all';
+  state.adminFilterStatus = 'all';
+
+  // 5. Renderiza a aplicação
+  if (typeof renderApp === 'function') {
+    renderApp();
+  } else {
+    renderStepContent();
+  }
+
+  // 6. Rola suavemente até o dia selecionado no calendário horizontal
+  setTimeout(() => {
+    const dayBtn = document.querySelector(`[data-date="${cleanDate}"]`);
+    if (dayBtn) {
+      dayBtn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+    const container = document.getElementById('horizontalDaysContainer');
+    if (container) {
+      container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    if (window.lucide) lucide.createIcons();
+  }, 120);
 }
 
 // Vincula funções no escopo global window para garantir chamadas inline de eventos
