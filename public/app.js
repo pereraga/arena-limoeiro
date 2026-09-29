@@ -1276,6 +1276,14 @@ function renderStepper() {
         </div>
 
         <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
+          <button onclick="openResetPinModal('${state.currentUser?.email || ''}')" 
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                  title="Editar seu PIN de Segurança de 6 dígitos">
+            <i data-lucide="key-round" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0"></i>
+            <span class="hidden sm:inline">Editar PIN</span>
+            <span class="sm:hidden">PIN</span>
+          </button>
+
           <button onclick="switchToClientView()" 
                   class="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
                   title="Alternar para a visão pública do cliente">
@@ -3241,9 +3249,15 @@ function openLoginModal(onSuccessCallback = null) {
             <p>Máximo de <strong>3 tentativas</strong>. Em caso de erro consecutivo, o acesso é travado por <strong>15 minutos</strong>.</p>
           </div>
 
-          <div class="pt-2 flex items-center justify-end space-x-3">
-            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
-            <button type="submit" id="btnLoginSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Avançar →</button>
+          <div class="pt-2 flex items-center justify-between gap-2 flex-wrap">
+            <button type="button" onclick="openResetPinModal()" class="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer">
+              <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+              <span>Editar / Redefinir PIN</span>
+            </button>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
+              <button type="submit" id="btnLoginSubmit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Entrar no Painel</button>
+            </div>
           </div>
         </form>
       </div>
@@ -3777,6 +3791,196 @@ setInterval(() => {
     checkPeriodicPinReminder();
   }
 }, 5 * 60 * 1000); // Checa a cada 5 minutos
+
+// ==============================================================================
+// 🔑 EDIÇÃO / REDEFINIÇÃO DO PIN DE 6 DÍGITOS
+// ==============================================================================
+function openResetPinModal(prefilledEmail = '') {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const currentEmail = prefilledEmail || (state.currentUser ? state.currentUser.email : '') || '';
+  const isAlreadyLoggedIn = isManagerLoggedIn();
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col my-auto max-h-[92vh]">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/25 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="key-round" class="w-5 h-5 text-emerald-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-wide">Editar PIN de 6 Dígitos</h3>
+              <p class="text-xs text-emerald-300 font-medium">Atualize seu código de segurança</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleResetPinSubmit(event)" class="p-6 space-y-4 overflow-y-auto" autocomplete="off">
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 space-y-1">
+            <strong class="font-bold block text-emerald-900">🔐 Segurança de Identidade</strong>
+            <p class="text-[11px] leading-relaxed">
+              Para definir um novo PIN de 6 dígitos, confirme seu e-mail e sua senha de administrador atual.
+            </p>
+          </div>
+
+          <div id="resetPinError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">E-mail do Administrador *</label>
+            <input type="email" id="resetPinEmail" required placeholder="seuemail@arenalimoeiro.com.br"
+                   value="${currentEmail}" ${isAlreadyLoggedIn ? 'readonly' : ''}
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm font-medium ${isAlreadyLoggedIn ? 'bg-slate-100 text-slate-600' : 'bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none'}">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha de Acesso Atual *</label>
+            <input type="password" id="resetPinPassword" required placeholder="Digite sua senha de administrador"
+                   class="w-full p-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+
+          <div class="pt-2 border-t border-slate-100">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Novo PIN (6 Números) *</label>
+            <input type="password" id="resetPinNew" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••"
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-3 text-center text-2xl font-mono tracking-[0.4em] font-black border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Confirme o Novo PIN (6 Números) *</label>
+            <input type="password" id="resetPinConfirm" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••"
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-3 text-center text-2xl font-mono tracking-[0.4em] font-black border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-3">
+            <button type="button" onclick="${isAlreadyLoggedIn ? 'closeModal()' : 'openLoginModal()'}" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnResetPinSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-1.5">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Salvar Novo PIN</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openResetPinModal = openResetPinModal;
+window.openChangePinModal = openResetPinModal;
+
+async function handleResetPinSubmit(event) {
+  event.preventDefault();
+  const emailInp = document.getElementById('resetPinEmail');
+  const passInp = document.getElementById('resetPinPassword');
+  const newPinInp = document.getElementById('resetPinNew');
+  const confirmPinInp = document.getElementById('resetPinConfirm');
+  const errBox = document.getElementById('resetPinError');
+  const submitBtn = document.getElementById('btnResetPinSubmit');
+
+  const email = (emailInp ? emailInp.value : '').trim().toLowerCase();
+  const password = (passInp ? passInp.value : '').trim();
+  const newPin = (newPinInp ? newPinInp.value : '').trim();
+  const confirmPin = (confirmPinInp ? confirmPinInp.value : '').trim();
+
+  if (!email || !password) {
+    if (errBox) {
+      errBox.innerText = "Informe seu e-mail e sua senha de administrador.";
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (!/^\d{6}$/.test(newPin)) {
+    if (errBox) {
+      errBox.innerText = "O novo PIN deve conter exatamente 6 números.";
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (newPin !== confirmPin) {
+    if (errBox) {
+      errBox.innerText = "Os dois novos PINs digitados não são idênticos.";
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Validando...";
+  }
+
+  let verified = false;
+
+  // Supabase check
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      const { data } = await client.from('admin_users').select('*').ilike('email', email);
+      if (data && data.length > 0) {
+        verified = data.some(u => {
+          const uPass = String(u.password || '').trim();
+          return uPass === password || uPass.toLowerCase() === password.toLowerCase();
+        });
+      }
+    } catch(e) {}
+  }
+
+  // Local state check
+  if (!verified) {
+    const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
+    const allKnown = [...(state.adminUsers || []), ...localAdmins];
+    verified = allKnown.some(u => {
+      if (!u || !u.email) return false;
+      if (u.email.trim().toLowerCase() !== email) return false;
+      const uPass = String(u.password || '').trim();
+      return uPass === password || uPass.toLowerCase() === password.toLowerCase();
+    });
+  }
+
+  // Master fallback check
+  if (!verified) {
+    if (email === 'admin@arenalimoeiro.com.br' && (password.toLowerCase() === 'alves@157620' || password === 'admin123')) verified = true;
+    if ((email.includes('vinicius') || email.includes('gerente')) && (password.toLowerCase() === 'vinicius@2026!' || password === 'gerente123')) verified = true;
+    if (email.includes('recep') && (password === 'arena123' || password.toLowerCase() === 'recepcao@2026!')) verified = true;
+  }
+
+  if (!verified) {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Salvar Novo PIN";
+    }
+    if (errBox) {
+      errBox.innerText = "Senha de administrador incorreta. Não foi possível alterar o PIN.";
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  // Salva o novo PIN
+  saveAdminPinRecord(email, newPin);
+  clearAdminLockInfo();
+
+  alert("✅ PIN de 6 dígitos atualizado com sucesso!\nVocê já pode utilizar seu novo PIN para as confirmações periódicas.");
+
+  if (isManagerLoggedIn()) {
+    closeModal();
+  } else {
+    openLoginModal();
+  }
+}
+window.handleResetPinSubmit = handleResetPinSubmit;
 
 function logoutAdmin() {
   state.currentUser = null;
