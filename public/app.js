@@ -3399,14 +3399,23 @@ async function handleLoginSubmit(event) {
       }
     }
 
-    // Avança para a 2ª ETAPA (PIN de 6 dígitos)
+    // Verificação do PIN de 6 dígitos:
+    // Só é solicitado no 1º login para cadastrar, ou a cada 4 dias para verificar e não esquecer!
     const pinRecord = getAdminPinRecord(authenticatedUser.email);
     if (!pinRecord || !pinRecord.pin) {
       // Primeiro login: Cadastrar o PIN de 6 dígitos
       openRegisterPinModal(authenticatedUser);
     } else {
-      // Próximos logins: Confirmar o PIN de 6 dígitos
-      openVerifyPinModal(authenticatedUser, pinRecord);
+      const lastVerified = pinRecord.lastVerifiedAt || pinRecord.registeredAt || 0;
+      const elapsed = Date.now() - lastVerified;
+      if (elapsed >= FOUR_DAYS_MS) {
+        // Já se passaram 4 dias: solicita a verificação do PIN para lembrar
+        openVerifyPinModal(authenticatedUser, pinRecord);
+      } else {
+        // Dentro do período de 4 dias: entra direto sem precisar digitar o PIN!
+        clearAdminLockInfo();
+        completeAdminLogin(authenticatedUser);
+      }
     }
 
   } else {
@@ -3544,8 +3553,8 @@ function openVerifyPinModal(user, pinRecord) {
               <i data-lucide="shield-check" class="w-5 h-5 text-emerald-300"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase tracking-wide">Verificação em 2 Etapas</h3>
-              <p class="text-xs text-emerald-300 font-medium">Digite seu PIN de 6 Dígitos</p>
+              <h3 class="text-base font-black uppercase tracking-wide">Lembrete Periódico (A cada 4 Dias)</h3>
+              <p class="text-xs text-emerald-300 font-medium">Confirme seu PIN de 6 Dígitos</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
@@ -3554,9 +3563,14 @@ function openVerifyPinModal(user, pinRecord) {
         </div>
 
         <form onsubmit="handleVerifyPinSubmit(event, '${user.email}')" class="p-6 space-y-4" autocomplete="off">
-          <div class="text-center py-2">
+          <div class="text-center py-1">
             <div class="text-sm font-black text-slate-800">${user.name}</div>
             <p class="text-xs text-slate-500">${user.email}</p>
+          </div>
+
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-950 space-y-0.5">
+            <strong class="font-bold block text-emerald-900">🔔 Confirmação Periódica de 4 Dias</strong>
+            <p>Para você não esquecer e manter o sistema protegido, digite seu PIN cadastrado:</p>
           </div>
 
           <div id="pinVerifyError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
@@ -3567,10 +3581,6 @@ function openVerifyPinModal(user, pinRecord) {
                    placeholder="••••••" autofocus
                    oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
                    class="w-full p-4 text-center text-3xl font-mono tracking-[0.45em] font-black border border-slate-300 rounded-2xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-          </div>
-
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 text-center">
-            🔒 O PIN de 6 dígitos é individual e protege suas decisões financeiras e agenda.
           </div>
 
           <div class="pt-2 flex items-center justify-end space-x-3">
