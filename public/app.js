@@ -3982,6 +3982,159 @@ async function handleResetPinSubmit(event) {
 }
 window.handleResetPinSubmit = handleResetPinSubmit;
 
+// ==============================================================================
+// 🔑 EDIÇÃO DIRETA DE PIN EM "GESTORES & ACESSOS"
+// ==============================================================================
+function openAdminPinManagerModal(targetEmail, targetName = '') {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const email = (targetEmail || '').trim().toLowerCase();
+  const foundUser = (state.adminUsers || []).find(u => (u.email || '').toLowerCase() === email);
+  const name = targetName || (foundUser ? (foundUser.name || foundUser.role) : 'Gestor');
+  const currentPinRec = getAdminPinRecord(email);
+  const currentPinVal = currentPinRec ? currentPinRec.pin : '';
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col my-auto max-h-[92vh]">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between shrink-0">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-400/30">
+              <i data-lucide="key-round" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-wide">Editar PIN de 6 Dígitos</h3>
+              <p class="text-xs text-emerald-200 font-medium">Gestores & Acessos da Arena Limoeiro</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleSaveAdminPinFromManager(event, '${email}')" class="p-6 space-y-4 overflow-y-auto" autocomplete="off">
+          <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black shrink-0">
+              <i data-lucide="user-check" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <h4 class="text-sm font-black text-slate-900 truncate">${name}</h4>
+              <p class="text-xs font-mono text-slate-500 truncate">${email}</p>
+            </div>
+          </div>
+
+          <div id="managerPinAlertBox" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+
+          ${currentPinVal ? `
+            <div class="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-950">
+              <div>
+                <span class="text-slate-500 font-medium block text-[11px]">PIN atual cadastrado:</span>
+                <span class="font-mono font-black text-base tracking-widest text-emerald-800">${currentPinVal}</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 font-black text-[10px]">Ativo</span>
+            </div>
+          ` : `
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900">
+              ⚠️ Este gestor ainda não possui um PIN de 6 dígitos personalizado. Defina abaixo para ativá-lo.
+            </div>
+          `}
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Novo PIN (6 Números) *</label>
+            <input type="password" id="managerNewPin" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••" autofocus
+                   value="${currentPinVal}"
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-3.5 text-center text-2xl font-mono tracking-[0.4em] font-black border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Confirme o Novo PIN (6 Números) *</label>
+            <input type="password" id="managerConfirmPin" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••"
+                   value="${currentPinVal}"
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-3.5 text-center text-2xl font-mono tracking-[0.4em] font-black border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+          </div>
+
+          <p class="text-[11px] text-slate-500 leading-snug">
+            💡 Este PIN de 6 dígitos será solicitado para este gestor no primeiro login e verificado periodicamente a cada 4 dias.
+          </p>
+
+          <div class="pt-2 flex items-center justify-end space-x-3">
+            <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnSaveManagerPin" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-1.5">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Salvar PIN</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openAdminPinManagerModal = openAdminPinManagerModal;
+
+async function handleSaveAdminPinFromManager(event, email) {
+  event.preventDefault();
+  const newPinInp = document.getElementById('managerNewPin');
+  const confirmPinInp = document.getElementById('managerConfirmPin');
+  const alertBox = document.getElementById('managerPinAlertBox');
+  const submitBtn = document.getElementById('btnSaveManagerPin');
+
+  const newPin = (newPinInp ? newPinInp.value : '').trim();
+  const confirmPin = (confirmPinInp ? confirmPinInp.value : '').trim();
+
+  if (!/^\d{6}$/.test(newPin)) {
+    if (alertBox) {
+      alertBox.innerText = "O PIN deve conter exatamente 6 dígitos numéricos.";
+      alertBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (newPin !== confirmPin) {
+    if (alertBox) {
+      alertBox.innerText = "A confirmação do PIN não confere com o novo PIN digitado.";
+      alertBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerText = "Salvando...";
+  }
+
+  // Salva no registro de PINs
+  saveAdminPinRecord(email, newPin);
+
+  // Se o gestor estiver na lista, salva o atributo pin também
+  const user = (state.adminUsers || []).find(u => (u.email || '').toLowerCase() === email.toLowerCase());
+  if (user) {
+    user.pin = newPin;
+    try {
+      localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
+    } catch(e) {}
+  }
+
+  // Fecha o modal
+  closeModal();
+
+  // Re-renderiza a visualização para atualizar na hora
+  if (typeof renderStepContent === 'function') {
+    renderStepContent();
+  }
+
+  alert(`✅ PIN de 6 dígitos atualizado com sucesso para ${email}!`);
+}
+window.handleSaveAdminPinFromManager = handleSaveAdminPinFromManager;
+
 function logoutAdmin() {
   state.currentUser = null;
   localStorage.removeItem('arena_user');
@@ -9504,10 +9657,18 @@ function renderAdminSubTabContent(tab) {
               <span class="text-[10px] text-slate-500 font-bold">Autenticação e Permissões Sincronizadas na Nuvem</span>
             </div>
           </div>
-          <button onclick="openNewAdminUserModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer">
-            <i data-lucide="user-plus" class="w-4 h-4"></i>
-            <span>+ Novo Gestor</span>
-          </button>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="openAdminPinManagerModal('${state.currentUser ? state.currentUser.email : 'admin@arenalimoeiro.com.br'}', '${(state.currentUser ? (state.currentUser.name || 'Gabriel Alves') : 'Gabriel Alves').replace(/'/g, "\\'")}')" 
+                    class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer"
+                    title="Editar o PIN de 6 dígitos da sua conta">
+              <i data-lucide="key-round" class="w-4 h-4"></i>
+              <span>🔑 Editar Meu PIN</span>
+            </button>
+            <button onclick="openNewAdminUserModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>+ Novo Gestor</span>
+            </button>
+          </div>
         </div>
         
         <div class="space-y-3">
@@ -9517,6 +9678,8 @@ function renderAdminSubTabContent(tab) {
             const canDel = userHasPermission(u, 'can_delete_bookings');
             const activeCount = SYSTEM_PERMISSIONS.filter(p => userHasPermission(u, p.id)).length;
             const isRecep = (u.role || '').toLowerCase().includes('recep');
+            const pinRec = typeof getAdminPinRecord === 'function' ? getAdminPinRecord(u.email) : null;
+            const pinDisplay = (pinRec && pinRec.pin) ? pinRec.pin : (u.pin || '••••••');
 
             return `
               <div class="p-4 sm:p-5 border ${isMaster ? 'border-emerald-300 bg-emerald-50/40 ring-1 ring-emerald-300/50' : 'border-slate-200 bg-white'} rounded-2xl sm:rounded-3xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-xs transition-all hover:border-slate-300">
@@ -9546,6 +9709,8 @@ function renderAdminSubTabContent(tab) {
                       <span><strong>E-mail:</strong> <code class="text-slate-800 font-mono font-bold">${u.email}</code></span>
                       <span class="text-slate-300">•</span>
                       <span><strong>Senha:</strong> <code class="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-mono font-bold">${u.password}</code></span>
+                      <span class="text-slate-300">•</span>
+                      <span class="flex items-center gap-1"><strong>PIN (6 dígitos):</strong> <code class="bg-amber-50 text-amber-900 border border-amber-200 px-1.5 py-0.5 rounded text-slate-800 font-mono font-bold tracking-widest">${pinDisplay}</code></span>
                     </p>
 
                     <!-- Resumo das permissões ativas em badges compactas -->
@@ -9560,7 +9725,7 @@ function renderAdminSubTabContent(tab) {
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2 self-end lg:self-center shrink-0">
+                <div class="flex items-center gap-2 self-end lg:self-center shrink-0 flex-wrap">
                   <button onclick="copyCredentialsDirect('${(u.name || uName).replace(/'/g, "\\'")}', '${u.role || 'Gerente'}', '${u.email}', '${u.password}')" 
                           class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs" 
                           title="Copiar dados de login para o WhatsApp">
@@ -9573,6 +9738,13 @@ function renderAdminSubTabContent(tab) {
                           title="Modificar nome, cargo, permissões e senha">
                     <i data-lucide="edit-3" class="w-3.5 h-3.5 text-emerald-600"></i>
                     <span>Editar</span>
+                  </button>
+
+                  <button onclick="openAdminPinManagerModal('${u.email}', '${(u.name || uName).replace(/'/g, "\\'")}')" 
+                          class="px-3 py-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs" 
+                          title="Editar ou redefinir o PIN de 6 dígitos deste gestor">
+                    <i data-lucide="key-round" class="w-3.5 h-3.5 text-amber-700"></i>
+                    <span>Editar PIN</span>
                   </button>
 
                   ${isMaster ? `
@@ -13428,7 +13600,9 @@ function openAdminUserModal() {
 function copyCredentialsDirect(name, role, email, pass) {
   const isLocalOrApp = !window.location.origin || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'capacitor:';
   const accessUrl = isLocalOrApp ? 'https://arenalimoeiro.vercel.app' : window.location.origin;
-  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}\n🌐 Link de Acesso: ${accessUrl}`;
+  const pinRec = typeof getAdminPinRecord === 'function' ? getAdminPinRecord(email) : null;
+  const pinLine = pinRec && pinRec.pin ? `\n🔢 PIN de 6 Dígitos: ${pinRec.pin}` : '';
+  const text = `⚽ Arena Limoeiro - Dados de Acesso ao Sistema\n\n👤 Gestor: ${name}\n🛡️ Cargo: ${role}\n📧 E-mail: ${email}\n🔑 Senha: ${pass}${pinLine}\n🌐 Link de Acesso: ${accessUrl}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {
       alert(`✅ Credenciais de "${name}" copiadas com sucesso! Você pode colar no WhatsApp.`);
@@ -13957,11 +14131,11 @@ function openEditAdminUserModal(id) {
               </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
                   <span>E-mail de Login *</span>
-                  <span class="text-[10px] text-emerald-700 font-normal">Editável livremente</span>
+                  <span class="text-[10px] text-emerald-700 font-normal">Editável</span>
                 </label>
                 <input type="email" id="editAdminEmail" required value="${(user.email || '').replace(/"/g, '&quot;')}" placeholder="nome@arenalimoeiro.com.br" 
                        class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-emerald-600 bg-white">
@@ -13970,10 +14144,21 @@ function openEditAdminUserModal(id) {
               <div>
                 <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
                   <span>Senha de Acesso *</span>
-                  <span class="text-[10px] text-emerald-700 font-normal">Editável livremente</span>
+                  <span class="text-[10px] text-emerald-700 font-normal">Editável</span>
                 </label>
                 <input type="text" id="editAdminPassword" required value="${(user.password || '').replace(/"/g, '&quot;')}" 
                        class="w-full p-2.5 border border-emerald-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-emerald-800 focus:ring-2 focus:ring-emerald-600 bg-white">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-emerald-900 uppercase mb-1 flex items-center justify-between">
+                  <span>PIN (6 Dígitos)</span>
+                  <span class="text-[10px] text-amber-700 font-bold">2ª Etapa</span>
+                </label>
+                <input type="password" id="editAdminPin" maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                       placeholder="••••••" value="${(typeof getAdminPinRecord === 'function' && getAdminPinRecord(user.email) ? getAdminPinRecord(user.email).pin : (user.pin || ''))}"
+                       oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                       class="w-full p-2.5 border border-amber-300 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500 bg-white text-center tracking-widest">
               </div>
             </div>
 
@@ -14003,6 +14188,8 @@ async function handleEditAdminUserSubmit(event, id) {
   const roleEl = document.getElementById('editAdminRole');
   const role = roleEl ? roleEl.value : 'Gerente do Sistema';
   const password = document.getElementById('editAdminPassword').value.trim();
+  const pinEl = document.getElementById('editAdminPin');
+  const pinVal = pinEl ? pinEl.value.trim() : '';
 
   if (!name || !email || !password) {
     alert('Por favor, preencha todos os campos obrigatórios.');
@@ -14013,6 +14200,11 @@ async function handleEditAdminUserSubmit(event, id) {
   if (idx === -1) {
     alert('Gestor não encontrado.');
     return;
+  }
+
+  // Se informou um PIN de 6 dígitos, atualiza o registro
+  if (pinVal && /^\d{6}$/.test(pinVal)) {
+    saveAdminPinRecord(email, pinVal);
   }
 
   // Extrai as permissões marcadas na matriz 4x3
@@ -14033,6 +14225,7 @@ async function handleEditAdminUserSubmit(event, id) {
     email,
     role,
     password,
+    pin: pinVal || state.adminUsers[idx].pin || '',
     permissions,
     updated_at: new Date().toISOString()
   };
