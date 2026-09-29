@@ -1410,22 +1410,6 @@ function renderStepper() {
         </div>
 
         <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
-          <button onclick="openResetPinModal('${state.currentUser?.email || ''}')" 
-                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
-                  title="Editar seu PIN de Segurança de 6 dígitos">
-            <i data-lucide="key-round" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0"></i>
-            <span class="hidden sm:inline">Editar PIN</span>
-            <span class="sm:hidden">PIN</span>
-          </button>
-
-          <button onclick="switchToClientView()" 
-                  class="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-emerald-950/90 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
-                  title="Alternar para a visão pública do cliente">
-            <i data-lucide="eye" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <span class="hidden sm:inline">Ver Tela do Cliente</span>
-            <span class="sm:hidden">Ver Cliente</span>
-          </button>
-
           <button onclick="logoutAdmin()" 
                   class="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
                   title="Sair do painel">
@@ -4268,6 +4252,11 @@ function logoutAdmin() {
   localStorage.removeItem('arena_user');
   state.currentMode = 'client';
   renderApp();
+  setTimeout(() => {
+    if (typeof openLoginModal === 'function') {
+      openLoginModal();
+    }
+  }, 100);
 }
 
 function isReceptionUser() {
