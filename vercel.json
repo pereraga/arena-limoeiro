@@ -15,6 +15,12 @@
       ]
     }
   ],
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/index.html?admin=true"
+    }
+  ],
   "crons": [
     {
       "path": "/api/keep-alive",

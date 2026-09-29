@@ -64,7 +64,10 @@ function validateCPF(cpf) {
 
 // Detecta se a URL requisita modo admin ou se o gestor já estava logado
 const _initialUrlParams = new URLSearchParams(window.location.search);
-const _isAdminUrl = _initialUrlParams.get('admin') === 'true' || _initialUrlParams.get('mode') === 'admin';
+const _isAdminUrl = _initialUrlParams.get('admin') === 'true' || 
+                    _initialUrlParams.get('mode') === 'admin' ||
+                    window.location.hash === '#admin' ||
+                    window.location.hash === '#gestao';
 let _savedArenaUser = null;
 try {
   _savedArenaUser = JSON.parse(localStorage.getItem('arena_user') || 'null');
@@ -104,20 +107,34 @@ function isManagerLoggedIn() {
 }
 window.isManagerLoggedIn = isManagerLoggedIn;
 
+function triggerAdminLoginIfRequested() {
+  if (isManagerLoggedIn()) {
+    state.currentMode = 'admin';
+    state.adminTab = 'live_dashboard';
+    renderApp();
+    return;
+  }
+  if (typeof openLoginModal === 'function') {
+    openLoginModal(() => {
+      state.currentMode = 'admin';
+      state.adminTab = 'live_dashboard';
+      renderApp();
+    });
+  }
+}
+
 // Se o usuário tentar acessar a URL de admin sem estar logado, solicitamos o login
 if (_isAdminUrl && !_isUserProperlyLogged) {
   window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-      if (!isManagerLoggedIn() && typeof openLoginModal === 'function') {
-        openLoginModal(() => {
-          state.currentMode = 'admin';
-          state.adminTab = 'live_dashboard';
-          renderApp();
-        });
-      }
-    }, 350);
+    setTimeout(triggerAdminLoginIfRequested, 350);
   });
 }
+
+window.addEventListener('hashchange', () => {
+  if (window.location.hash === '#admin' || window.location.hash === '#gestao') {
+    triggerAdminLoginIfRequested();
+  }
+});
 
 // Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
 let state = {
