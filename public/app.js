@@ -4080,6 +4080,7 @@ function renderLiveDashboardTab() {
         id: b.id,
         court_id: b.court_id || b.courtId,
         date: b.date,
+        monthly_member_id: b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : null),
         customer_name: b.customer_name || b.customerName || 'Cliente',
         customer_phone: b.customer_phone || b.customerPhone || '',
         customer_cpf: cpfVal,
@@ -4120,6 +4121,7 @@ function renderLiveDashboardTab() {
           id: 'monthly-' + m.id,
           court_id: cId,
           date: selectedDate,
+          monthly_member_id: m.id,
           customer_name: (m.team_name || m.teamName) + ' (' + (m.responsible_name || m.responsibleName) + ')',
           customer_phone: m.phone || '',
           customer_cpf: cpfVal,
@@ -4496,6 +4498,14 @@ function renderLiveDashboardTab() {
                           <span>Liberar Jogo</span>
                         </button>
                       ` : '') : ''))}
+
+                      <!-- Botão de Editar Contrato do Mensalista -->
+                      ${(match.isMensalista || isMensalistaBooking(match)) ? `
+                        <button onclick="openEditContractFromMatch('${match.id}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border border-indigo-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Editar o contrato semanal deste horário fixo">
+                          <i data-lucide="edit-3" class="w-4 h-4 text-indigo-700"></i>
+                          <span>Editar Contrato Fixo</span>
+                        </button>
+                      ` : ''}
 
                       <!-- Botão de Comanda do Bar -->
                       ${canManageBar() ? `
@@ -8689,7 +8699,7 @@ function renderAdminSubTabContent(tab) {
                     </div>
                   </div>
 
-                  <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                  <div class="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
                     <div class="flex items-center space-x-1.5 text-slate-700 font-bold">
                       <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
                       <span>${dayLabel}</span>
@@ -8697,9 +8707,10 @@ function renderAdminSubTabContent(tab) {
                       <span class="text-emerald-800 font-black">${timeDisplay}</span>
                     </div>
 
-                    <div class="flex items-center space-x-1">
-                      <button onclick="openMonthlyModal('${m.id}')" class="p-1.5 rounded-lg text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer" title="Editar Contrato">
-                        <i data-lucide="pencil" class="w-4 h-4"></i>
+                    <div class="flex items-center gap-2">
+                      <button onclick="openMonthlyModal('${m.id}')" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-2xs transition-all cursor-pointer" title="Editar Contrato deste Horário Fixo">
+                        <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                        <span>Editar Contrato</span>
                       </button>
                       <button onclick="deleteMonthlyMember('${m.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer" title="Cancelar Horário Fixo">
                         <i data-lucide="trash-2" class="w-4 h-4"></i>
@@ -12189,6 +12200,60 @@ function openMonthlyModal(memberId = null) {
 }
 window.openMonthlyModal = openMonthlyModal;
 
+function openEditContractFromMatch(matchId) {
+  let member = null;
+  const match = (state.bookings || []).find(b => b.id === matchId || String(b.id) === String(matchId)) || 
+                ((Array.isArray(state.matches) ? state.matches : []).find(m => m.id === matchId || String(m.id) === String(matchId)));
+  
+  if (match && match.monthly_member_id) {
+    member = (state.monthlyMembers || []).find(m => m.id === match.monthly_member_id);
+  }
+  
+  if (!member && String(matchId).startsWith('monthly-')) {
+    const rawId = String(matchId).replace('monthly-', '');
+    member = (state.monthlyMembers || []).find(m => m.id === rawId);
+  }
+  
+  if (!member && match) {
+    const cPhone = (match.customer_phone || match.customerPhone || '').replace(/\D/g, '');
+    const cName = (match.customer_name || match.customerName || '').toLowerCase();
+    member = (state.monthlyMembers || []).find(m => {
+      const mPhone = (m.phone || '').replace(/\D/g, '');
+      if (mPhone && cPhone && mPhone === cPhone) return true;
+      if (m.team_name && cName.includes(m.team_name.toLowerCase())) return true;
+      if (m.responsible_name && cName.includes(m.responsible_name.toLowerCase())) return true;
+      return false;
+    });
+  }
+
+  if (member) {
+    openMonthlyModal(member.id);
+  } else {
+    openMonthlyModal();
+    setTimeout(() => {
+      if (match) {
+        const teamInp = document.getElementById('monthlyTeamName');
+        const respInp = document.getElementById('monthlyResponsibleName');
+        const phoneInp = document.getElementById('monthlyPhone');
+        const courtSel = document.getElementById('monthlyCourtId');
+        const startSel = document.getElementById('monthlyStartTime');
+        const endSel = document.getElementById('monthlyEndTime');
+        if (teamInp && match.customer_name) teamInp.value = match.customer_name.split(' (')[0] || match.customer_name;
+        if (respInp && match.customer_name && match.customer_name.includes('(')) {
+          respInp.value = match.customer_name.split('(')[1].replace(')', '');
+        }
+        if (phoneInp && (match.customer_phone || match.customerPhone)) {
+          phoneInp.value = formatPhone(match.customer_phone || match.customerPhone);
+        }
+        if (courtSel && (match.court_id || match.courtId)) courtSel.value = match.court_id || match.courtId;
+        if (startSel && (match.start_time || match.startTime)) startSel.value = match.start_time || match.startTime;
+        if (endSel && (match.end_time || match.endTime)) endSel.value = match.end_time || match.endTime;
+      }
+    }, 50);
+  }
+}
+window.openEditContractFromMatch = openEditContractFromMatch;
+
 function handleMonthlyCourtChange() {
   const courtSelect = document.getElementById('monthlyCourtId');
   const priceInput = document.getElementById('monthlyPrice');
@@ -12363,6 +12428,56 @@ async function handleMonthlySubmit(event, editId) {
       await client.from('monthly_members').upsert([dbPayload]);
     } catch (e) {
       console.warn('Erro ao salvar no Supabase monthly_members:', e);
+    }
+  }
+
+  // Se estiver editando, sincroniza os agendamentos já gerados deste mensalista com os dados atualizados
+  if (editId) {
+    const existingMemberBookings = (state.bookings || []).filter(b => {
+      if (!b) return false;
+      if (b.monthly_member_id === editId) return true;
+      if (String(b.id).startsWith('monthly-' + editId)) return true;
+      return false;
+    });
+
+    existingMemberBookings.forEach(b => {
+      b.customer_name = `${teamName} (${responsibleName})`;
+      b.customerName = `${teamName} (${responsibleName})`;
+      b.customer_phone = phone;
+      b.customerPhone = phone;
+      b.court_id = courtId;
+      b.courtId = courtId;
+      b.start_time = startTime;
+      b.startTime = startTime;
+      b.end_time = endTime;
+      b.endTime = endTime;
+      b.time = `${startTime} às ${endTime}`;
+      b.duration = eMin - sMin;
+      b.price = monthlyPrice / 4;
+      b.total_price = monthlyPrice / 4;
+      b.totalPrice = monthlyPrice / 4;
+      b.observation = `Contrato de Horário Fixo Semanal (${teamName})`;
+    });
+
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+      if (window.ArenaSupabase && window.ArenaSupabase.isReady() && existingMemberBookings.length > 0) {
+        const client = window.ArenaSupabase.getClient();
+        for (const b of existingMemberBookings) {
+          client.from('bookings').update({
+            customer_name: b.customer_name,
+            customer_phone: b.customer_phone,
+            court_id: b.court_id,
+            start_time: b.start_time,
+            end_time: b.end_time,
+            price: b.price,
+            total_price: b.total_price,
+            observation: b.observation
+          }).eq('id', b.id).then();
+        }
+      }
+    } catch(err) {
+      console.warn('Aviso ao sincronizar agendamentos editados no Supabase:', err);
     }
   }
 
@@ -15999,6 +16114,13 @@ Bora pro jogo!`);
             <i data-lucide="share-2" class="w-4 h-4"></i>
             <span>Compartilhar no WhatsApp do Time</span>
           </a>
+
+          ${booking.isMensalista ? `
+            <button onclick="closeModal(); openMonthlyModal('${booking.id || ''}')" class="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-black text-xs transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs">
+              <i data-lucide="edit-3" class="w-4 h-4 text-emerald-700"></i>
+              <span>Editar Contrato do Horário Fixo</span>
+            </button>
+          ` : ''}
 
           <button onclick="resetFlow()" class="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-sm transition-all">
             Fazer Novo Agendamento
