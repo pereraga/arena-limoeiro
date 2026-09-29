@@ -4591,11 +4591,6 @@ function renderAdminView(container) {
               <span class="whitespace-nowrap">⚡ Fazer Reserva Balcão</span>
             </button>
           ` : ''}
-
-          <button onclick="logoutAdmin()" class="${canDirectBooking() ? 'shrink-0' : 'w-full'} md:w-auto px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-2xs">
-            <i data-lucide="log-out" class="w-4 h-4 flex-shrink-0"></i>
-            <span>Sair</span>
-          </button>
         </div>
       </div>
 
