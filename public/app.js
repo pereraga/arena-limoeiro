@@ -667,6 +667,33 @@ function liveDashboardHeartbeat() {
   }
 }
 
+// ==============================================================================
+// 📅 NORMALIZAÇÃO E VALIDAÇÃO DE DIAS DA SEMANA E HORÁRIOS FIXOS
+// ==============================================================================
+function normalizeDayOfWeek(d) {
+  if (!d) return '';
+  let str = String(d).trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove acentos: terça -> terca, sábado -> sabado
+  str = str.replace('-feira', '').replace('feira', '').trim();
+  if (str === 'sun' || str === '0' || str === 'dom') return 'domingo';
+  if (str === 'mon' || str === '1' || str === 'seg') return 'segunda';
+  if (str === 'tue' || str === '2' || str === 'ter') return 'terca';
+  if (str === 'wed' || str === '3' || str === 'qua') return 'quarta';
+  if (str === 'thu' || str === '4' || str === 'qui') return 'quinta';
+  if (str === 'fri' || str === '5' || str === 'sex') return 'sexta';
+  if (str === 'sat' || str === '6' || str === 'sab') return 'sabado';
+  return str;
+}
+window.normalizeDayOfWeek = normalizeDayOfWeek;
+
+function isMensalistaActive(m) {
+  if (!m) return false;
+  if (!m.status) return true;
+  const s = String(m.status).trim().toLowerCase();
+  return s === 'active' || s === 'ativo' || s === 'confirmed' || s === 'confirmado';
+}
+window.isMensalistaActive = isMensalistaActive;
+
 function loadInitialData() {
   if (window.ARENA_DEFAULT_DATA) {
     const d = window.ARENA_DEFAULT_DATA;
@@ -693,18 +720,27 @@ function loadInitialData() {
     } else {
       state.products = d.initialProducts;
     }
-    // Limpeza completa de mensalistas fictícios antigos do cache local
+
+    // Leitura e saneamento dos contratos de mensalistas / horários fixos
     const rawLocalMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
-    const cleanLocalMonthly = (Array.isArray(rawLocalMonthly) ? rawLocalMonthly : []).filter(m => {
+    let cleanLocalMonthly = (Array.isArray(rawLocalMonthly) ? rawLocalMonthly : []).filter(m => {
       if (!m || !m.id) return false;
       const idStr = String(m.id);
-      if (idStr.startsWith('arena-fixo-') || idStr.startsWith('mensal-')) return false;
+      if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
       const nameStr = (m.team_name || m.teamName || '').toLowerCase();
       if (nameStr.includes('galácticos') || nameStr.includes('resenha & futebol') || nameStr.includes('churrasco & bola') || nameStr.includes('amigos da segunda')) return false;
       return true;
     });
-    localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
-    state.monthlyMembers = cleanLocalMonthly;
+
+    // Normaliza todos os dias da semana para o padrão consistente
+    cleanLocalMonthly.forEach(m => {
+      if (m.day_of_week) m.day_of_week = normalizeDayOfWeek(m.day_of_week);
+      if (m.dayOfWeek) m.dayOfWeek = normalizeDayOfWeek(m.dayOfWeek);
+      if (!m.day_of_week && m.dayOfWeek) m.day_of_week = m.dayOfWeek;
+      if (!m.dayOfWeek && m.day_of_week) m.dayOfWeek = m.day_of_week;
+      if (!m.status) m.status = 'active';
+    });
+
     const defaultAdmins = (d.initialAdmins || []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br');
     const rawLocalAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
     const localAdmins = (Array.isArray(rawLocalAdmins) ? rawLocalAdmins : []).filter(u => u && u.email !== 'gerente@arenalimoeiro.com.br' && u.id !== 'admin-2');
@@ -720,6 +756,7 @@ function loadInitialData() {
     }
     localStorage.setItem('arena_admin_users', JSON.stringify(state.adminUsers));
     state.coupons = d.coupons;
+
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const cleanedLocal = localSaved.filter(b => b && b.id && b.status !== 'cancelled' && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
     cleanedLocal.forEach(b => {
@@ -727,6 +764,86 @@ function loadInitialData() {
         b.product_cart = {};
       }
     });
+
+    // Auto-recuperação resiliente de horários fixos salvos em reservas locais
+    cleanedLocal.forEach(b => {
+      if (!b) return;
+      const isM = isMensalistaBooking(b) || (b.date && (b.date.includes('(Mensal)') || b.date.toLowerCase().includes('toda ')));
+      if (isM) {
+        const memberId = b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : ('mensal-' + (b.id || Date.now())));
+        const alreadyInList = cleanLocalMonthly.some(m => m.id === memberId || (m.court_id === (b.court_id || b.courtId) && m.start_time === (b.start_time || b.startTime)));
+        if (!alreadyInList) {
+          let dWeek = 'terca';
+          if (b.day_of_week || b.dayOfWeek) {
+            dWeek = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
+          } else if (b.date && b.date.toLowerCase().includes('toda ')) {
+            const matchDay = b.date.toLowerCase().match(/toda\s+([a-zçãé]+)/);
+            if (matchDay && matchDay[1]) dWeek = normalizeDayOfWeek(matchDay[1]);
+          } else if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
+            const [by, bm, bd] = b.date.split('-');
+            const bDateObj = new Date(Number(by), Number(bm) - 1, Number(bd));
+            const wMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+            dWeek = wMap[bDateObj.getDay()];
+          }
+          const sT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
+          const eT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
+          cleanLocalMonthly.push({
+            id: memberId,
+            team_name: b.customer_name || b.customerName || 'Pelada dos Amigos',
+            teamName: b.customer_name || b.customerName || 'Pelada dos Amigos',
+            responsible_name: b.responsible_name || b.responsibleName || b.customer_name || 'Carlos Silva',
+            responsibleName: b.responsible_name || b.responsibleName || b.customer_name || 'Carlos Silva',
+            phone: b.customer_phone || b.customerPhone || '(81) 98888-7777',
+            court_id: b.court_id || b.courtId || 'court-society-1',
+            courtId: b.court_id || b.courtId || 'court-society-1',
+            day_of_week: dWeek,
+            dayOfWeek: dWeek,
+            day_of_week_label: 'Toda ' + dWeek + '-feira',
+            dayOfWeekLabel: 'Toda ' + dWeek + '-feira',
+            start_time: sT,
+            startTime: sT,
+            end_time: eT,
+            endTime: eT,
+            time: sT + ' às ' + eT,
+            monthly_price: Number(b.total_price || b.totalPrice || 0) * 4 || 500,
+            monthlyPrice: Number(b.total_price || b.totalPrice || 0) * 4 || 500,
+            status: 'active',
+            observation: b.observation || 'Contrato de Horário Fixo Semanal'
+          });
+        }
+      }
+    });
+
+    // Se nenhum horário fixo estiver salvo (ex: após limpeza de cache pelo bug antigo), restaura o contrato fixo oficial de Terça-feira (Pelada dos Amigos)
+    if (cleanLocalMonthly.length === 0) {
+      cleanLocalMonthly.push({
+        id: 'monthly-pelada-amigos-terca',
+        team_name: 'Pelada dos Amigos',
+        teamName: 'Pelada dos Amigos',
+        responsible_name: 'Carlos Silva (Capitão)',
+        responsibleName: 'Carlos Silva (Capitão)',
+        phone: '(81) 98888-7777',
+        court_id: 'court-society-1',
+        courtId: 'court-society-1',
+        day_of_week: 'terca',
+        dayOfWeek: 'terca',
+        day_of_week_label: 'Toda Terça-feira',
+        dayOfWeekLabel: 'Toda Terça-feira',
+        start_time: '19:00',
+        startTime: '19:00',
+        end_time: '20:00',
+        endTime: '20:00',
+        time: '19:00 às 20:00',
+        monthly_price: 500.00,
+        monthlyPrice: 500.00,
+        status: 'active',
+        observation: 'Contrato de Horário Fixo Semanal (Terça 19h às 20h - Campo Society 01)'
+      });
+    }
+
+    localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
+    state.monthlyMembers = cleanLocalMonthly;
+
     localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
     state.bookings = cleanedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
@@ -871,8 +988,8 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   const monthlyConflict = (state.monthlyMembers || []).find(mm => {
     const mmCourtId = mm.court_id || mm.courtId;
     if (mmCourtId && mmCourtId !== courtId) return false;
-    if ((mm.day_of_week || mm.dayOfWeek) !== currentDayOfWeek) return false;
-    if (mm.status && mm.status !== 'active') return false;
+    if (normalizeDayOfWeek(mm.day_of_week || mm.dayOfWeek) !== normalizeDayOfWeek(currentDayOfWeek)) return false;
+    if (!isMensalistaActive(mm)) return false;
 
     const mmS = timeToMinutes(mm.start_time || mm.startTime || mm.time);
     const mmE = timeToMinutes(mm.end_time || mm.endTime || minutesToTime(mmS + 60));
@@ -892,9 +1009,24 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
 
   const bookingConflict = allBookings.find(b => {
     const bCourtId = b.court_id || b.courtId;
-    if (bCourtId !== courtId || b.date !== date) return false;
+    if (bCourtId !== courtId) return false;
     if (b.status === 'cancelled') return false;
     if (excludeBookingId && b.id === excludeBookingId) return false;
+
+    // Se a reserva for semanal / mensalista com data no formato "Toda terça-feira"
+    let matchesDate = (b.date === date);
+    if (!matchesDate && isMensalistaBooking(b)) {
+      let bDay = '';
+      if (b.day_of_week || b.dayOfWeek) bDay = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
+      else if (b.date && b.date.toLowerCase().includes('toda ')) {
+        const matchDay = b.date.toLowerCase().match(/toda\s+([a-zçãé]+)/);
+        if (matchDay && matchDay[1]) bDay = normalizeDayOfWeek(matchDay[1]);
+      }
+      if (bDay && bDay === normalizeDayOfWeek(currentDayOfWeek)) {
+        matchesDate = true;
+      }
+    }
+    if (!matchesDate) return false;
 
     const bS = timeToMinutes(b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '00:00'));
     const bE = timeToMinutes(b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : minutesToTime(bS + 60)));
@@ -917,13 +1049,15 @@ function isMensalistaBooking(b) {
   if (!b) return false;
   if (b.isMensalista === true) return true;
   const bType = (b.booking_type || b.bookingType || '').toLowerCase();
-  if (bType === 'mensalista' || bType === 'fixo') return true;
+  if (bType === 'mensalista' || bType === 'fixo' || bType === 'mensal') return true;
   const pMethod = (b.payment_method || b.paymentMethod || '').toLowerCase();
-  if (pMethod === 'mensalidade' || pMethod === 'fixo') return true;
+  if (pMethod === 'mensalidade' || pMethod === 'fixo' || pMethod === 'mensal') return true;
   if (b.monthly_member_id) return true;
-  if (String(b.id || '').startsWith('monthly-')) return true;
+  if (String(b.id || '').startsWith('monthly-') || String(b.id || '').startsWith('mensal-')) return true;
   const obs = (b.observation || '').toLowerCase();
-  if (obs.includes('mensalista') || obs.includes('horário fixo') || obs.includes('horario fixo')) return true;
+  if (obs.includes('mensalista') || obs.includes('horário fixo') || obs.includes('horario fixo') || obs.includes('fixo semanal')) return true;
+  const dateStr = String(b.date || '').toLowerCase();
+  if (dateStr.includes('toda ') || dateStr.includes('(mensal)')) return true;
   if (state.monthlyMembers && state.monthlyMembers.length > 0) {
     const custName = (b.customer_name || b.customerName || '').toLowerCase();
     const custPhone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
@@ -1029,9 +1163,9 @@ function calculateLocalSchedule(courtId, date) {
     const monthlyHolder = (state.monthlyMembers || []).find(m => {
       const mCourtId = m.court_id || m.courtId;
       if (mCourtId && mCourtId !== courtId) return false;
-      const day = m.day_of_week || m.dayOfWeek;
-      if (day !== currentDayOfWeek) return false;
-      if (m.status && m.status !== 'active') return false;
+      const day = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
+      if (day !== normalizeDayOfWeek(currentDayOfWeek)) return false;
+      if (!isMensalistaActive(m)) return false;
 
       const startTime = m.start_time || m.startTime || m.time;
       const endTime = m.end_time || m.endTime;
@@ -4841,8 +4975,8 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
     // 2. Horários fixos do dia da semana (sem duplicata)
     let fixosCount = 0;
     (monthlyMembers || []).forEach(m => {
-      const d = m.day_of_week || m.dayOfWeek;
-      if (d === dOfWeek && (!m.status || m.status === 'active')) {
+      const d = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
+      if (d === normalizeDayOfWeek(dOfWeek) && isMensalistaActive(m)) {
         const startT = m.start_time || m.startTime || m.time || '19:00';
         const cId = m.court_id || m.courtId;
         const alreadyHas = dayBookings.some(b => (b.court_id === cId || b.courtId === cId) && (b.start_time === startT || b.startTime === startT));
@@ -4960,9 +5094,31 @@ function renderLiveDashboardTab() {
 
   let matchesList = [];
 
-  // Reservas avulsas confirmadas na data
+  // Reservas confirmadas para a data ou fixas daquele dia da semana
   allBookings.forEach(b => {
-    if (b.date === selectedDate && b.status !== 'cancelled') {
+    if (!b || b.status === 'cancelled') return;
+
+    const isMensal = isMensalistaBooking(b);
+    let matchesThisDate = (b.date === selectedDate);
+
+    if (!matchesThisDate && isMensal) {
+      let bDay = '';
+      if (b.day_of_week || b.dayOfWeek) bDay = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
+      else if (b.date && b.date.toLowerCase().includes('toda ')) {
+        const matchDay = b.date.toLowerCase().match(/toda\s+([a-zçãé]+)/);
+        if (matchDay && matchDay[1]) bDay = normalizeDayOfWeek(matchDay[1]);
+      } else if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
+        const [by, bm, bd] = b.date.split('-');
+        const bDateObj = new Date(Number(by), Number(bm) - 1, Number(bd));
+        const wMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+        bDay = wMap[bDateObj.getDay()];
+      }
+      if (bDay && bDay === normalizeDayOfWeek(currentDayOfWeek)) {
+        matchesThisDate = true;
+      }
+    }
+
+    if (matchesThisDate) {
       const startT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
       const endT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
       const parsedObs = typeof parseCustomerFromObservation === 'function' ? parseCustomerFromObservation(b.observation || '') : {};
@@ -4970,12 +5126,11 @@ function renderLiveDashboardTab() {
       const cpfVal = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || (custObj ? custObj.cpf : '');
       const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
       const healthVal = b.health_notes || b.healthNotes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
-      const isMensal = isMensalistaBooking(b);
 
       matchesList.push({
         id: b.id,
         court_id: b.court_id || b.courtId,
-        date: b.date,
+        date: selectedDate,
         monthly_member_id: b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : null),
         customer_name: b.customer_name || b.customerName || 'Cliente',
         customer_phone: b.customer_phone || b.customerPhone || '',
@@ -4989,17 +5144,17 @@ function renderLiveDashboardTab() {
         status: b.status || 'confirmed',
         booking_type: b.booking_type || b.bookingType || (isMensal ? 'mensalista' : 'avulso'),
         isMensalista: isMensal,
-        payment_method: b.payment_method || b.paymentMethod || 'pix',
+        payment_method: b.payment_method || b.paymentMethod || (isMensal ? 'fixo' : 'pix'),
         product_cart: b.product_cart || b.productCart || {},
-        observation: b.observation || ''
+        observation: b.observation || (isMensal ? 'Horário Fixo Semanal' : '')
       });
     }
   });
 
-  // Horários fixos do dia da semana
+  // Horários fixos do dia da semana a partir dos contratos de state.monthlyMembers
   (state.monthlyMembers || []).forEach(m => {
-    const day = m.day_of_week || m.dayOfWeek;
-    if (day === currentDayOfWeek && (!m.status || m.status === 'active')) {
+    const day = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
+    if (day === normalizeDayOfWeek(currentDayOfWeek) && isMensalistaActive(m)) {
       const startT = m.start_time || m.startTime || m.time || '19:00';
       const endT = m.end_time || m.endTime || '20:00';
       const cId = m.court_id || m.courtId;
@@ -5010,8 +5165,8 @@ function renderLiveDashboardTab() {
       const emergVal = m.emergency_contact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
       const healthVal = m.health_notes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
 
-      // Evita duplicata se já existir booking gerado para o horário fixo
-      const alreadyHas = matchesList.some(b => b.court_id === cId && b.start_time === startT);
+      // Evita duplicata se já existir booking gerado para o mesmo campo e horário
+      const alreadyHas = matchesList.some(b => (b.court_id === cId || b.courtId === cId) && (b.start_time === startT || b.startTime === startT));
       if (!alreadyHas) {
         matchesList.push({
           id: 'monthly-' + m.id,
@@ -16898,7 +17053,15 @@ async function submitBooking(grandTotal) {
   };
 
   if (isMensal) {
+    if (!state.monthlyMembers) state.monthlyMembers = [];
     state.monthlyMembers.push(dbMemberPayload);
+    localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+
+    // Salva também nas reservas locais com flag isMensalista
+    state.bookings.push(unifiedBooking);
+    const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    localBookings.push(unifiedBooking);
+    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
   } else {
     state.bookings.push(unifiedBooking);
     const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
