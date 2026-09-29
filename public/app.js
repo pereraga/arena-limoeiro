@@ -3383,15 +3383,9 @@ function openLoginModal(onSuccessCallback = null) {
             <p>Máximo de <strong>3 tentativas</strong>. Em caso de erro consecutivo, o acesso é travado por <strong>15 minutos</strong>.</p>
           </div>
 
-          <div class="pt-2 flex items-center justify-between gap-2 flex-wrap">
-            <button type="button" onclick="openResetPinModal()" class="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer">
-              <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
-              <span>Editar / Redefinir PIN</span>
-            </button>
-            <div class="flex items-center space-x-2">
-              <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
-              <button type="submit" id="btnLoginSubmit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Entrar no Painel</button>
-            </div>
+          <div class="pt-2 flex items-center justify-end gap-2 flex-wrap">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
+            <button type="submit" id="btnLoginSubmit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Entrar no Painel</button>
           </div>
         </form>
       </div>
@@ -9813,12 +9807,6 @@ function renderAdminSubTabContent(tab) {
             </div>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
-            <button onclick="openAdminPinManagerModal('${state.currentUser ? state.currentUser.email : 'admin@arenalimoeiro.com.br'}', '${(state.currentUser ? (state.currentUser.name || 'Gabriel Alves') : 'Gabriel Alves').replace(/'/g, "\\'")}')" 
-                    class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer"
-                    title="Editar o PIN de 6 dígitos da sua conta">
-              <i data-lucide="key-round" class="w-4 h-4"></i>
-              <span>🔑 Editar Meu PIN</span>
-            </button>
             <button onclick="openNewAdminUserModal()" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-md transition-all cursor-pointer">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
               <span>+ Novo Gestor</span>
