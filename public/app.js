@@ -1297,8 +1297,31 @@ function requestSchedule() {
 
 
 // ==============================================================================
-// 📱 MOTOR DE DETECÇÃO DE PLATAFORMA & DISPOSITIVO (MOBILE, TABLET, DESKTOP)
+// 📱 MOTOR DE DETECÇÃO DE PLATAFORMA & DISPOSITIVO (MOBILE, TABLET, DESKTOP, APK)
 // ==============================================================================
+function isAndroidApk() {
+  if (typeof window === 'undefined') return false;
+  if (window.isAndroidApk === true) return true;
+  // 1. Capacitor Nativo
+  if (window.Capacitor) {
+    if (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) return true;
+    if (typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android') return true;
+  }
+  // 2. Esquema / Domínio do Capacitor Android WebView (sempre https://localhost)
+  if (window.location) {
+    if (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:') return true;
+    if (window.location.protocol === 'https:' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) return true;
+  }
+  // 3. User Agent Android WebView
+  const ua = (navigator.userAgent || '').toLowerCase();
+  if (ua.includes('android') && (window.location.hostname === 'localhost' || ua.includes('wv') || ua.includes('version/'))) return true;
+  return false;
+}
+window.isAndroidApk = isAndroidApk;
+if (typeof document !== 'undefined' && document.documentElement && isAndroidApk()) {
+  document.documentElement.classList.add('is-android-apk');
+}
+
 function detectPlatform() {
   const width = window.innerWidth;
   const ua = (navigator.userAgent || navigator.vendor || window.opera || '').toLowerCase();
@@ -1357,6 +1380,11 @@ function applyPlatformAttributes() {
 
   if (p.isTouch) html.classList.add('has-touch');
   else html.classList.remove('has-touch');
+
+  if (isAndroidApk()) {
+    html.classList.add('is-android-apk');
+    if (document.body) document.body.classList.add('is-android-apk');
+  }
 }
 
 // Inicializa e escuta redimensionamento com debounce
@@ -1409,14 +1437,16 @@ function renderStepper() {
           <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
         </div>
 
-        <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
-          <button onclick="logoutAdmin()" 
-                  class="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
-                  title="Sair do painel">
-            <i data-lucide="log-out" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <span>Sair</span>
-          </button>
-        </div>
+        ${!isAndroidApk() ? `
+          <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
+            <button onclick="logoutAdmin()" 
+                    class="btn-admin-logout px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                    title="Sair do painel">
+              <i data-lucide="log-out" class="w-3.5 h-3.5 flex-shrink-0"></i>
+              <span>Sair</span>
+            </button>
+          </div>
+        ` : ''}
       </div>
     `;
     if (window.lucide) lucide.createIcons();
