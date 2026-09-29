@@ -66,6 +66,8 @@ function validateCPF(cpf) {
 const _initialUrlParams = new URLSearchParams(window.location.search);
 const _isAdminUrl = _initialUrlParams.get('admin') === 'true' || 
                     _initialUrlParams.get('mode') === 'admin' ||
+                    window.location.pathname === '/admin' ||
+                    window.location.pathname.endsWith('/admin') ||
                     window.location.hash === '#admin' ||
                     window.location.hash === '#gestao';
 let _savedArenaUser = null;
@@ -108,12 +110,6 @@ function isManagerLoggedIn() {
 window.isManagerLoggedIn = isManagerLoggedIn;
 
 function triggerAdminLoginIfRequested() {
-  if (isManagerLoggedIn()) {
-    state.currentMode = 'admin';
-    state.adminTab = 'live_dashboard';
-    renderApp();
-    return;
-  }
   if (typeof openLoginModal === 'function') {
     openLoginModal(() => {
       state.currentMode = 'admin';
@@ -123,8 +119,8 @@ function triggerAdminLoginIfRequested() {
   }
 }
 
-// Se o usuário tentar acessar a URL de admin sem estar logado, solicitamos o login
-if (_isAdminUrl && !_isUserProperlyLogged) {
+// Se acessar o modo admin, solicita sempre as credenciais com proteção de 3 tentativas e 2ª etapa
+if (_isAdminUrl) {
   window.addEventListener('DOMContentLoaded', () => {
     setTimeout(triggerAdminLoginIfRequested, 350);
   });
@@ -3036,6 +3032,170 @@ function switchToClientView() {
   renderApp();
 }
 
+// ==============================================================================
+// 🔐 CONTROLE DE SEGURANÇA: LIMITE DE 3 TENTATIVAS + BLOQUEIO DE 15 MINUTOS
+// ==============================================================================
+const ADMIN_MAX_ATTEMPTS = 3;
+const ADMIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos
+const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000; // 4 dias em milissegundos
+
+let _adminLockTimerInterval = null;
+
+function getAdminLockInfo() {
+  try {
+    const raw = localStorage.getItem('arena_admin_login_lock');
+    if (!raw) return { attempts: 0, lockedUntil: 0 };
+    const parsed = JSON.parse(raw);
+    return {
+      attempts: Number(parsed.attempts) || 0,
+      lockedUntil: Number(parsed.lockedUntil) || 0
+    };
+  } catch(e) {
+    return { attempts: 0, lockedUntil: 0 };
+  }
+}
+
+function setAdminLockInfo(info) {
+  try {
+    localStorage.setItem('arena_admin_login_lock', JSON.stringify(info));
+  } catch(e) {}
+}
+
+function clearAdminLockInfo() {
+  try {
+    localStorage.removeItem('arena_admin_login_lock');
+  } catch(e) {}
+}
+
+function getAdminPinRecord(email) {
+  try {
+    const raw = localStorage.getItem('arena_admin_pins');
+    const pins = raw ? JSON.parse(raw) : {};
+    return pins[String(email).trim().toLowerCase()] || null;
+  } catch(e) {
+    return null;
+  }
+}
+
+function saveAdminPinRecord(email, pin) {
+  try {
+    const raw = localStorage.getItem('arena_admin_pins');
+    const pins = raw ? JSON.parse(raw) : {};
+    pins[String(email).trim().toLowerCase()] = {
+      pin: String(pin).trim(),
+      registeredAt: Date.now(),
+      lastVerifiedAt: Date.now()
+    };
+    localStorage.setItem('arena_admin_pins', JSON.stringify(pins));
+  } catch(e) {}
+}
+
+function updateAdminPinLastVerified(email) {
+  try {
+    const raw = localStorage.getItem('arena_admin_pins');
+    const pins = raw ? JSON.parse(raw) : {};
+    const key = String(email).trim().toLowerCase();
+    if (pins[key]) {
+      pins[key].lastVerifiedAt = Date.now();
+      localStorage.setItem('arena_admin_pins', JSON.stringify(pins));
+    }
+  } catch(e) {}
+}
+
+function checkAndDisplayLockout(errorMsgElement, submitBtn, inputA, inputB) {
+  const lockInfo = getAdminLockInfo();
+  const now = Date.now();
+
+  if (_adminLockTimerInterval) {
+    clearInterval(_adminLockTimerInterval);
+    _adminLockTimerInterval = null;
+  }
+
+  if (lockInfo.lockedUntil && now < lockInfo.lockedUntil) {
+    if (submitBtn) submitBtn.disabled = true;
+    if (inputA) inputA.disabled = true;
+    if (inputB) inputB.disabled = true;
+
+    const renderRemaining = () => {
+      const remainingMs = lockInfo.lockedUntil - Date.now();
+      if (remainingMs <= 0) {
+        clearInterval(_adminLockTimerInterval);
+        _adminLockTimerInterval = null;
+        clearAdminLockInfo();
+        if (submitBtn) submitBtn.disabled = false;
+        if (inputA) inputA.disabled = false;
+        if (inputB) inputB.disabled = false;
+        if (errorMsgElement) {
+          errorMsgElement.innerHTML = `✅ <strong>Bloqueio de 15 minutos expirado.</strong> Você pode tentar novamente.`;
+          errorMsgElement.className = "p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold";
+          errorMsgElement.classList.remove('hidden');
+        }
+        return;
+      }
+      const totalSec = Math.ceil(remainingMs / 1000);
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      const timeStr = `${min}m ${sec < 10 ? '0' : ''}${sec}s`;
+      if (errorMsgElement) {
+        errorMsgElement.innerHTML = `
+          <div class="flex items-start space-x-2.5">
+            <span class="text-xl">⛔</span>
+            <div>
+              <strong class="block text-rose-800 font-black">Acesso bloqueado por segurança!</strong>
+              <p class="text-rose-700 mt-0.5">Você errou suas credenciais 3 vezes. Aguarde para tentar novamente:</p>
+              <div class="mt-1.5 font-mono text-sm font-black text-rose-950 bg-rose-100/90 px-3 py-1 rounded-lg border border-rose-300 inline-block">
+                ⏳ ${timeStr}
+              </div>
+            </div>
+          </div>
+        `;
+        errorMsgElement.className = "p-3.5 rounded-2xl bg-rose-50 border border-rose-300 text-rose-700 text-xs";
+        errorMsgElement.classList.remove('hidden');
+      }
+    };
+
+    renderRemaining();
+    _adminLockTimerInterval = setInterval(renderRemaining, 1000);
+    return true;
+  }
+
+  if (lockInfo.lockedUntil && now >= lockInfo.lockedUntil) {
+    clearAdminLockInfo();
+  }
+  return false;
+}
+
+function recordFailedLoginAttempt(errorMsgElement, submitBtn, inputA, inputB) {
+  const lockInfo = getAdminLockInfo();
+  const newAttempts = lockInfo.attempts + 1;
+
+  if (newAttempts >= ADMIN_MAX_ATTEMPTS) {
+    const lockedUntil = Date.now() + ADMIN_LOCKOUT_MS;
+    setAdminLockInfo({ attempts: ADMIN_MAX_ATTEMPTS, lockedUntil: lockedUntil });
+    checkAndDisplayLockout(errorMsgElement, submitBtn, inputA, inputB);
+  } else {
+    setAdminLockInfo({ attempts: newAttempts, lockedUntil: 0 });
+    const remaining = ADMIN_MAX_ATTEMPTS - newAttempts;
+    if (errorMsgElement) {
+      errorMsgElement.innerHTML = `
+        <div class="space-y-1">
+          <div class="font-black text-rose-900 flex items-center gap-1.5">
+            <span>⚠️</span> E-mail, senha ou PIN incorreto.
+          </div>
+          <div class="text-rose-700 text-[11px]">
+            Tentativa <strong>${newAttempts} de ${ADMIN_MAX_ATTEMPTS}</strong>. Resta(m) apenas <strong>${remaining} tentativa(s)</strong> antes do bloqueio de 15 minutos!
+          </div>
+        </div>
+      `;
+      errorMsgElement.className = "p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-700 text-xs";
+      errorMsgElement.classList.remove('hidden');
+    }
+  }
+}
+
+// ==============================================================================
+// 1ª ETAPA: LOGIN COM E-MAIL E SENHA
+// ==============================================================================
 function openLoginModal(onSuccessCallback = null) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
@@ -3048,10 +3208,10 @@ function openLoginModal(onSuccessCallback = null) {
             <i data-lucide="shield-check" class="w-6 h-6 text-emerald-400"></i>
             <div>
               <h3 class="text-base font-black uppercase">Acesso Restrito do Administrador</h3>
-              <p class="text-xs text-emerald-300 font-medium">Faça login para modificar o sistema</p>
+              <p class="text-xs text-emerald-300 font-medium">Etapa 1 de 2: Credenciais de Acesso</p>
             </div>
           </div>
-          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1">
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
             <i data-lucide="x" class="w-6 h-6"></i>
           </button>
         </div>
@@ -3061,21 +3221,29 @@ function openLoginModal(onSuccessCallback = null) {
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">E-mail do Administrador *</label>
-            <input type="email" id="loginEmail" required placeholder="EMAIL" 
+            <input type="email" id="loginEmail" required placeholder="seuemail@arenalimoeiro.com.br" 
                    value="" autocomplete="off"
                    class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Senha de Acesso *</label>
-            <input type="password" id="loginPassword" required placeholder="SENHA" 
+            <input type="password" id="loginPassword" required placeholder="Digite sua senha" 
                    value="" autocomplete="new-password"
                    class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-medium">
           </div>
 
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+            <div class="flex items-center space-x-1.5 font-bold text-slate-800">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-600"></i>
+              <span>Proteção Anti-Invasão Ativa</span>
+            </div>
+            <p>Máximo de <strong>3 tentativas</strong>. Em caso de erro consecutivo, o acesso é travado por <strong>15 minutos</strong>.</p>
+          </div>
+
           <div class="pt-2 flex items-center justify-end space-x-3">
             <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
-            <button type="submit" id="btnLoginSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Entrar na Administração</button>
+            <button type="submit" id="btnLoginSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Avançar →</button>
           </div>
         </form>
       </div>
@@ -3083,7 +3251,15 @@ function openLoginModal(onSuccessCallback = null) {
   `;
 
   window._onLoginSuccess = onSuccessCallback;
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
+
+  const emailInp = document.getElementById('loginEmail');
+  const passInp = document.getElementById('loginPassword');
+  const btnSubmit = document.getElementById('btnLoginSubmit');
+  const errBox = document.getElementById('loginErrorMessage');
+
+  // Verifica se está no bloqueio de 15 minutos
+  checkAndDisplayLockout(errBox, btnSubmit, emailInp, passInp);
 }
 
 async function handleLoginSubmit(event) {
@@ -3094,6 +3270,11 @@ async function handleLoginSubmit(event) {
   const password = (passwordInput ? passwordInput.value : '').trim();
   const errorMsg = document.getElementById('loginErrorMessage');
   const submitBtn = document.getElementById('btnLoginSubmit');
+
+  // Verifica bloqueio de 15 min
+  if (checkAndDisplayLockout(errorMsg, submitBtn, emailInput, passwordInput)) {
+    return;
+  }
 
   const cleanEmail = email.trim().toLowerCase();
   const cleanPassword = password.trim();
@@ -3113,7 +3294,7 @@ async function handleLoginSubmit(event) {
 
   let authenticatedUser = null;
 
-  // 1. Tenta verificar no Supabase com busca flexível e tratamento seguro
+  // 1. Tenta verificar no Supabase
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
@@ -3128,11 +3309,8 @@ async function handleLoginSubmit(event) {
           const uPass = String(u.password || '').trim();
           if (uEmail !== cleanEmail) return false;
           if (uPass === cleanPassword || uPass.toLowerCase() === cleanPassword.toLowerCase()) return true;
-          // Credenciais mestras aceitas para Gabriel Alves
           if (cleanEmail === 'admin@arenalimoeiro.com.br' && (cleanPassword.toLowerCase() === 'alves@157620' || cleanPassword === 'admin123')) return true;
-          // Credenciais aceitas para Vinicius Melo / Gerente do Sistema
           if ((cleanEmail === 'vinicius.melo@arenalimoeiro.com.br' || cleanEmail === 'gerente@arenalimoeiro.com.br' || cleanEmail.includes('vinicius') || cleanEmail.includes('gerente')) && (cleanPassword.toLowerCase() === 'vinicius@2026!' || cleanPassword === 'gerente123')) return true;
-          // Credenciais aceitas para Recepção
           if ((cleanEmail === 'recepcao@arenalimoeiro.com.br' || cleanEmail.includes('recep')) && (cleanPassword === 'arena123' || cleanPassword.toLowerCase() === 'recepcao@2026!')) return true;
           return false;
         });
@@ -3151,7 +3329,7 @@ async function handleLoginSubmit(event) {
     }
   }
 
-  // 2. Verifica no state e localStorage (gestores criados ou modificados localmente)
+  // 2. Verifica no state e localStorage
   if (!authenticatedUser) {
     const localAdmins = JSON.parse(localStorage.getItem('arena_admin_users') || '[]');
     const allKnownAdmins = [...(state.adminUsers || []), ...localAdmins];
@@ -3199,62 +3377,396 @@ async function handleLoginSubmit(event) {
   }
 
   if (authenticatedUser) {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerText = "Avançar →";
+    }
+
+    // Configura permissões
     if (authenticatedUser.email.toLowerCase() === 'admin@arenalimoeiro.com.br' || authenticatedUser.name === 'Administrador Geral' || authenticatedUser.role === 'Administrador Geral') {
       authenticatedUser.name = 'Gabriel Alves';
       authenticatedUser.role = 'Administrador Geral';
-      authenticatedUser.permissions = SYSTEM_PERMISSIONS.map(p => p.id); // Todas as 12 permissões
+      authenticatedUser.permissions = SYSTEM_PERMISSIONS.map(p => p.id);
     } else if (authenticatedUser.email.toLowerCase() === 'vinicius.melo@arenalimoeiro.com.br' || authenticatedUser.name === 'Vinicius Melo' || authenticatedUser.role === 'Gerente do Sistema') {
       authenticatedUser.name = 'Vinicius Melo';
       authenticatedUser.role = 'Gerente do Sistema';
       if (!authenticatedUser.permissions || authenticatedUser.permissions.length === 0) {
-        authenticatedUser.permissions = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id); // 11 permissões
+        authenticatedUser.permissions = SYSTEM_PERMISSIONS.filter(p => p.id !== 'can_manage_settings').map(p => p.id);
       }
     } else if (!authenticatedUser.permissions || authenticatedUser.permissions.length === 0) {
       if (authenticatedUser.role === 'Recepção & Atendimento' || isReceptionUser()) {
         authenticatedUser.permissions = ['can_start_matches', 'can_finish_matches', 'can_manage_bar', 'can_direct_booking'];
       }
     }
-    authenticatedUser.authenticated = true;
-    authenticatedUser.loginTimestamp = Date.now();
-    state.currentUser = authenticatedUser;
-    localStorage.setItem('arena_user', JSON.stringify(authenticatedUser));
-    closeModal();
-    state.currentMode = 'admin';
-    state.adminTab = 'live_dashboard';
-    renderApp();
 
-    setTimeout(() => {
-      if (typeof checkAndShowWaterSupplyLoginNotice === 'function') {
-        checkAndShowWaterSupplyLoginNotice();
-      }
-    }, 450);
-
-    if (window._onLoginSuccess) {
-      window._onLoginSuccess();
-      window._onLoginSuccess = null;
+    // Avança para a 2ª ETAPA (PIN de 6 dígitos)
+    const pinRecord = getAdminPinRecord(authenticatedUser.email);
+    if (!pinRecord || !pinRecord.pin) {
+      // Primeiro login: Cadastrar o PIN de 6 dígitos
+      openRegisterPinModal(authenticatedUser);
+    } else {
+      // Próximos logins: Confirmar o PIN de 6 dígitos
+      openVerifyPinModal(authenticatedUser, pinRecord);
     }
 
-    // Solicita permissão de notificação no navegador para este aparelho agora que o gestor se autenticou
-    try {
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
-      }
-    } catch(e) {}
   } else {
+    // Falha de autenticação: Registra tentativa e aplica bloqueio de 15 min se atingir 3
     if (submitBtn) {
       submitBtn.disabled = false;
-      submitBtn.innerText = "Entrar na Administração";
+      submitBtn.innerText = "Avançar →";
     }
-    if (errorMsg) {
-      errorMsg.innerText = "E-mail ou senha incorretos. Acesso restrito a administradores.";
-      errorMsg.classList.remove('hidden');
-    }
+    recordFailedLoginAttempt(errorMsg, submitBtn, emailInput, passwordInput);
     if (passwordInput) {
       passwordInput.value = '';
       passwordInput.focus();
     }
   }
 }
+
+// ==============================================================================
+// 2ª ETAPA: CADASTRO DO PIN DE 6 DÍGITOS (NO 1º LOGIN)
+// ==============================================================================
+function openRegisterPinModal(user) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/25 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="key-round" class="w-5 h-5 text-emerald-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-wide">Crie seu PIN de 6 Dígitos</h3>
+              <p class="text-xs text-emerald-300 font-medium">Etapa 2 de 2: Senha de Registro Obrigatória</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleRegisterPinSubmit(event, '${user.email}')" class="p-6 space-y-4" autocomplete="off">
+          <div class="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-950 space-y-1">
+            <div class="font-black flex items-center gap-1.5 text-emerald-900">
+              <i data-lucide="info" class="w-4 h-4 text-emerald-600"></i>
+              <span>Bem-vindo(a), ${user.name}!</span>
+            </div>
+            <p class="text-[11px] leading-relaxed">
+              Para a sua máxima segurança, defina um <strong>PIN numérico de 6 dígitos</strong>. 
+              Você usará este código para acessar a administração e <strong>a cada 4 dias</strong> o sistema pedirá para você confirmá-lo para que você nunca esqueça.
+            </p>
+          </div>
+
+          <div id="pinRegisterError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Crie seu PIN (6 Números) *</label>
+            <input type="password" id="newAdminPin" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••"
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-3.5 text-center text-2xl font-mono tracking-[0.4em] font-black border border-slate-300 rounded-2xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Confirme seu PIN (6 Números) *</label>
+            <input type="password" id="confirmAdminPin" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••"
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-3.5 text-center text-2xl font-mono tracking-[0.4em] font-black border border-slate-300 rounded-2xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-3">
+            <button type="button" onclick="openLoginModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Voltar</button>
+            <button type="submit" id="btnRegisterPinSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-1.5">
+              <i data-lucide="check-check" class="w-4 h-4"></i>
+              <span>Salvar PIN e Entrar</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  window._tempUserToAuthenticate = user;
+  if (window.lucide) lucide.createIcons();
+  const input = document.getElementById('newAdminPin');
+  if (input) input.focus();
+}
+
+function handleRegisterPinSubmit(event, userEmail) {
+  event.preventDefault();
+  const pinInput = document.getElementById('newAdminPin');
+  const confirmInput = document.getElementById('confirmAdminPin');
+  const errBox = document.getElementById('pinRegisterError');
+  const pin = (pinInput ? pinInput.value : '').trim();
+  const confirmPin = (confirmInput ? confirmInput.value : '').trim();
+
+  if (!/^\d{6}$/.test(pin)) {
+    if (errBox) {
+      errBox.innerText = "O PIN deve conter exatamente 6 números.";
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (pin !== confirmPin) {
+    if (errBox) {
+      errBox.innerText = "Os dois PINs digitados não são idênticos. Digite o mesmo PIN em ambos os campos.";
+      errBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  // Salva o PIN de 6 dígitos para este usuário
+  saveAdminPinRecord(userEmail, pin);
+  clearAdminLockInfo();
+
+  const user = window._tempUserToAuthenticate;
+  completeAdminLogin(user);
+}
+
+// ==============================================================================
+// 2ª ETAPA: VALIDAÇÃO DO PIN DE 6 DÍGITOS (NOS PRÓXIMOS LOGINS)
+// ==============================================================================
+function openVerifyPinModal(user, pinRecord) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/25 flex items-center justify-center border border-emerald-400/30">
+              <i data-lucide="shield-check" class="w-5 h-5 text-emerald-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-wide">Verificação em 2 Etapas</h3>
+              <p class="text-xs text-emerald-300 font-medium">Digite seu PIN de 6 Dígitos</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleVerifyPinSubmit(event, '${user.email}')" class="p-6 space-y-4" autocomplete="off">
+          <div class="text-center py-2">
+            <div class="text-sm font-black text-slate-800">${user.name}</div>
+            <p class="text-xs text-slate-500">${user.email}</p>
+          </div>
+
+          <div id="pinVerifyError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5 text-center">Informe seu PIN de Segurança (6 Dígitos) *</label>
+            <input type="password" id="verifyAdminPin" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••" autofocus
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-4 text-center text-3xl font-mono tracking-[0.45em] font-black border border-slate-300 rounded-2xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 text-center">
+            🔒 O PIN de 6 dígitos é individual e protege suas decisões financeiras e agenda.
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-3">
+            <button type="button" onclick="openLoginModal()" class="px-5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Voltar</button>
+            <button type="submit" id="btnVerifyPinSubmit" class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center space-x-1.5">
+              <i data-lucide="lock" class="w-4 h-4"></i>
+              <span>Confirmar e Entrar</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  window._tempUserToAuthenticate = user;
+  if (window.lucide) lucide.createIcons();
+
+  const pinInp = document.getElementById('verifyAdminPin');
+  const btnSubmit = document.getElementById('btnVerifyPinSubmit');
+  const errBox = document.getElementById('pinVerifyError');
+
+  // Verifica bloqueio de 15 min
+  checkAndDisplayLockout(errBox, btnSubmit, pinInp, null);
+  if (pinInp) pinInp.focus();
+}
+
+function handleVerifyPinSubmit(event, userEmail) {
+  event.preventDefault();
+  const pinInput = document.getElementById('verifyAdminPin');
+  const errBox = document.getElementById('pinVerifyError');
+  const submitBtn = document.getElementById('btnVerifyPinSubmit');
+  const enteredPin = (pinInput ? pinInput.value : '').trim();
+
+  // Verifica bloqueio de 15 min
+  if (checkAndDisplayLockout(errBox, submitBtn, pinInput, null)) {
+    return;
+  }
+
+  const pinRecord = getAdminPinRecord(userEmail);
+  const correctPin = pinRecord ? pinRecord.pin : null;
+
+  if (correctPin && enteredPin === correctPin) {
+    // PIN correto!
+    clearAdminLockInfo();
+    updateAdminPinLastVerified(userEmail);
+    const user = window._tempUserToAuthenticate;
+    completeAdminLogin(user);
+  } else {
+    // PIN incorreto: conta como tentativa errada (mesma regra de 3 tentativas -> 15 min)
+    recordFailedLoginAttempt(errBox, submitBtn, pinInput, null);
+    if (pinInput) {
+      pinInput.value = '';
+      pinInput.focus();
+    }
+  }
+}
+
+// ==============================================================================
+// CONCLUSÃO DO LOGIN E ENTRADA NO MODO ADMIN
+// ==============================================================================
+function completeAdminLogin(authenticatedUser) {
+  authenticatedUser.authenticated = true;
+  authenticatedUser.loginTimestamp = Date.now();
+  state.currentUser = authenticatedUser;
+  localStorage.setItem('arena_user', JSON.stringify(authenticatedUser));
+  closeModal();
+  state.currentMode = 'admin';
+  state.adminTab = 'live_dashboard';
+  renderApp();
+
+  setTimeout(() => {
+    if (typeof checkAndShowWaterSupplyLoginNotice === 'function') {
+      checkAndShowWaterSupplyLoginNotice();
+    }
+    // Inicia verificação periódica de 4 dias
+    checkPeriodicPinReminder();
+  }, 450);
+
+  if (window._onLoginSuccess) {
+    window._onLoginSuccess();
+    window._onLoginSuccess = null;
+  }
+
+  try {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  } catch(e) {}
+}
+
+// ==============================================================================
+// LEMBRETE PERIÓDICO DO PIN A CADA 4 DIAS (PARA NÃO ESQUECER)
+// ==============================================================================
+function checkPeriodicPinReminder() {
+  if (!isManagerLoggedIn()) return;
+  const user = state.currentUser;
+  if (!user || !user.email) return;
+
+  const pinRecord = getAdminPinRecord(user.email);
+  if (!pinRecord || !pinRecord.pin) return;
+
+  const lastVerified = pinRecord.lastVerifiedAt || pinRecord.registeredAt || 0;
+  const elapsed = Date.now() - lastVerified;
+
+  if (elapsed >= FOUR_DAYS_MS) {
+    openPeriodicPinReminderModal(user, pinRecord);
+  }
+}
+
+function openPeriodicPinReminderModal(user, pinRecord) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/25 flex items-center justify-center border border-amber-400/30">
+              <i data-lucide="bell-ring" class="w-5 h-5 text-amber-300"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-wide">Lembrete Periódico (4 Dias)</h3>
+              <p class="text-xs text-amber-300 font-medium">Confirme seu PIN para não esquecer</p>
+            </div>
+          </div>
+        </div>
+
+        <form onsubmit="handlePeriodicPinSubmit(event, '${user.email}')" class="p-6 space-y-4" autocomplete="off">
+          <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-950 space-y-1">
+            <div class="font-black flex items-center gap-1.5 text-amber-900">
+              <span>🔔</span> Olá, ${user.name}!
+            </div>
+            <p class="text-[11px] leading-relaxed">
+              Passaram-se <strong>4 dias</strong> desde sua última confirmação de segurança. 
+              Por favor, digite o seu <strong>PIN de 6 dígitos</strong> para mantê-lo ativo na sua memória e proteger seu painel:
+            </p>
+          </div>
+
+          <div id="periodicPinError" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1.5 text-center">Digite seu PIN (6 Dígitos) *</label>
+            <input type="password" id="periodicAdminPin" required maxlength="6" inputmode="numeric" pattern="[0-9]{6}"
+                   placeholder="••••••" autofocus
+                   oninput="this.value = this.value.replace(/\\D/g, '').slice(0, 6)"
+                   class="w-full p-4 text-center text-3xl font-mono tracking-[0.45em] font-black border border-slate-300 rounded-2xl focus:ring-2 focus:ring-amber-500 focus:outline-none">
+          </div>
+
+          <div class="pt-2 flex items-center justify-end">
+            <button type="submit" id="btnPeriodicPinSubmit" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer flex items-center justify-center space-x-1.5">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              <span>Confirmar PIN e Prosseguir</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+  const input = document.getElementById('periodicAdminPin');
+  if (input) input.focus();
+}
+
+function handlePeriodicPinSubmit(event, userEmail) {
+  event.preventDefault();
+  const pinInput = document.getElementById('periodicAdminPin');
+  const errBox = document.getElementById('periodicPinError');
+  const enteredPin = (pinInput ? pinInput.value : '').trim();
+
+  const pinRecord = getAdminPinRecord(userEmail);
+  const correctPin = pinRecord ? pinRecord.pin : null;
+
+  if (correctPin && enteredPin === correctPin) {
+    updateAdminPinLastVerified(userEmail);
+    closeModal();
+    alert("✅ PIN de 6 dígitos confirmado com sucesso!\nTudo certo, sua memória está afiada e seu painel permanece protegido pelos próximos 4 dias.");
+  } else {
+    if (errBox) {
+      errBox.innerText = "PIN de 6 dígitos incorreto. Tente novamente.";
+      errBox.classList.remove('hidden');
+    }
+    if (pinInput) {
+      pinInput.value = '';
+      pinInput.focus();
+    }
+  }
+}
+
+// Verifica periodicamente o lembrete de 4 dias enquanto o sistema estiver aberto
+setInterval(() => {
+  if (isManagerLoggedIn()) {
+    checkPeriodicPinReminder();
+  }
+}, 5 * 60 * 1000); // Checa a cada 5 minutos
 
 function logoutAdmin() {
   state.currentUser = null;
