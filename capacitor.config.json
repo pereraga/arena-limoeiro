@@ -1,8 +1,10 @@
-﻿{
+{
   "appId": "com.arenalimoeiro.app",
   "appName": "Arena Limoeiro",
   "webDir": "public",
   "server": {
+    "url": "https://arenalimoeiro.vercel.app",
+    "cleartext": false,
     "androidScheme": "https"
   },
   "plugins": {

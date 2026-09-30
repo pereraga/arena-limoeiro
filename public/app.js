@@ -1351,19 +1351,19 @@ function requestSchedule() {
 function isAndroidApk() {
   if (typeof window === 'undefined') return false;
   if (window.isAndroidApk === true) return true;
-  // 1. Capacitor Nativo
+  // 1. Capacitor Nativo (Local ou Remoto Vercel)
   if (window.Capacitor) {
     if (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) return true;
     if (typeof window.Capacitor.getPlatform === 'function' && window.Capacitor.getPlatform() === 'android') return true;
   }
-  // 2. Esquema / Domínio do Capacitor Android WebView (sempre https://localhost)
+  // 2. Esquema / Domínio do Capacitor Android WebView (local)
   if (window.location) {
     if (window.location.protocol === 'capacitor:' || window.location.protocol === 'file:') return true;
     if (window.location.protocol === 'https:' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) return true;
   }
   // 3. User Agent Android WebView
   const ua = (navigator.userAgent || '').toLowerCase();
-  if (ua.includes('android') && (window.location.hostname === 'localhost' || ua.includes('wv') || ua.includes('version/'))) return true;
+  if (ua.includes('android') && (window.location.hostname === 'localhost' || ua.includes('; wv') || ua.includes('version/'))) return true;
   return false;
 }
 window.isAndroidApk = isAndroidApk;
