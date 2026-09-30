@@ -5,7 +5,13 @@
   "server": {
     "url": "https://arenalimoeiro.vercel.app",
     "cleartext": false,
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "allowNavigation": [
+      "arenalimoeiro.vercel.app",
+      "*.arenalimoeiro.vercel.app",
+      "brmclyukjfijommbxhks.supabase.co",
+      "*.supabase.co"
+    ]
   },
   "plugins": {
     "SplashScreen": {
