@@ -110,7 +110,13 @@ function isManagerLoggedIn() {
 window.isManagerLoggedIn = isManagerLoggedIn;
 
 function triggerAdminLoginIfRequested() {
-  if (typeof openLoginModal === 'function') {
+  if (typeof requestAdminAccess === 'function') {
+    requestAdminAccess(() => {
+      state.currentMode = 'admin';
+      state.adminTab = 'live_dashboard';
+      renderApp();
+    });
+  } else if (typeof openLoginModal === 'function') {
     openLoginModal(() => {
       state.currentMode = 'admin';
       state.adminTab = 'live_dashboard';
@@ -3174,11 +3180,19 @@ function handleGestaoButtonClick() {
       state.adminTab = 'live_dashboard';
       renderApp();
     } else {
-      openLoginModal(() => {
-        state.currentMode = 'admin';
-        state.adminTab = 'live_dashboard';
-        renderApp();
-      });
+      if (typeof requestAdminAccess === 'function') {
+        requestAdminAccess(() => {
+          state.currentMode = 'admin';
+          state.adminTab = 'live_dashboard';
+          renderApp();
+        });
+      } else {
+        openLoginModal(() => {
+          state.currentMode = 'admin';
+          state.adminTab = 'live_dashboard';
+          renderApp();
+        });
+      }
     }
   }
 }
@@ -3350,9 +3364,374 @@ function recordFailedLoginAttempt(errorMsgElement, submitBtn, inputA, inputB) {
 }
 
 // ==============================================================================
+// 🛡️ PORTÃO DE SEGURANÇA: CHAVE MESTRA OBRIGATÓRIA ANTES DO LOGIN (/admin)
+// ==============================================================================
+const AUTHORIZED_MASTER_GATE_HASHES = [
+  '3fb825c4dc879d4848e3381d4cffde7d442f177bf97f9c0f161e07aee1a0ba0a', // alves@157620
+  'c4b90a0d5bc3ede83632359f6221c5c2126871bb5ddd20ce68652c12d6e94017', // alves157620
+  '823043644f07ba62d12d77dd59b0760d59e9fd759111281c5bbfbd57cac743cd', // arena@2026
+  '8fb69718b3968091d45796bd93b90c65f519b45ab197ecbdb0ee6802253fcdde', // arena123
+  '240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9'  // admin123
+];
+
+async function sha256Hex(text) {
+  try {
+    if (window.crypto && window.crypto.subtle) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(String(text).trim());
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch(e) {}
+  return String(text).trim();
+}
+
+function getMasterGateLockInfo() {
+  try {
+    const raw = localStorage.getItem('arena_master_gate_lock');
+    if (!raw) return { attempts: 0, lockedUntil: 0 };
+    const p = JSON.parse(raw);
+    return { attempts: Number(p.attempts) || 0, lockedUntil: Number(p.lockedUntil) || 0 };
+  } catch(e) {
+    return { attempts: 0, lockedUntil: 0 };
+  }
+}
+
+function setMasterGateLockInfo(info) {
+  try {
+    localStorage.setItem('arena_master_gate_lock', JSON.stringify(info));
+  } catch(e) {}
+}
+
+function clearMasterGateLockInfo() {
+  try {
+    localStorage.removeItem('arena_master_gate_lock');
+  } catch(e) {}
+}
+
+async function verifyMasterSecurityKey(inputKey) {
+  if (!inputKey || typeof inputKey !== 'string') return false;
+  const cleanKey = inputKey.trim();
+  if (!cleanKey) return false;
+
+  const keyHash = await sha256Hex(cleanKey);
+
+  // 1. Hashes padrão autorizados
+  if (AUTHORIZED_MASTER_GATE_HASHES.includes(keyHash)) return true;
+
+  // 2. Chave personalizada definida no painel
+  const customHash = localStorage.getItem('arena_custom_master_gate_hash');
+  if (customHash && customHash === keyHash) return true;
+
+  const customKey = localStorage.getItem('arena_custom_master_gate_key');
+  if (customKey && customKey.trim().toLowerCase() === cleanKey.toLowerCase()) return true;
+
+  return false;
+}
+window.verifyMasterSecurityKey = verifyMasterSecurityKey;
+
+function isMasterGatePassed() {
+  if (typeof isAndroidApk === 'function' && isAndroidApk()) return true;
+  return sessionStorage.getItem('arena_master_gate_passed') === 'true';
+}
+window.isMasterGatePassed = isMasterGatePassed;
+
+function requestAdminAccess(onSuccessCallback = null) {
+  if (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn()) {
+    state.currentMode = 'admin';
+    state.adminTab = 'live_dashboard';
+    renderApp();
+    if (typeof onSuccessCallback === 'function') onSuccessCallback();
+    return;
+  }
+
+  if (isMasterGatePassed()) {
+    openLoginModal(onSuccessCallback);
+  } else {
+    openMasterSecurityGateModal(onSuccessCallback);
+  }
+}
+window.requestAdminAccess = requestAdminAccess;
+
+function openMasterSecurityGateModal(onSuccessCallback = null) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const lockInfo = getMasterGateLockInfo();
+  const isLocked = lockInfo.lockedUntil && Date.now() < lockInfo.lockedUntil;
+  const remainingMinutes = isLocked ? Math.ceil((lockInfo.lockedUntil - Date.now()) / 60000) : 0;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+      <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-md w-full overflow-hidden shadow-2xl text-slate-100 flex flex-col">
+        <!-- Cabeçalho de Proteção Restrita -->
+        <div class="p-6 bg-gradient-to-r from-emerald-950 via-slate-900 to-black border-b border-emerald-500/20 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+              <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-[10px] font-black uppercase tracking-widest text-emerald-400">Portal Blindado</span>
+              </div>
+              <h3 class="text-base font-black text-white">Chave Mestra de Segurança</h3>
+            </div>
+          </div>
+          <button onclick="closeMasterSecurityGateModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-all cursor-pointer" title="Fechar e voltar">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Conteúdo do Portão -->
+        <form onsubmit="handleMasterSecurityGateSubmit(event)" class="p-6 space-y-4" autocomplete="off">
+          <div id="masterGateErrorMessage" class="${isLocked ? '' : 'hidden'} p-3.5 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 text-xs font-bold leading-relaxed">
+            ${isLocked ? `⛔ Acesso bloqueado por tentativas incorretas. Tente novamente em <strong>${remainingMinutes} minutos</strong>.` : ''}
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-xs text-slate-300 space-y-1.5">
+            <p class="font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="lock" class="w-4 h-4 text-emerald-400"></i>
+              <span>Acesso Exclusivo da Diretoria</span>
+            </p>
+            <p class="text-[11px] text-slate-400 leading-relaxed">
+              O console administrativo da Arena Limoeiro é protegido contra acessos não autorizados. Insira a <strong>Chave Mestra</strong> para desbloquear a tela de login.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">Chave Mestra da Arena *</label>
+            <div class="relative">
+              <input type="password" id="masterGateKeyInput" required placeholder="Digite a Chave Mestra de Acesso"
+                     autocomplete="new-password" ${isLocked ? 'disabled' : ''}
+                     class="w-full p-3.5 pr-11 bg-slate-950/80 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none font-mono font-medium disabled:opacity-50">
+              <button type="button" onclick="toggleMasterKeyVisibility()" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-400 cursor-pointer p-1">
+                <i data-lucide="eye" id="masterKeyEyeIcon" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-500 mt-1.5 flex items-center justify-between">
+              <span>Máximo de 3 tentativas • Bloqueio de 15 min</span>
+              <span id="masterGateAttemptCounter" class="text-amber-400 font-bold">${lockInfo.attempts > 0 ? `${lockInfo.attempts}/3 tentativas` : ''}</span>
+            </p>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between gap-2">
+            <button type="button" onclick="closeMasterSecurityGateModal()" class="px-4 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-bold transition-all cursor-pointer">
+              Voltar ao Site
+            </button>
+            <button type="submit" id="btnMasterGateSubmit" ${isLocked ? 'disabled' : ''} class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center space-x-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              <i data-lucide="key-round" class="w-4 h-4"></i>
+              <span>Validar e Entrar</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  window._onMasterGateSuccess = onSuccessCallback;
+  if (window.lucide) lucide.createIcons();
+
+  const keyInp = document.getElementById('masterGateKeyInput');
+  if (keyInp && !isLocked) {
+    setTimeout(() => keyInp.focus(), 150);
+  }
+}
+window.openMasterSecurityGateModal = openMasterSecurityGateModal;
+
+async function handleMasterSecurityGateSubmit(event) {
+  event.preventDefault();
+  const input = document.getElementById('masterGateKeyInput');
+  const errorBox = document.getElementById('masterGateErrorMessage');
+  const submitBtn = document.getElementById('btnMasterGateSubmit');
+  const keyVal = (input ? input.value : '').trim();
+
+  // Verifica bloqueio
+  const lockInfo = getMasterGateLockInfo();
+  if (lockInfo.lockedUntil && Date.now() < lockInfo.lockedUntil) {
+    const mins = Math.ceil((lockInfo.lockedUntil - Date.now()) / 60000);
+    if (errorBox) {
+      errorBox.innerHTML = `⛔ Acesso bloqueado por tentativas consecutivas incorretas. Tente novamente em <strong>${mins} minutos</strong>.`;
+      errorBox.classList.remove('hidden');
+    }
+    return;
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span>Validando...</span>`;
+  }
+
+  const isValid = await verifyMasterSecurityKey(keyVal);
+
+  if (!isValid) {
+    lockInfo.attempts = (lockInfo.attempts || 0) + 1;
+    if (lockInfo.attempts >= 3) {
+      lockInfo.lockedUntil = Date.now() + (15 * 60 * 1000);
+      setMasterGateLockInfo(lockInfo);
+      if (errorBox) {
+        errorBox.innerHTML = `⛔ <strong>Chave incorreta (3 de 3 tentativas)!</strong> Acesso ao console travado por <strong>15 minutos</strong>.`;
+        errorBox.classList.remove('hidden');
+      }
+      if (input) {
+        input.value = '';
+        input.disabled = true;
+      }
+      if (submitBtn) submitBtn.disabled = true;
+      // Redireciona para o site do cliente após 2 segundos
+      setTimeout(() => {
+        closeMasterSecurityGateModal();
+      }, 2500);
+      return;
+    }
+
+    setMasterGateLockInfo(lockInfo);
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `<i data-lucide="key-round" class="w-4 h-4"></i><span>Validar e Entrar</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
+    if (errorBox) {
+      errorBox.innerHTML = `❌ <strong>Chave Mestra incorreta!</strong> Tentativa <strong>${lockInfo.attempts} de 3</strong>. Restam apenas ${3 - lockInfo.attempts} tentativa(s).`;
+      errorBox.classList.remove('hidden');
+    }
+    const attemptLabel = document.getElementById('masterGateAttemptCounter');
+    if (attemptLabel) attemptLabel.innerText = `${lockInfo.attempts}/3 tentativas`;
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    return;
+  }
+
+  // Chave válida!
+  clearMasterGateLockInfo();
+  sessionStorage.setItem('arena_master_gate_passed', 'true');
+
+  if (submitBtn) {
+    submitBtn.className = "px-5 py-2.5 bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg flex items-center space-x-1.5";
+    submitBtn.innerHTML = `<span>✓ Liberado!</span>`;
+  }
+
+  setTimeout(() => {
+    const cb = window._onMasterGateSuccess;
+    openLoginModal(cb);
+  }, 400);
+}
+window.handleMasterSecurityGateSubmit = handleMasterSecurityGateSubmit;
+
+function closeMasterSecurityGateModal() {
+  closeModal();
+  try {
+    if (window.location.pathname.endsWith('/admin') || window.location.pathname === '/admin') {
+      window.history.replaceState({}, document.title, '/');
+    }
+    if (window.location.hash === '#admin' || window.location.hash === '#gestao') {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  } catch(e) {}
+  state.currentMode = 'client';
+  renderApp();
+}
+window.closeMasterSecurityGateModal = closeMasterSecurityGateModal;
+
+function toggleMasterKeyVisibility() {
+  const inp = document.getElementById('masterGateKeyInput');
+  const icon = document.getElementById('masterKeyEyeIcon');
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    if (icon) icon.setAttribute('data-lucide', 'eye-off');
+  } else {
+    inp.type = 'password';
+    if (icon) icon.setAttribute('data-lucide', 'eye');
+  }
+  if (window.lucide) lucide.createIcons();
+}
+window.toggleMasterKeyVisibility = toggleMasterKeyVisibility;
+
+// Modal para Gabriel Alves alterar a Chave Mestra quando quiser
+function openEditMasterGateKeyModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const currentKey = localStorage.getItem('arena_custom_master_gate_key') || 'alves@157620';
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-2.5">
+            <i data-lucide="shield-alert" class="w-6 h-6 text-emerald-400"></i>
+            <div>
+              <h3 class="text-base font-black uppercase">Chave Mestra do Portão (/admin)</h3>
+              <p class="text-xs text-emerald-300 font-medium">Controle de Segurança Anti-Invasão</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+            <i data-lucide="x" class="w-6 h-6"></i>
+          </button>
+        </div>
+
+        <form onsubmit="handleSaveCustomMasterGateKey(event)" class="p-6 space-y-4">
+          <div class="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-800 space-y-1">
+            <p class="font-bold flex items-center gap-1.5">
+              <i data-lucide="info" class="w-4 h-4 text-emerald-600"></i>
+              <span>Como funciona este portão?</span>
+            </p>
+            <p class="text-[11px] text-emerald-700 leading-relaxed">
+              Qualquer pessoa que acessar o link <code>/admin</code> pelo navegador terá que digitar esta Chave Mestra antes de ver a tela de login.
+            </p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nova Chave Mestra *</label>
+            <input type="text" id="newMasterGateKeyInput" required value="${currentKey}" placeholder="Ex: alves@157620 ou sua chave secreta"
+                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-600 focus:outline-none font-mono font-bold">
+            <p class="text-[10px] text-slate-500 mt-1">Dica: escolha uma palavra ou código difícil de adivinhar.</p>
+          </div>
+
+          <div class="pt-2 flex items-center justify-end space-x-2">
+            <button type="button" onclick="closeModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 font-bold text-xs text-slate-700 hover:bg-slate-50 transition-all cursor-pointer">Cancelar</button>
+            <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md transition-all cursor-pointer">Salvar Nova Chave</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+window.openEditMasterGateKeyModal = openEditMasterGateKeyModal;
+
+async function handleSaveCustomMasterGateKey(event) {
+  event.preventDefault();
+  const input = document.getElementById('newMasterGateKeyInput');
+  const val = (input ? input.value : '').trim();
+  if (!val || val.length < 4) {
+    alert('A Chave Mestra deve ter no mínimo 4 caracteres.');
+    return;
+  }
+
+  const hash = await sha256Hex(val);
+  localStorage.setItem('arena_custom_master_gate_key', val);
+  localStorage.setItem('arena_custom_master_gate_hash', hash);
+
+  closeModal();
+  alert('✅ Chave Mestra atualizada com sucesso! Ela será exigida em qualquer acesso à URL /admin.');
+  renderApp();
+}
+window.handleSaveCustomMasterGateKey = handleSaveCustomMasterGateKey;
+
+// ==============================================================================
 // 1ª ETAPA: LOGIN COM E-MAIL E SENHA
 // ==============================================================================
 function openLoginModal(onSuccessCallback = null) {
+  // 🛡️ Garante que o Portão de Chave Mestra foi aprovado antes de liberar a tela de credenciais
+  if (!isMasterGatePassed()) {
+    openMasterSecurityGateModal(onSuccessCallback);
+    return;
+  }
+
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
@@ -9826,6 +10205,26 @@ function renderAdminSubTabContent(tab) {
               <span>+ Novo Gestor</span>
             </button>
           </div>
+        </div>
+
+        <!-- Blindagem de Segurança da URL /admin -->
+        <div class="mb-5 p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 border border-emerald-500/30 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h4 class="text-xs sm:text-sm font-black text-white">Blindagem da URL (/admin)</h4>
+                <span class="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Chave Mestra Ativa</span>
+              </div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Exige a Chave Mestra antes de mostrar o formulário de login para quem tentar acessar via link no navegador.</p>
+            </div>
+          </div>
+          <button onclick="openEditMasterGateKeyModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black rounded-xl flex items-center space-x-1.5 shadow-md transition-all cursor-pointer self-start sm:self-auto shrink-0">
+            <i data-lucide="key" class="w-3.5 h-3.5"></i>
+            <span>Alterar Chave Mestra</span>
+          </button>
         </div>
         
         <div class="space-y-3">
