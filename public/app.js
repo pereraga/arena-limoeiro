@@ -696,7 +696,9 @@ function normalizeDayOfWeek(d) {
   if (!d) return '';
   let str = String(d).trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove acentos: terça -> terca, sábado -> sabado
-  str = str.replace('-feira', '').replace('feira', '').trim();
+  str = str.replace(/^tod[ao]\s+/, '').replace(/\s+tod[ao]$/, '').trim();
+  str = str.replace(/-?feira/g, '').trim();
+  str = str.replace(/\(mensal\)/g, '').trim();
   if (str === 'sun' || str === '0' || str === 'dom') return 'domingo';
   if (str === 'mon' || str === '1' || str === 'seg') return 'segunda';
   if (str === 'tue' || str === '2' || str === 'ter') return 'terca';
@@ -790,7 +792,7 @@ function loadInitialData() {
     // Auto-recuperação resiliente de horários fixos salvos em reservas locais
     cleanedLocal.forEach(b => {
       if (!b) return;
-      const isM = isMensalistaBooking(b) || (b.date && (b.date.includes('(Mensal)') || b.date.toLowerCase().includes('toda ')));
+      const isM = isMensalistaBooking(b) || (b.date && (b.date.includes('(Mensal)') || b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo ')));
       if (isM) {
         const memberId = b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : ('mensal-' + (b.id || Date.now())));
         const alreadyInList = cleanLocalMonthly.some(m => m.id === memberId || (m.court_id === (b.court_id || b.courtId) && m.start_time === (b.start_time || b.startTime)));
@@ -798,8 +800,8 @@ function loadInitialData() {
           let dWeek = 'terca';
           if (b.day_of_week || b.dayOfWeek) {
             dWeek = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
-          } else if (b.date && b.date.toLowerCase().includes('toda ')) {
-            const matchDay = b.date.toLowerCase().match(/toda\s+([a-zçãé]+)/);
+          } else if (b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
+            const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
             if (matchDay && matchDay[1]) dWeek = normalizeDayOfWeek(matchDay[1]);
           } else if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
             const [by, bm, bd] = b.date.split('-');
@@ -809,6 +811,16 @@ function loadInitialData() {
           }
           const sT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
           const eT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
+          const dLabelMap = {
+            segunda: 'Toda Segunda-feira',
+            terca: 'Toda Terça-feira',
+            quarta: 'Toda Quarta-feira',
+            quinta: 'Toda Quinta-feira',
+            sexta: 'Toda Sexta-feira',
+            sabado: 'Todo Sábado',
+            domingo: 'Todo Domingo'
+          };
+          const formattedLabel = dLabelMap[dWeek] || ('Toda ' + dWeek + '-feira');
           cleanLocalMonthly.push({
             id: memberId,
             team_name: b.customer_name || b.customerName || 'Pelada dos Amigos',
@@ -820,8 +832,8 @@ function loadInitialData() {
             courtId: b.court_id || b.courtId || 'court-society-1',
             day_of_week: dWeek,
             dayOfWeek: dWeek,
-            day_of_week_label: 'Toda ' + dWeek + '-feira',
-            dayOfWeekLabel: 'Toda ' + dWeek + '-feira',
+            day_of_week_label: formattedLabel,
+            dayOfWeekLabel: formattedLabel,
             start_time: sT,
             startTime: sT,
             end_time: eT,
@@ -836,7 +848,17 @@ function loadInitialData() {
       }
     });
 
-    // Se nenhum horário fixo estiver salvo (ex: após limpeza de cache pelo bug antigo), restaura o contrato fixo oficial de Terça-feira (Pelada dos Amigos)
+    // Se nenhum horário fixo estiver salvo, verifica primeiro o backup persistente
+    if (cleanLocalMonthly.length === 0) {
+      try {
+        const backupMonthly = JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]');
+        if (Array.isArray(backupMonthly) && backupMonthly.length > 0) {
+          cleanLocalMonthly = backupMonthly;
+        }
+      } catch(e) {}
+    }
+
+    // Se ainda assim estiver vazio, restaura o contrato fixo oficial padrão de Terça-feira
     if (cleanLocalMonthly.length === 0) {
       cleanLocalMonthly.push({
         id: 'monthly-pelada-amigos-terca',
@@ -864,6 +886,7 @@ function loadInitialData() {
     }
 
     localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
+    localStorage.setItem('arena_monthly_members_backup', JSON.stringify(cleanLocalMonthly));
     state.monthlyMembers = cleanLocalMonthly;
 
     localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
@@ -914,6 +937,10 @@ async function autoAdvanceFinishedMatches() {
 
     // Se for de um dia anterior, finaliza automaticamente
     if (b.date < todayStr) {
+      // Se for reserva mestre semanal (ex: date contém "Toda " ou "Todo "), nunca finaliza a reserva recorrente
+      if (isMensalistaBooking(b) && typeof b.date === 'string' && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo ') || b.date.includes('(Mensal)'))) {
+        continue;
+      }
       b.status = 'finished';
       hasUpdates = true;
       if (client) {
@@ -1035,13 +1062,13 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
     if (b.status === 'cancelled') return false;
     if (excludeBookingId && b.id === excludeBookingId) return false;
 
-    // Se a reserva for semanal / mensalista com data no formato "Toda terça-feira"
+    // Se a reserva for semanal / mensalista com data no formato "Toda terça-feira" ou "Todo sábado"
     let matchesDate = (b.date === date);
     if (!matchesDate && isMensalistaBooking(b)) {
       let bDay = '';
       if (b.day_of_week || b.dayOfWeek) bDay = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
-      else if (b.date && b.date.toLowerCase().includes('toda ')) {
-        const matchDay = b.date.toLowerCase().match(/toda\s+([a-zçãé]+)/);
+      else if (b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
+        const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
         if (matchDay && matchDay[1]) bDay = normalizeDayOfWeek(matchDay[1]);
       }
       if (bDay && bDay === normalizeDayOfWeek(currentDayOfWeek)) {
@@ -1079,7 +1106,7 @@ function isMensalistaBooking(b) {
   const obs = (b.observation || '').toLowerCase();
   if (obs.includes('mensalista') || obs.includes('horário fixo') || obs.includes('horario fixo') || obs.includes('fixo semanal')) return true;
   const dateStr = String(b.date || '').toLowerCase();
-  if (dateStr.includes('toda ') || dateStr.includes('(mensal)')) return true;
+  if (dateStr.includes('toda ') || dateStr.includes('todo ') || dateStr.includes('(mensal)') || dateStr.includes('mensal')) return true;
   if (state.monthlyMembers && state.monthlyMembers.length > 0) {
     const custName = (b.customer_name || b.customerName || '').toLowerCase();
     const custPhone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
@@ -5148,8 +5175,8 @@ function renderLiveDashboardTab() {
     if (!matchesThisDate && isMensal) {
       let bDay = '';
       if (b.day_of_week || b.dayOfWeek) bDay = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
-      else if (b.date && b.date.toLowerCase().includes('toda ')) {
-        const matchDay = b.date.toLowerCase().match(/toda\s+([a-zçãé]+)/);
+      else if (b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
+        const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
         if (matchDay && matchDay[1]) bDay = normalizeDayOfWeek(matchDay[1]);
       } else if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
         const [by, bm, bd] = b.date.split('-');
@@ -5171,6 +5198,8 @@ function renderLiveDashboardTab() {
       const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
       const healthVal = b.health_notes || b.healthNotes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
 
+      const matchStatus = (b.date === selectedDate) ? (b.status || 'confirmed') : (selectedDate >= todayStr ? 'confirmed' : 'finished');
+
       matchesList.push({
         id: b.id,
         court_id: b.court_id || b.courtId,
@@ -5185,7 +5214,7 @@ function renderLiveDashboardTab() {
         end_time: endT,
         time: b.time || (startT + ' às ' + endT),
         total_price: parseFloat(b.total_price || b.totalPrice || 0),
-        status: b.status || 'confirmed',
+        status: matchStatus,
         booking_type: b.booking_type || b.bookingType || (isMensal ? 'mensalista' : 'avulso'),
         isMensalista: isMensal,
         payment_method: b.payment_method || b.paymentMethod || (isMensal ? 'fixo' : 'pix'),
@@ -5210,8 +5239,8 @@ function renderLiveDashboardTab() {
       const healthVal = m.health_notes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
 
       // Evita duplicata se já existir booking gerado para o mesmo campo e horário
-      const alreadyHas = matchesList.some(b => (b.court_id === cId || b.courtId === cId) && (b.start_time === startT || b.startTime === startT));
-      if (!alreadyHas) {
+      const existingMatch = matchesList.find(b => (b.court_id === cId || b.courtId === cId) && (b.start_time === startT || b.startTime === startT));
+      if (!existingMatch) {
         matchesList.push({
           id: 'monthly-' + m.id,
           court_id: cId,
@@ -5233,6 +5262,9 @@ function renderLiveDashboardTab() {
           product_cart: {},
           observation: 'Horário Fixo Semanal'
         });
+      } else {
+        existingMatch.isMensalista = true;
+        if (!existingMatch.monthly_member_id) existingMatch.monthly_member_id = m.id;
       }
     }
   });
@@ -13536,6 +13568,7 @@ async function handleMonthlySubmit(event, editId) {
   }
 
   localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+  localStorage.setItem('arena_monthly_members_backup', JSON.stringify(state.monthlyMembers));
 
   // Salva no Supabase (Nuvem)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
@@ -17117,6 +17150,7 @@ async function submitBooking(grandTotal) {
     if (!state.monthlyMembers) state.monthlyMembers = [];
     state.monthlyMembers.push(dbMemberPayload);
     localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+    localStorage.setItem('arena_monthly_members_backup', JSON.stringify(state.monthlyMembers));
 
     // Salva também nas reservas locais com flag isMensalista
     state.bookings.push(unifiedBooking);
@@ -17867,9 +17901,26 @@ async function syncDataFromSupabase(skipRender = false) {
       localStorage.setItem('arena_local_products', JSON.stringify(filteredProducts));
     }
 
-    if (dbMembers) {
-      state.monthlyMembers = dbMembers;
-      localStorage.setItem('arena_monthly_members', JSON.stringify(dbMembers));
+    if (Array.isArray(dbMembers) && dbMembers.length > 0) {
+      const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+      const memberMap = new Map();
+      localMembers.forEach(m => { if (m && m.id) memberMap.set(m.id, m); });
+      dbMembers.forEach(m => { if (m && m.id) memberMap.set(m.id, m); });
+      state.monthlyMembers = Array.from(memberMap.values());
+      localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+      localStorage.setItem('arena_monthly_members_backup', JSON.stringify(state.monthlyMembers));
+    } else {
+      // Se a nuvem não retornou registros ou falhou, preserva os mensalistas locais e do backup
+      const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+      const backupMembers = JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]');
+      const mergedLocal = [...localMembers];
+      backupMembers.forEach(bm => {
+        if (bm && bm.id && !mergedLocal.some(lm => lm.id === bm.id)) mergedLocal.push(bm);
+      });
+      if (mergedLocal.length > 0) {
+        state.monthlyMembers = mergedLocal;
+        localStorage.setItem('arena_monthly_members', JSON.stringify(mergedLocal));
+      }
     }
 
     if (dbBookings) {
@@ -18084,7 +18135,12 @@ async function syncDataFromSupabase(skipRender = false) {
         // ──── Mensalistas / Planos Fixos ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_members' }, async () => {
           const { data } = await client.from('monthly_members').select('*');
-          if (data) { state.monthlyMembers = data; _refreshAllUI(); }
+          if (Array.isArray(data) && data.length > 0) { 
+            state.monthlyMembers = data; 
+            localStorage.setItem('arena_monthly_members', JSON.stringify(data));
+            localStorage.setItem('arena_monthly_members_backup', JSON.stringify(data));
+            _refreshAllUI(); 
+          }
         })
         // ──── Quadras (caso o gestor altere uma quadra em outra aba) ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'courts' }, async () => {
