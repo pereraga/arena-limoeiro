@@ -44,14 +44,14 @@
   </script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.8.16">
+  <link rel="stylesheet" href="/styles.css?v=4.8.17">
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24">
 
   <!-- CABEÇALHO ARENA LIMOEIRO VERDE E BRANCO -->
   <header class="arena-header-bg text-white sticky top-0 z-40 shadow-xl">
     <div class="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between border-b border-emerald-900/60 gap-2">
-      <div class="flex items-center space-x-2 sm:space-x-3.5 min-w-0 flex-shrink">
+      <div class="flex items-center space-x-2 sm:space-x-3.5 min-w-0 flex-shrink cursor-pointer select-none" onclick="handleLogoClickForAdmin()" title="Arena Limoeiro">
         <img src="/logo.jpg" alt="Arena Limoeiro" class="h-8 sm:h-12 w-auto object-contain rounded-lg bg-black p-0.5 sm:p-1 border border-emerald-500/40 shadow flex-shrink-0">
         <div class="min-w-0">
           <span class="text-[9px] sm:text-[10px] uppercase tracking-widest text-emerald-400 font-extrabold hidden sm:block">SISTEMA DE AGENDAMENTO</span>
@@ -63,6 +63,14 @@
       </div>
 
       <div class="flex items-center space-x-1.5 sm:space-x-2.5 flex-shrink-0">
+        <!-- Acesso Gestão / Painel Secreto (APK e Web) -->
+        <button id="btnAdminAccessHeader" onclick="openSecretAdminAccess()" 
+                class="bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-200 hover:text-white transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 shadow-md flex-shrink-0 cursor-pointer"
+                title="Área de Gestão da Arena">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400"></i>
+          <span id="modeBtnText" class="text-[11px] sm:text-xs">Gestão</span>
+        </button>
+
         <!-- Compartilhar Link -->
         <button onclick="openShareModal()" 
                 class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/60 p-2 sm:px-3.5 sm:py-1.5 rounded-xl text-xs font-black text-white transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 shadow-md flex-shrink-0"
@@ -100,6 +108,6 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=4.8.62"></script>
+  <script src="/app.js?v=4.8.63"></script>
 </body>
 </html>

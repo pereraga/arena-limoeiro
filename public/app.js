@@ -1464,9 +1464,23 @@ function renderHeader() {
   const titleElem = document.getElementById('arenaTitle');
   if (titleElem && state.arenaInfo) titleElem.innerText = state.arenaInfo.name;
 
+  const btnAdminAccessHeader = document.getElementById('btnAdminAccessHeader');
   const modeBtnText = document.getElementById('modeBtnText');
-  if (modeBtnText) {
-    modeBtnText.innerText = "Gestão";
+  if (btnAdminAccessHeader) {
+    if (state.currentMode === 'admin') {
+      btnAdminAccessHeader.classList.add('hidden');
+    } else {
+      btnAdminAccessHeader.classList.remove('hidden');
+      if (modeBtnText) {
+        if (isManagerLoggedIn()) {
+          modeBtnText.innerText = "Painel";
+          btnAdminAccessHeader.classList.add('ring-2', 'ring-emerald-400');
+        } else {
+          modeBtnText.innerText = "Gestão";
+          btnAdminAccessHeader.classList.remove('ring-2', 'ring-emerald-400');
+        }
+      }
+    }
   }
 }
 
@@ -1486,16 +1500,21 @@ function renderStepper() {
           <span class="truncate">Olá tudo bom, <strong class="text-white">${displayName}</strong></span>
         </div>
 
-        ${!isAndroidApk() ? `
-          <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
-            <button onclick="logoutAdmin()" 
-                    class="btn-admin-logout px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
-                    title="Sair do painel">
-              <i data-lucide="log-out" class="w-3.5 h-3.5 flex-shrink-0"></i>
-              <span>Sair</span>
-            </button>
-          </div>
-        ` : ''}
+        <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
+          <button onclick="switchToClientView()" 
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                  title="Ver agendamento como cliente">
+            <i data-lucide="eye" class="w-3.5 h-3.5 flex-shrink-0 text-emerald-400"></i>
+            <span class="hidden xs:inline">Ver como Cliente</span>
+            <span class="xs:hidden">Cliente</span>
+          </button>
+          <button onclick="logoutAdmin()" 
+                  class="btn-admin-logout px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-950/70 hover:bg-rose-900 border border-rose-500/40 text-rose-300 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                  title="Sair do painel administrativo">
+            <i data-lucide="log-out" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <span>Sair</span>
+          </button>
+        </div>
       </div>
     `;
     if (window.lucide) lucide.createIcons();
@@ -3212,25 +3231,47 @@ function renderStep4(container) {
   lucide.createIcons();
 }
 
-// AUTENTICAÇÃO E GESTÃO
-function handleGestaoButtonClick() {
+// ==============================================================================
+// 🔐 ACESSO À GESTÃO / ADMIN (APK E WEB)
+// ==============================================================================
+let _logoClickCounter = 0;
+let _logoClickTimer = null;
+
+function handleLogoClickForAdmin() {
+  _logoClickCounter++;
+  clearTimeout(_logoClickTimer);
+  _logoClickTimer = setTimeout(() => {
+    _logoClickCounter = 0;
+  }, 1800);
+
+  if (_logoClickCounter >= 4) {
+    _logoClickCounter = 0;
+    openSecretAdminAccess();
+  }
+}
+window.handleLogoClickForAdmin = handleLogoClickForAdmin;
+
+function openSecretAdminAccess() {
   if (state.currentMode === 'admin') {
-    state.currentMode = 'client';
+    state.adminTab = state.adminTab || 'live_dashboard';
+    renderApp();
+    return;
+  }
+
+  if (isManagerLoggedIn()) {
+    state.currentMode = 'admin';
+    state.adminTab = state.adminTab || 'live_dashboard';
     renderApp();
   } else {
-    if (isManagerLoggedIn()) {
+    openLoginModal(() => {
       state.currentMode = 'admin';
       state.adminTab = 'live_dashboard';
       renderApp();
-    } else {
-      openLoginModal(() => {
-        state.currentMode = 'admin';
-        state.adminTab = 'live_dashboard';
-        renderApp();
-      });
-    }
+    });
   }
 }
+window.openSecretAdminAccess = openSecretAdminAccess;
+window.handleGestaoButtonClick = openSecretAdminAccess;
 
 function copySecretAdminUrl() {
   const secretUrl = `${window.location.origin || 'https://arenalimoeiro.vercel.app'}/adm-sec-x9k7-limoeiro-2026-auth`;
@@ -3250,6 +3291,7 @@ function switchToClientView() {
   state.currentMode = 'client';
   renderApp();
 }
+window.switchToClientView = switchToClientView;
 
 // ==============================================================================
 // 🔐 CONTROLE DE SEGURANÇA: LIMITE DE 3 TENTATIVAS + BLOQUEIO DE 15 MINUTOS
@@ -4342,15 +4384,13 @@ window.handleSaveAdminPinFromManager = handleSaveAdminPinFromManager;
 
 function logoutAdmin() {
   state.currentUser = null;
-  localStorage.removeItem('arena_user');
+  try {
+    localStorage.removeItem('arena_user');
+  } catch(e) {}
   state.currentMode = 'client';
   renderApp();
-  setTimeout(() => {
-    if (typeof openLoginModal === 'function') {
-      openLoginModal();
-    }
-  }, 100);
 }
+window.logoutAdmin = logoutAdmin;
 
 function isReceptionUser() {
   const role = (state.currentUser?.role || '').toLowerCase();

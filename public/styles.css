@@ -27,12 +27,6 @@ body {
   padding-bottom: calc(5.5rem + var(--safe-bottom));
 }
 
-/* Ocultar botão Sair no APK Android */
-html.is-android-apk .btn-admin-logout,
-body.is-android-apk .btn-admin-logout,
-.is-android-apk .btn-admin-logout {
-  display: none !important;
-}
 
 /* Header Verde Escuro */
 .arena-header-bg {
