@@ -161,10 +161,12 @@ window.addEventListener('hashchange', () => {
   }
 });
 
-// Gerenciador Arena Limoeiro - Data Primeiro, Horários Disponíveis Ocultando Ocupados
+// O modo admin é ativado EXCLUSIVAMENTE se for a URL secreta de administração
+const _shouldStartInAdmin = _isAdminUrl && _isUserProperlyLogged;
+
 let state = {
   currentStep: 1,
-  currentMode: _isUserProperlyLogged ? 'admin' : 'client',
+  currentMode: _shouldStartInAdmin ? 'admin' : 'client',
   adminTab: 'live_dashboard',
   platform: {
     device: 'desktop',
@@ -726,19 +728,23 @@ function loadInitialData() {
     state.arenaInfo = d.arenaInfo;
     const defaultCats = d.categories || [];
     const localCats = JSON.parse(localStorage.getItem('arena_categories') || 'null');
-    if (Array.isArray(localCats) && localCats.length > 0) {
+    const hasOldCats = Array.isArray(localCats) && localCats.some(c => c && (c.id === 'futsal' || c.id === 'padel'));
+    if (Array.isArray(localCats) && localCats.length > 0 && !hasOldCats) {
       state.categories = localCats;
       if (!state.categories.some(c => c.id === 'all')) {
         state.categories.unshift({ id: 'all', name: 'Todos os Espaços', icon: 'layout-grid' });
       }
     } else {
       state.categories = [...defaultCats];
+      try { localStorage.setItem('arena_categories', JSON.stringify(state.categories)); } catch(e) {}
     }
     const localCourts = JSON.parse(localStorage.getItem('arena_local_courts') || 'null');
-    if (localCourts !== null && Array.isArray(localCourts)) {
+    const hasOldMockCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && c.name.includes('Campo Society 01'));
+    if (localCourts !== null && Array.isArray(localCourts) && localCourts.length > 0 && !hasOldMockCourts) {
       state.courts = localCourts.map(normalizeCourt);
     } else {
       state.courts = (d.initialCourts || []).map(normalizeCourt);
+      try { localStorage.setItem('arena_local_courts', JSON.stringify(state.courts)); } catch(e) {}
     }
     const localProducts = JSON.parse(localStorage.getItem('arena_local_products') || 'null');
     if (localProducts && Array.isArray(localProducts) && localProducts.length > 0) {
@@ -1467,29 +1473,8 @@ function renderHeader() {
   if (titleElem && state.arenaInfo) titleElem.innerText = state.arenaInfo.name;
 
   const btnAdminAccessHeader = document.getElementById('btnAdminAccessHeader');
-  const modeBtnText = document.getElementById('modeBtnText');
   if (btnAdminAccessHeader) {
-    const isSecretUrl = (typeof checkIsSecretAdminUrl === 'function' && checkIsSecretAdminUrl());
-    const isApk = (typeof isAndroidApk === 'function' && isAndroidApk());
-    const isLogged = (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn());
-
-    // Mostra o botão de gestão no cabeçalho APENAS no APK, ou quando o gestor estiver logado, ou na URL secreta
-    if ((isApk || isLogged || isSecretUrl) && state.currentMode !== 'admin') {
-      btnAdminAccessHeader.classList.remove('hidden');
-      btnAdminAccessHeader.classList.add('flex');
-      if (modeBtnText) {
-        if (isLogged) {
-          modeBtnText.innerText = "Painel";
-          btnAdminAccessHeader.classList.add('ring-2', 'ring-emerald-400');
-        } else {
-          modeBtnText.innerText = "Gestão";
-          btnAdminAccessHeader.classList.remove('ring-2', 'ring-emerald-400');
-        }
-      }
-    } else {
-      btnAdminAccessHeader.classList.add('hidden');
-      btnAdminAccessHeader.classList.remove('flex');
-    }
+    btnAdminAccessHeader.remove();
   }
 }
 
@@ -3247,20 +3232,14 @@ let _logoClickCounter = 0;
 let _logoClickTimer = null;
 
 function handleLogoClickForAdmin() {
-  _logoClickCounter++;
-  clearTimeout(_logoClickTimer);
-  _logoClickTimer = setTimeout(() => {
-    _logoClickCounter = 0;
-  }, 1800);
-
-  if (_logoClickCounter >= 4) {
-    _logoClickCounter = 0;
-    openSecretAdminAccess();
-  }
+  // Desativado no cliente
 }
 window.handleLogoClickForAdmin = handleLogoClickForAdmin;
 
 function openSecretAdminAccess() {
+  if (!checkIsSecretAdminUrl()) {
+    return;
+  }
   if (state.currentMode === 'admin') {
     state.adminTab = state.adminTab || 'live_dashboard';
     renderApp();
