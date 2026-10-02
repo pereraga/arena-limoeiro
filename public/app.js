@@ -1,3 +1,10 @@
+// 🛡️ Safe Lucide Proxy: Garante imunidade contra falhas de carregamento de CDN e erros ReferenceError
+if (typeof window !== 'undefined') {
+  if (!window.lucide) {
+    window.lucide = { createIcons: () => {} };
+  }
+}
+
 function getFormattedDate(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -642,12 +649,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, 30000); // Atualiza os horários para ocultar os que acabaram de passar
 
-  // Registra Service Worker para notificações em segundo plano no celular
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js?v=4.8.2').catch(err => {
-      console.warn('Aviso Service Worker:', err);
-    });
-  }
+  // Service Worker registrado via index.html
 
   // Desbloqueia o canal de áudio e solicita permissão nativa de notificação no mobile no 1º toque
   const unlockAudioAndNotif = () => {
@@ -1467,12 +1469,16 @@ function renderHeader() {
   const btnAdminAccessHeader = document.getElementById('btnAdminAccessHeader');
   const modeBtnText = document.getElementById('modeBtnText');
   if (btnAdminAccessHeader) {
-    if (state.currentMode === 'admin') {
-      btnAdminAccessHeader.classList.add('hidden');
-    } else {
+    const isSecretUrl = (typeof checkIsSecretAdminUrl === 'function' && checkIsSecretAdminUrl());
+    const isApk = (typeof isAndroidApk === 'function' && isAndroidApk());
+    const isLogged = (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn());
+
+    // Mostra o botão de gestão no cabeçalho APENAS no APK, ou quando o gestor estiver logado, ou na URL secreta
+    if ((isApk || isLogged || isSecretUrl) && state.currentMode !== 'admin') {
       btnAdminAccessHeader.classList.remove('hidden');
+      btnAdminAccessHeader.classList.add('flex');
       if (modeBtnText) {
-        if (isManagerLoggedIn()) {
+        if (isLogged) {
           modeBtnText.innerText = "Painel";
           btnAdminAccessHeader.classList.add('ring-2', 'ring-emerald-400');
         } else {
@@ -1480,6 +1486,9 @@ function renderHeader() {
           btnAdminAccessHeader.classList.remove('ring-2', 'ring-emerald-400');
         }
       }
+    } else {
+      btnAdminAccessHeader.classList.add('hidden');
+      btnAdminAccessHeader.classList.remove('flex');
     }
   }
 }

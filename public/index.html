@@ -38,13 +38,13 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=4.8.39').catch(console.error);
+        navigator.serviceWorker.register('/sw.js?v=4.8.40').catch(console.error);
       });
     }
   </script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.8.17">
+  <link rel="stylesheet" href="/styles.css?v=4.8.18">
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24">
 
@@ -63,9 +63,9 @@
       </div>
 
       <div class="flex items-center space-x-1.5 sm:space-x-2.5 flex-shrink-0">
-        <!-- Acesso Gestão / Painel Secreto (APK e Web) -->
+        <!-- Acesso Gestão / Painel Secreto (APK e Web autenticada) -->
         <button id="btnAdminAccessHeader" onclick="openSecretAdminAccess()" 
-                class="bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-200 hover:text-white transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 shadow-md flex-shrink-0 cursor-pointer"
+                class="hidden bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-200 hover:text-white transition-all items-center justify-center space-x-1 sm:space-x-1.5 shadow-md flex-shrink-0 cursor-pointer"
                 title="Área de Gestão da Arena">
           <i data-lucide="shield-check" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400"></i>
           <span id="modeBtnText" class="text-[11px] sm:text-xs">Gestão</span>
@@ -108,6 +108,6 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=4.8.63"></script>
+  <script src="/app.js?v=4.8.64"></script>
 </body>
 </html>
