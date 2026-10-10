@@ -301,89 +301,228 @@ function showSessionExpiredModal(reason = '') {
 }
 window.showSessionExpiredModal = showSessionExpiredModal;
 
-function promptCookieActivationModal(force = false) {
-  if (!force && isCookieConsentGiven()) return;
+// ------------------------------------------------------------------------------
+// DETECÇÃO DE AMBIENTE: APK NATIVO ANDROID VS NAVEGADOR WEB / COMPUTADOR
+// ------------------------------------------------------------------------------
+function isApkEnvironment() {
+  try {
+    if (typeof window !== 'undefined') {
+      const search = window.location.search || '';
+      const href = window.location.href || '';
+      if (search.includes('apk') || href.includes('apk') || search.includes('app=apk')) {
+        try { localStorage.setItem('arena_is_apk', 'true'); } catch(e) {}
+        return true;
+      }
+      if (localStorage.getItem('arena_is_apk') === 'true' || localStorage.getItem('arena_is_control_app') === 'true') {
+        return true;
+      }
+      if (window._isControlApp === true || window.isNativeApk === true) return true;
+      if (window.Capacitor && (typeof window.Capacitor.isNativePlatform === 'function' ? window.Capacitor.isNativePlatform() : true)) {
+        return true;
+      }
+      const ua = (navigator.userAgent || '').toLowerCase();
+      if (ua.includes('wv') || ua.includes('capacitor') || (ua.includes('android') && ua.includes('version/'))) {
+        return true;
+      }
+    }
+  } catch(e) {}
+  return false;
+}
+window.isApkEnvironment = isApkEnvironment;
 
+// ------------------------------------------------------------------------------
+// BANNER INFERIOR DE COOKIES (PADRÃO BASEFY / COMPLIANCE LGPD)
+// ------------------------------------------------------------------------------
+function renderCookieBottomBanner() {
+  // NO APLICATIVO (APK): NÃO precisa de cookies e NÃO mostra nenhuma janela
+  if (isApkEnvironment()) {
+    return;
+  }
+
+  // Se já consentiu anteriormente no computador, não exibe
+  if (isCookieConsentGiven()) {
+    return;
+  }
+
+  let root = document.getElementById('cookieBannerRoot');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'cookieBannerRoot';
+    document.body.appendChild(root);
+  }
+
+  root.innerHTML = `
+    <div id="arenaCookieBottomBanner" role="region" aria-label="Aviso sobre uso de cookies" 
+         class="fixed inset-x-0 bottom-0 z-[4500] px-3 pb-3 sm:px-4 sm:pb-4 pointer-events-none transition-all duration-300 transform translate-y-0 opacity-100">
+      <div class="mx-auto flex max-w-4xl flex-col gap-4 rounded-2xl border border-white/[0.08] bg-[#0c120e]/95 p-4 shadow-2xl shadow-black/80 backdrop-blur-md sm:flex-row sm:items-center sm:gap-5 sm:p-5 pointer-events-auto">
+        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cookie h-5 w-5" aria-hidden="true">
+            <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path>
+            <path d="M8.5 8.5v.01"></path>
+            <path d="M16 15.5v.01"></path>
+            <path d="M12 12v.01"></path>
+            <path d="M11 17v.01"></path>
+            <path d="M7 14v.01"></path>
+          </svg>
+        </span>
+        <p class="min-w-0 flex-1 text-xs leading-relaxed text-zinc-300 sm:text-sm">
+          Utilizamos cookies para melhorar sua experiência em nosso site. Alguns são essenciais para o funcionamento, enquanto outros nos ajudam a entender como você utiliza a plataforma. 
+          <a onclick="openPrivacyPolicyModal()" class="font-medium text-purple-400 underline underline-offset-2 transition-colors hover:text-white cursor-pointer">Política de Privacidade</a>
+        </p>
+        <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+          <button type="button" onclick="acceptAllCookies()" 
+                  class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all outline-none bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white shadow-lg shadow-purple-600/30 cursor-pointer">
+            Aceitar todos
+          </button>
+          <button type="button" onclick="rejectAllCookies()" 
+                  class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all outline-none border border-white/[0.12] bg-white/[0.04] text-white hover:border-white/25 hover:bg-white/[0.08] cursor-pointer">
+            Recusar todos
+          </button>
+          <button type="button" onclick="openCookieSettingsModal()" 
+                  class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all outline-none border border-white/[0.12] bg-white/[0.04] text-white hover:border-white/25 hover:bg-white/[0.08] sm:px-3 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings h-4 w-4" aria-hidden="true">
+              <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            Configurar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.renderCookieBottomBanner = renderCookieBottomBanner;
+
+function removeCookieBottomBanner() {
+  const banner = document.getElementById('arenaCookieBottomBanner');
+  if (banner) {
+    banner.style.opacity = '0';
+    banner.style.transform = 'translateY(24px)';
+    setTimeout(() => {
+      if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+    }, 320);
+  }
+}
+window.removeCookieBottomBanner = removeCookieBottomBanner;
+
+function acceptAllCookies() {
+  try {
+    setArenaCookie('arena_cookies_accepted', 'all', 24 * 365);
+    localStorage.setItem('arena_cookies_accepted', 'all');
+    localStorage.setItem('arena_cookie_prefs', JSON.stringify({ essential: true, performance: true, audio: true }));
+  } catch(e) {}
+
+  removeCookieBottomBanner();
+
+  if (typeof showToastNotification === 'function') {
+    showToastNotification(`
+      <strong class="text-purple-300 font-bold block text-sm mb-0.5">🍪 Cookies Aceitos com Sucesso!</strong>
+      <p class="text-slate-300 text-xs">O sistema está 100% otimizado com sessão segura de 5 horas e sincronização em tempo real.</p>
+    `, 4000);
+  }
+}
+window.acceptAllCookies = acceptAllCookies;
+
+function rejectAllCookies() {
+  try {
+    setArenaCookie('arena_cookies_accepted', 'essential_only', 24 * 365);
+    localStorage.setItem('arena_cookies_accepted', 'essential_only');
+    localStorage.setItem('arena_cookie_prefs', JSON.stringify({ essential: true, performance: false, audio: false }));
+  } catch(e) {}
+
+  removeCookieBottomBanner();
+
+  if (typeof showToastNotification === 'function') {
+    showToastNotification(`
+      <strong class="text-slate-200 font-bold block text-sm mb-0.5">🍪 Apenas Essenciais Mantidos</strong>
+      <p class="text-slate-300 text-xs">Mantivemos apenas os cookies estritamente necessários para a sessão de 5 horas e segurança de login.</p>
+    `, 4000);
+  }
+}
+window.rejectAllCookies = rejectAllCookies;
+
+// MODAL DE CONFIGURAÇÃO DE COOKIES
+function openCookieSettingsModal() {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
-  const cookiesSupported = areCookiesEnabled();
+  let prefs = { essential: true, performance: true, audio: true };
+  try {
+    const saved = JSON.parse(localStorage.getItem('arena_cookie_prefs') || 'null');
+    if (saved) prefs = Object.assign(prefs, saved);
+  } catch(e) {}
 
   modalRoot.innerHTML = `
-    <div id="arenaCookieModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col my-auto text-slate-800">
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div class="bg-[#0e1712] rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-white/[0.1] flex flex-col text-slate-100 my-auto">
         
         <!-- Header -->
-        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+        <div class="p-5 border-b border-white/[0.08] flex items-center justify-between bg-black/30">
           <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center border border-emerald-400/30 text-emerald-300">
-              <i data-lucide="cookie" class="w-6 h-6"></i>
+            <div class="w-10 h-10 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <i data-lucide="settings" class="w-5 h-5"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase tracking-tight">Ativação de Cookies & Sistema</h3>
-              <p class="text-xs text-emerald-200 font-medium">Arena Limoeiro - Complexo Esportivo</p>
+              <h3 class="text-base font-black text-white">Preferências de Cookies</h3>
+              <p class="text-xs text-slate-400">Arena Limoeiro • Em conformidade com a LGPD</p>
             </div>
+          </div>
+          <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-white p-1.5 rounded-xl transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+          <!-- Item 1: Essenciais -->
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-sm text-white">Cookies Essenciais & Sessão</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Sempre Ativo</span>
+              </div>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Necessários para manter seu login do controle ativo por até 5 horas, autenticação de recepção e prevenção de reservas duplicadas.
+              </p>
+            </div>
+            <input type="checkbox" checked disabled class="accent-emerald-500 w-5 h-5 cursor-not-allowed shrink-0 mt-1 opacity-70">
+          </div>
+
+          <!-- Item 2: Desempenho e Navegação -->
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <span class="font-bold text-sm text-white block">Preferências de Busca e Filtros</span>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Lembram sua modalidade esportiva preferida, filtro de quadra e opções selecionadas recentemente para agilizar seus agendamentos.
+              </p>
+            </div>
+            <input type="checkbox" id="prefPerformance" ${prefs.performance ? 'checked' : ''} class="accent-purple-500 w-5 h-5 cursor-pointer shrink-0 mt-1">
+          </div>
+
+          <!-- Item 3: Áudio e Notificações -->
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] flex items-start justify-between gap-4">
+            <div class="space-y-1">
+              <span class="font-bold text-sm text-white block">Áudio & Alertas do Sistema</span>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Permite a execução do apito de início de jogo e alertas sonoros quando um novo agendamento for realizado.
+              </p>
+            </div>
+            <input type="checkbox" id="prefAudio" ${prefs.audio ? 'checked' : ''} class="accent-purple-500 w-5 h-5 cursor-pointer shrink-0 mt-1">
           </div>
         </div>
 
-        <div class="p-6 space-y-4">
-          <div class="flex items-start gap-3">
-            <div class="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 shrink-0">
-              <i data-lucide="shield-check" class="w-6 h-6"></i>
-            </div>
-            <div class="space-y-1">
-              <h4 class="text-sm font-black text-slate-900">Permissão de Cookies para Funcionamento 100%</h4>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                Para que o aplicativo de <strong>Controle (APK)</strong> e o <strong>Site</strong> funcionem com <strong>100% de estabilidade</strong>, o sistema necessita da ativação dos cookies e armazenamento do navegador.
-              </p>
-            </div>
-          </div>
-
-          <!-- O que os cookies garantem -->
-          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5 text-xs text-slate-700">
-            <span class="font-black text-slate-900 block uppercase tracking-wider text-[11px]">Recursos que dependem dos cookies ativos:</span>
-            <div class="flex items-center gap-2">
-              <span class="text-emerald-600 font-black">✓</span>
-              <span><strong>Login Seguro por 5 Horas:</strong> verificação de inatividade para proteger o painel.</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-emerald-600 font-black">✓</span>
-              <span><strong>Sincronização Supabase em Tempo Real:</strong> partidas e pagamentos instantâneos entre aparelhos.</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-emerald-600 font-black">✓</span>
-              <span><strong>Notificações Sonoras e WhatsApp:</strong> alertas automáticos de novas reservas sem falhas.</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-emerald-600 font-black">✓</span>
-              <span><strong>Cache Offline de Segurança:</strong> impede qualquer perda de lançamentos ou partidas.</span>
-            </div>
-          </div>
-
-          ${!cookiesSupported ? `
-            <div class="p-3.5 bg-red-50 border-2 border-red-300 rounded-2xl text-xs text-red-900 space-y-1.5">
-              <div class="flex items-center gap-2 font-black text-red-800">
-                <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i>
-                <span>Atenção: Os cookies estão bloqueados no seu navegador!</span>
-              </div>
-              <p class="text-[11px] leading-relaxed">
-                Para liberar no celular ou PC: acesse as <strong>Configurações do Navegador > Privacidade e Segurança > Ativar Cookies / Permitir dados do site</strong> e clique no botão abaixo para confirmar.
-              </p>
-            </div>
-          ` : `
-            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 font-bold flex items-center gap-2">
-              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
-              <span>Seu navegador é compatível e está pronto para ativar a permissão completa!</span>
-            </div>
-          `}
-
-          <div class="pt-2 flex flex-col sm:flex-row gap-2.5">
-            <button type="button" onclick="acceptArenaCookies();" 
-                    class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl font-black text-xs sm:text-sm shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer">
-              <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Ativar Cookies & Acesso 100% Funcionando</span>
-            </button>
-          </div>
+        <!-- Footer -->
+        <div class="p-5 border-t border-white/[0.08] bg-black/20 flex flex-col sm:flex-row gap-2.5">
+          <button type="button" onclick="saveCustomCookiePreferences()" 
+                  class="flex-1 py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>Salvar Preferências</span>
+          </button>
+          <button type="button" onclick="acceptAllCookies(); closeModal();" 
+                  class="flex-1 py-3 px-4 bg-white/[0.06] hover:bg-white/[0.1] border border-white/[0.12] text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+            <span>Aceitar Todos</span>
+          </button>
         </div>
 
       </div>
@@ -392,30 +531,347 @@ function promptCookieActivationModal(force = false) {
 
   if (window.lucide) lucide.createIcons();
 }
-window.promptCookieActivationModal = promptCookieActivationModal;
+window.openCookieSettingsModal = openCookieSettingsModal;
 
-function acceptArenaCookies() {
+function saveCustomCookiePreferences() {
+  const perf = document.getElementById('prefPerformance')?.checked ?? true;
+  const audio = document.getElementById('prefAudio')?.checked ?? true;
+  const newPrefs = { essential: true, performance: perf, audio: audio };
+
   try {
-    setArenaCookie('arena_cookies_accepted', 'true', 24 * 365); // 1 ano
-    localStorage.setItem('arena_cookies_accepted', 'true');
+    setArenaCookie('arena_cookies_accepted', 'custom', 24 * 365);
+    localStorage.setItem('arena_cookies_accepted', 'custom');
+    localStorage.setItem('arena_cookie_prefs', JSON.stringify(newPrefs));
   } catch(e) {}
 
   closeModal();
+  removeCookieBottomBanner();
 
   if (typeof showToastNotification === 'function') {
     showToastNotification(`
-      <strong class="text-emerald-400 font-bold block text-sm mb-0.5">🍪 Cookies Ativados com Sucesso!</strong>
-      <p class="text-slate-300">O sistema está 100% operacional com proteção de login de 5 horas e sincronização em tempo real.</p>
-    `, 4000);
+      <strong class="text-purple-300 font-bold block text-sm mb-0.5">Preferências Atualizadas!</strong>
+      <p class="text-slate-300 text-xs">Suas configurações de cookies foram salvas com sucesso.</p>
+    `, 3500);
   }
+}
+window.saveCustomCookiePreferences = saveCustomCookiePreferences;
+
+// MODAL DA POLÍTICA DE PRIVACIDADE COMPLETA (LGPD)
+function openPrivacyPolicyModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/90 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div class="bg-[#0b150f] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-white/[0.1] flex flex-col text-slate-100 my-auto max-h-[90vh]">
+        
+        <!-- Header -->
+        <div class="p-5 border-b border-white/[0.08] flex items-center justify-between bg-black/40 sticky top-0 z-10 backdrop-blur">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <i data-lucide="shield-check" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black text-white">Política de Privacidade</h3>
+              <p class="text-xs text-emerald-400 font-semibold">Arena Limoeiro • Conforme a LGPD</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-white p-1.5 rounded-xl transition-colors cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Conteúdo Scrollável -->
+        <div class="p-6 space-y-5 overflow-y-auto text-xs sm:text-sm text-slate-300 leading-relaxed">
+          <div class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
+            A <strong>Arena Limoeiro</strong> valoriza a sua privacidade. Esta política descreve como tratamos e protegemos seus dados em total respeito à Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
+              <span>1. Dados Pessoais Coletados</span>
+            </h4>
+            <p><strong>Fornecidos voluntariamente:</strong> Nome completo, telefone/WhatsApp para envio de comprovantes de reserva, CPF para contratos de mensalistas e registros de pagamentos esportivos.</p>
+            <p><strong>Coletados automaticamente:</strong> Informações de dispositivo (detecção de APK ou Navegador Web), registros de inatividade e cookies técnicos para segurança da sessão.</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
+              <span>2. Finalidade do Tratamento</span>
+            </h4>
+            <p>Os dados são utilizados estritamente para confirmar partidas, gerar comprovantes instantâneos no WhatsApp, controlar a integridade de horários sem duplicidade e manter a segurança financeira da recepção.</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
+              <span>3. Política de Cookies: Site vs APK</span>
+            </h4>
+            <p><strong>No Computador / Navegador:</strong> O site solicita permissão de cookies na barra inferior para garantir sessões seguras de até 5 horas e sincronização.</p>
+            <p><strong>No Aplicativo Android (APK):</strong> O app opera de forma nativa e direta pelo armazenamento do dispositivo, <strong>sem necessitar nem solicitar permissão de cookies</strong>.</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
+              <span>4. Regra de Segurança: Inatividade de 5 Horas</span>
+            </h4>
+            <p>Caso o usuário do painel de controle ou recepção permaneça mais de 5 horas sem entrar ou utilizar o aplicativo, o login expira automaticamente para evitar acessos não autorizados ao caixa.</p>
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
+              <span>5. Seus Direitos (LGPD)</span>
+            </h4>
+            <p>Você tem o direito de solicitar a confirmação, retificação ou exclusão de seus dados a qualquer momento entrando em contato com a gerência da Arena Limoeiro pelo WhatsApp ou na recepção física.</p>
+          </div>
+        </div>
+
+        <!-- Rodapé do Modal -->
+        <div class="p-5 border-t border-white/[0.08] bg-black/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <a href="/privacidade.html" target="_blank" class="text-xs text-purple-400 hover:text-purple-300 underline font-semibold flex items-center gap-1">
+            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+            <span>Abrir Página Completa da Política</span>
+          </a>
+
+          <button type="button" onclick="closeModal()" 
+                  class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer">
+            Entendido / Fechar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openPrivacyPolicyModal = openPrivacyPolicyModal;
+
+// MODAL DE INFORMAÇÕES DO SISTEMA (ARENA LIMOEIRO)
+function openSystemInfoModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const isApk = isApkEnvironment();
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/90 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div class="bg-[#0b1610] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-emerald-500/30 flex flex-col text-slate-100 my-auto max-h-[92vh]">
+        
+        <!-- Header -->
+        <div class="p-5 border-b border-emerald-900/60 bg-gradient-to-r from-emerald-900/80 via-[#0d2216] to-[#08150d] flex items-center justify-between sticky top-0 z-10 backdrop-blur">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300">
+              <i data-lucide="info" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h3 class="text-base sm:text-lg font-black text-white uppercase tracking-tight">Informações do Sistema</h3>
+              <p class="text-xs text-emerald-300 font-semibold">Arena Limoeiro • Complexo Esportivo & Lazer</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-white p-1.5 rounded-xl transition-colors cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Conteúdo Scrollável -->
+        <div class="p-6 space-y-6 overflow-y-auto text-xs sm:text-sm text-slate-300 leading-relaxed">
+          
+          <!-- Badge do Ambiente Detectado -->
+          <div class="p-4 rounded-2xl border ${isApk ? 'bg-emerald-950/40 border-emerald-500/50' : 'bg-slate-900/60 border-slate-700/60'} flex items-start gap-3.5">
+            <div class="w-9 h-9 rounded-xl ${isApk ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'} flex items-center justify-center shrink-0 mt-0.5">
+              <i data-lucide="${isApk ? 'smartphone' : 'monitor'}" class="w-5 h-5"></i>
+            </div>
+            <div class="space-y-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-sm text-white">Ambiente Atual:</span>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-black ${isApk ? 'bg-emerald-500 text-[#06170d]' : 'bg-blue-500 text-white'}">
+                  ${isApk ? '📱 Aplicativo Android Nativo (APK)' : '💻 Navegador Web / Computador'}
+                </span>
+              </div>
+              <p class="text-xs ${isApk ? 'text-emerald-200' : 'text-slate-300'}">
+                ${isApk 
+                  ? 'O APK opera direto pelo armazenamento interno do Android com sincronização em nuvem, <strong>sem precisar de cookies e sem solicitar permissões extras</strong>.' 
+                  : 'No computador, o sistema utiliza cookies e armazenamento local para manter sua sessão conectada com segurança por até 5 horas.'}
+              </p>
+            </div>
+          </div>
+
+          <!-- Grade de Informações Gerais -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+              <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">Versão do Sistema</span>
+              <strong class="text-sm font-black text-white block">Arena Pro v3.8.5 (Build 2026.10)</strong>
+              <span class="text-[11px] text-emerald-400 font-semibold">🟢 100% Estável & Supabase Conectado</span>
+            </div>
+
+            <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-1">
+              <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">Segurança de Sessão</span>
+              <strong class="text-sm font-black text-white block">Expira em 5 Horas sem Acesso</strong>
+              <span class="text-[11px] text-amber-300 font-semibold">🔒 Proteção automática do login de controle</span>
+            </div>
+          </div>
+
+          <!-- Horários de Funcionamento e Promoção -->
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="clock" class="w-4 h-4 text-emerald-400"></i>
+              <strong class="text-sm font-black text-white">Horários Oficiais de Funcionamento</strong>
+            </div>
+            
+            <div class="space-y-2 text-xs">
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-black/30 border border-white/[0.05]">
+                <span class="text-slate-300">Horário Geral da Arena:</span>
+                <span class="font-extrabold text-white bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/30">06:00 às 22:00</span>
+              </div>
+
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <span class="text-amber-200 font-bold flex items-center gap-1.5">
+                  <i data-lucide="tag" class="w-3.5 h-3.5 text-amber-400"></i>
+                  <span>Janela Promocional com Desconto:</span>
+                </span>
+                <span class="font-extrabold text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-md border border-amber-500/40">09:00 às 16:00</span>
+              </div>
+
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-black/30 border border-white/[0.05]">
+                <span class="text-slate-300">Horário Normal da Tabela:</span>
+                <span class="font-bold text-slate-200">06:00 às 09:00 e 16:00 às 22:00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabela de Valores por Modalidade -->
+          <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i data-lucide="coins" class="w-4 h-4 text-emerald-400"></i>
+                <strong class="text-sm font-black text-white">Tabela de Preços por Espaço</strong>
+              </div>
+              <span class="text-[10px] text-slate-400 font-semibold">*Cálculo proporcional por minuto</span>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-left">
+                <thead>
+                  <tr class="border-b border-white/[0.1] text-slate-400 font-bold">
+                    <th class="py-2 pr-3">Modalidade / Espaço</th>
+                    <th class="py-2 px-2 text-center">Horário Normal</th>
+                    <th class="py-2 pl-2 text-center text-amber-400 font-black">🔥 Promoção (09h-16h)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/[0.05]">
+                  <tr>
+                    <td class="py-2.5 pr-3 font-semibold text-white">Campo Society Fut 5</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300 font-bold">R$ 90,00/h</td>
+                    <td class="py-2.5 pl-2 text-center text-emerald-400 font-black">R$ 50,00/h</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 pr-3 font-semibold text-white">Campo Society Fut 6</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300 font-bold">R$ 100,00/h</td>
+                    <td class="py-2.5 pl-2 text-center text-emerald-400 font-black">R$ 60,00/h</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 pr-3 font-semibold text-white">Campo Society Fut 7</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300 font-bold">R$ 110,00/h</td>
+                    <td class="py-2.5 pl-2 text-center text-emerald-400 font-black">R$ 70,00/h</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 pr-3 font-semibold text-white">Quadra Poliesportiva</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300 font-bold">R$ 60,00/h</td>
+                    <td class="py-2.5 pl-2 text-center text-emerald-400 font-black">R$ 40,00/h</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 pr-3 font-semibold text-white">Quadra de Areia (Vôlei/Futevôlei)</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300 font-bold">R$ 50,00/h</td>
+                    <td class="py-2.5 pl-2 text-center text-emerald-400 font-black">R$ 30,00/h</td>
+                  </tr>
+                  <tr>
+                    <td class="py-2.5 pr-3 font-semibold text-white">Mesa de Futmesa</td>
+                    <td class="py-2.5 px-2 text-center text-slate-300 font-bold">R$ 35,00/h</td>
+                    <td class="py-2.5 pl-2 text-center text-emerald-400 font-black">R$ 25,00/h</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Download dos Aplicativos APK -->
+          <div class="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-3">
+            <div class="flex items-center gap-2 text-emerald-300">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <strong class="text-sm font-black text-white">Download dos Aplicativos Android (APK)</strong>
+            </div>
+            <p class="text-xs text-slate-300">
+              Instale os aplicativos oficiais no celular para acesso rápido e direto sem necessitar de navegador:
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <a href="/apks/ArenaLimoeiro-Cliente.apk" download 
+                 class="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xs flex items-center justify-between shadow transition-all cursor-pointer">
+                <div class="flex items-center space-x-2">
+                  <i data-lucide="smartphone" class="w-4 h-4"></i>
+                  <span>APK Cliente (Reservas)</span>
+                </div>
+                <span class="text-[10px] bg-black/20 px-2 py-0.5 rounded-md font-mono">Baixar</span>
+              </a>
+
+              <a href="/apks/ArenaLimoeiro-Controle.apk" download 
+                 class="p-3 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-600 text-white font-bold text-xs flex items-center justify-between shadow transition-all cursor-pointer">
+                <div class="flex items-center space-x-2">
+                  <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                  <span>APK Controle (Gestão)</span>
+                </div>
+                <span class="text-[10px] bg-black/30 px-2 py-0.5 rounded-md font-mono">Baixar</span>
+              </a>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="p-5 border-t border-emerald-900/60 bg-black/40 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <button type="button" onclick="closeModal(); openPrivacyPolicyModal();" class="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+            <span>Ver Política de Privacidade (LGPD)</span>
+          </button>
+
+          <button type="button" onclick="closeModal()" 
+                  class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer">
+            Fechar Informações
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openSystemInfoModal = openSystemInfoModal;
+
+function promptCookieActivationModal(force = false) {
+  if (isApkEnvironment()) return;
+  if (!force && isCookieConsentGiven()) return;
+  renderCookieBottomBanner();
+}
+window.promptCookieActivationModal = promptCookieActivationModal;
+
+function acceptArenaCookies() {
+  acceptAllCookies();
 }
 window.acceptArenaCookies = acceptArenaCookies;
 
 function checkAndPromptCookiePermission() {
-  if (!isCookieConsentGiven() || !areCookiesEnabled()) {
+  // NO APK: NÃO pede cookies e funciona normal
+  if (isApkEnvironment()) {
+    removeCookieBottomBanner();
+    return;
+  }
+
+  // NO COMPUTADOR: Abre a barra inferior conforme o padrão solicitado
+  if (!isCookieConsentGiven()) {
     setTimeout(() => {
-      promptCookieActivationModal(false);
-    }, 700);
+      renderCookieBottomBanner();
+    }, 600);
   }
 }
 window.checkAndPromptCookiePermission = checkAndPromptCookiePermission;
@@ -2638,6 +3094,39 @@ function renderStep1(container) {
             </div>
           `;
         }).join('')}
+      </div>
+
+      <!-- INFORMAÇÕES DO SISTEMA & REGRAS OFICIAIS -->
+      <div class="mt-10 p-5 sm:p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center space-x-3.5">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-700 shrink-0">
+            <i data-lucide="info" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black uppercase tracking-wider text-emerald-800">Arena Pro Limoeiro v3.8.5</span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full">🕒 06:00 às 22:00</span>
+              <span class="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-2 py-0.5 rounded-full">🔥 Promo 09:00 às 16:00</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">Informações do Sistema, Preços & Regras</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Consulte a tabela de valores das modalidades, horários promocionais, controle de 5h e regras de funcionamento.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+          <button type="button" onclick="openSystemInfoModal()" 
+                  class="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+            <i data-lucide="info" class="w-4 h-4"></i>
+            <span>Ver Info do Sistema</span>
+          </button>
+          <button type="button" onclick="openPrivacyPolicyModal()" 
+                  class="flex-1 md:flex-initial px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+            <i data-lucide="shield" class="w-4 h-4 text-emerald-600"></i>
+            <span>Privacidade (LGPD)</span>
+          </button>
+        </div>
       </div>
 
     </div>
@@ -5664,6 +6153,10 @@ function renderAdminView(container) {
         </div>
 
         <div class="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0">
+          <button onclick="openSystemInfoModal()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-slate-200" title="Ver Informações do Sistema">
+            <i data-lucide="info" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
+            <span class="whitespace-nowrap">Info Sistema</span>
+          </button>
           ${canDirectBooking() ? `
             <button onclick="openDirectBookingModal()" class="flex-1 md:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>

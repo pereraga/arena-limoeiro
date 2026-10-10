@@ -101,7 +101,7 @@ async function main() {
     // 1. Sincroniza web assets atualizados para o Android
     console.log("📦 Copiando web assets atualizados para android/app/src/main/assets/public/...");
     const publicAssetsDir = path.join(androidDir, 'app', 'src', 'main', 'assets', 'public');
-    ['app.js', 'index.html', 'sw.js', 'supabase-client.js', 'default-data.js', 'styles.css'].forEach(file => {
+    ['app.js', 'index.html', 'privacidade.html', 'sw.js', 'supabase-client.js', 'default-data.js', 'styles.css'].forEach(file => {
       const src = path.join(rootDir, 'public', file);
       const dst = path.join(publicAssetsDir, file);
       if (fs.existsSync(src)) {
@@ -113,7 +113,7 @@ async function main() {
     setConfig({
       appId: "com.arenalimoeiro.cliente",
       appName: "Arena Limoeiro",
-      url: "https://arenalimoeiro.vercel.app"
+      url: "https://arenalimoeiro.vercel.app?app=apk_cliente"
     });
     buildApk("ArenaLimoeiro-Cliente.apk");
 
@@ -121,7 +121,7 @@ async function main() {
     setConfig({
       appId: "com.arenalimoeiro.controle",
       appName: "Arena Controle",
-      url: "https://arenalimoeiro.vercel.app/adm-sec-x9k7-limoeiro-2026-auth"
+      url: "https://arenalimoeiro.vercel.app/adm-sec-x9k7-limoeiro-2026-auth?app=apk_controle"
     });
     buildApk("ArenaLimoeiro-Controle.apk");
 

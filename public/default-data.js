@@ -5,7 +5,7 @@ const arenaInfo = {
   address: "Av. Principal, 1200 - Centro Esportivo - Limoeiro / PE",
   phone: "(81) 98765-4321",
   whatsapp: "5581987654321",
-  openingHours: "06:00 às 23:00 (Segunda a Domingo)",
+  openingHours: "06:00 às 22:00 (Segunda a Domingo) • Promoção 09:00 às 16:00",
   logo: "/logo.jpg"
 };
 

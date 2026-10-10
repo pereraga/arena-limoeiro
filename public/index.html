@@ -63,7 +63,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=5.2.0').then(reg => {
+        navigator.serviceWorker.register('/sw.js?v=5.2.2').then(reg => {
           reg.update();
         }).catch(console.error);
       });
@@ -90,6 +90,14 @@
       </div>
 
       <div id="headerTopActions" class="flex items-center space-x-1.5 sm:space-x-2.5 flex-shrink-0">
+        <!-- Informações do Sistema -->
+        <button onclick="openSystemInfoModal()" 
+                class="bg-emerald-800/80 hover:bg-emerald-700 border border-emerald-400/50 p-2 sm:px-3 sm:py-1.5 rounded-xl text-xs font-black text-white transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 shadow-md flex-shrink-0 cursor-pointer"
+                title="Informações do Sistema (Horários, Preços, Regras e Status)">
+          <i data-lucide="info" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-300"></i>
+          <span class="hidden sm:inline">Info Sistema</span>
+        </button>
+
         <!-- Compartilhar Link -->
         <button onclick="openShareModal()" 
                 class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/60 p-2 sm:px-3.5 sm:py-1.5 rounded-xl text-xs font-black text-white transition-all flex items-center justify-center space-x-1 sm:space-x-1.5 shadow-md flex-shrink-0"
@@ -99,7 +107,7 @@
         </button>
 
         <!-- Reiniciar -->
-        <button onclick="resetFlow()" title="Reiniciar Agendamento" class="text-emerald-300 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0">
+        <button onclick="resetFlow()" title="Reiniciar Agendamento" class="text-emerald-300 hover:text-white p-1 rounded-lg transition-colors flex-shrink-0 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5 sm:w-6 sm:h-6"></i>
         </button>
       </div>
@@ -123,9 +131,12 @@
     <!-- Renderizado pelo app.js -->
   </footer>
 
+  <!-- BANNER INFERIOR DE COOKIES (ESTILO BASEFY) -->
+  <div id="cookieBannerRoot"></div>
+
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=5.2.1"></script>
+  <script src="/app.js?v=5.2.2"></script>
 </body>
 </html>
