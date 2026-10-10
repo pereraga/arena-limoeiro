@@ -105,10 +105,20 @@ function checkIsSecretAdminUrl() {
     }
 
     // Reconhece a URL secreta criptografada com siglas, nomes e números
-    if (path.includes('adm-sec-x9k7-limoeiro-2026') || path.includes('adm-sec-x9k7')) return true;
-    if (hash.includes('adm-sec-x9k7-limoeiro-2026') || hash.includes('adm-sec-x9k7')) return true;
-    if (search.get('adm_token') === SECRET_ADMIN_TOKEN || search.get('token') === SECRET_ADMIN_TOKEN) return true;
-    if (search.get('adm') === SECRET_ADMIN_TOKEN) return true;
+    const isSecret = path.includes('adm-sec-x9k7-limoeiro-2026') || 
+                     path.includes('adm-sec-x9k7') || 
+                     hash.includes('adm-sec-x9k7-limoeiro-2026') || 
+                     hash.includes('adm-sec-x9k7') || 
+                     search.get('adm_token') === SECRET_ADMIN_TOKEN || 
+                     search.get('token') === SECRET_ADMIN_TOKEN || 
+                     search.get('adm') === SECRET_ADMIN_TOKEN ||
+                     (typeof window !== 'undefined' && window._isControlApp === true) ||
+                     localStorage.getItem('arena_is_control_app') === 'true';
+
+    if (isSecret) {
+      try { localStorage.setItem('arena_can_switch_to_admin', 'true'); } catch(e) {}
+      return true;
+    }
 
     return false;
   } catch(e) {
@@ -1537,9 +1547,34 @@ function renderHeader() {
   const titleElem = document.getElementById('arenaTitle');
   if (titleElem && state.arenaInfo) titleElem.innerText = state.arenaInfo.name;
 
-  const btnAdminAccessHeader = document.getElementById('btnAdminAccessHeader');
-  if (btnAdminAccessHeader) {
-    btnAdminAccessHeader.remove();
+  const headerActions = document.getElementById('headerTopActions');
+  if (headerActions) {
+    const existingBtn = document.getElementById('btnSwitchToAdminHeader');
+    const canShowAdminBtn = state.currentMode === 'client' && (
+      isManagerLoggedIn() || 
+      localStorage.getItem('arena_can_switch_to_admin') === 'true' ||
+      checkIsSecretAdminUrl() ||
+      window._isControlApp ||
+      localStorage.getItem('arena_is_control_app') === 'true'
+    );
+
+    if (canShowAdminBtn) {
+      if (!existingBtn) {
+        const btn = document.createElement('button');
+        btn.id = 'btnSwitchToAdminHeader';
+        btn.onclick = switchToAdminView;
+        btn.className = 'px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer animate-fade-in';
+        btn.title = 'Voltar ao sistema de controle da Gerência';
+        btn.innerHTML = `
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 flex-shrink-0 text-emerald-400"></i>
+          <span>Gerência</span>
+        `;
+        headerActions.insertBefore(btn, headerActions.firstChild);
+        if (window.lucide) lucide.createIcons();
+      }
+    } else if (existingBtn) {
+      existingBtn.remove();
+    }
   }
 }
 
@@ -3525,10 +3560,22 @@ function copySecretAdminUrl() {
 window.copySecretAdminUrl = copySecretAdminUrl;
 
 function switchToClientView() {
+  try { localStorage.setItem('arena_can_switch_to_admin', 'true'); } catch(e) {}
   state.currentMode = 'client';
   renderApp();
 }
 window.switchToClientView = switchToClientView;
+
+function switchToAdminView() {
+  if (isManagerLoggedIn()) {
+    state.currentMode = 'admin';
+    state.adminTab = state.adminTab || 'live_dashboard';
+    renderApp();
+  } else {
+    openSecretAdminAccess();
+  }
+}
+window.switchToAdminView = switchToAdminView;
 
 // ==============================================================================
 // 🔐 CONTROLE DE SEGURANÇA: LIMITE DE 3 TENTATIVAS + BLOQUEIO DE 15 MINUTOS
