@@ -475,6 +475,38 @@ window.isCustomerDeleted = isCustomerDeleted;
 window.markCustomerAsDeleted = markCustomerAsDeleted;
 window.unmarkCustomerAsDeleted = unmarkCustomerAsDeleted;
 
+// ==============================================================================
+// 🗑️ TOMBSTONES DE AGENDAMENTOS EXCLUÍDOS (BLINDAGEM INSTANTÂNEA CONTRA RETORNO)
+// ==============================================================================
+function getDeletedBookingIds() {
+  try {
+    const raw = localStorage.getItem('arena_deleted_bookings');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr.map(String));
+    }
+  } catch(e) {}
+  return new Set();
+}
+
+function addDeletedBookingId(id) {
+  if (!id) return;
+  const set = getDeletedBookingIds();
+  set.add(String(id));
+  try {
+    localStorage.setItem('arena_deleted_bookings', JSON.stringify(Array.from(set)));
+  } catch(e) {}
+}
+
+function isBookingDeleted(id) {
+  if (!id) return false;
+  return getDeletedBookingIds().has(String(id));
+}
+
+window.getDeletedBookingIds = getDeletedBookingIds;
+window.addDeletedBookingId = addDeletedBookingId;
+window.isBookingDeleted = isBookingDeleted;
+
 // ⭐ Retorna o badge / destaque da quadra (calculado automaticamente ou definido manualmente)
 function getCourtDisplayBadge(court) {
   if (!court) return '';
@@ -759,6 +791,9 @@ function loadInitialData() {
       if (!m || !m.id) return false;
       const idStr = String(m.id);
       if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
+      if (idStr.startsWith('mensal-ARENA-') || idStr.includes('ARENA-')) return false;
+      // Remove contratos fantasmas gerados por bug a partir de reservas avulsas antigas
+      if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
       const nameStr = (m.team_name || m.teamName || '').toLowerCase();
       if (nameStr.includes('galácticos') || nameStr.includes('resenha & futebol') || nameStr.includes('churrasco & bola') || nameStr.includes('amigos da segunda')) return false;
       return true;
@@ -790,78 +825,75 @@ function loadInitialData() {
     state.coupons = d.coupons;
 
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    const cleanedLocal = localSaved.filter(b => b && b.id && b.status !== 'cancelled' && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
+    const deletedBookingSet = getDeletedBookingIds();
+    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
     cleanedLocal.forEach(b => {
       if (b && (b.id === 'ARENA-6776' || b.id === 'ARENA-9247')) {
         b.product_cart = {};
       }
     });
 
-    // Auto-recuperação resiliente de horários fixos salvos em reservas locais
+    // DEDUPLICAÇÃO RÍGIDA DE RESERVAS LOCAIS:
+    // Garante que para a mesma data e quadra, nunca existam jogos duplicados ou sobrepostos.
+    const dedupedLocal = [];
     cleanedLocal.forEach(b => {
-      if (!b) return;
-      const isM = isMensalistaBooking(b) || (b.date && (b.date.includes('(Mensal)') || b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo ')));
-      if (isM) {
-        const memberId = b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : ('mensal-' + (b.id || Date.now())));
-        const alreadyInList = cleanLocalMonthly.some(m => m.id === memberId || (m.court_id === (b.court_id || b.courtId) && m.start_time === (b.start_time || b.startTime)));
-        if (!alreadyInList) {
-          let dWeek = 'terca';
-          if (b.day_of_week || b.dayOfWeek) {
-            dWeek = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
-          } else if (b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
-            const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
-            if (matchDay && matchDay[1]) dWeek = normalizeDayOfWeek(matchDay[1]);
-          } else if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
-            const [by, bm, bd] = b.date.split('-');
-            const bDateObj = new Date(Number(by), Number(bm) - 1, Number(bd));
-            const wMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-            dWeek = wMap[bDateObj.getDay()];
-          }
-          const sT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
-          const eT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
-          const dLabelMap = {
-            segunda: 'Toda Segunda-feira',
-            terca: 'Toda Terça-feira',
-            quarta: 'Toda Quarta-feira',
-            quinta: 'Toda Quinta-feira',
-            sexta: 'Toda Sexta-feira',
-            sabado: 'Todo Sábado',
-            domingo: 'Todo Domingo'
-          };
-          const formattedLabel = dLabelMap[dWeek] || ('Toda ' + dWeek + '-feira');
-          cleanLocalMonthly.push({
-            id: memberId,
-            team_name: b.customer_name || b.customerName || 'Pelada dos Amigos',
-            teamName: b.customer_name || b.customerName || 'Pelada dos Amigos',
-            responsible_name: b.responsible_name || b.responsibleName || b.customer_name || 'Carlos Silva',
-            responsibleName: b.responsible_name || b.responsibleName || b.customer_name || 'Carlos Silva',
-            phone: b.customer_phone || b.customerPhone || '(81) 98888-7777',
-            court_id: b.court_id || b.courtId || 'court-society-1',
-            courtId: b.court_id || b.courtId || 'court-society-1',
-            day_of_week: dWeek,
-            dayOfWeek: dWeek,
-            day_of_week_label: formattedLabel,
-            dayOfWeekLabel: formattedLabel,
-            start_time: sT,
-            startTime: sT,
-            end_time: eT,
-            endTime: eT,
-            time: sT + ' às ' + eT,
-            monthly_price: Number(b.total_price || b.totalPrice || 0) * 4 || 500,
-            monthlyPrice: Number(b.total_price || b.totalPrice || 0) * 4 || 500,
-            status: 'active',
-            observation: b.observation || 'Contrato de Horário Fixo Semanal'
-          });
-        }
+      if (!b || !b.id || b.status === 'cancelled' || deletedBookingSet.has(String(b.id))) return;
+      const bCourtId = b.court_id || b.courtId;
+      const bDate = b.date;
+      const bS = timeToMinutes(b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '00:00'));
+      const bE = timeToMinutes(b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : minutesToTime(bS + 60)));
+
+      // Se já houver um jogo aceito no mesmo campo e data com horário sobreposto:
+      const hasConflict = dedupedLocal.some(existing => {
+        const exCourtId = existing.court_id || existing.courtId;
+        if (exCourtId !== bCourtId || existing.date !== bDate) return false;
+        const exS = timeToMinutes(existing.start_time || existing.startTime || (existing.time ? existing.time.split(' ')[0] : '00:00'));
+        const exE = timeToMinutes(existing.end_time || existing.endTime || (existing.time ? existing.time.split(' às ')[1] : minutesToTime(exS + 60)));
+        return Math.max(bS, exS) < Math.min(bE, exE);
+      });
+
+      if (!hasConflict) {
+        dedupedLocal.push(b);
       }
     });
+
+    // Deduplica contratos de mensalistas para que nunca existam dois contratos sobrepostos na mesma quadra e dia
+    const dedupedMonthly = [];
+    cleanLocalMonthly.forEach(m => {
+      if (!m || !m.id) return;
+      const mCourt = m.court_id || m.courtId;
+      const mDay = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
+      const mS = timeToMinutes(m.start_time || m.startTime || m.time || '19:00');
+      const mE = timeToMinutes(m.end_time || m.endTime || minutesToTime(mS + 60));
+
+      const conflict = dedupedMonthly.some(ex => {
+        const exCourt = ex.court_id || ex.courtId;
+        if (exCourt && mCourt && exCourt !== mCourt) return false;
+        const exDay = normalizeDayOfWeek(ex.day_of_week || ex.dayOfWeek);
+        if (exDay !== mDay) return false;
+        const exS = timeToMinutes(ex.start_time || ex.startTime || ex.time || '19:00');
+        const exE = timeToMinutes(ex.end_time || ex.endTime || minutesToTime(exS + 60));
+        return Math.max(mS, exS) < Math.min(eMin, exE);
+      });
+
+      if (!conflict) {
+        dedupedMonthly.push(m);
+      }
+    });
+    cleanLocalMonthly = dedupedMonthly;
 
     // Se nenhum horário fixo estiver salvo, verifica primeiro o backup persistente
     if (cleanLocalMonthly.length === 0) {
       try {
         const backupMonthly = JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]');
         if (Array.isArray(backupMonthly) && backupMonthly.length > 0) {
-          cleanLocalMonthly = backupMonthly;
+          cleanLocalMonthly = backupMonthly.filter(m => {
+            if (!m || !m.id) return false;
+            const idStr = String(m.id);
+            if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
+            if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
+            return true;
+          });
         }
       } catch(e) {}
     }
@@ -897,8 +929,8 @@ function loadInitialData() {
     localStorage.setItem('arena_monthly_members_backup', JSON.stringify(cleanLocalMonthly));
     state.monthlyMembers = cleanLocalMonthly;
 
-    localStorage.setItem('arena_local_bookings', JSON.stringify(cleanedLocal));
-    state.bookings = cleanedLocal;
+    localStorage.setItem('arena_local_bookings', JSON.stringify(dedupedLocal));
+    state.bookings = dedupedLocal;
     state.maintenanceBlocks = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
     state.matchDelays = JSON.parse(localStorage.getItem('arena_match_delays') || '{}');
     try {
@@ -1036,50 +1068,48 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
     };
   }
 
-  // 2. Mensalistas fixos naquele dia da semana
+  // 2. MENSALISTAS FIXOS: Bloqueio estrito de campo e horário fixo naquele dia da semana
   const [y, m, d] = date.split('-');
   const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
   const monthlyConflict = (state.monthlyMembers || []).find(mm => {
+    if (!isMensalistaActive(mm)) return false;
     const mmCourtId = mm.court_id || mm.courtId;
     if (mmCourtId && mmCourtId !== courtId) return false;
     if (normalizeDayOfWeek(mm.day_of_week || mm.dayOfWeek) !== normalizeDayOfWeek(currentDayOfWeek)) return false;
-    if (!isMensalistaActive(mm)) return false;
+    if (excludeBookingId && (mm.id === excludeBookingId || 'monthly-' + mm.id === excludeBookingId)) return false;
 
     const mmS = timeToMinutes(mm.start_time || mm.startTime || mm.time);
     const mmE = timeToMinutes(mm.end_time || mm.endTime || minutesToTime(mmS + 60));
     return Math.max(sMin, mmS) < Math.min(eMin, mmE);
   });
   if (monthlyConflict) {
+    const teamName = monthlyConflict.team_name || monthlyConflict.teamName || 'Mensalista';
+    const mmTime = (monthlyConflict.start_time || monthlyConflict.startTime || monthlyConflict.time) + ' às ' + (monthlyConflict.end_time || monthlyConflict.endTime || minutesToTime(timeToMinutes(monthlyConflict.start_time || monthlyConflict.startTime || monthlyConflict.time) + 60));
     return { 
       conflict: true, 
-      reason: `Este horário já está reservado para o time com horário fixo: ${(monthlyConflict.team_name || monthlyConflict.teamName)}.` 
+      reason: `⛔ HORÁRIO FIXO BLOQUEADO: Este campo já possui contrato fixo reservado para o time "${teamName}" (${mmTime}). Não é permitido agendar outro jogo neste horário fixo!` 
     };
   }
 
-  // 3. Reservas ativas no mesmo campo e data (ANTI-CHOQUE)
+  // 3. RESERVAS ATIVAS NO MESMO CAMPO E DATA: Bloqueio estrito para permitir no máximo 1 jogo por campo e horário
   const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
     ? state.bookings
     : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
 
   const bookingConflict = allBookings.find(b => {
+    if (!b || b.status === 'cancelled') return false;
+    if (excludeBookingId && (b.id === excludeBookingId || String(b.id) === String(excludeBookingId))) return false;
     const bCourtId = b.court_id || b.courtId;
     if (bCourtId !== courtId) return false;
-    if (b.status === 'cancelled') return false;
-    if (excludeBookingId && b.id === excludeBookingId) return false;
 
-    // Se a reserva for semanal / mensalista com data no formato "Toda terça-feira" ou "Todo sábado"
+    // Se a reserva for semanal / mensalista com data explícita no formato "Toda terça-feira" ou "Todo sábado"
     let matchesDate = (b.date === date);
-    if (!matchesDate && isMensalistaBooking(b)) {
-      let bDay = '';
-      if (b.day_of_week || b.dayOfWeek) bDay = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
-      else if (b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
-        const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
-        if (matchDay && matchDay[1]) bDay = normalizeDayOfWeek(matchDay[1]);
-      }
-      if (bDay && bDay === normalizeDayOfWeek(currentDayOfWeek)) {
+    if (!matchesDate && isMensalistaBooking(b) && b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
+      const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
+      if (matchDay && matchDay[1] && normalizeDayOfWeek(matchDay[1]) === normalizeDayOfWeek(currentDayOfWeek)) {
         matchesDate = true;
       }
     }
@@ -1091,11 +1121,13 @@ function checkScheduleConflict(courtId, date, startTime, endTime, excludeBooking
   });
   if (bookingConflict) {
     const isM = bookingConflict.booking_type === 'manutencao' || bookingConflict.bookingType === 'manutencao';
+    const bCust = bookingConflict.customer_name || bookingConflict.customerName || 'Outro Cliente';
+    const bTimeRange = (bookingConflict.start_time || bookingConflict.startTime || (bookingConflict.time ? bookingConflict.time.split(' ')[0] : startTime)) + ' às ' + (bookingConflict.end_time || bookingConflict.endTime || (bookingConflict.time ? bookingConflict.time.split(' às ')[1] : endTime));
     return { 
       conflict: true, 
       reason: isM ? 
-        `Horário bloqueado para treino reservado ou manutenção (${bookingConflict.customer_name || bookingConflict.observation || 'Reservado'}).` :
-        `Choque de agendamento evitado: O horário das ${startTime} às ${endTime} já foi reservado neste campo por ${bookingConflict.customer_name || 'outro cliente'}.`
+        `⛔ Horário bloqueado para treino reservado ou manutenção (${bookingConflict.customer_name || bookingConflict.observation || 'Reservado'}).` :
+        `⛔ CAMPO JÁ AGENDADO NESTE HORÁRIO: O horário das ${bTimeRange} já foi reservado neste campo por "${bCust}". Neste campo e dia, é permitido apenas 1 jogo por horário!`
     };
   }
 
@@ -1114,18 +1146,7 @@ function isMensalistaBooking(b) {
   const obs = (b.observation || '').toLowerCase();
   if (obs.includes('mensalista') || obs.includes('horário fixo') || obs.includes('horario fixo') || obs.includes('fixo semanal')) return true;
   const dateStr = String(b.date || '').toLowerCase();
-  if (dateStr.includes('toda ') || dateStr.includes('todo ') || dateStr.includes('(mensal)') || dateStr.includes('mensal')) return true;
-  if (state.monthlyMembers && state.monthlyMembers.length > 0) {
-    const custName = (b.customer_name || b.customerName || '').toLowerCase();
-    const custPhone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
-    const found = state.monthlyMembers.some(m => {
-      if (m.team_name && custName.includes(m.team_name.toLowerCase())) return true;
-      if (m.responsible_name && custName.includes(m.responsible_name.toLowerCase())) return true;
-      if (custPhone && m.phone && m.phone.replace(/\D/g, '') === custPhone) return true;
-      return false;
-    });
-    if (found) return true;
-  }
+  if (dateStr.includes('toda ') || dateStr.includes('todo ') || dateStr.includes('(mensal)')) return true;
   return false;
 }
 window.isMensalistaBooking = isMensalistaBooking;
@@ -1186,10 +1207,11 @@ function calculateLocalSchedule(courtId, date) {
   const localMaint = JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]');
   const allMaint = [...(state.maintenanceBlocks || []), ...localMaint];
 
-  // 2. Bookings consolidados
-  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+  const deletedBookingSet = getDeletedBookingIds();
+  const rawBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
     ? state.bookings
     : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const allBookings = rawBookings.filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
 
   return operatingHours.map(time => {
     const slotMin = timeToMinutes(time);
@@ -1249,8 +1271,18 @@ function calculateLocalSchedule(courtId, date) {
     // Checagem 3: Reservas avulsas ou treinos salvos
     const booking = allBookings.find(b => {
       const bCourtId = b.court_id || b.courtId;
-      if (bCourtId !== courtId || b.date !== date) return false;
+      if (bCourtId !== courtId) return false;
       if (b.status === 'cancelled') return false;
+
+      let matchesThisDate = (b.date === date);
+      if (!matchesThisDate && isMensalistaBooking(b) && b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
+        const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
+        if (matchDay && matchDay[1] && normalizeDayOfWeek(matchDay[1]) === normalizeDayOfWeek(currentDayOfWeek)) {
+          matchesThisDate = true;
+        }
+      }
+      if (!matchesThisDate) return false;
+
       if (b.status === 'finished') {
         const finishEndMin = timeToMinutes(b.end_time || b.endTime || '00:00');
         if (slotMin >= finishEndMin) return false;
@@ -1641,6 +1673,19 @@ function changeCourtImage(courtId, delta, event) {
   }
 }
 
+// Helper para obter contratos e horários fixos de um campo específico
+function getCourtFixedMembers(courtId) {
+  if (!courtId) return [];
+  const members = Array.isArray(state.monthlyMembers) ? state.monthlyMembers : [];
+  return members.filter(m => {
+    if (!m) return false;
+    const mCourtId = m.court_id || m.courtId;
+    if (mCourtId && mCourtId !== courtId) return false;
+    return typeof isMensalistaActive === 'function' ? isMensalistaActive(m) : true;
+  });
+}
+window.getCourtFixedMembers = getCourtFixedMembers;
+
 // ETAPA 1: VISÃO TOTALMENTE LIMPA PARA O CLIENTE
 function renderStep1(container) {
   let displayCourts = [...state.courts].filter(court => {
@@ -1715,8 +1760,8 @@ function renderStep1(container) {
           const safeIdx = (currentPhotoIdx >= 0 && currentPhotoIdx < courtGallery.length) ? currentPhotoIdx : 0;
           const currentActiveImage = courtGallery[safeIdx] || court.image;
 
-          const registeredFixos = (state.monthlyMembers || []).filter(m => (m.courtId === court.id || m.court_id === court.id));
-          const fixosList = registeredFixos.map(m => `${m.team_name || m.teamName} (${(m.day_of_week_label || m.dayOfWeekLabel || 'Semanal')} ${m.time})`);
+          const registeredFixos = getCourtFixedMembers(court.id);
+          const fixosList = registeredFixos.map(m => `${m.team_name || m.teamName} (${(m.day_of_week_label || m.dayOfWeekLabel || (m.day_of_week ? 'Toda ' + m.day_of_week + '-feira' : 'Semanal'))} ${m.time || m.start_time || m.startTime || '19:00'})`);
 
           return `
             <div onclick="selectCourt('${court.id}')" 
@@ -2011,30 +2056,59 @@ function renderStep2(container) {
     <div class="max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
       
       <!-- Card da Quadra Selecionada -->
-      <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-3xl p-4 sm:p-6 text-white mb-6 flex items-center justify-between shadow-xl border border-emerald-800/50">
-        <div class="flex items-center space-x-3.5 sm:space-x-4">
-          <img src="${court.image}" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
-          <div>
-            <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
-              Campo Selecionado
-            </span>
-            <h2 class="text-base sm:text-xl font-black mt-1 leading-tight">${court.name}</h2>
-            <p class="text-xs text-emerald-300 font-bold mt-1 flex items-center flex-wrap gap-2">
-              <span>R$ ${getCourtNormalHourlyPrice(court).toFixed(2).replace('.', ',')} / hora (Normal)</span>
-              ${(() => {
-                const dInfo = getCourtDiscountInfo(court);
-                return dInfo.hasDiscount ? `
-                  <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center shadow-xs">
-                    🔥 ${dInfo.startHour} às ${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
-                  </span>
-                ` : '';
-              })()}
-            </p>
+      <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-3xl p-4 sm:p-6 text-white mb-6 shadow-xl border border-emerald-800/50">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3.5 sm:space-x-4">
+            <img src="${court.image}" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
+            <div>
+              <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
+                Campo Selecionado
+              </span>
+              <h2 class="text-base sm:text-xl font-black mt-1 leading-tight">${court.name}</h2>
+              <p class="text-xs text-emerald-300 font-bold mt-1 flex items-center flex-wrap gap-2">
+                <span>R$ ${getCourtNormalHourlyPrice(court).toFixed(2).replace('.', ',')} / hora (Normal)</span>
+                ${(() => {
+                  const dInfo = getCourtDiscountInfo(court);
+                  return dInfo.hasDiscount ? `
+                    <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md uppercase flex items-center shadow-xs">
+                      🔥 ${dInfo.startHour} às ${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}/h
+                    </span>
+                  ` : '';
+                })()}
+              </p>
+            </div>
           </div>
+          <button onclick="goToStep(1)" class="text-xs text-emerald-300 hover:text-white underline font-bold flex items-center flex-shrink-0 ml-2">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5 mr-1"></i> Trocar
+          </button>
         </div>
-        <button onclick="goToStep(1)" class="text-xs text-emerald-300 hover:text-white underline font-bold flex items-center flex-shrink-0 ml-2">
-          <i data-lucide="edit-3" class="w-3.5 h-3.5 mr-1"></i> Trocar
-        </button>
+
+        ${(() => {
+          const courtFixos = getCourtFixedMembers(court.id);
+          if (courtFixos.length === 0) return '';
+          return `
+            <div class="mt-3.5 pt-3 border-t border-emerald-800/60">
+              <div class="flex items-center space-x-1.5 text-xs font-black text-amber-400 uppercase mb-2">
+                <i data-lucide="crown" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>HORÁRIOS FIXOS DESTE CAMPO:</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                ${courtFixos.map(m => {
+                  const teamName = m.team_name || m.teamName || 'Mensalista';
+                  const dayLabel = m.day_of_week_label || m.dayOfWeekLabel || (m.day_of_week ? 'Toda ' + m.day_of_week + '-feira' : 'Semanal');
+                  const time = m.time || m.start_time || m.startTime || '19:00';
+                  return `
+                    <div class="text-xs font-medium text-emerald-100 bg-black/40 px-3 py-2 rounded-xl border border-emerald-500/30 flex items-center space-x-2">
+                      <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                      <strong class="text-white truncate">• ${teamName}</strong>
+                      <span class="text-emerald-300 text-[11px] truncate">(${dayLabel} ${time})</span>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        })()}
       </div>
 
       <!-- Card do Calendário do Mês -->
@@ -2119,6 +2193,46 @@ function renderCalendarHTML() {
       </span>
     </div>
 
+    <!-- BANNER DE HORÁRIOS FIXOS DESTE CAMPO: EXIBIÇÃO CLARA NA ÁREA DE AGENDAMENTO -->
+    ${(() => {
+      const courtFixos = getCourtFixedMembers(selectedCourtId);
+      if (courtFixos.length === 0) return '';
+      return `
+        <div class="mb-4 p-3.5 sm:p-4 rounded-2xl bg-amber-50/90 border-2 border-amber-300 text-amber-950 shadow-xs">
+          <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-amber-200">
+            <div class="flex items-center space-x-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
+              <i data-lucide="crown" class="w-4 h-4 text-amber-600"></i>
+              <span>HORÁRIOS FIXOS DESTE CAMPO:</span>
+            </div>
+            <span class="text-[10px] font-black bg-amber-200 text-amber-900 px-2.5 py-0.5 rounded-full uppercase">
+              ${courtFixos.length} ${courtFixos.length === 1 ? 'Horário Fixo' : 'Horários Fixos'}
+            </span>
+          </div>
+          <div class="space-y-1.5">
+            ${courtFixos.map(m => {
+              const teamName = m.team_name || m.teamName || 'Mensalista';
+              const dayLabel = m.day_of_week_label || m.dayOfWeekLabel || (m.day_of_week ? 'Toda ' + m.day_of_week + '-feira' : 'Semanal');
+              const time = m.time || m.start_time || m.startTime || '19:00';
+              return `
+                <div class="text-xs font-semibold text-slate-800 flex items-center justify-between bg-white/95 p-2.5 rounded-xl border border-amber-200 shadow-2xs">
+                  <div class="flex items-center space-x-2 truncate">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                    <strong class="text-slate-900 truncate">• ${teamName}</strong>
+                    <span class="text-slate-600 text-[11px] truncate">(${dayLabel} às ${time})</span>
+                  </div>
+                  <span class="text-[10px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md uppercase shrink-0">Fixo</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <p class="text-[10px] font-semibold text-amber-800 mt-2 flex items-center">
+            <i data-lucide="info" class="w-3 h-3 mr-1 text-amber-600 shrink-0"></i>
+            <span>Estes horários já possuem times mensalistas fixos e ficam indisponíveis nos dias da semana correspondentes.</span>
+          </p>
+        </div>
+      `;
+    })()}
+
     <!-- Cabeçalho do Mês com Navegação Completa -->
     <div class="calendar-header flex items-center justify-between mb-4 pb-3.5 border-b border-slate-100 flex-wrap gap-2">
       <div class="flex items-center space-x-2.5">
@@ -2148,11 +2262,19 @@ function renderCalendarHTML() {
                 title="Voltar ao Mês Atual">
           Hoje
         </button>
-        <button type="button" onclick="changeCalendarMonth(1)" 
-                class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" 
-                title="Próximo Mês">
-          <i data-lucide="chevron-right" class="w-4 h-4"></i>
-        </button>
+        ${state.currentMode !== 'admin' ? `
+          <button type="button" onclick="showFutureMonthBalcaoNotice()" 
+                  class="w-9 h-9 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center transition-all cursor-pointer shadow-2xs" 
+                  title="🔒 Próximo Mês: Bloqueado para o Cliente. Falar com o Responsável no Balcão!">
+            <i data-lucide="lock" class="w-4 h-4 text-amber-700"></i>
+          </button>
+        ` : `
+          <button type="button" onclick="changeCalendarMonth(1)" 
+                  class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer shadow-2xs" 
+                  title="Próximo Mês">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </button>
+        `}
       </div>
     </div>
 
@@ -2175,6 +2297,9 @@ function renderCalendarHTML() {
     html += `<div class="h-11 sm:h-12"></div>`;
   }
 
+  const courtFixos = getCourtFixedMembers(selectedCourtId);
+  const dayNameMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+
   for (let day = 1; day <= daysInMonth; day++) {
     const currentDayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const isSelected = state.selectedDate === currentDayStr;
@@ -2182,6 +2307,8 @@ function renderCalendarHTML() {
     const isPastDay = currentDayStr < todayStr;
     const dayOfWeek = new Date(year, month, day).getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const currentDayName = dayNameMap[dayOfWeek];
+    const fixosThisDay = courtFixos.filter(m => normalizeDayOfWeek(m.day_of_week || m.dayOfWeek) === currentDayName);
 
     if (isPastDay) {
       html += `
@@ -2213,12 +2340,15 @@ function renderCalendarHTML() {
                        'bg-emerald-600 text-white shadow-lg ring-4 ring-emerald-300 transform scale-105 z-10' : 
                        isToday ? 
                        'border-2 border-emerald-600 text-emerald-900 font-black bg-emerald-50/70 hover:bg-emerald-100 shadow-sm' : 
+                       fixosThisDay.length > 0 ?
+                       'bg-amber-50/60 text-slate-800 hover:bg-amber-100 border border-amber-200/90 font-bold' :
                        isWeekend ?
                        'bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200/80 font-bold' :
                        'bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-100 font-bold'}">
         <span>${day}</span>
-        ${isSelected ? '<span class="text-[9px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓</span>' : 
+        ${isSelected ? '<span class="text-[9px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓' + (fixosThisDay.length > 0 ? ' 👑' : '') + '</span>' : 
           isToday ? '<span class="text-[9px] font-extrabold text-emerald-700 leading-none mt-0.5">Hoje</span>' : 
+          fixosThisDay.length > 0 ? '<span class="text-[8px] font-black text-amber-700 leading-none mt-0.5 flex items-center">👑 Fixo</span>' :
           isWeekend ? '<span class="w-1 h-1 rounded-full bg-emerald-500 mt-0.5"></span>' : ''}
       </button>
     `;
@@ -2226,18 +2356,52 @@ function renderCalendarHTML() {
 
   html += `</div>`;
 
-  // Banner Informativo de Confirmação da Data Selecionada
+  // Banner Informativo de Confirmação da Data Selecionada e Horários Fixos do Dia
+  const selectedDayFixos = state.selectedDate ? (() => {
+    const [sy, sm, sd] = state.selectedDate.split('-').map(Number);
+    const sDOW = new Date(sy, sm - 1, sd).getDay();
+    const sDayName = dayNameMap[sDOW];
+    return courtFixos.filter(m => normalizeDayOfWeek(m.day_of_week || m.dayOfWeek) === sDayName);
+  })() : [];
+
   html += `
-    <div class="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center space-x-3 shadow-sm">
-      <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow">
-        <i data-lucide="calendar-check" class="w-5 h-5"></i>
+    <div class="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 shadow">
+          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido:</span>
+          <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
+            ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
+          </strong>
+        </div>
       </div>
-      <div>
-        <span class="text-[10px] font-black text-emerald-800 uppercase tracking-wide block">Dia Escolhido:</span>
-        <strong class="text-sm sm:text-base font-black ${state.selectedDate ? 'text-emerald-950' : 'text-slate-500'} block leading-tight">
-          ${state.selectedDate ? formatFullDate(state.selectedDate) : 'Nenhum dia selecionado (clique em um dia)'}
-        </strong>
-      </div>
+      ${selectedDayFixos.length > 0 ? `
+        <div class="mt-3 pt-2.5 border-t border-emerald-200 text-xs">
+          <div class="flex items-center space-x-1.5 font-black text-amber-900 uppercase text-[11px] mb-1.5">
+            <i data-lucide="crown" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Horários Fixos Ocupados neste dia da semana:</span>
+          </div>
+          <div class="space-y-1">
+            ${selectedDayFixos.map(m => `
+              <div class="text-[11px] font-bold text-slate-800 flex items-center justify-between bg-amber-100/70 px-2.5 py-1.5 rounded-xl border border-amber-300">
+                <div class="flex items-center space-x-1.5 truncate">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span class="text-amber-950 font-black">• ${m.team_name || m.teamName}</span>
+                  <span class="text-slate-600">(${m.time || m.start_time || m.startTime})</span>
+                </div>
+                <span class="text-[9px] font-black text-amber-900 bg-amber-200 px-2 py-0.5 rounded-md uppercase shrink-0">Reservado Fixo</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : (state.selectedDate ? `
+        <div class="mt-2.5 pt-2 border-t border-emerald-200/80 flex items-center text-xs text-emerald-800 font-medium">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i>
+          <span>Nenhum horário fixo recorrente neste dia da semana. Todos os horários livres estão disponíveis para você!</span>
+        </div>
+      ` : '')}
     </div>
 
     <!-- Atalhos Rápidos de Dias no Mês -->
@@ -2287,6 +2451,12 @@ function changeCalendarMonth(delta) {
     alert('Não é possível navegar para meses anteriores ao mês atual.');
     return;
   }
+
+  // REGRA OFICIAL ARENA LIMOEIRO: Clientes online só visualizam e agendam no mês atual
+  if (targetYM > currentYM && state.currentMode !== 'admin') {
+    showFutureMonthBalcaoNotice();
+    return;
+  }
   
   const d = new Date(state.currentMonthDate.getFullYear(), state.currentMonthDate.getMonth() + delta, 1);
   state.currentMonthDate = d;
@@ -2298,6 +2468,13 @@ window.changeCalendarMonth = changeCalendarMonth;
 function handleMonthInputChange(val) {
   if (!val) return;
   const [y, m] = val.split('-').map(Number);
+  const now = new Date();
+  const currentYM = now.getFullYear() * 12 + now.getMonth();
+  const targetYM = y * 12 + (m - 1);
+  if (targetYM > currentYM && state.currentMode !== 'admin') {
+    showFutureMonthBalcaoNotice(val + '-01');
+    return;
+  }
   state.currentMonthDate = new Date(y, m - 1, 1);
   renderStepContent();
   if (window.lucide) lucide.createIcons();
@@ -2458,6 +2635,35 @@ function renderStep3Content() {
         </button>
       </div>
 
+      <!-- Horários Fixos deste Campo e Dia (Exibição para os Clientes) -->
+      ${(() => {
+        const courtFixos = getCourtFixedMembers(court.id);
+        const [sy, sm, sd] = state.selectedDate ? state.selectedDate.split('-').map(Number) : [0, 0, 0];
+        const sDOW = state.selectedDate ? new Date(sy, sm - 1, sd).getDay() : -1;
+        const sDayName = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"][sDOW];
+        const sDayFixos = courtFixos.filter(m => normalizeDayOfWeek(m.day_of_week || m.dayOfWeek) === sDayName);
+        if (sDayFixos.length === 0) return '';
+        return `
+          <div class="mb-6 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 shadow-xs">
+            <div class="flex items-center space-x-2 text-xs font-black text-amber-950 uppercase mb-1.5">
+              <i data-lucide="crown" class="w-4 h-4 text-amber-600"></i>
+              <span>👑 Horário Fixo Mensalista Reservado neste Dia:</span>
+            </div>
+            <p class="text-xs text-amber-900 mb-2.5">Os horários abaixo já pertencem a times mensalistas fixos e ficam destacados em dourado com a coroa 👑 na grade:</p>
+            <div class="flex flex-wrap gap-2">
+              ${sDayFixos.map(m => `
+                <div class="text-xs font-bold bg-white text-slate-800 px-3 py-1.5 rounded-xl border border-amber-300 shadow-2xs flex items-center space-x-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                  <strong class="text-slate-900">${m.team_name || m.teamName}</strong>
+                  <span class="text-slate-600 text-[11px]">(${m.time || m.start_time || m.startTime})</span>
+                  <span class="text-[9px] font-black text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-md uppercase">Fixo</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      })()}
+
       <!-- GRADE DE HORÁRIOS: MOSTRA TODOS (LIVRES + OCUPADOS/EM JOGO) -->
       <div class="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm mb-8">
         <div class="flex items-center space-x-3 mb-3">
@@ -2501,6 +2707,9 @@ function renderStep3Content() {
           </span>
           <span class="flex items-center gap-1.5 text-[11px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full">
             <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse inline-block"></span> Em Jogo Agora
+          </span>
+          <span class="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-full">
+            <span class="text-xs">👑</span> Horário Fixo (Mensalista)
           </span>
           <span class="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full">
             <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Reservado
@@ -2605,10 +2814,17 @@ function renderStep3Content() {
                 icon = '⚽';
                 nameLabel = slot.customerName ? `<span class="text-[10px] opacity-80 truncate block mt-0.5">${slot.customerName}</span>` : '';
               } else if (isBooked) {
-                cardClass = 'bg-slate-100 border-2 border-slate-300 text-slate-500 cursor-not-allowed';
-                badge = '<span class="text-[10px] font-bold text-slate-500">Reservado</span>';
-                icon = slot.isMensalista ? '👑' : '🔒';
-                nameLabel = slot.customerName ? `<span class="text-[10px] text-slate-400 truncate block mt-0.5">${slot.isMensalista ? 'Fixo: ' : ''}${slot.customerName}</span>` : '';
+                if (slot.isMensalista) {
+                  cardClass = 'bg-amber-50/90 border-2 border-amber-300 text-amber-950 cursor-not-allowed shadow-2xs';
+                  badge = '<span class="text-[10px] font-black bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-300 inline-flex items-center gap-1">👑 Horário Fixo</span>';
+                  icon = '👑';
+                  nameLabel = slot.customerName ? `<span class="text-[10px] text-amber-900 font-extrabold truncate block mt-0.5">Time: ${slot.customerName}</span>` : '';
+                } else {
+                  cardClass = 'bg-slate-100 border-2 border-slate-300 text-slate-500 cursor-not-allowed';
+                  badge = '<span class="text-[10px] font-bold text-slate-500">Reservado</span>';
+                  icon = '🔒';
+                  nameLabel = slot.customerName ? `<span class="text-[10px] text-slate-400 truncate block mt-0.5">${slot.customerName}</span>` : '';
+                }
               } else if (isMaint) {
                 cardClass = 'bg-amber-50 border-2 border-amber-300 text-amber-800 cursor-not-allowed';
                 badge = '<span class="text-[10px] font-bold text-amber-700">Manutenção</span>';
@@ -4547,6 +4763,8 @@ function logSystemAction({ actionType, actionLabel, courtName, details, targetId
 function handleReceivedBookingDelete(data) {
   if (!data || !data.id) return;
   const targetId = String(data.id);
+  addDeletedBookingId(targetId);
+  if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(targetId);
 
   // 1. Remove da memória
   state.bookings = (state.bookings || []).filter(b => b && String(b.id) !== targetId);
@@ -4573,22 +4791,7 @@ function handleReceivedBookingDelete(data) {
     filterSubtabBookingsList();
   }
 
-  // 4. Notifica gestores logados no aparelho (som, vibração e aviso na tela)
-  if (isManagerLoggedIn()) {
-    playNotificationSound();
-    if ('vibrate' in navigator) {
-      try { navigator.vibrate([150, 80, 150]); } catch(e) {}
-    }
-    showToastNotification(`
-      <h5 class="font-black text-white text-xs mb-0.5 flex items-center gap-1.5">
-        <span class="text-rose-400 font-black">🗑️ Jogo Excluído / Horário Liberado!</span>
-      </h5>
-      <p class="text-slate-200 font-bold mb-0.5">🏟️ <strong>Quadra:</strong> ${data.courtName || 'Quadra'}</p>
-      <p class="text-slate-300 text-xs">⏰ <strong>Horário:</strong> ${data.date || ''} (${data.time || ''})</p>
-      <p class="text-slate-300 text-xs">👤 <strong>Cliente:</strong> ${data.customerName || 'Cliente'}</p>
-      <p class="text-amber-300 text-[11px] font-bold mt-1">Excluído por: ${data.userName || 'Gestor'} (${data.deviceType || 'Dispositivo'})</p>
-    `);
-  }
+  // 4. Exclusão silenciosa sem disparar alertas sonoros ou notificações na tela
 }
 
 function handleReceivedSystemLog(logEntry) {
@@ -4631,10 +4834,10 @@ if (typeof BroadcastChannel !== 'undefined' && !window.arenaSyncChannel) {
       if (msg.type === 'booking_deleted') {
         handleReceivedBookingDelete(msg.payload);
       } else if (msg.type === 'new_booking') {
-        if (msg.payload && !state.bookings.some(b => b.id === msg.payload.id)) {
+        if (msg.payload && !isBookingDeleted(msg.payload.id) && !state.bookings.some(b => b.id === msg.payload.id)) {
           state.bookings = [...state.bookings, msg.payload];
           _refreshAllUI();
-          triggerBookingNotification(msg.payload);
+          triggerBookingNotification(msg.payload, 'new');
         }
       } else if (msg.type === 'system_log') {
         handleReceivedSystemLog(msg.payload);
@@ -5186,73 +5389,16 @@ function renderLiveDashboardTab() {
   const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
   const currentDayOfWeek = weekDaysMap[dateObj.getDay()];
 
-  // Junta reservas avulsas e horários fixos do dia (sem duplicatas por ID)
-  const allBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
+  // Junta reservas avulsas e horários fixos do dia (sem duplicatas por ID e sem jogos excluídos)
+  const deletedBookingSet = getDeletedBookingIds();
+  const rawBookings = (Array.isArray(state.bookings) && state.bookings.length > 0)
     ? state.bookings
     : JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const allBookings = rawBookings.filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
 
   let matchesList = [];
 
-  // Reservas confirmadas para a data ou fixas daquele dia da semana
-  allBookings.forEach(b => {
-    if (!b || b.status === 'cancelled') return;
-
-    const isMensal = isMensalistaBooking(b);
-    let matchesThisDate = (b.date === selectedDate);
-
-    if (!matchesThisDate && isMensal) {
-      let bDay = '';
-      if (b.day_of_week || b.dayOfWeek) bDay = normalizeDayOfWeek(b.day_of_week || b.dayOfWeek);
-      else if (b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
-        const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
-        if (matchDay && matchDay[1]) bDay = normalizeDayOfWeek(matchDay[1]);
-      } else if (b.date && /^\d{4}-\d{2}-\d{2}$/.test(b.date)) {
-        const [by, bm, bd] = b.date.split('-');
-        const bDateObj = new Date(Number(by), Number(bm) - 1, Number(bd));
-        const wMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-        bDay = wMap[bDateObj.getDay()];
-      }
-      if (bDay && bDay === normalizeDayOfWeek(currentDayOfWeek)) {
-        matchesThisDate = true;
-      }
-    }
-
-    if (matchesThisDate) {
-      const startT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
-      const endT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
-      const parsedObs = typeof parseCustomerFromObservation === 'function' ? parseCustomerFromObservation(b.observation || '') : {};
-      const custObj = typeof findCustomerByPhone === 'function' ? findCustomerByPhone(b.customer_phone || b.customerPhone || '') : null;
-      const cpfVal = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || (custObj ? custObj.cpf : '');
-      const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
-      const healthVal = b.health_notes || b.healthNotes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
-
-      const matchStatus = (b.date === selectedDate) ? (b.status || 'confirmed') : (selectedDate >= todayStr ? 'confirmed' : 'finished');
-
-      matchesList.push({
-        id: b.id,
-        court_id: b.court_id || b.courtId,
-        date: selectedDate,
-        monthly_member_id: b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : null),
-        customer_name: b.customer_name || b.customerName || 'Cliente',
-        customer_phone: b.customer_phone || b.customerPhone || '',
-        customer_cpf: cpfVal,
-        emergency_contact: emergVal,
-        health_notes: healthVal,
-        start_time: startT,
-        end_time: endT,
-        time: b.time || (startT + ' às ' + endT),
-        total_price: parseFloat(b.total_price || b.totalPrice || 0),
-        status: matchStatus,
-        booking_type: b.booking_type || b.bookingType || (isMensal ? 'mensalista' : 'avulso'),
-        isMensalista: isMensal,
-        payment_method: b.payment_method || b.paymentMethod || (isMensal ? 'fixo' : 'pix'),
-        product_cart: b.product_cart || b.productCart || {},
-        observation: b.observation || (isMensal ? 'Horário Fixo Semanal' : '')
-      });
-    }
-  });
-
-  // Horários fixos do dia da semana a partir dos contratos de state.monthlyMembers
+  // PRIORIDADE 1: Horários fixos do dia da semana a partir dos contratos de state.monthlyMembers
   (state.monthlyMembers || []).forEach(m => {
     const day = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
     if (day === normalizeDayOfWeek(currentDayOfWeek) && isMensalistaActive(m)) {
@@ -5266,9 +5412,19 @@ function renderLiveDashboardTab() {
       const emergVal = m.emergency_contact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
       const healthVal = m.health_notes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
 
-      // Evita duplicata se já existir booking gerado para o mesmo campo e horário
-      const existingMatch = matchesList.find(b => (b.court_id === cId || b.courtId === cId) && (b.start_time === startT || b.startTime === startT));
-      if (!existingMatch) {
+      const sMin = timeToMinutes(startT);
+      const eMin = timeToMinutes(endT);
+
+      // Garante que não haja contrato fixo duplicado sobreposto
+      const existingOverlap = matchesList.find(b => {
+        const bCourt = b.court_id || b.courtId;
+        if (bCourt !== cId) return false;
+        const bS = timeToMinutes(b.start_time);
+        const bE = timeToMinutes(b.end_time);
+        return Math.max(sMin, bS) < Math.min(eMin, bE);
+      });
+
+      if (!existingOverlap) {
         matchesList.push({
           id: 'monthly-' + m.id,
           court_id: cId,
@@ -5290,12 +5446,89 @@ function renderLiveDashboardTab() {
           product_cart: {},
           observation: 'Horário Fixo Semanal'
         });
-      } else {
-        existingMatch.isMensalista = true;
-        if (!existingMatch.monthly_member_id) existingMatch.monthly_member_id = m.id;
       }
     }
   });
+
+  // PRIORIDADE 2: Reservas confirmadas para a data ou fixas daquele dia da semana
+  allBookings.forEach(b => {
+    if (!b || b.status === 'cancelled') return;
+
+    const isMensal = isMensalistaBooking(b);
+    // UMA RESERVA DA TABELA BOOKINGS SÓ DEVE APARECER NO DIA ESPECÍFICO DELA!
+    let matchesThisDate = (b.date === selectedDate);
+
+    // Somente se a reserva NÃO tiver data fixa YYYY-MM-DD e for texto explícito recorrente (ex: "Toda sexta-feira")
+    if (!matchesThisDate && isMensal && b.date && (b.date.toLowerCase().includes('toda ') || b.date.toLowerCase().includes('todo '))) {
+      const matchDay = b.date.toLowerCase().match(/tod[ao]\s+([a-zçãé]+)/);
+      if (matchDay && matchDay[1] && normalizeDayOfWeek(matchDay[1]) === normalizeDayOfWeek(currentDayOfWeek)) {
+        matchesThisDate = true;
+      }
+    }
+
+    if (matchesThisDate) {
+      const bCourtId = b.court_id || b.courtId;
+      const startT = b.start_time || b.startTime || (b.time ? b.time.split(' ')[0] : '19:00');
+      const endT = b.end_time || b.endTime || (b.time ? b.time.split(' às ')[1] : '20:00');
+      const sMin = timeToMinutes(startT);
+      const eMin = timeToMinutes(endT);
+
+      // Checa sobreposição ou duplicação no mesmo campo e horário
+      const overlapMatch = matchesList.find(m => {
+        const mCourt = m.court_id || m.courtId;
+        if (mCourt !== bCourtId) return false;
+        const mS = timeToMinutes(m.start_time);
+        const mE = timeToMinutes(m.end_time);
+        return Math.max(sMin, mS) < Math.min(eMin, mE);
+      });
+
+      if (overlapMatch) {
+        // Se já existe um jogo fixo ou confirmado que ocupa este horário neste campo,
+        // NÃO duplica! Se esta reserva contiver produtos de bar, agrega ao jogo existente.
+        if (b.product_cart && Object.keys(b.product_cart).length > 0) {
+          overlapMatch.product_cart = { ...(overlapMatch.product_cart || {}), ...b.product_cart };
+        }
+        if (isMensal && !overlapMatch.monthly_member_id) {
+          overlapMatch.isMensalista = true;
+          overlapMatch.monthly_member_id = b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : null);
+        }
+        return; // BLOQUEIA DUPLICATA
+      }
+
+      const parsedObs = typeof parseCustomerFromObservation === 'function' ? parseCustomerFromObservation(b.observation || '') : {};
+      const custObj = typeof findCustomerByPhone === 'function' ? findCustomerByPhone(b.customer_phone || b.customerPhone || '') : null;
+      const cpfVal = b.customer_cpf || b.customerCpf || b.customerCPF || parsedObs.cpf || (custObj ? custObj.cpf : '');
+      const emergVal = b.emergency_contact || b.emergencyContact || parsedObs.emergency_contact || (custObj ? custObj.emergency_contact : '');
+      const healthVal = b.health_notes || b.healthNotes || parsedObs.health_notes || (custObj ? custObj.health_notes : '');
+
+      const matchStatus = b.status || 'confirmed';
+
+      matchesList.push({
+        id: b.id,
+        court_id: bCourtId,
+        date: selectedDate,
+        monthly_member_id: b.monthly_member_id || (b.id && String(b.id).startsWith('monthly-') ? String(b.id).replace('monthly-', '') : null),
+        customer_name: b.customer_name || b.customerName || 'Cliente',
+        customer_phone: b.customer_phone || b.customerPhone || '',
+        customer_cpf: cpfVal,
+        emergency_contact: emergVal,
+        health_notes: healthVal,
+        start_time: startT,
+        end_time: endT,
+        time: b.time || (startT + ' às ' + endT),
+        total_price: parseFloat(b.total_price || b.totalPrice || 0),
+        status: matchStatus,
+        booking_type: b.booking_type || b.bookingType || (isMensal ? 'mensalista' : 'avulso'),
+        isMensalista: isMensal,
+        payment_method: b.payment_method || b.paymentMethod || (isMensal ? 'fixo' : 'pix'),
+        product_cart: b.product_cart || b.productCart || {},
+        observation: b.observation || (isMensal ? 'Horário Fixo Semanal' : '')
+      });
+    }
+  });
+
+  // Ordena os jogos cronologicamente pelo horário de início
+  matchesList.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
 
   // Cálculos de Tempo Real (Ao Vivo)
   const now = new Date();
@@ -10477,7 +10710,8 @@ function filterSubtabBookingsList() {
   const courtFilter = courtEl ? courtEl.value : 'all';
   const statusFilter = statusEl ? statusEl.value : 'all';
 
-  let list = [...(state.bookings || [])];
+  const delIds = getDeletedBookingIds();
+  let list = (state.bookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
 
   list.sort((a, b) => {
     if (a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
@@ -11584,6 +11818,11 @@ async function handleCancelBooking(bookingId) {
 
   if (!confirm('Deseja realmente apagar esta reserva de jogo e liberar o horário imediatamente no sistema?')) return;
 
+  // Silencia e bloqueia qualquer disparo residual de notificação para este ID
+  if (typeof recentNotifiedBookings !== 'undefined') {
+    recentNotifiedBookings.add(bookingId);
+  }
+
   // 0. Captura dados completos do agendamento antes da remoção
   const bToDelete = (state.bookings || []).find(b => b && (b.id === bookingId || String(b.id) === String(bookingId)));
   const courtObj = bToDelete ? (state.courts || []).find(c => c.id === (bToDelete.court_id || bToDelete.courtId)) : null;
@@ -11630,10 +11869,10 @@ async function handleCancelBooking(bookingId) {
     );
   }
 
-  if (deleteAllMensalista) {
-    const memberId = matchedMember ? matchedMember.id : (bToDelete ? bToDelete.monthly_member_id : null);
+  const memberId = matchedMember ? matchedMember.id : (bToDelete ? bToDelete.monthly_member_id : null);
+  let idsToRemove = [bookingId];
 
-    // Identifica todos os jogos deste mensalista
+  if (deleteAllMensalista) {
     const bookingsToRemove = (state.bookings || []).filter(b => {
       if (!b) return false;
       if (b.id === bookingId || String(b.id) === String(bookingId)) return true;
@@ -11654,142 +11893,33 @@ async function handleCancelBooking(bookingId) {
       }
       return false;
     });
-
-    const idsToRemove = bookingsToRemove.map(b => b.id);
-    if (!idsToRemove.includes(bookingId)) idsToRemove.push(bookingId);
-
-    // 1. Remove do estado em memória
-    state.bookings = (state.bookings || []).filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
-
-    // 2. Remove do localStorage local
-    try {
-      let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-      local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
-      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
-    } catch(e) {}
-
-    // 3. Cancela em monthlyMembers
-    if (memberId) {
-      state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
-      localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
-    }
-
-    // 4. Deleta do Supabase
-    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-      try {
-        const client = window.ArenaSupabase.getClient();
-        if (memberId) {
-          await client.from('monthly_members').delete().eq('id', memberId);
-        }
-        await client.from('bookings').update({ status: 'cancelled' }).in('id', idsToRemove);
-        await client.from('bookings').delete().in('id', idsToRemove);
-      } catch(e) {
-        console.warn('Erro ao deletar mensalista/jogos no Supabase:', e);
-      }
-    }
-
-    // 5. Transmissão imediata via WebSocket / Broadcast para todos os aparelhos
-    idsToRemove.forEach(bId => {
-      const bObj = bookingsToRemove.find(x => x.id === bId);
-      const delPayload = {
-        id: bId,
-        courtName,
-        customerName: bObj ? (bObj.customer_name || custName) : custName,
-        date: bObj ? formatDisplayDate(bObj.date) : bDate,
-        time: bObj ? (bObj.time || bObj.start_time) : bTime,
-        userName: state.currentUser ? (state.currentUser.name || 'Gestor') : 'Gestor',
-        deviceType: getDeviceContext ? getDeviceContext().label : 'Sistema'
-      };
-      if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
-        window.ArenaSupabase.broadcastBookingDelete(delPayload);
-      }
-      if (window.arenaSyncChannel) {
-        try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: delPayload }); } catch(e) {}
-      }
-    });
-
-    logSystemAction({
-      actionType: 'DELETE_BOOKING',
-      actionLabel: 'Exclusão Total de Mensalista',
-      courtName,
-      details: `Todos os ${idsToRemove.length} jogos do mensalista "${custName}" foram excluídos e o contrato cancelado no sistema.`,
-      targetId: bookingId
-    });
-
-    alert(`✅ Todos os ${idsToRemove.length} jogos do mensalista "${custName}" foram excluídos e o horário liberado com sucesso!`);
-  } else {
-    // 1. Remove do estado em memória
-    state.bookings = (state.bookings || []).filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
-
-    // 2. Remove do localStorage local
-    try {
-      let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-      local = local.filter(b => b && b.id !== bookingId && String(b.id) !== String(bookingId));
-      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
-    } catch (e) {}
-
-    // 3. Transmissão imediata via WebSocket / Broadcast para TODOS os outros aparelhos (Celular e PC)
-    const devContext = getDeviceContext();
-    let currentAuthor = 'Administrador Geral (Gabriel Alves)';
-    if (state.currentUser) {
-      currentAuthor = (state.currentUser.name && state.currentUser.name !== 'Administrador Geral') 
-        ? state.currentUser.name 
-        : (state.currentUser.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser.name || state.currentUser.email));
-    }
-
-    const deletePayload = {
-      id: bookingId,
-      courtName,
-      customerName: custName,
-      date: bDate,
-      time: bTime,
-      userName: currentAuthor,
-      deviceType: devContext.label
-    };
-
-    if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
-      window.ArenaSupabase.broadcastBookingDelete(deletePayload);
-    }
-    if (window.arenaSyncChannel) {
-      try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: deletePayload }); } catch(e) {}
-    }
-
-    // 4. Registra no Log do Sistema com quem apagou, quadra, horário, data e dispositivo (Mobile ou PC)
-    logSystemAction({
-      actionType: 'DELETE_BOOKING',
-      actionLabel: 'Exclusão de Jogo',
-      courtName,
-      details: `Jogo agendado de ${custName} (${bDate} às ${bTime} • R$ ${bPrice}) foi apagado e o horário liberado no sistema.`,
-      targetId: bookingId
-    });
-
-    // 5. Se for um horário fixo (monthly-...), lida com a tabela monthly_members
-    if (String(bookingId).startsWith('monthly-')) {
-      const memberId = String(bookingId).replace('monthly-', '');
-      state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
-      localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
-      if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-        try {
-          const client = window.ArenaSupabase.getClient();
-          await client.from('monthly_members').delete().eq('id', memberId);
-        } catch(e) {
-          console.warn('Erro ao remover monthly_members:', e);
-        }
-      }
-    } else if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-      try {
-        const client = window.ArenaSupabase.getClient();
-        // Atualiza primeiro para cancelled para propagar Realtime instantâneo para todos os clientes
-        await client.from('bookings').update({ status: 'cancelled' }).eq('id', bookingId);
-        // E remove da tabela para liberação definitiva
-        await client.from('bookings').delete().eq('id', bookingId);
-      } catch(e) {
-        console.warn('Erro ao deletar booking no Supabase:', e);
-      }
-    }
+    idsToRemove = Array.from(new Set([...bookingsToRemove.map(b => b.id), bookingId]));
   }
 
-  // 6. Limpa seleções pendentes de horários
+  // ⚡ 1. ATUALIZAÇÃO ULTRA-RÁPIDA (< 5ms): Registra tombstones imediatos e bloqueia notificações
+  idsToRemove.forEach(id => {
+    addDeletedBookingId(id);
+    if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(String(id));
+  });
+
+  // ⚡ 2. Remove da memória e do cache local imediatamente (< 5ms)
+  state.bookings = (state.bookings || []).filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+  try {
+    let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+    local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+    localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+  } catch(e) {}
+
+  if (deleteAllMensalista && memberId) {
+    state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
+    localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+  } else if (String(bookingId).startsWith('monthly-')) {
+    const mId = String(bookingId).replace('monthly-', '');
+    state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== mId);
+    localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+  }
+
+  // Limpa seleções pendentes
   if (state.selectedSlots && state.selectedSlots.length > 0) {
     state.selectedSlots = [];
     state.startTime = null;
@@ -11797,25 +11927,75 @@ async function handleCancelBooking(bookingId) {
     state.selectedDuration = 0;
   }
 
-  // 7. Recalcula a grade de horários do agendamento principal imediatamente
+  // 🚀 3. RENDERIZAÇÃO INSTANTÂNEA NA TELA (< 5ms)
   requestSchedule();
   _refreshAllUI();
   if (state.currentMode === 'admin') {
     renderStepContent();
   }
   if (window.lucide) lucide.createIcons();
-
-  // Se o modal de busca estiver aberto, atualiza a pesquisa
   if (typeof renderSearchResults === 'function' && document.getElementById('matchSearchResultsList')) {
     renderSearchResults();
   }
-
-  // Se estiver na sub-aba de gestão de agendamentos, atualiza a lista filtrada
   if (typeof filterSubtabBookingsList === 'function' && document.getElementById('subtabBookingsListContainer')) {
     filterSubtabBookingsList();
   }
 
-  alert('Jogo apagado com sucesso! O horário foi liberado no sistema.');
+  // 📡 4. Transmissão imediata via WebSocket / Broadcast para celulares e computadores
+  const devContext = (typeof getDeviceContext === 'function') ? getDeviceContext() : { label: 'Sistema' };
+  let currentAuthor = 'Administrador Geral';
+  if (state.currentUser) {
+    currentAuthor = (state.currentUser.name && state.currentUser.name !== 'Administrador Geral') 
+      ? state.currentUser.name 
+      : (state.currentUser.email === 'admin@arenalimoeiro.com.br' ? 'Gabriel Alves' : (state.currentUser.name || state.currentUser.email));
+  }
+
+  idsToRemove.forEach(bId => {
+    const delPayload = {
+      id: bId,
+      courtName,
+      customerName: custName,
+      date: bDate,
+      time: bTime,
+      userName: currentAuthor,
+      deviceType: devContext.label
+    };
+    if (window.ArenaSupabase && window.ArenaSupabase.broadcastBookingDelete) {
+      window.ArenaSupabase.broadcastBookingDelete(delPayload);
+    }
+    if (window.arenaSyncChannel) {
+      try { window.arenaSyncChannel.postMessage({ type: 'booking_deleted', payload: delPayload }); } catch(e) {}
+    }
+  });
+
+  // 📝 5. Log de Auditoria
+  logSystemAction({
+    actionType: 'DELETE_BOOKING',
+    actionLabel: deleteAllMensalista ? 'Exclusão Total de Mensalista' : 'Exclusão de Jogo',
+    courtName,
+    details: deleteAllMensalista 
+      ? `Todos os ${idsToRemove.length} jogos do mensalista "${custName}" foram excluídos e o contrato cancelado no sistema.`
+      : `Jogo agendado de ${custName} (${bDate} às ${bTime} • R$ ${bPrice}) foi apagado e o horário liberado no sistema.`,
+    targetId: bookingId
+  });
+
+  // ☁️ 6. Exclusão assíncrona no Supabase em segundo plano (direto DELETE sem update e sem travar UI)
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      if (client) {
+        if (deleteAllMensalista && memberId) {
+          client.from('monthly_members').delete().eq('id', memberId).then(() => {}).catch(console.warn);
+        } else if (String(bookingId).startsWith('monthly-')) {
+          const mId = String(bookingId).replace('monthly-', '');
+          client.from('monthly_members').delete().eq('id', mId).then(() => {}).catch(console.warn);
+        }
+        client.from('bookings').delete().in('id', idsToRemove).then(() => {}).catch(console.warn);
+      }
+    } catch(e) {
+      console.warn('Erro na exclusão remota:', e);
+    }
+  }
 }
 window.handleCancelBooking = handleCancelBooking;
 
@@ -12271,6 +12451,13 @@ window.toggleDirectBookingRecurrence = toggleDirectBookingRecurrence;
 async function handleDirectBookingSubmit(e) {
   e.preventDefault();
 
+  const submitBtn = e.target.querySelector('button[type="submit"]') || document.querySelector('#modalDirectBooking button[type="submit"]');
+  if (submitBtn) {
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    setTimeout(() => { if (submitBtn) submitBtn.disabled = false; }, 3000);
+  }
+
   const courtId = document.getElementById('directCourtSelect').value;
   const date = document.getElementById('directDateInput').value;
   const startTime = document.getElementById('directTimeSelect').value;
@@ -12279,6 +12466,7 @@ async function handleDirectBookingSubmit(e) {
 
   const sMin = timeToMinutes(startTime);
   let eMin = endTimeVal ? timeToMinutes(endTimeVal) : (sMin + 60);
+
   if (endTimeVal === '00:00') eMin = 1440;
   else if (endTimeVal === '00:30') eMin = 1470;
   else if (endTimeVal === '01:00') eMin = 1500;
@@ -12308,12 +12496,12 @@ async function handleDirectBookingSubmit(e) {
     obs = obs ? `${obs} [Emergência: ${emergency}]` : `[Emergência: ${emergency}]`;
   }
 
-  // ANTI-CHOQUE NA RESERVA DIRETA: Verifica sobreposição antes de salvar sem bloquear arbitrariamente o Balcão
+  // ANTI-CHOQUE RIGOROSO NA RESERVA DIRETA: Bloqueio estrito — Apenas 1 jogo por campo e horário
   const conflict = checkScheduleConflict(courtId, date, startTime, endTime);
   if (conflict.conflict) {
-    if (!confirm(`⚠️ Aviso de Conflito de Horário:\n\n${conflict.reason}\n\nVocê está realizando esta reserva diretamente no Balcão. Deseja confirmar e prosseguir com o agendamento mesmo assim?`)) {
-      return;
-    }
+    alert(`⛔ BLOQUEIO DE AGENDAMENTO (REGRA OFICIAL DA ARENA):\n\n${conflict.reason}\n\nNeste dia e campo, só é permitido 1 jogo por horário. O agendamento foi bloqueado para evitar choque de partidas.`);
+    if (submitBtn) submitBtn.disabled = false;
+    return;
   }
 
   const court = state.courts.find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 140 };
@@ -12359,6 +12547,13 @@ async function handleDirectBookingSubmit(e) {
   for (let w = 0; w < totalWeeks; w++) {
     const curGameDateObj = new Date(sy, sm - 1, sd + (w * 7));
     const curGameDate = getFormattedDate(curGameDateObj);
+    if (w > 0) {
+      const wConflict = checkScheduleConflict(courtId, curGameDate, startTime, endTime);
+      if (wConflict.conflict) {
+        console.warn(`Data ${curGameDate} já ocupada para este campo. Pulando semana conflitante.`);
+        continue;
+      }
+    }
     const bId = w === 0 ? newBookingId : ('ARENA-' + Math.floor(1000 + Math.random() * 9000));
 
     const dbPayload = {
@@ -13686,11 +13881,16 @@ async function handleMonthlySubmit(event, editId) {
         d.setDate(today.getDate() + i);
         if (d.getDay() === targetDay) {
           const dateStr = getFormattedDate(d);
-          // Verifica se já não existe reserva idêntica
-          const alreadyExists = (state.bookings || []).some(b => 
-            b.court_id === courtId && b.date === dateStr && b.start_time === startTime && b.status !== 'cancelled'
-          );
-          if (!alreadyExists) {
+          // Verifica se já não existe reserva sobreposta ou conflitante neste campo e data
+          const hasConflict = (state.bookings || []).some(b => {
+            if (!b || b.status === 'cancelled') return false;
+            const bCourt = b.court_id || b.courtId;
+            if (bCourt !== courtId || b.date !== dateStr) return false;
+            const bS = timeToMinutes(b.start_time || b.startTime || '00:00');
+            const bE = timeToMinutes(b.end_time || b.endTime || minutesToTime(bS + 60));
+            return Math.max(sMin, bS) < Math.min(eMin, bE);
+          });
+          if (!hasConflict) {
             const bId = 'ARENA-M' + Math.floor(1000 + Math.random() * 9000);
             const newBooking = {
               id: bId,
@@ -17748,19 +17948,35 @@ function showToastNotification(htmlContent, duration = 6500) {
 
 const recentNotifiedBookings = new Set();
 
-function triggerBookingNotification(booking) {
+function triggerBookingNotification(booking, type = 'new') {
+  // 1. Nunca notifica atualizações de status (início de jogo, encerramento, edição ou cancelamento)
+  if (type === 'update') return;
+
   // 🔒 RESTRIÇÃO ESTRITA: Notificações de novos agendamentos/pedidos
   // SÓ APARECEM para quem tem conta credencial aceita para login na seção de gerência.
-  // Caso o usuário não tenha entrado com login de gerência, a notificação de pedido
-  // NÃO será notificada nem no mobile, nem no tablet, nem no navegador de computador.
   if (!isManagerLoggedIn()) {
     return;
   }
 
   if (!booking || !booking.id) return;
+  if (isBookingDeleted(booking.id)) return;
+
+  // 2. Nunca notifica jogos cancelados ou finalizados
+  if (booking.status === 'cancelled' || booking.status === 'finished') return;
+
+  // 3. Nunca notifica datas passadas (apenas hoje ou datas futuras)
+  const todayStr = getFormattedDate(new Date());
+  if (booking.date && booking.date < todayStr) return;
+
+  // 4. Se o agendamento tiver created_at e for mais antigo que 3 minutos, ignora (evita disparar ao carregar banco)
+  if (booking.created_at) {
+    const createdTs = new Date(booking.created_at).getTime();
+    if (!isNaN(createdTs) && (Date.now() - createdTs) > 180000) return;
+  }
+
   if (recentNotifiedBookings.has(booking.id)) return;
   recentNotifiedBookings.add(booking.id);
-  setTimeout(() => recentNotifiedBookings.delete(booking.id), 60000);
+  setTimeout(() => recentNotifiedBookings.delete(booking.id), 300000);
 
   // 1. Alerta Sonoro
   playNotificationSound();
@@ -17930,17 +18146,42 @@ async function syncDataFromSupabase(skipRender = false) {
     }
 
     if (Array.isArray(dbMembers) && dbMembers.length > 0) {
-      const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+      const localMembers = (JSON.parse(localStorage.getItem('arena_monthly_members') || '[]')).filter(m => {
+        if (!m || !m.id) return false;
+        const idStr = String(m.id);
+        if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
+        if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
+        return true;
+      });
       const memberMap = new Map();
       localMembers.forEach(m => { if (m && m.id) memberMap.set(m.id, m); });
-      dbMembers.forEach(m => { if (m && m.id) memberMap.set(m.id, m); });
+      dbMembers.forEach(m => { 
+        if (m && m.id) {
+          const idStr = String(m.id);
+          if (idStr.includes('ARENA-')) return;
+          if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return;
+          memberMap.set(m.id, m); 
+        }
+      });
       state.monthlyMembers = Array.from(memberMap.values());
       localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
       localStorage.setItem('arena_monthly_members_backup', JSON.stringify(state.monthlyMembers));
     } else {
       // Se a nuvem não retornou registros ou falhou, preserva os mensalistas locais e do backup
-      const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
-      const backupMembers = JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]');
+      const localMembers = (JSON.parse(localStorage.getItem('arena_monthly_members') || '[]')).filter(m => {
+        if (!m || !m.id) return false;
+        const idStr = String(m.id);
+        if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
+        if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
+        return true;
+      });
+      const backupMembers = (JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]')).filter(m => {
+        if (!m || !m.id) return false;
+        const idStr = String(m.id);
+        if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
+        if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
+        return true;
+      });
       const mergedLocal = [...localMembers];
       backupMembers.forEach(bm => {
         if (bm && bm.id && !mergedLocal.some(lm => lm.id === bm.id)) mergedLocal.push(bm);
@@ -17952,7 +18193,8 @@ async function syncDataFromSupabase(skipRender = false) {
     }
 
     if (dbBookings) {
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
+      const deletedBookingSet = getDeletedBookingIds();
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
       state.bookings = validDbBookings;
       localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
 
@@ -18056,7 +18298,7 @@ async function syncDataFromSupabase(skipRender = false) {
         window.arenaBroadcastActive = true;
         bChan.on('broadcast', { event: 'new_booking' }, (evt) => {
           const b = evt.payload;
-          if (b && b.id) {
+          if (b && b.id && !isBookingDeleted(b.id)) {
             if (!state.bookings.find(x => x.id === b.id)) {
               state.bookings = [...state.bookings, b];
               const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
@@ -18098,7 +18340,6 @@ async function syncDataFromSupabase(skipRender = false) {
             }
             localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
             _refreshAllUI();
-            triggerBookingNotification({ court_name: norm.name, customer_name: 'Gestor da Arena' }, 'update');
           }
         });
       }
@@ -18111,51 +18352,57 @@ async function syncDataFromSupabase(skipRender = false) {
       client.channel('realtime_arena')
         // ──── Agendamentos ────
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, async (payload) => {
-          if (payload.new && !state.bookings.find(b => b.id === payload.new.id)) {
-            state.bookings = [...state.bookings, payload.new];
-            _refreshAllUI();
-          }
+          if (payload.new && !isBookingDeleted(payload.new.id)) {
+            if (!state.bookings.find(b => b.id === payload.new.id)) {
+              state.bookings = [...state.bookings, payload.new];
+              _refreshAllUI();
+            }
 
-          if (payload.new) {
-            triggerBookingNotification(payload.new, 'new');
+            if (payload.new.status !== 'cancelled' && payload.new.status !== 'finished') {
+              const todayStr = getFormattedDate(new Date());
+              if (payload.new.date >= todayStr) {
+                triggerBookingNotification(payload.new, 'new');
+              }
+            }
           }
 
           const { data } = await client.from('bookings').select('*');
           if (data) { 
-            state.bookings = data.filter(b => b && b.status !== 'cancelled');
+            const delIds = getDeletedBookingIds();
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.new) {
-            if (payload.new.status === 'cancelled') {
+            if (payload.new.status === 'cancelled' || isBookingDeleted(payload.new.id)) {
               state.bookings = (state.bookings || []).filter(b => b.id !== payload.new.id);
             } else {
               state.bookings = (state.bookings || []).map(b => b.id === payload.new.id ? payload.new : b);
             }
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
-            if (payload.new.status !== 'cancelled') {
-              triggerBookingNotification(payload.new, 'update');
-            }
           }
           const { data } = await client.from('bookings').select('*');
           if (data) { 
-            state.bookings = data.filter(b => b && b.status !== 'cancelled');
+            const delIds = getDeletedBookingIds();
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.old) {
+            addDeletedBookingId(payload.old.id);
             state.bookings = (state.bookings || []).filter(b => b.id !== payload.old.id);
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
           }
           const { data } = await client.from('bookings').select('*');
           if (data) { 
-            state.bookings = data.filter(b => b && b.status !== 'cancelled');
+            const delIds = getDeletedBookingIds();
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -18259,18 +18506,19 @@ async function checkAndSyncBookingsBackground() {
     }
 
     if (dbBookings && !error) {
+      const delIds = getDeletedBookingIds();
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
-      const brandNew = dbBookings.filter(b => b && b.id && !existingMap.has(b.id));
+      const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
 
       const updatedBookings = [];
-      for (const dbB of dbBookings) {
+      for (const dbB of validDbBookings) {
         const cur = existingMap.get(dbB.id);
         if (cur && (cur.status !== dbB.status || cur.start_time !== dbB.start_time || cur.date !== dbB.date || cur.court_id !== dbB.court_id)) {
           updatedBookings.push(dbB);
         }
       }
 
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled');
       const newIds = new Set(validDbBookings.map(b => b.id));
       const hasDeleted = (state.bookings || []).some(b => b && b.id && !newIds.has(b.id));
       let hasChanges = brandNew.length > 0 || updatedBookings.length > 0 || hasDeleted || validDbBookings.length !== (state.bookings || []).length;
@@ -18280,14 +18528,6 @@ async function checkAndSyncBookingsBackground() {
         localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
 
         _refreshAllUI();
-
-        // Dispara notificação imediata com som, vibração e alerta para o gestor
-        brandNew.forEach(b => {
-          triggerBookingNotification(b, 'new');
-        });
-        updatedBookings.forEach(b => {
-          triggerBookingNotification(b, 'update');
-        });
       }
     }
 
