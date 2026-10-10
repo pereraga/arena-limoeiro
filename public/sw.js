@@ -1,12 +1,22 @@
-﻿// Service Worker da Arena Limoeiro para Notificações Mobile em Segundo Plano
-const CACHE_NAME = 'arena-sw-v1';
+// Service Worker da Arena Limoeiro para Notificações Mobile em Segundo Plano
+const CACHE_NAME = 'arena-sw-v5.1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((k) => {
+          if (k !== CACHE_NAME) {
+            return caches.delete(k);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 // Manipula cliques na notificação para focar ou abrir o painel da Arena

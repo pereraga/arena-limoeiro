@@ -12,6 +12,25 @@ function getFormattedDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+function normalizeDateToYMD(dateStr) {
+  if (!dateStr) return '';
+  let str = String(dateStr).trim();
+  if (str.includes('/')) {
+    const parts = str.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  return str;
+}
+
+function isBookingDateInThePast(dateVal) {
+  if (!dateVal) return false;
+  const normalized = normalizeDateToYMD(dateVal);
+  const todayStr = getFormattedDate(new Date());
+  return normalized < todayStr;
+}
+
 function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(':').map(Number);
@@ -507,6 +526,38 @@ window.getDeletedBookingIds = getDeletedBookingIds;
 window.addDeletedBookingId = addDeletedBookingId;
 window.isBookingDeleted = isBookingDeleted;
 
+// ==============================================================================
+// 🔕 RASTREAMENTO PERSISTENTE DE NOTIFICAÇÕES (ANTI-SPAM & ANTI-NOTIFICAÇÃO EM EXCLUSÃO)
+// ==============================================================================
+function getNotifiedBookingIds() {
+  try {
+    const raw = localStorage.getItem('arena_notified_bookings');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr.map(String));
+    }
+  } catch(e) {}
+  return new Set();
+}
+
+function addNotifiedBookingId(id) {
+  if (!id) return;
+  const set = getNotifiedBookingIds();
+  set.add(String(id));
+  try {
+    localStorage.setItem('arena_notified_bookings', JSON.stringify(Array.from(set)));
+  } catch(e) {}
+}
+
+function isBookingNotified(id) {
+  if (!id) return false;
+  return getNotifiedBookingIds().has(String(id));
+}
+
+window.getNotifiedBookingIds = getNotifiedBookingIds;
+window.addNotifiedBookingId = addNotifiedBookingId;
+window.isBookingNotified = isBookingNotified;
+
 // ⭐ Retorna o badge / destaque da quadra (calculado automaticamente ou definido manualmente)
 function getCourtDisplayBadge(court) {
   if (!court) return '';
@@ -826,7 +877,7 @@ function loadInitialData() {
 
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const deletedBookingSet = getDeletedBookingIds();
-    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
+    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id) && !isBookingDateInThePast(b.date));
     cleanedLocal.forEach(b => {
       if (b && (b.id === 'ARENA-6776' || b.id === 'ARENA-9247')) {
         b.product_cart = {};
@@ -4764,6 +4815,7 @@ function handleReceivedBookingDelete(data) {
   if (!data || !data.id) return;
   const targetId = String(data.id);
   addDeletedBookingId(targetId);
+  addNotifiedBookingId(targetId);
   if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(targetId);
 
   // 1. Remove da memória
@@ -11820,8 +11872,13 @@ async function handleCancelBooking(bookingId) {
 
   // Silencia e bloqueia qualquer disparo residual de notificação para este ID
   if (typeof recentNotifiedBookings !== 'undefined') {
-    recentNotifiedBookings.add(bookingId);
+    recentNotifiedBookings.add(String(bookingId));
   }
+  addDeletedBookingId(bookingId);
+  addNotifiedBookingId(bookingId);
+
+  // Fecha qualquer modal aberto imediatamente para eliminar qualquer atraso visual
+  closeModal();
 
   // 0. Captura dados completos do agendamento antes da remoção
   const bToDelete = (state.bookings || []).find(b => b && (b.id === bookingId || String(b.id) === String(bookingId)));
@@ -11899,6 +11956,7 @@ async function handleCancelBooking(bookingId) {
   // ⚡ 1. ATUALIZAÇÃO ULTRA-RÁPIDA (< 5ms): Registra tombstones imediatos e bloqueia notificações
   idsToRemove.forEach(id => {
     addDeletedBookingId(id);
+    addNotifiedBookingId(id);
     if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(String(id));
   });
 
@@ -12682,9 +12740,14 @@ async function handleDirectBookingSubmit(e) {
     localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
   } catch(e) {}
 
-  // Dispara notificação imediata
+  // Dispara notificação imediata para novo agendamento criado agora
   try {
-    triggerBookingNotification(bookingsToCreate[0]);
+    if (bookingsToCreate && bookingsToCreate[0]) {
+      bookingsToCreate[0]._isJustCreatedNow = true;
+      bookingsToCreate[0]._isRealtimeBookingCheckout = true;
+      bookingsToCreate[0].created_at = new Date().toISOString();
+      triggerBookingNotification(bookingsToCreate[0]);
+    }
   } catch(e) {}
 
   // Transmite broadcast instantâneo via WebSocket para todos os outros aparelhos/celulares
@@ -17416,6 +17479,11 @@ async function submitBooking(grandTotal) {
 
   // Dispara notificação imediata apenas se quem estiver no aparelho for um gestor com credencial aceita
   try {
+    if (unifiedBooking) {
+      unifiedBooking._isJustCreatedNow = true;
+      unifiedBooking._isRealtimeBookingCheckout = true;
+      unifiedBooking.created_at = new Date().toISOString();
+    }
     if (isManagerLoggedIn()) {
       triggerBookingNotification(unifiedBooking);
     }
@@ -17950,33 +18018,50 @@ const recentNotifiedBookings = new Set();
 
 function triggerBookingNotification(booking, type = 'new') {
   // 1. Nunca notifica atualizações de status (início de jogo, encerramento, edição ou cancelamento)
-  if (type === 'update') return;
+  if (type !== 'new') return;
 
   // 🔒 RESTRIÇÃO ESTRITA: Notificações de novos agendamentos/pedidos
   // SÓ APARECEM para quem tem conta credencial aceita para login na seção de gerência.
-  if (!isManagerLoggedIn()) {
+  if (!isManagerLoggedIn()) return;
+
+  if (!booking || !booking.id) return;
+  const bookingIdStr = String(booking.id);
+
+  // 2. NUNCA NOTIFICA JOGOS EXCLUÍDOS OU JÁ NOTIFICADOS NESTE DISPOSITIVO
+  if (isBookingDeleted(bookingIdStr)) return;
+  if (isBookingNotified(bookingIdStr)) return;
+  if (recentNotifiedBookings.has(bookingIdStr)) return;
+
+  // 3. Nunca notifica jogos cancelados ou finalizados
+  if (booking.status === 'cancelled' || booking.status === 'finished') return;
+
+  // 4. Nunca notifica datas passadas (validação robusta com normalizeDateToYMD)
+  if (isBookingDateInThePast(booking.date)) return;
+
+  // 5. BLINDAGEM DE FRESCURA TEMPORAL: Notificação de NOVO AGENDAMENTO só dispara se:
+  //    - For teste manual explícito do gestor ("Testar Notificação"), OU
+  //    - For checkout em tempo real concluído agora (_isJustCreatedNow ou _isRealtimeBookingCheckout), OU
+  //    - O agendamento tiver created_at registrado há MENOS de 30 segundos.
+  //    Se for registro recuperado de sync/banco/local antigo, descarta sem qualquer som ou push.
+  const isManualTest = (booking._isManualTestNotification === true || bookingIdStr.startsWith('test-'));
+  const isJustCreatedInUI = (booking._isJustCreatedNow === true || booking._isRealtimeBookingCheckout === true);
+
+  let isRecentCreation = false;
+  if (booking.created_at) {
+    const createdTs = new Date(booking.created_at).getTime();
+    if (!isNaN(createdTs) && (Date.now() - createdTs) <= 30000) {
+      isRecentCreation = true;
+    }
+  }
+
+  if (!isManualTest && !isJustCreatedInUI && !isRecentCreation) {
     return;
   }
 
-  if (!booking || !booking.id) return;
-  if (isBookingDeleted(booking.id)) return;
-
-  // 2. Nunca notifica jogos cancelados ou finalizados
-  if (booking.status === 'cancelled' || booking.status === 'finished') return;
-
-  // 3. Nunca notifica datas passadas (apenas hoje ou datas futuras)
-  const todayStr = getFormattedDate(new Date());
-  if (booking.date && booking.date < todayStr) return;
-
-  // 4. Se o agendamento tiver created_at e for mais antigo que 3 minutos, ignora (evita disparar ao carregar banco)
-  if (booking.created_at) {
-    const createdTs = new Date(booking.created_at).getTime();
-    if (!isNaN(createdTs) && (Date.now() - createdTs) > 180000) return;
-  }
-
-  if (recentNotifiedBookings.has(booking.id)) return;
-  recentNotifiedBookings.add(booking.id);
-  setTimeout(() => recentNotifiedBookings.delete(booking.id), 300000);
+  // Registra no rastreamento permanente e no cache de sessão
+  addNotifiedBookingId(bookingIdStr);
+  recentNotifiedBookings.add(bookingIdStr);
+  setTimeout(() => recentNotifiedBookings.delete(bookingIdStr), 300000);
 
   // 1. Alerta Sonoro
   playNotificationSound();
@@ -18194,7 +18279,7 @@ async function syncDataFromSupabase(skipRender = false) {
 
     if (dbBookings) {
       const deletedBookingSet = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !isBookingDateInThePast(b.date));
       state.bookings = validDbBookings;
       localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
 
@@ -18299,7 +18384,8 @@ async function syncDataFromSupabase(skipRender = false) {
         bChan.on('broadcast', { event: 'new_booking' }, (evt) => {
           const b = evt.payload;
           if (b && b.id && !isBookingDeleted(b.id)) {
-            if (!state.bookings.find(x => x.id === b.id)) {
+            const exists = (state.bookings || []).some(x => x.id === b.id);
+            if (!exists) {
               state.bookings = [...state.bookings, b];
               const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
               if (!local.find(x => x.id === b.id)) {
@@ -18307,8 +18393,8 @@ async function syncDataFromSupabase(skipRender = false) {
                 localStorage.setItem('arena_local_bookings', JSON.stringify(local));
               }
               _refreshAllUI();
+              triggerBookingNotification(b, 'new');
             }
-            triggerBookingNotification(b, 'new');
           }
         });
 
@@ -18353,14 +18439,12 @@ async function syncDataFromSupabase(skipRender = false) {
         // ──── Agendamentos ────
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.new && !isBookingDeleted(payload.new.id)) {
-            if (!state.bookings.find(b => b.id === payload.new.id)) {
+            const exists = (state.bookings || []).some(b => b.id === payload.new.id);
+            if (!exists) {
               state.bookings = [...state.bookings, payload.new];
               _refreshAllUI();
-            }
 
-            if (payload.new.status !== 'cancelled' && payload.new.status !== 'finished') {
-              const todayStr = getFormattedDate(new Date());
-              if (payload.new.date >= todayStr) {
+              if (payload.new.status !== 'cancelled' && payload.new.status !== 'finished') {
                 triggerBookingNotification(payload.new, 'new');
               }
             }
@@ -18369,7 +18453,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -18377,6 +18461,8 @@ async function syncDataFromSupabase(skipRender = false) {
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.new) {
             if (payload.new.status === 'cancelled' || isBookingDeleted(payload.new.id)) {
+              addDeletedBookingId(payload.new.id);
+              addNotifiedBookingId(payload.new.id);
               state.bookings = (state.bookings || []).filter(b => b.id !== payload.new.id);
             } else {
               state.bookings = (state.bookings || []).map(b => b.id === payload.new.id ? payload.new : b);
@@ -18387,7 +18473,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -18395,6 +18481,7 @@ async function syncDataFromSupabase(skipRender = false) {
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'bookings' }, async (payload) => {
           if (payload.old) {
             addDeletedBookingId(payload.old.id);
+            addNotifiedBookingId(payload.old.id);
             state.bookings = (state.bookings || []).filter(b => b.id !== payload.old.id);
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
@@ -18402,7 +18489,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -18507,7 +18594,7 @@ async function checkAndSyncBookingsBackground() {
 
     if (dbBookings && !error) {
       const delIds = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
       const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
 

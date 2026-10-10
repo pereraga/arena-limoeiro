@@ -8,6 +8,25 @@
   <meta http-equiv="Expires" content="0">
   <title>Arena Limoeiro - Complexo Poliesportivo e Lazer | Agendamento Online</title>
   
+  <!-- Invalidação Imediata de Cache e Service Worker Antigo v5.1.0 -->
+  <script>
+    (function() {
+      const CURRENT_APP_VERSION = '5.1.0';
+      const storedVersion = localStorage.getItem('arena_app_version');
+      if (storedVersion !== CURRENT_APP_VERSION) {
+        localStorage.setItem('arena_app_version', CURRENT_APP_VERSION);
+        if ('caches' in window) {
+          caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            regs.forEach(reg => reg.unregister());
+          }).catch(() => {});
+        }
+      }
+    })();
+  </script>
+
   <!-- PWA & Mobile Meta Tags -->
   <link rel="manifest" href="/manifest.json">
   <meta name="theme-color" content="#064e3b">
@@ -15,13 +34,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Favicon & Ícones Mobile/PWA (Monograma A com Folhas) -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=4.8.5">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=4.8.5">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4.8.5">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=4.8.5">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4.8.5">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=4.8.5">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=4.8.5">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.1.0">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.1.0">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.1.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.1.0">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.1.0">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.1.0">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -31,20 +50,22 @@
   
   <!-- Supabase JS Client & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/supabase-client.js?v=4.9.0"></script>
-  <script src="/default-data.js?v=4.9.0"></script>
+  <script src="/supabase-client.js?v=5.1.0"></script>
+  <script src="/default-data.js?v=5.1.0"></script>
 
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=4.9.0').catch(console.error);
+        navigator.serviceWorker.register('/sw.js?v=5.1.0').then(reg => {
+          reg.update();
+        }).catch(console.error);
       });
     }
   </script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/styles.css?v=4.9.0">
+  <link rel="stylesheet" href="/styles.css?v=5.1.0">
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24">
 
@@ -99,6 +120,6 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=4.9.0"></script>
+  <script src="/app.js?v=5.1.0"></script>
 </body>
 </html>
