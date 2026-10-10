@@ -511,7 +511,13 @@ function getDeletedBookingIds() {
 function addDeletedBookingId(id) {
   if (!id) return;
   const set = getDeletedBookingIds();
-  set.add(String(id));
+  const idStr = String(id);
+  set.add(idStr);
+  if (idStr.startsWith('monthly-')) {
+    set.add(idStr.replace('monthly-', ''));
+  } else {
+    set.add('monthly-' + idStr);
+  }
   try {
     localStorage.setItem('arena_deleted_bookings', JSON.stringify(Array.from(set)));
   } catch(e) {}
@@ -519,7 +525,12 @@ function addDeletedBookingId(id) {
 
 function isBookingDeleted(id) {
   if (!id) return false;
-  return getDeletedBookingIds().has(String(id));
+  const idStr = String(id);
+  const set = getDeletedBookingIds();
+  if (set.has(idStr)) return true;
+  if (idStr.startsWith('monthly-') && set.has(idStr.replace('monthly-', ''))) return true;
+  if (!idStr.startsWith('monthly-') && set.has('monthly-' + idStr)) return true;
+  return false;
 }
 
 window.getDeletedBookingIds = getDeletedBookingIds;
@@ -543,7 +554,13 @@ function getNotifiedBookingIds() {
 function addNotifiedBookingId(id) {
   if (!id) return;
   const set = getNotifiedBookingIds();
-  set.add(String(id));
+  const idStr = String(id);
+  set.add(idStr);
+  if (idStr.startsWith('monthly-')) {
+    set.add(idStr.replace('monthly-', ''));
+  } else {
+    set.add('monthly-' + idStr);
+  }
   try {
     localStorage.setItem('arena_notified_bookings', JSON.stringify(Array.from(set)));
   } catch(e) {}
@@ -551,7 +568,12 @@ function addNotifiedBookingId(id) {
 
 function isBookingNotified(id) {
   if (!id) return false;
-  return getNotifiedBookingIds().has(String(id));
+  const idStr = String(id);
+  const set = getNotifiedBookingIds();
+  if (set.has(idStr)) return true;
+  if (idStr.startsWith('monthly-') && set.has(idStr.replace('monthly-', ''))) return true;
+  if (!idStr.startsWith('monthly-') && set.has('monthly-' + idStr)) return true;
+  return false;
 }
 
 window.getNotifiedBookingIds = getNotifiedBookingIds;
@@ -841,6 +863,7 @@ function loadInitialData() {
     let cleanLocalMonthly = (Array.isArray(rawLocalMonthly) ? rawLocalMonthly : []).filter(m => {
       if (!m || !m.id) return false;
       const idStr = String(m.id);
+      if (isBookingDeleted(idStr)) return false;
       if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
       if (idStr.startsWith('mensal-ARENA-') || idStr.includes('ARENA-')) return false;
       // Remove contratos fantasmas gerados por bug a partir de reservas avulsas antigas
@@ -933,51 +956,10 @@ function loadInitialData() {
     });
     cleanLocalMonthly = dedupedMonthly;
 
-    // Se nenhum horário fixo estiver salvo, verifica primeiro o backup persistente
-    if (cleanLocalMonthly.length === 0) {
-      try {
-        const backupMonthly = JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]');
-        if (Array.isArray(backupMonthly) && backupMonthly.length > 0) {
-          cleanLocalMonthly = backupMonthly.filter(m => {
-            if (!m || !m.id) return false;
-            const idStr = String(m.id);
-            if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
-            if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
-            return true;
-          });
-        }
-      } catch(e) {}
-    }
-
-    // Se ainda assim estiver vazio, restaura o contrato fixo oficial padrão de Terça-feira
-    if (cleanLocalMonthly.length === 0) {
-      cleanLocalMonthly.push({
-        id: 'monthly-pelada-amigos-terca',
-        team_name: 'Pelada dos Amigos',
-        teamName: 'Pelada dos Amigos',
-        responsible_name: 'Carlos Silva (Capitão)',
-        responsibleName: 'Carlos Silva (Capitão)',
-        phone: '(81) 98888-7777',
-        court_id: 'court-society-1',
-        courtId: 'court-society-1',
-        day_of_week: 'terca',
-        dayOfWeek: 'terca',
-        day_of_week_label: 'Toda Terça-feira',
-        dayOfWeekLabel: 'Toda Terça-feira',
-        start_time: '19:00',
-        startTime: '19:00',
-        end_time: '20:00',
-        endTime: '20:00',
-        time: '19:00 às 20:00',
-        monthly_price: 500.00,
-        monthlyPrice: 500.00,
-        status: 'active',
-        observation: 'Contrato de Horário Fixo Semanal (Terça 19h às 20h - Campo Society 01)'
-      });
-    }
+    // Nuvem Supabase é a ÚNICA fonte da verdade: NUNCA ressuscita contratos excluídos
+    try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
 
     localStorage.setItem('arena_monthly_members', JSON.stringify(cleanLocalMonthly));
-    localStorage.setItem('arena_monthly_members_backup', JSON.stringify(cleanLocalMonthly));
     state.monthlyMembers = cleanLocalMonthly;
 
     localStorage.setItem('arena_local_bookings', JSON.stringify(dedupedLocal));
@@ -4814,21 +4796,33 @@ function logSystemAction({ actionType, actionLabel, courtName, details, targetId
 function handleReceivedBookingDelete(data) {
   if (!data || !data.id) return;
   const targetId = String(data.id);
-  addDeletedBookingId(targetId);
-  addNotifiedBookingId(targetId);
-  if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(targetId);
+  const memberId = targetId.startsWith('monthly-') ? targetId.replace('monthly-', '') : targetId;
 
-  // 1. Remove da memória
-  state.bookings = (state.bookings || []).filter(b => b && String(b.id) !== targetId);
+  addDeletedBookingId(targetId);
+  addDeletedBookingId(memberId);
+  addNotifiedBookingId(targetId);
+  addNotifiedBookingId(memberId);
+  if (typeof recentNotifiedBookings !== 'undefined') {
+    recentNotifiedBookings.add(targetId);
+    recentNotifiedBookings.add(memberId);
+    recentNotifiedBookings.add('monthly-' + memberId);
+  }
+
+  // 1. Remove da memória (jogos e mensalistas)
+  state.bookings = (state.bookings || []).filter(b => b && String(b.id) !== targetId && String(b.id) !== memberId);
+  state.monthlyMembers = (state.monthlyMembers || []).filter(m => m && String(m.id) !== targetId && String(m.id) !== memberId);
 
   // 2. Remove do localStorage
   try {
     let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    local = local.filter(b => b && String(b.id) !== targetId);
+    local = local.filter(b => b && String(b.id) !== targetId && String(b.id) !== memberId);
     localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+
+    localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+    localStorage.removeItem('arena_monthly_members_backup');
   } catch(e) {}
 
-  // 3. Atualiza grade e interface instantaneamente (<50ms)
+  // 3. Atualiza grade e interface instantaneamente (<5ms)
   requestSchedule();
   _refreshAllUI();
   if (state.currentMode === 'admin') {
@@ -5452,6 +5446,8 @@ function renderLiveDashboardTab() {
 
   // PRIORIDADE 1: Horários fixos do dia da semana a partir dos contratos de state.monthlyMembers
   (state.monthlyMembers || []).forEach(m => {
+    if (!m || !m.id) return;
+    if (deletedBookingSet.has(String(m.id)) || deletedBookingSet.has('monthly-' + String(m.id))) return;
     const day = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
     if (day === normalizeDayOfWeek(currentDayOfWeek) && isMensalistaActive(m)) {
       const startT = m.start_time || m.startTime || m.time || '19:00';
@@ -11882,58 +11878,78 @@ async function handleCancelBooking(bookingId) {
 
   // 0. Captura dados completos do agendamento antes da remoção
   const bToDelete = (state.bookings || []).find(b => b && (b.id === bookingId || String(b.id) === String(bookingId)));
-  const courtObj = bToDelete ? (state.courts || []).find(c => c.id === (bToDelete.court_id || bToDelete.courtId)) : null;
-  const courtName = courtObj ? courtObj.name : 'Quadra Esportiva';
-  const custName = bToDelete ? (bToDelete.customer_name || bToDelete.customerName || 'Cliente') : 'Cliente';
-  const bDate = bToDelete ? formatDisplayDate(bToDelete.date) : '';
-  const bTime = bToDelete ? (bToDelete.time || `${bToDelete.start_time} às ${bToDelete.end_time}`) : '';
-  const bPrice = bToDelete ? Number(bToDelete.total_price || 0).toFixed(2).replace('.', ',') : '0,00';
+  let courtObj = bToDelete ? (state.courts || []).find(c => c.id === (bToDelete.court_id || bToDelete.courtId)) : null;
+  let courtName = courtObj ? courtObj.name : 'Quadra Esportiva';
+  let custName = bToDelete ? (bToDelete.customer_name || bToDelete.customerName || 'Cliente') : 'Cliente';
+  let bDate = bToDelete ? formatDisplayDate(bToDelete.date) : '';
+  let bTime = bToDelete ? (bToDelete.time || `${bToDelete.start_time} às ${bToDelete.end_time}`) : '';
+  let bPrice = bToDelete ? Number(bToDelete.total_price || 0).toFixed(2).replace('.', ',') : '0,00';
 
   // Verifica se este jogo pertence a um mensalista
   const isMensal = isMensalistaBooking(bToDelete) || String(bookingId).startsWith('monthly-');
+  let memberId = null;
+  if (String(bookingId).startsWith('monthly-')) {
+    memberId = String(bookingId).replace('monthly-', '');
+  } else if (bToDelete && bToDelete.monthly_member_id) {
+    memberId = String(bToDelete.monthly_member_id);
+  }
+
   let matchedMember = null;
-  if (bToDelete) {
-    if (bToDelete.monthly_member_id) {
-      matchedMember = (state.monthlyMembers || []).find(m => m.id === bToDelete.monthly_member_id);
-    }
-    if (!matchedMember && String(bookingId).startsWith('monthly-')) {
-      const mId = String(bookingId).replace('monthly-', '');
-      matchedMember = (state.monthlyMembers || []).find(m => m.id === mId);
-    }
-    if (!matchedMember && isMensal) {
-      matchedMember = (state.monthlyMembers || []).find(m => {
-        const cName = (bToDelete.customer_name || bToDelete.customerName || '').toLowerCase();
-        const obs = (bToDelete.observation || '').toLowerCase();
-        const cPhone = (bToDelete.customer_phone || bToDelete.customerPhone || '').replace(/\D/g, '');
-        const mPhone = (m.phone || '').replace(/\D/g, '');
-        if (m.team_name && cName.includes(m.team_name.toLowerCase())) return true;
-        if (m.responsible_name && cName.includes(m.responsible_name.toLowerCase())) return true;
-        if (m.team_name && obs.includes(m.team_name.toLowerCase())) return true;
-        if (cPhone && mPhone && cPhone === mPhone) return true;
-        return false;
-      });
+  if (memberId) {
+    matchedMember = (state.monthlyMembers || []).find(m => m && String(m.id) === memberId);
+  }
+  if (!matchedMember) {
+    matchedMember = (state.monthlyMembers || []).find(m => m && String(m.id) === String(bookingId));
+    if (matchedMember) memberId = String(matchedMember.id);
+  }
+  if (!matchedMember && bToDelete && isMensal) {
+    matchedMember = (state.monthlyMembers || []).find(m => {
+      if (!m) return false;
+      const cName = (bToDelete.customer_name || bToDelete.customerName || '').toLowerCase();
+      const obs = (bToDelete.observation || '').toLowerCase();
+      const cPhone = (bToDelete.customer_phone || bToDelete.customerPhone || '').replace(/\D/g, '');
+      const mPhone = (m.phone || '').replace(/\D/g, '');
+      if (m.team_name && cName.includes(m.team_name.toLowerCase())) return true;
+      if (m.responsible_name && cName.includes(m.responsible_name.toLowerCase())) return true;
+      if (m.team_name && obs.includes(m.team_name.toLowerCase())) return true;
+      if (cPhone && mPhone && cPhone === mPhone) return true;
+      return false;
+    });
+    if (matchedMember) memberId = String(matchedMember.id);
+  }
+
+  if (matchedMember) {
+    if (!bToDelete) {
+      courtObj = (state.courts || []).find(c => c.id === (matchedMember.court_id || matchedMember.courtId));
+      courtName = courtObj ? courtObj.name : 'Quadra Poliesportiva';
+      custName = (matchedMember.team_name || matchedMember.teamName || '') + (matchedMember.responsible_name ? ` (${matchedMember.responsible_name})` : '');
+      bTime = matchedMember.time || `${matchedMember.start_time || '19:00'} às ${matchedMember.end_time || '20:00'}`;
+      bPrice = Number(matchedMember.monthly_price || 0).toFixed(2).replace('.', ',');
     }
   }
 
   let deleteAllMensalista = false;
-  if (isMensal || matchedMember) {
+  if (isMensal || matchedMember || memberId) {
     const memberNameDisplay = matchedMember ? (matchedMember.team_name || matchedMember.responsible_name) : custName;
     deleteAllMensalista = confirm(
       `⭐ ATENÇÃO: Este jogo pertence ao MENSALISTA "${memberNameDisplay}"!\n\n` +
-      `Deseja excluir TODOS OS JOGOS gerados para este mensalista e cancelar o contrato dele também?\n\n` +
-      `• [OK] = Excluir TODOS os jogos deste mensalista e cancelar o contrato\n` +
+      `Deseja excluir TODOS OS JOGOS deste mensalista e cancelar o contrato no banco de dados Supabase?\n\n` +
+      `• [OK] = Excluir TODOS os jogos e cancelar o contrato em nuvem (Supabase)\n` +
       `• [Cancelar] = Apagar APENAS este jogo de hoje`
     );
   }
 
-  const memberId = matchedMember ? matchedMember.id : (bToDelete ? bToDelete.monthly_member_id : null);
-  let idsToRemove = [bookingId];
+  let idsToRemove = [String(bookingId)];
+  if (memberId) {
+    idsToRemove.push(memberId);
+    idsToRemove.push('monthly-' + memberId);
+  }
 
   if (deleteAllMensalista) {
     const bookingsToRemove = (state.bookings || []).filter(b => {
       if (!b) return false;
       if (b.id === bookingId || String(b.id) === String(bookingId)) return true;
-      if (memberId && (b.monthly_member_id === memberId || String(b.id).startsWith('monthly-' + memberId))) return true;
+      if (memberId && (b.monthly_member_id === memberId || String(b.id) === memberId || String(b.id) === 'monthly-' + memberId || String(b.id).startsWith('monthly-' + memberId))) return true;
       if (matchedMember) {
         const cName = (b.customer_name || b.customerName || '').toLowerCase();
         const obs = (b.observation || '').toLowerCase();
@@ -11950,8 +11966,12 @@ async function handleCancelBooking(bookingId) {
       }
       return false;
     });
-    idsToRemove = Array.from(new Set([...bookingsToRemove.map(b => b.id), bookingId]));
+    bookingsToRemove.forEach(b => {
+      if (b && b.id) idsToRemove.push(String(b.id));
+    });
   }
+
+  idsToRemove = Array.from(new Set(idsToRemove));
 
   // ⚡ 1. ATUALIZAÇÃO ULTRA-RÁPIDA (< 5ms): Registra tombstones imediatos e bloqueia notificações
   idsToRemove.forEach(id => {
@@ -11959,22 +11979,33 @@ async function handleCancelBooking(bookingId) {
     addNotifiedBookingId(id);
     if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(String(id));
   });
+  if (memberId) {
+    addDeletedBookingId(memberId);
+    addDeletedBookingId('monthly-' + memberId);
+    addNotifiedBookingId(memberId);
+    addNotifiedBookingId('monthly-' + memberId);
+    if (typeof recentNotifiedBookings !== 'undefined') {
+      recentNotifiedBookings.add(String(memberId));
+      recentNotifiedBookings.add('monthly-' + String(memberId));
+    }
+  }
 
   // ⚡ 2. Remove da memória e do cache local imediatamente (< 5ms)
-  state.bookings = (state.bookings || []).filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+  state.bookings = (state.bookings || []).filter(b => b && !idsToRemove.includes(String(b.id)));
   try {
     let local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
+    local = local.filter(b => b && !idsToRemove.includes(String(b.id)));
     localStorage.setItem('arena_local_bookings', JSON.stringify(local));
   } catch(e) {}
 
-  if (deleteAllMensalista && memberId) {
-    state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== memberId);
+  if (deleteAllMensalista || String(bookingId).startsWith('monthly-') || (matchedMember && !bToDelete)) {
+    if (memberId) {
+      state.monthlyMembers = (state.monthlyMembers || []).filter(m => m && String(m.id) !== memberId && String(m.id) !== String(bookingId));
+    } else if (matchedMember) {
+      state.monthlyMembers = (state.monthlyMembers || []).filter(m => m && m.id !== matchedMember.id);
+    }
     localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
-  } else if (String(bookingId).startsWith('monthly-')) {
-    const mId = String(bookingId).replace('monthly-', '');
-    state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== mId);
-    localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+    try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
   }
 
   // Limpa seleções pendentes
@@ -12042,13 +12073,16 @@ async function handleCancelBooking(bookingId) {
     try {
       const client = window.ArenaSupabase.getClient();
       if (client) {
-        if (deleteAllMensalista && memberId) {
+        if (memberId) {
           client.from('monthly_members').delete().eq('id', memberId).then(() => {}).catch(console.warn);
-        } else if (String(bookingId).startsWith('monthly-')) {
-          const mId = String(bookingId).replace('monthly-', '');
-          client.from('monthly_members').delete().eq('id', mId).then(() => {}).catch(console.warn);
         }
-        client.from('bookings').delete().in('id', idsToRemove).then(() => {}).catch(console.warn);
+        if (deleteAllMensalista && matchedMember && matchedMember.id && matchedMember.id !== memberId) {
+          client.from('monthly_members').delete().eq('id', matchedMember.id).then(() => {}).catch(console.warn);
+        }
+        const realBookingIds = idsToRemove.filter(id => !id.startsWith('monthly-') && id !== memberId);
+        if (realBookingIds.length > 0) {
+          client.from('bookings').delete().in('id', realBookingIds).then(() => {}).catch(console.warn);
+        }
       }
     } catch(e) {
       console.warn('Erro na exclusão remota:', e);
@@ -14046,9 +14080,25 @@ async function deleteMonthlyMember(id) {
 
   const idsToRemove = bookingsToRemove.map(b => b.id);
 
+  // 1.5. Registra tombstones imediatos e bloqueia notificações
+  addDeletedBookingId(id);
+  addDeletedBookingId('monthly-' + id);
+  addNotifiedBookingId(id);
+  addNotifiedBookingId('monthly-' + id);
+  if (typeof recentNotifiedBookings !== 'undefined') {
+    recentNotifiedBookings.add(String(id));
+    recentNotifiedBookings.add('monthly-' + String(id));
+  }
+  idsToRemove.forEach(bId => {
+    addDeletedBookingId(bId);
+    addNotifiedBookingId(bId);
+    if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(String(bId));
+  });
+
   // 2. Remove o mensalista do state e localStorage
   state.monthlyMembers = (state.monthlyMembers || []).filter(m => m.id !== id);
   localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
+  try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
 
   // 3. Remove os agendamentos do state e localStorage
   if (idsToRemove.length > 0) {
@@ -14064,10 +14114,9 @@ async function deleteMonthlyMember(id) {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      await client.from('monthly_members').delete().eq('id', id);
+      client.from('monthly_members').delete().eq('id', id).then(() => {}).catch(console.warn);
       if (idsToRemove.length > 0) {
-        await client.from('bookings').update({ status: 'cancelled' }).in('id', idsToRemove);
-        await client.from('bookings').delete().in('id', idsToRemove);
+        client.from('bookings').delete().in('id', idsToRemove).then(() => {}).catch(console.warn);
       }
     } catch(e) {
       console.warn('Erro ao deletar mensalista/jogos no Supabase:', e);
@@ -14075,7 +14124,8 @@ async function deleteMonthlyMember(id) {
   }
 
   // 5. Transmissão imediata via WebSocket / Broadcast para todos os aparelhos
-  idsToRemove.forEach(bId => {
+  const allBroadcastIds = Array.from(new Set([id, 'monthly-' + id, ...idsToRemove]));
+  allBroadcastIds.forEach(bId => {
     const bObj = bookingsToRemove.find(x => x.id === bId) || {};
     const deletePayload = {
       id: bId,
@@ -18030,7 +18080,9 @@ function triggerBookingNotification(booking, type = 'new') {
   // 2. NUNCA NOTIFICA JOGOS EXCLUÍDOS OU JÁ NOTIFICADOS NESTE DISPOSITIVO
   if (isBookingDeleted(bookingIdStr)) return;
   if (isBookingNotified(bookingIdStr)) return;
-  if (recentNotifiedBookings.has(bookingIdStr)) return;
+  if (recentNotifiedBookings.has(bookingIdStr) || 
+      (bookingIdStr.startsWith('monthly-') && recentNotifiedBookings.has(bookingIdStr.replace('monthly-', ''))) ||
+      (!bookingIdStr.startsWith('monthly-') && recentNotifiedBookings.has('monthly-' + bookingIdStr))) return;
 
   // 3. Nunca notifica jogos cancelados ou finalizados
   if (booking.status === 'cancelled' || booking.status === 'finished') return;
@@ -18230,51 +18282,17 @@ async function syncDataFromSupabase(skipRender = false) {
       localStorage.setItem('arena_local_products', JSON.stringify(filteredProducts));
     }
 
-    if (Array.isArray(dbMembers) && dbMembers.length > 0) {
-      const localMembers = (JSON.parse(localStorage.getItem('arena_monthly_members') || '[]')).filter(m => {
+    if (Array.isArray(dbMembers)) {
+      const validDbMembers = dbMembers.filter(m => {
         if (!m || !m.id) return false;
         const idStr = String(m.id);
-        if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
-        if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
+        if (idStr.includes('ARENA-') || idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
+        if (isBookingDeleted(idStr)) return false;
         return true;
       });
-      const memberMap = new Map();
-      localMembers.forEach(m => { if (m && m.id) memberMap.set(m.id, m); });
-      dbMembers.forEach(m => { 
-        if (m && m.id) {
-          const idStr = String(m.id);
-          if (idStr.includes('ARENA-')) return;
-          if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return;
-          memberMap.set(m.id, m); 
-        }
-      });
-      state.monthlyMembers = Array.from(memberMap.values());
-      localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
-      localStorage.setItem('arena_monthly_members_backup', JSON.stringify(state.monthlyMembers));
-    } else {
-      // Se a nuvem não retornou registros ou falhou, preserva os mensalistas locais e do backup
-      const localMembers = (JSON.parse(localStorage.getItem('arena_monthly_members') || '[]')).filter(m => {
-        if (!m || !m.id) return false;
-        const idStr = String(m.id);
-        if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
-        if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
-        return true;
-      });
-      const backupMembers = (JSON.parse(localStorage.getItem('arena_monthly_members_backup') || '[]')).filter(m => {
-        if (!m || !m.id) return false;
-        const idStr = String(m.id);
-        if (idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-') || idStr.includes('ARENA-')) return false;
-        if (m.phone && m.phone.replace(/\D/g, '') === '81984634126' && (m.day_of_week === 'sexta' || m.dayOfWeek === 'sexta')) return false;
-        return true;
-      });
-      const mergedLocal = [...localMembers];
-      backupMembers.forEach(bm => {
-        if (bm && bm.id && !mergedLocal.some(lm => lm.id === bm.id)) mergedLocal.push(bm);
-      });
-      if (mergedLocal.length > 0) {
-        state.monthlyMembers = mergedLocal;
-        localStorage.setItem('arena_monthly_members', JSON.stringify(mergedLocal));
-      }
+      state.monthlyMembers = validDbMembers;
+      localStorage.setItem('arena_monthly_members', JSON.stringify(validDbMembers));
+      try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
     }
 
     if (dbBookings) {
@@ -18497,10 +18515,17 @@ async function syncDataFromSupabase(skipRender = false) {
         // ──── Mensalistas / Planos Fixos ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'monthly_members' }, async () => {
           const { data } = await client.from('monthly_members').select('*');
-          if (Array.isArray(data) && data.length > 0) { 
-            state.monthlyMembers = data; 
-            localStorage.setItem('arena_monthly_members', JSON.stringify(data));
-            localStorage.setItem('arena_monthly_members_backup', JSON.stringify(data));
+          if (Array.isArray(data)) { 
+            const valid = data.filter(m => {
+              if (!m || !m.id) return false;
+              const idStr = String(m.id);
+              if (idStr.includes('ARENA-') || idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
+              if (isBookingDeleted(idStr)) return false;
+              return true;
+            });
+            state.monthlyMembers = valid; 
+            localStorage.setItem('arena_monthly_members', JSON.stringify(valid));
+            try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
             _refreshAllUI(); 
           }
         })
@@ -18564,11 +18589,13 @@ async function checkAndSyncBookingsBackground() {
     const [
       { data: dbBookings, error },
       { data: dbCourts },
-      { data: dbWaterProduct }
+      { data: dbWaterProduct },
+      { data: dbMonthlyMembers }
     ] = await Promise.all([
       client.from('bookings').select('*'),
       client.from('courts').select('*').order('order_index', { ascending: true }),
-      client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle()
+      client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle(),
+      client.from('monthly_members').select('*')
     ]);
 
     // Sincroniza estoque de água em segundo plano
@@ -18614,6 +18641,25 @@ async function checkAndSyncBookingsBackground() {
         state.bookings = validDbBookings;
         localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
 
+        _refreshAllUI();
+      }
+    }
+
+    // Sincroniza mensalistas / planos fixos em segundo plano
+    if (Array.isArray(dbMonthlyMembers)) {
+      const validMonthly = dbMonthlyMembers.filter(m => {
+        if (!m || !m.id) return false;
+        const idStr = String(m.id);
+        if (idStr.includes('ARENA-') || idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
+        if (isBookingDeleted(idStr)) return false;
+        return true;
+      });
+      const currentIds = (state.monthlyMembers || []).map(m => String(m.id)).sort().join(',');
+      const newIds = validMonthly.map(m => String(m.id)).sort().join(',');
+      if (currentIds !== newIds) {
+        state.monthlyMembers = validMonthly;
+        localStorage.setItem('arena_monthly_members', JSON.stringify(validMonthly));
+        try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
         _refreshAllUI();
       }
     }
