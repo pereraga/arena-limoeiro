@@ -127,11 +127,326 @@ function checkIsSecretAdminUrl() {
 }
 window.checkIsSecretAdminUrl = checkIsSecretAdminUrl;
 
+// ==============================================================================
+// 🍪 SISTEMA DE COOKIES E CONTROLE DE SESSÃO DE 5 HORAS (ARENA LIMOEIRO)
+// ==============================================================================
+const ARENA_SESSION_MAX_IDLE_MS = 5 * 60 * 60 * 1000; // 5 horas sem acesso (18.000.000 ms)
+
+function setArenaCookie(name, value, hours = 5) {
+  try {
+    const d = new Date();
+    d.setTime(d.getTime() + (hours * 60 * 60 * 1000));
+    const expires = "expires=" + d.toUTCString();
+    document.cookie = `${name}=${encodeURIComponent(value)};${expires};path=/;SameSite=Lax`;
+  } catch(e) {
+    console.warn('Aviso gravação cookie:', e);
+  }
+}
+window.setArenaCookie = setArenaCookie;
+
+function getArenaCookie(name) {
+  try {
+    const cname = name + "=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const ca = decodedCookie.split(';');
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) === ' ') {
+        c = c.substring(1);
+      }
+      if (c.indexOf(cname) === 0) {
+        return c.substring(cname.length, c.length);
+      }
+    }
+  } catch(e) {}
+  return "";
+}
+window.getArenaCookie = getArenaCookie;
+
+function removeArenaCookie(name) {
+  try {
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Lax`;
+  } catch(e) {}
+}
+window.removeArenaCookie = removeArenaCookie;
+
+function areCookiesEnabled() {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.cookieEnabled === false) {
+      return false;
+    }
+    const testKey = 'arena_cookie_test_' + Date.now();
+    document.cookie = `${testKey}=1;path=/;SameSite=Lax`;
+    const enabled = document.cookie.indexOf(testKey + '=1') !== -1;
+    document.cookie = `${testKey}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;SameSite=Lax`;
+    return enabled;
+  } catch(e) {
+    return false;
+  }
+}
+window.areCookiesEnabled = areCookiesEnabled;
+
+function isCookieConsentGiven() {
+  try {
+    const local = localStorage.getItem('arena_cookies_accepted');
+    const cookie = getArenaCookie('arena_cookies_accepted');
+    return local === 'true' || cookie === 'true';
+  } catch(e) {
+    return false;
+  }
+}
+window.isCookieConsentGiven = isCookieConsentGiven;
+
+function touchArenaSessionActivity() {
+  const now = Date.now();
+  try {
+    localStorage.setItem('arena_last_activity', String(now));
+  } catch(e) {}
+  try {
+    setArenaCookie('arena_last_activity', String(now), 5);
+  } catch(e) {}
+  if (typeof state !== 'undefined' && state && state.currentUser) {
+    state.currentUser.lastActivityTimestamp = now;
+  }
+}
+window.touchArenaSessionActivity = touchArenaSessionActivity;
+
+function getArenaLastActivityTimestamp() {
+  try {
+    const local = Number(localStorage.getItem('arena_last_activity') || '0');
+    if (local > 0) return local;
+    const cookie = Number(getArenaCookie('arena_last_activity') || '0');
+    if (cookie > 0) return cookie;
+  } catch(e) {}
+  return 0;
+}
+window.getArenaLastActivityTimestamp = getArenaLastActivityTimestamp;
+
+function isArenaSessionExpired() {
+  const lastAct = getArenaLastActivityTimestamp();
+  if (!lastAct) return false;
+  return (Date.now() - lastAct) > ARENA_SESSION_MAX_IDLE_MS;
+}
+window.isArenaSessionExpired = isArenaSessionExpired;
+
+function expireArenaManagerSession(customReason) {
+  const reason = customReason || 'Sua sessão expirou por segurança após mais de 5 horas sem acesso ao aplicativo de controle ou site. Por favor, confirme seu login novamente.';
+  try {
+    localStorage.removeItem('arena_user');
+    localStorage.removeItem('arena_last_activity');
+    removeArenaCookie('arena_user');
+    removeArenaCookie('arena_last_activity');
+  } catch(e) {}
+
+  if (typeof state !== 'undefined' && state) {
+    state.currentUser = null;
+    state.currentMode = 'client';
+    if (typeof renderApp === 'function') renderApp();
+  }
+
+  showSessionExpiredModal(reason);
+}
+window.expireArenaManagerSession = expireArenaManagerSession;
+
+function showSessionExpiredModal(reason = '') {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/85 backdrop-blur-md animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col text-slate-800">
+        
+        <!-- Header de Segurança -->
+        <div class="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center border border-white/30 text-white">
+              <i data-lucide="shield-alert" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-tight">Sessão Expirada (5 Horas)</h3>
+              <p class="text-xs text-amber-200 font-medium">Arena Limoeiro - Controle de Acesso</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-6 space-y-4 text-center">
+          <div class="w-16 h-16 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="clock" class="w-8 h-8"></i>
+          </div>
+
+          <div class="space-y-1.5">
+            <h4 class="text-base font-black text-slate-900">Tempo Limite de 5 Horas Atingido</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              ${escapeHtmlAttr(reason || 'Para garantir a segurança dos dados financeiros e agendamentos, o login de controle expira automaticamente se você passar mais de 5 horas sem entrar ou utilizar o aplicativo.')}
+            </p>
+          </div>
+
+          <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-xs text-amber-900 font-medium flex items-start gap-2">
+            <i data-lucide="info" class="w-4 h-4 text-amber-700 shrink-0 mt-0.5"></i>
+            <span>Faça login novamente com suas credenciais para reativar seu acesso 100% completo com sincronização em tempo real.</span>
+          </div>
+
+          <button type="button" onclick="closeModal(); openLoginModal();" 
+                  class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl font-black text-sm shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer">
+            <i data-lucide="log-in" class="w-4 h-4"></i>
+            <span>Fazer Login Novamente</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.showSessionExpiredModal = showSessionExpiredModal;
+
+function promptCookieActivationModal(force = false) {
+  if (!force && isCookieConsentGiven()) return;
+
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const cookiesSupported = areCookiesEnabled();
+
+  modalRoot.innerHTML = `
+    <div id="arenaCookieModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+      <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col my-auto text-slate-800">
+        
+        <!-- Header -->
+        <div class="arena-header-bg p-5 text-white flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center border border-emerald-400/30 text-emerald-300">
+              <i data-lucide="cookie" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-black uppercase tracking-tight">Ativação de Cookies & Sistema</h3>
+              <p class="text-xs text-emerald-200 font-medium">Arena Limoeiro - Complexo Esportivo</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <div class="flex items-start gap-3">
+            <div class="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 shrink-0">
+              <i data-lucide="shield-check" class="w-6 h-6"></i>
+            </div>
+            <div class="space-y-1">
+              <h4 class="text-sm font-black text-slate-900">Permissão de Cookies para Funcionamento 100%</h4>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                Para que o aplicativo de <strong>Controle (APK)</strong> e o <strong>Site</strong> funcionem com <strong>100% de estabilidade</strong>, o sistema necessita da ativação dos cookies e armazenamento do navegador.
+              </p>
+            </div>
+          </div>
+
+          <!-- O que os cookies garantem -->
+          <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5 text-xs text-slate-700">
+            <span class="font-black text-slate-900 block uppercase tracking-wider text-[11px]">Recursos que dependem dos cookies ativos:</span>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-600 font-black">✓</span>
+              <span><strong>Login Seguro por 5 Horas:</strong> verificação de inatividade para proteger o painel.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-600 font-black">✓</span>
+              <span><strong>Sincronização Supabase em Tempo Real:</strong> partidas e pagamentos instantâneos entre aparelhos.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-600 font-black">✓</span>
+              <span><strong>Notificações Sonoras e WhatsApp:</strong> alertas automáticos de novas reservas sem falhas.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-600 font-black">✓</span>
+              <span><strong>Cache Offline de Segurança:</strong> impede qualquer perda de lançamentos ou partidas.</span>
+            </div>
+          </div>
+
+          ${!cookiesSupported ? `
+            <div class="p-3.5 bg-red-50 border-2 border-red-300 rounded-2xl text-xs text-red-900 space-y-1.5">
+              <div class="flex items-center gap-2 font-black text-red-800">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-red-600"></i>
+                <span>Atenção: Os cookies estão bloqueados no seu navegador!</span>
+              </div>
+              <p class="text-[11px] leading-relaxed">
+                Para liberar no celular ou PC: acesse as <strong>Configurações do Navegador > Privacidade e Segurança > Ativar Cookies / Permitir dados do site</strong> e clique no botão abaixo para confirmar.
+              </p>
+            </div>
+          ` : `
+            <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 font-bold flex items-center gap-2">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600 shrink-0"></i>
+              <span>Seu navegador é compatível e está pronto para ativar a permissão completa!</span>
+            </div>
+          `}
+
+          <div class="pt-2 flex flex-col sm:flex-row gap-2.5">
+            <button type="button" onclick="acceptArenaCookies();" 
+                    class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl font-black text-xs sm:text-sm shadow-md transition-all flex items-center justify-center space-x-2 cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Ativar Cookies & Acesso 100% Funcionando</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.promptCookieActivationModal = promptCookieActivationModal;
+
+function acceptArenaCookies() {
+  try {
+    setArenaCookie('arena_cookies_accepted', 'true', 24 * 365); // 1 ano
+    localStorage.setItem('arena_cookies_accepted', 'true');
+  } catch(e) {}
+
+  closeModal();
+
+  if (typeof showToastNotification === 'function') {
+    showToastNotification(`
+      <strong class="text-emerald-400 font-bold block text-sm mb-0.5">🍪 Cookies Ativados com Sucesso!</strong>
+      <p class="text-slate-300">O sistema está 100% operacional com proteção de login de 5 horas e sincronização em tempo real.</p>
+    `, 4000);
+  }
+}
+window.acceptArenaCookies = acceptArenaCookies;
+
+function checkAndPromptCookiePermission() {
+  if (!isCookieConsentGiven() || !areCookiesEnabled()) {
+    setTimeout(() => {
+      promptCookieActivationModal(false);
+    }, 700);
+  }
+}
+window.checkAndPromptCookiePermission = checkAndPromptCookiePermission;
+
 const _isAdminUrl = checkIsSecretAdminUrl();
 let _savedArenaUser = null;
 try {
   _savedArenaUser = JSON.parse(localStorage.getItem('arena_user') || 'null');
+  if (!_savedArenaUser) {
+    const cookieUser = getArenaCookie('arena_user');
+    if (cookieUser) {
+      _savedArenaUser = JSON.parse(decodeURIComponent(cookieUser));
+    }
+  }
 } catch(e) {}
+
+// Verificação de inatividade de 5 horas ao iniciar o aplicativo de Controle ou Site:
+let _isSessionExpiredAtStartup = false;
+const _startupLastAct = getArenaLastActivityTimestamp();
+if (_savedArenaUser && _startupLastAct > 0 && (Date.now() - _startupLastAct > ARENA_SESSION_MAX_IDLE_MS)) {
+  _isSessionExpiredAtStartup = true;
+  _savedArenaUser = null;
+  try {
+    localStorage.removeItem('arena_user');
+    localStorage.removeItem('arena_last_activity');
+    removeArenaCookie('arena_user');
+    removeArenaCookie('arena_last_activity');
+  } catch(e) {}
+}
+
+window._pendingSessionExpiredNotice = _isSessionExpiredAtStartup;
 
 // Validação estrita de credenciais aceitas:
 // O usuário precisa ter sido autenticado com sucesso no login da gerência (authenticated === true)
@@ -145,15 +460,24 @@ const _isUserProperlyLogged = !!(
 if (!_isUserProperlyLogged) {
   _savedArenaUser = null;
   try { localStorage.removeItem('arena_user'); } catch(e) {}
+} else {
+  // Usuário autenticado e ativo dentro das 5 horas: renova atividade recente
+  touchArenaSessionActivity();
 }
 
-// 🔐 CONTROLE GLOBAL DE AUTENTICAÇÃO DO GESTOR
+// 🔐 CONTROLE GLOBAL DE AUTENTICAÇÃO DO GESTOR COM VERIFICAÇÃO DE 5 HORAS
 function isManagerLoggedIn() {
   if (!state || !state.currentUser) return false;
   const u = state.currentUser;
   if (!u.email || typeof u.email !== 'string') return false;
   if (!u.role || typeof u.role !== 'string') return false;
   if (u.authenticated !== true) return false;
+
+  // Verificação estrita do limite de 5 horas sem entrada/uso no aplicativo de Controle ou site
+  if (isArenaSessionExpired()) {
+    expireArenaManagerSession('Sua sessão expirou por segurança após mais de 5 horas sem acesso ao aplicativo de controle ou site. Por favor, faça login novamente.');
+    return false;
+  }
 
   try {
     const saved = JSON.parse(localStorage.getItem('arena_user') || 'null');
@@ -677,14 +1001,15 @@ function isCourtDiscountTime(court, time) {
   if (!hasDiscount) return false;
 
   const tMin = timeToMinutes(time);
-  const sMin = timeToMinutes(startHour);
-  const eMin = timeToMinutes(endHour);
+  const sMin = timeToMinutes(startHour || '09:00');
+  const eMin = timeToMinutes(endHour || '16:00');
 
-  return tMin >= sMin && tMin <= eMin;
+  // Válido a partir do horário de início da promoção até antes do término (ex: 09:00 até 15:59)
+  return tMin >= sMin && tMin < eMin;
 }
 
 function getCourtHourlyPrice(court, time = null) {
-  if (!court) return 140;
+  if (!court) return 90;
   const normalPrice = getCourtNormalHourlyPrice(court);
   const checkTime = time || (typeof state !== 'undefined' ? state.startTime : null);
   if (checkTime && isCourtDiscountTime(court, checkTime)) {
@@ -699,6 +1024,252 @@ function getCourtMonthlyPrice(court) {
   return parseFloat(court.monthlyPrice || court.monthly_price || (getCourtNormalHourlyPrice(court) * 3.6));
 }
 
+// ==============================================================================
+// ⏱️ CÁLCULO E VERIFICAÇÃO RIGOROSA DE HORÁRIOS & PREÇOS DA PARTIDA
+// ==============================================================================
+function calculateCourtMatchPrice(court, startTime, endTime) {
+  if (!court || !startTime || !endTime) return 0;
+  const sMin = timeToMinutes(startTime);
+  const eMin = timeToMinutes(endTime);
+  if (eMin <= sMin) return 0;
+
+  const normalRate = getCourtNormalHourlyPrice(court);
+  const { hasDiscount, discountPrice, startHour, endHour } = getCourtDiscountInfo(court);
+  const promoStartMin = timeToMinutes(startHour || '09:00');
+  const promoEndMin = timeToMinutes(endHour || '16:00');
+
+  let total = 0;
+  // Integração minuto a minuto para precisão absoluta em qualquer duração
+  for (let m = sMin; m < eMin; m++) {
+    const isPromo = hasDiscount && discountPrice > 0 && (m >= promoStartMin && m < promoEndMin);
+    const minuteRate = isPromo ? (discountPrice / 60) : (normalRate / 60);
+    total += minuteRate;
+  }
+  return Math.round(total * 100) / 100;
+}
+window.calculateCourtMatchPrice = calculateCourtMatchPrice;
+
+function verifyMatchTimeAndPricing({
+  court,
+  courtId,
+  startTime,
+  endTime,
+  date,
+  durationMin = null,
+  isMensalista = false,
+  excludeBookingId = null
+} = {}) {
+  const resolvedCourt = court || (state.courts || []).find(c => c.id === (courtId || (state.selectedCourt?.id)));
+  const normalHourlyRate = resolvedCourt ? getCourtNormalHourlyPrice(resolvedCourt) : 90;
+  const { hasDiscount, discountPrice, startHour, endHour } = resolvedCourt ? getCourtDiscountInfo(resolvedCourt) : { hasDiscount: false, discountPrice: 0, startHour: '09:00', endHour: '16:00' };
+
+  const sMin = startTime ? timeToMinutes(startTime) : 0;
+  let eMin = endTime ? timeToMinutes(endTime) : (sMin + (durationMin || 60));
+  if (eMin <= sMin) {
+    eMin = sMin + (durationMin || 60);
+  }
+  const calcDurationMin = eMin - sMin;
+  const validStartTime = minutesToTime(sMin);
+  const validEndTime = minutesToTime(eMin);
+
+  const errors = [];
+  const warnings = [];
+
+  const arenaOpenMin = 6 * 60;   // 06:00
+  const arenaCloseMin = 22 * 60; // 22:00
+
+  if (sMin < arenaOpenMin) {
+    errors.push(`Horário de início (${validStartTime}) antes da abertura da Arena (06:00).`);
+  }
+  if (eMin > arenaCloseMin) {
+    errors.push(`Horário de término (${validEndTime}) ultrapassa o fechamento da Arena (22:00).`);
+  }
+
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  if (date === todayStr && sMin < nowMin) {
+    warnings.push(`O horário (${validStartTime}) já passou no dia de hoje.`);
+    errors.push(`O horário (${validStartTime}) já se encerrou hoje.`);
+  }
+
+  // Verificação de conflito se quadra e data fornecidas
+  if (resolvedCourt && date && typeof checkScheduleConflict === 'function') {
+    const conflictInfo = checkScheduleConflict(resolvedCourt.id, date, validStartTime, validEndTime, excludeBookingId);
+    if (conflictInfo && conflictInfo.conflict) {
+      errors.push(conflictInfo.reason);
+    }
+  }
+
+  // Cálculo de valor
+  let totalPrice = 0;
+  let promoMinutes = 0;
+  let normalMinutes = 0;
+
+  if (isMensalista) {
+    totalPrice = resolvedCourt ? getCourtMonthlyPrice(resolvedCourt) : (normalHourlyRate * 3.6);
+  } else if (resolvedCourt) {
+    const promoStartMin = timeToMinutes(startHour || '09:00');
+    const promoEndMin = timeToMinutes(endHour || '16:00');
+
+    for (let m = sMin; m < eMin; m++) {
+      const isBlockPromo = hasDiscount && discountPrice > 0 && (m >= promoStartMin && m < promoEndMin);
+      if (isBlockPromo) {
+        promoMinutes++;
+        totalPrice += (discountPrice / 60);
+      } else {
+        normalMinutes++;
+        totalPrice += (normalHourlyRate / 60);
+      }
+    }
+    totalPrice = Math.round(totalPrice * 100) / 100;
+  }
+
+  const hasPromo = promoMinutes > 0;
+  const hours = Math.floor(calcDurationMin / 60);
+  const mins = calcDurationMin % 60;
+  const formattedDuration = hours > 0 ? (mins > 0 ? `${hours}h ${mins}min` : `${hours} hora${hours > 1 ? 's' : ''}`) : `${mins} min`;
+
+  let priceLabel = '';
+  if (isMensalista) {
+    priceLabel = `R$ ${totalPrice.toFixed(2).replace('.', ',')} (Mensalidade com 4 jogos)`;
+  } else if (hasPromo && normalMinutes === 0) {
+    priceLabel = `R$ ${totalPrice.toFixed(2).replace('.', ',')} (🔥 Promoção 09h às 16h: R$ ${discountPrice.toFixed(2).replace('.', ',')}/h)`;
+  } else if (hasPromo) {
+    priceLabel = `R$ ${totalPrice.toFixed(2).replace('.', ',')} (🔥 Promoção parcial das 09h às 16h)`;
+  } else {
+    priceLabel = `R$ ${totalPrice.toFixed(2).replace('.', ',')} (Normal: R$ ${normalHourlyRate.toFixed(2).replace('.', ',')}/h)`;
+  }
+
+  return {
+    isValid: errors.length === 0,
+    startTime: validStartTime,
+    endTime: validEndTime,
+    durationMin: calcDurationMin,
+    formattedDuration,
+    timeFormatted: `${validStartTime} às ${validEndTime}`,
+    totalPrice,
+    isPromo: hasPromo,
+    promoMinutes,
+    normalMinutes,
+    normalHourlyRate,
+    promoHourlyRate: discountPrice,
+    priceLabel,
+    errors,
+    warnings,
+    court: resolvedCourt
+  };
+}
+window.verifyMatchTimeAndPricing = verifyMatchTimeAndPricing;
+
+// ==============================================================================
+// 📲 EXPORTAÇÃO & ENVIO VERIFICADO PARA O WHATSAPP (HORAS E VALORES EXATOS)
+// ==============================================================================
+function generateVerifiedWhatsAppBookingMessage(booking) {
+  if (!booking) return '';
+
+  const courtId = booking.court_id || booking.courtId || (state.selectedCourt?.id);
+  const court = (state.courts || []).find(c => c.id === courtId) || state.selectedCourt || { name: 'Quadra Esportiva' };
+  
+  const customerName = booking.customer_name || booking.customerName || state.customerName || 'Cliente';
+  const customerPhone = booking.customer_phone || booking.customerPhone || state.customerPhone || '';
+  const date = booking.date || state.selectedDate || getFormattedDate(new Date());
+  
+  const rawStartTime = booking.start_time || booking.startTime || (booking.time ? booking.time.split(' ')[0] : '19:00');
+  const rawEndTime = booking.end_time || booking.endTime || (booking.time ? booking.time.split(' às ')[1] : '20:00');
+  const isMensal = !!(booking.isMensalista || (typeof isMensalistaBooking === 'function' && isMensalistaBooking(booking)));
+
+  // Executa verificação rigorosa de horários e valores
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    startTime: rawStartTime,
+    endTime: rawEndTime,
+    date,
+    isMensalista: isMensal,
+    excludeBookingId: booking.id
+  });
+
+  const verifiedStart = verification.startTime;
+  const verifiedEnd = verification.endTime;
+  const verifiedDuration = verification.formattedDuration;
+  
+  let finalPrice = verification.totalPrice;
+  if (typeof booking.total_price === 'number' && booking.total_price > 0 && Math.abs(booking.total_price - verification.totalPrice) > 5) {
+    finalPrice = booking.total_price;
+  } else if (typeof booking.totalPrice === 'number' && booking.totalPrice > 0 && Math.abs(booking.totalPrice - verification.totalPrice) > 5) {
+    finalPrice = booking.totalPrice;
+  }
+
+  const formattedDate = (typeof formatFullDate === 'function' ? formatFullDate(date) : null) || 
+                        (typeof formatDisplayDate === 'function' ? formatDisplayDate(date) : null) || date;
+  const bookingId = booking.id ? `#${booking.id}` : '#ARENA';
+  
+  const pMethod = (booking.payment_method || booking.paymentMethod || 'local').toLowerCase();
+  const paymentLabels = {
+    local: 'Pagar na Recepção / Balcão da Arena',
+    pix: 'PIX',
+    dinheiro: 'Dinheiro',
+    cartao_credito: 'Cartão de Crédito',
+    cartao_debito: 'Cartão de Débito',
+    isento: 'Cortesia / Isento'
+  };
+  const paymentDesc = paymentLabels[pMethod] || 'Pagar no Balcão';
+
+  const cart = booking.product_cart || booking.productCart || {};
+  const barItems = Object.entries(cart)
+    .filter(([k, v]) => !k.startsWith('_') && typeof v === 'number' && v > 0)
+    .map(([k, v]) => {
+      const prod = (state.products || []).find(p => p.id === k);
+      return `${v}x ${prod ? prod.name : k}`;
+    });
+  const barText = barItems.length > 0 ? `\n🥤 *Itens Guardados no Bar:* ${barItems.join(', ')}` : '';
+
+  const promoBadge = verification.isPromo ? `\n🔥 *Tarifa Promocional:* Horário com desconto aplicado (09h às 16h)` : '';
+
+  return (
+`🏟️ *ARENA LIMOEIRO - COMPROVANTE OFICIAL DE JOGO* ⚽
+
+Olá, *${customerName}*! Seu agendamento foi verificado e confirmado no sistema:
+
+🏟️ *Espaço:* ${court.name}
+📅 *Data:* ${formattedDate}
+⏰ *Horário Verificado:* ${verifiedStart} às ${verifiedEnd} (${verifiedDuration})
+💰 *Valor do Jogo:* R$ ${finalPrice.toFixed(2).replace('.', ',')}${promoBadge}
+💳 *Pagamento:* ${paymentDesc}${barText}
+📌 *Identificador:* ${bookingId}
+
+📍 *Localização:* Arena Limoeiro - Complexo Poliesportivo
+⚠️ *Aviso aos Atletas:* Cheguem com 10 minutos de antecedência para aquecimento e liberação da quadra.
+
+Nos vemos na Arena Limoeiro! 🏃‍♂️⚽`
+  );
+}
+window.generateVerifiedWhatsAppBookingMessage = generateVerifiedWhatsAppBookingMessage;
+
+function openVerifiedBookingWhatsApp(bookingOrId, targetPhone = null) {
+  let booking = bookingOrId;
+  if (typeof bookingOrId === 'string' || typeof bookingOrId === 'number') {
+    booking = (state.bookings || []).find(b => String(b.id) === String(bookingOrId)) ||
+              ((Array.isArray(state.matches) ? state.matches : []).find(m => String(m.id) === String(bookingOrId)));
+  }
+  if (!booking) {
+    alert('Partida não encontrada para envio.');
+    return;
+  }
+
+  const phone = targetPhone || booking.customer_phone || booking.customerPhone || state.customerPhone || '';
+  const cleanPhone = (phone || '').replace(/\D/g, '');
+  const msg = generateVerifiedWhatsAppBookingMessage(booking);
+  const encodedMsg = encodeURIComponent(msg);
+
+  const zapUrl = cleanPhone.length >= 10 
+    ? `https://wa.me/55${cleanPhone}?text=${encodedMsg}`
+    : `https://api.whatsapp.com/send?text=${encodedMsg}`;
+
+  window.open(zapUrl, '_blank');
+}
+window.openVerifiedBookingWhatsApp = openVerifiedBookingWhatsApp;
+
 function canAdvanceFromStep(step) {
   if (step === 1) {
     return !!state.selectedCourt;
@@ -708,8 +1279,15 @@ function canAdvanceFromStep(step) {
   }
   if (step === 3) {
     if (!state.selectedCourt || !state.selectedDate || !state.startTime || !state.endTime) return false;
-    const conflict = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
-    return !conflict.conflict;
+    const verification = verifyMatchTimeAndPricing({
+      court: state.selectedCourt,
+      startTime: state.startTime,
+      endTime: state.endTime,
+      date: state.selectedDate,
+      durationMin: state.selectedDuration,
+      isMensalista: state.bookingType === 'mensalista'
+    });
+    return verification.isValid;
   }
   return true;
 }
@@ -724,11 +1302,16 @@ function calculateDuration() {
   }
   const startMin = timeToMinutes(state.startTime);
   let endMin = timeToMinutes(state.endTime);
+  const maxCloseMin = 22 * 60; // 22:00
   if (endMin <= startMin) {
     endMin = startMin + (state.selectedDuration || 60);
+    if (endMin > maxCloseMin) endMin = maxCloseMin;
+    state.endTime = minutesToTime(endMin);
+  } else if (endMin > maxCloseMin) {
+    endMin = maxCloseMin;
     state.endTime = minutesToTime(endMin);
   }
-  state.selectedDuration = endMin - startMin;
+  state.selectedDuration = Math.max(30, endMin - startMin);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -793,6 +1376,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Polling em segundo plano a cada 3.5s para sincronizar agendamentos em tempo real de forma blindada
   setInterval(checkAndSyncBookingsBackground, 3500);
+
+  // 5. 🍪 Verificação de Cookies e Verificação de Login de 5 Horas
+  if (window._pendingSessionExpiredNotice) {
+    setTimeout(() => {
+      showSessionExpiredModal('Sua sessão expirou por segurança após mais de 5 horas sem acesso ao aplicativo de controle ou site.');
+    }, 450);
+  } else {
+    checkAndPromptCookiePermission();
+  }
+
+  // Monitora inatividade de 5 horas em background a cada minuto
+  setInterval(() => {
+    if (state && state.currentUser && isArenaSessionExpired()) {
+      expireArenaManagerSession('Sua sessão expirou por segurança após mais de 5 horas sem acesso ao aplicativo de controle ou site.');
+    }
+  }, 60000);
+
+  // Renova atividade recente quando o gestor interagir com a tela (throttle de 15 segundos)
+  let _lastActivityTouch = 0;
+  const registerUserActivity = () => {
+    const now = Date.now();
+    if (now - _lastActivityTouch > 15000) {
+      _lastActivityTouch = now;
+      if (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn()) {
+        touchArenaSessionActivity();
+      }
+    }
+  };
+  ['pointerdown', 'keydown', 'touchstart'].forEach(evt => {
+    window.addEventListener(evt, registerUserActivity, { passive: true });
+  });
 });
 
 // BATIMENTO AO VIVO: Atualiza a contagem dos cronômetros sem resetar o scroll da tela
@@ -1595,6 +2209,12 @@ function renderStepper() {
         </div>
 
         <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
+          <button onclick="promptCookieActivationModal(true)" 
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-600/50 text-slate-200 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
+                  title="Configuração de Cookies e Sessão de 5 Horas">
+            <i data-lucide="cookie" class="w-3.5 h-3.5 flex-shrink-0 text-amber-400"></i>
+            <span class="hidden sm:inline">Cookies 100%</span>
+          </button>
           <button onclick="switchToClientView()" 
                   class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
                   title="Ver agendamento como cliente">
@@ -2630,12 +3250,20 @@ function renderStep3Content() {
       state.endTime = minutesToTime(safeEndMin);
     }
 
-    calculateDuration();
-  const basePrice = getCourtHourlyPrice(court);
+  calculateDuration();
+  const verifiedMatch = (state.startTime && state.endTime) ? verifyMatchTimeAndPricing({
+    court,
+    startTime: state.startTime,
+    endTime: state.endTime,
+    date: state.selectedDate,
+    durationMin: state.selectedDuration,
+    isMensalista: state.bookingType === 'mensalista'
+  }) : null;
+
   const hoursFraction = (state.selectedDuration || 60) / 60;
-  const courtFinalPrice = state.bookingType === 'mensalista' ? 
-    getCourtMonthlyPrice(court) : 
-    (basePrice * hoursFraction);
+  const courtFinalPrice = verifiedMatch ? verifiedMatch.totalPrice : (
+    state.bookingType === 'mensalista' ? getCourtMonthlyPrice(court) : (getCourtHourlyPrice(court) * hoursFraction)
+  );
 
   const durationHours = Math.floor(state.selectedDuration / 60);
   const durationMins = state.selectedDuration % 60;
@@ -2945,43 +3573,46 @@ function renderStep3Content() {
           return '';
         })()}
 
-          <!-- Resumo do horário selecionado -->
+          <!-- Resumo do horário selecionado com Verificação Rigorosa -->
           ${state.startTime && state.endTime ? (() => {
-            const isDiscApplied = isCourtDiscountTime(court, state.startTime);
-            const effectivePrice = getCourtHourlyPrice(court, state.startTime);
-            const normalPrice = getCourtNormalHourlyPrice(court);
+            const verification = verifyMatchTimeAndPricing({
+              court,
+              startTime: state.startTime,
+              endTime: state.endTime,
+              date: state.selectedDate,
+              durationMin: state.selectedDuration,
+              isMensalista: state.bookingType === 'mensalista'
+            });
 
             return `
               <div class="bg-gradient-to-br from-emerald-600 to-emerald-800 p-5 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 border border-emerald-500/50">
                 <div>
                   <div class="flex items-center space-x-2 flex-wrap gap-1">
-                    <span class="px-2.5 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-black uppercase tracking-wider">Horário Confirmado</span>
-                    <span class="text-xs text-white font-black">${state.startTime} às ${state.endTime}</span>
+                    <span class="px-2.5 py-0.5 rounded-md bg-white/20 text-white text-[10px] font-black uppercase tracking-wider">Horário Verificado</span>
+                    <span class="text-xs text-white font-black">${verification.startTime} às ${verification.endTime}</span>
                     <span class="px-2 py-0.5 rounded-md bg-white/20 text-emerald-100 text-[10px] font-bold">
-                      ${formattedDuration}
+                      ${verification.formattedDuration}
                     </span>
-                    ${isDiscApplied ? `
+                    ${verification.isPromo ? `
                       <span class="px-2 py-0.5 rounded-md bg-amber-400 text-slate-950 text-[10px] font-black uppercase flex items-center shadow-xs">
-                        🔥 Desconto Especial Aplicado
+                        🔥 Tarifa Promocional (09h às 16h)
                       </span>
                     ` : ''}
                   </div>
                   <p class="text-base sm:text-xl font-black text-white mt-1.5">
-                    ⏱️ Jogo das <span class="underline decoration-emerald-300 decoration-2 underline-offset-2">${state.startTime}</span> até às <span class="underline decoration-emerald-300 decoration-2 underline-offset-2">${state.endTime}</span> (${formattedDuration})
+                    ⏱️ Jogo das <span class="underline decoration-emerald-300 decoration-2 underline-offset-2">${verification.startTime}</span> até às <span class="underline decoration-emerald-300 decoration-2 underline-offset-2">${verification.endTime}</span> (${verification.formattedDuration})
                   </p>
                   <p class="text-xs text-emerald-100 mt-0.5">
-                    ${isDiscApplied ? `
-                      Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h <span class="line-through text-emerald-200 text-[11px]">R$ ${normalPrice.toFixed(2)}</span> (Desconto Especial de Horário)
-                    ` : `
-                      Cálculo: ${hoursFraction}h x R$ ${effectivePrice.toFixed(2)}/h
-                    `}
+                    ${verification.priceLabel}
                   </p>
-
+                  ${verification.warnings.length > 0 ? `
+                    <p class="text-[11px] text-amber-200 mt-1 font-bold">⚠️ ${verification.warnings.join(' • ')}</p>
+                  ` : ''}
                 </div>
                 <div class="text-right bg-white text-slate-900 px-5 py-3 rounded-2xl border border-emerald-300 shadow-md w-full sm:w-auto">
-                  <span class="text-[10px] font-bold text-slate-400 block uppercase">Valor das Horas</span>
+                  <span class="text-[10px] font-bold text-slate-400 block uppercase">Valor Verificado</span>
                   <p class="text-xl sm:text-2xl font-black text-emerald-700">
-                    R$ ${courtFinalPrice.toFixed(2).replace('.', ',')}
+                    R$ ${verification.totalPrice.toFixed(2).replace('.', ',')}
                   </p>
                 </div>
               </div>
@@ -3131,6 +3762,12 @@ function handleSlotClick(time) {
   if (!slot || (slot.status !== 'available' && !slot.endsBooking)) return;
 
   const clickedMin = timeToMinutes(time);
+  const arenaClosingMin = 22 * 60; // 22:00
+
+  if (clickedMin >= arenaClosingMin) {
+    alert("⚠️ A Arena Limoeiro encerra o funcionamento às 22:00.\nPor favor, selecione um horário de início anterior às 22:00.");
+    return;
+  }
 
   // Helper para verificar se um bloco de 30min está disponível para jogo
   const isSlotPlayable = (tMin) => {
@@ -3143,7 +3780,7 @@ function handleSlotClick(time) {
   if (state.startTime === time) {
     if (state.selectedDuration > 30) {
       // Alterna para 30 minutos (Início às XX:XX, Término às XX:XX + 30m)
-      const endT = minutesToTime(clickedMin + 30);
+      const endT = minutesToTime(Math.min(clickedMin + 30, arenaClosingMin));
       state.endTime = endT;
       state.selectedDuration = 30;
       state.selectedSlots = [time, endT];
@@ -3169,8 +3806,8 @@ function handleSlotClick(time) {
       // Caso 2a: Se clicou no slot imediatamente seguinte (+30min)
       if (clickedMin === startMin + 30) {
         if (state.endTime === time && state.selectedDuration === 30) {
-          // Já está em 30 min: expande para 1 hora (60 min) se o próximo intervalo estiver livre
-          if (isSlotPlayable(startMin + 30)) {
+          // Já está em 30 min: expande para 1 hora (60 min) se o próximo intervalo estiver livre e dentro de 22:00
+          if (startMin + 60 <= arenaClosingMin && isSlotPlayable(startMin + 30)) {
             const endT = minutesToTime(startMin + 60);
             state.endTime = endT;
             state.selectedDuration = 60;
@@ -3191,26 +3828,28 @@ function handleSlotClick(time) {
 
       // Caso 2b: Clicou em um horário mais à frente (ex: 15:00, 15:30, 16:00...)
       // O usuário quer definir esse horário como o Término da partida!
-      let canExtend = true;
-      const rangeSlots = [];
-      for (let m = startMin; m < clickedMin; m += 30) {
-        if (!isSlotPlayable(m)) {
-          canExtend = false;
-          break;
+      if (clickedMin <= arenaClosingMin) {
+        let canExtend = true;
+        const rangeSlots = [];
+        for (let m = startMin; m < clickedMin; m += 30) {
+          if (!isSlotPlayable(m)) {
+            canExtend = false;
+            break;
+          }
+          rangeSlots.push(minutesToTime(m));
         }
-        rangeSlots.push(minutesToTime(m));
-      }
 
-      if (canExtend) {
-        state.endTime = time;
-        rangeSlots.push(time);
-        state.selectedSlots = rangeSlots;
-        state.selectedDuration = clickedMin - startMin;
-        calculateDuration();
-        renderStep3Content();
-        renderBottomBar();
-        if (window.lucide) lucide.createIcons();
-        return;
+        if (canExtend) {
+          state.endTime = time;
+          rangeSlots.push(time);
+          state.selectedSlots = rangeSlots;
+          state.selectedDuration = clickedMin - startMin;
+          calculateDuration();
+          renderStep3Content();
+          renderBottomBar();
+          if (window.lucide) lucide.createIcons();
+          return;
+        }
       }
       // Se não pôde estender por haver horário ocupado no meio, cai para nova seleção a partir de `time`
     }
@@ -3220,7 +3859,7 @@ function handleSlotClick(time) {
   // Seleciona inicialmente 30 minutos (início no horário clicado até +30min).
   // O usuário pode estender clicando no horário de término na grade ou no seletor manual.
   state.startTime = time;
-  const endT = minutesToTime(clickedMin + 30);
+  const endT = minutesToTime(Math.min(clickedMin + 30, arenaClosingMin));
   state.endTime = endT;
   state.selectedDuration = 30;
   state.selectedSlots = [time, endT];
@@ -3235,6 +3874,11 @@ function handleTimeChange(val, type) {
   if (type === 'start') {
     handleSlotClick(val);
     return;
+  }
+  const valMin = timeToMinutes(val);
+  const maxClose = 22 * 60;
+  if (valMin > maxClose) {
+    val = '22:00';
   }
   state.endTime = val;
   calculateDuration();
@@ -3328,9 +3972,16 @@ function renderStep4(container) {
   const isMensal = state.bookingType === 'mensalista';
   const hoursFraction = state.selectedDuration / 60;
   
-  // VALOR TOTAL ONLINE: APENAS O VALOR DAS HORAS DE JOGO DA QUADRA!
-  const basePrice = getCourtHourlyPrice(court);
-  const courtPrice = isMensal ? getCourtMonthlyPrice(court) : (basePrice * hoursFraction);
+  // VALOR TOTAL ONLINE: APENAS O VALOR DAS HORAS DE JOGO DA QUADRA (VERIFICADO)!
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    startTime: state.startTime,
+    endTime: state.endTime,
+    date: state.selectedDate,
+    durationMin: state.selectedDuration,
+    isMensalista: isMensal
+  });
+  const courtPrice = verification.totalPrice;
 
   const savedBarItems = Object.entries(state.productCart || {}).map(([prodId, qty]) => {
     if (prodId.startsWith('_') || typeof qty !== 'number' || qty <= 0) return null;
@@ -3414,9 +4065,9 @@ function renderStep4(container) {
             <h4 class="text-base font-black text-slate-900">${court.name}</h4>
             <p class="text-xs text-slate-500 mt-0.5">
               ${isMensal ? '👑 Contrato de Horário Fixo (Horário semanal com 4 jogos no mês)' : 
-                (isCourtDiscountTime(court, state.startTime) ? 
-                  `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h) <span class="text-amber-900 font-black bg-amber-100 border border-amber-300 px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 mt-1 sm:mt-0">🔥 Desconto de Horário (${getCourtDiscountInfo(court).startHour} às ${getCourtDiscountInfo(court).endHour})</span>` : 
-                  `Partida de ${state.selectedDuration} minutos (${hoursFraction}h x R$ ${basePrice.toFixed(2)}/h)`
+                (verification.isPromo ? 
+                  `Partida de ${verification.formattedDuration} • <span class="text-amber-900 font-black bg-amber-100 border border-amber-300 px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 mt-1 sm:mt-0">🔥 ${verification.priceLabel}</span>` : 
+                  `Partida de ${verification.formattedDuration} • ${verification.priceLabel}`
                 )
               }
             </p>
@@ -4189,8 +4840,11 @@ function handleVerifyPinSubmit(event, userEmail) {
 function completeAdminLogin(authenticatedUser) {
   authenticatedUser.authenticated = true;
   authenticatedUser.loginTimestamp = Date.now();
+  authenticatedUser.lastActivityTimestamp = Date.now();
   state.currentUser = authenticatedUser;
   localStorage.setItem('arena_user', JSON.stringify(authenticatedUser));
+  touchArenaSessionActivity();
+  setArenaCookie('arena_user', encodeURIComponent(JSON.stringify(authenticatedUser)), 5);
   closeModal();
   state.currentMode = 'admin';
   state.adminTab = 'live_dashboard';
@@ -4670,6 +5324,9 @@ function logoutAdmin() {
   state.currentUser = null;
   try {
     localStorage.removeItem('arena_user');
+    localStorage.removeItem('arena_last_activity');
+    removeArenaCookie('arena_user');
+    removeArenaCookie('arena_last_activity');
   } catch(e) {}
   state.currentMode = 'client';
   renderApp();
@@ -5850,7 +6507,10 @@ function renderLiveDashboardTab() {
               const court = state.courts.find(c => c.id === match.court_id) || { name: 'Quadra Esportiva', image: '/logo.jpg', categoryLabel: 'Esporte' };
               const cleanPhone = (match.customer_phone || '').replace(/\D/g, '');
               const formattedPhone = formatPhone(match.customer_phone);
-              const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent('Olá ' + match.customer_name + '! Falamos da Arena Limoeiro sobre o seu jogo agendado para hoje (' + match.time + ') no ' + court.name + '.')}`;
+              const verifiedMsg = generateVerifiedWhatsAppBookingMessage(match);
+              const whatsappUrl = cleanPhone.length >= 10 
+                ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(verifiedMsg)}`
+                : `https://api.whatsapp.com/send?text=${encodeURIComponent(verifiedMsg)}`;
 
               // Duração formatada
               const durHours = Math.floor(match.durationMin / 60);
@@ -6010,6 +6670,12 @@ function renderLiveDashboardTab() {
                           <span>Editar Partida</span>
                         </button>
                       ` : ''}
+
+                      <!-- Botão WhatsApp com Comprovante Verificado -->
+                      <button onclick="openVerifiedBookingWhatsApp('${match.id}')" class="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 border border-emerald-300 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Enviar comprovante com horário e valor verificados no WhatsApp">
+                        <i data-lucide="message-circle" class="w-4 h-4 text-emerald-600"></i>
+                        <span>WhatsApp</span>
+                      </button>
 
                       <!-- Botão de Apagar Jogo (Apenas Gerente do Sistema e Administrador Geral) -->
                       ${canDeleteBookings() ? `
@@ -10741,8 +11407,10 @@ function renderSubtabBookingsItems(bookings) {
   return bookings.map(b => {
     const court = (state.courts || []).find(c => c.id === (b.court_id || b.courtId)) || { name: 'Quadra Esportiva' };
     const cleanPhone = (b.customer_phone || '').replace(/\D/g, '');
-    const zapMsg = `Olá ${b.customer_name || 'Cliente'}! Falamos da Arena Limoeiro sobre o seu jogo no dia ${formatDisplayDate(b.date)} (${b.time || b.start_time}) na quadra ${court.name}.`;
-    const zapUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`;
+    const zapMsg = generateVerifiedWhatsAppBookingMessage(b);
+    const zapUrl = cleanPhone.length >= 10 
+      ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(zapMsg)}`;
 
     let statusBadge = '';
     if (b.status === 'in_progress' || b.status === 'live') {
@@ -10816,6 +11484,11 @@ function renderSubtabBookingsItems(bookings) {
               <span>Editar</span>
             </button>
           ` : ''}
+
+          <button onclick="openVerifiedBookingWhatsApp('${b.id}')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" title="Enviar comprovante com horário e valor verificados no WhatsApp">
+            <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>WhatsApp</span>
+          </button>
 
           ${canDeleteBookings() ? `
             <button onclick="handleCancelBooking('${b.id}')" class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Apagar este jogo do sistema e liberar o horário imediatamente">
@@ -12261,10 +12934,10 @@ function handleDirectTimeChange() {
   const sMin = timeToMinutes(sTime);
   let eMin = timeToMinutes(endSelect.value);
 
-  // Se término for menor ou igual ao início, empurra término para início + 60 min
+  // Se término for menor ou igual ao início, empurra término para início + 60 min (máx 22:00)
   if (isNaN(eMin) || eMin <= sMin) {
-    const newEndMin = sMin + 60;
-    const h = Math.floor(newEndMin / 60) % 24;
+    const newEndMin = Math.min(sMin + 60, 22 * 60);
+    const h = Math.floor(newEndMin / 60);
     const m = newEndMin % 60;
     const newEndTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     
@@ -12287,16 +12960,14 @@ function handleDirectEndTimeChange() {
 
   const sMin = timeToMinutes(timeSelect.value);
   let eMin = timeToMinutes(endSelect.value);
-  if (endSelect.value === '00:00') eMin = 1440;
-  else if (endSelect.value === '00:30') eMin = 1470;
-  else if (endSelect.value === '01:00') eMin = 1500;
-  else if (endSelect.value === '02:00') eMin = 1560;
 
   if (eMin <= sMin) {
-    const newEndMin = sMin + 60;
-    const h = Math.floor(newEndMin / 60) % 24;
+    const newEndMin = Math.min(sMin + 60, 22 * 60);
+    const h = Math.floor(newEndMin / 60);
     const m = newEndMin % 60;
     endSelect.value = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  } else if (eMin > 22 * 60) {
+    endSelect.value = '22:00';
   }
 
   updateDirectDurationDisplay();
@@ -12315,41 +12986,46 @@ function highlightSelectedDirectSlot(time) {
 
 function updateDirectDurationDisplay() {
   const courtSelect = document.getElementById('directCourtSelect');
+  const dateInput = document.getElementById('directDateInput');
   const timeSelect = document.getElementById('directTimeSelect');
   const endSelect = document.getElementById('directEndTimeSelect');
   const durText = document.getElementById('directDurationText');
   const priceText = document.getElementById('directPriceText');
+  const summaryBox = document.getElementById('directTimeSummaryBox');
   if (!timeSelect || !endSelect || !durText || !priceText) return;
 
   const courtId = courtSelect ? courtSelect.value : null;
+  const court = (state.courts || []).find(c => c.id === courtId) || (state.courts && state.courts[0]) || { name: 'Quadra', basePricePerHour: 90 };
+  const date = dateInput ? dateInput.value : (state.adminFilterDate || getFormattedDate(new Date()));
   const sTime = timeSelect.value;
   const eTime = endSelect.value;
-  const sMin = timeToMinutes(sTime);
-  let eMin = timeToMinutes(eTime);
-  if (eTime === '00:00') eMin = 1440;
-  else if (eTime === '00:30') eMin = 1470;
-  else if (eTime === '01:00') eMin = 1500;
-  else if (eTime === '02:00') eMin = 1560;
 
-  let durationMin = eMin - sMin;
-  if (durationMin <= 0) durationMin = 60;
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    courtId,
+    date,
+    startTime: sTime,
+    endTime: eTime
+  });
 
-  const hours = Math.floor(durationMin / 60);
-  const mins = durationMin % 60;
-  let durLabel = '';
-  if (hours > 0 && mins > 0) {
-    durLabel = `${hours}h ${mins}min (${durationMin} min)`;
-  } else if (hours > 0) {
-    durLabel = `${hours} hora${hours > 1 ? 's' : ''} (${durationMin} min)`;
+  durText.textContent = `⏱️ Duração: ${verification.formattedDuration} (${verification.startTime} às ${verification.endTime})`;
+
+  if (!verification.isValid) {
+    if (summaryBox) {
+      summaryBox.className = 'flex flex-col gap-1 p-3 bg-red-50 border border-red-300 rounded-xl text-xs';
+    }
+    priceText.innerHTML = `<span class="text-red-700 font-black text-xs">⚠️ ${verification.errors[0] || 'Horário inválido'}</span>`;
   } else {
-    durLabel = `${mins} minutos`;
+    if (summaryBox) {
+      summaryBox.className = 'flex items-center justify-between p-3 bg-emerald-50 border border-emerald-300/80 rounded-xl text-xs';
+    }
+    priceText.innerHTML = `
+      <div class="flex flex-col items-end">
+        <span class="font-black text-emerald-950 text-xs sm:text-sm">Quadra: R$ ${verification.totalPrice.toFixed(2).replace('.', ',')}</span>
+        ${verification.isPromo ? `<span class="text-[10px] font-bold text-amber-600">🔥 Horário Promoção (09h às 16h)</span>` : `<span class="text-[10px] font-medium text-slate-500">Horário Normal</span>`}
+      </div>
+    `;
   }
-  durText.textContent = `⏱️ Duração: ${durLabel}`;
-
-  const court = (state.courts || []).find(c => c.id === courtId) || { basePricePerHour: 140 };
-  const rate = Number(court.basePricePerHour || court.base_price_per_hour || 140);
-  const courtPrice = rate * (durationMin / 60);
-  priceText.textContent = `Quadra: R$ ${courtPrice.toFixed(2).replace('.', ',')}`;
 }
 
 window.updateDirectBookingSlots = updateDirectBookingSlots;
@@ -12468,17 +13144,17 @@ function openDirectBookingModal() {
                 <span class="text-[10px] text-emerald-700 font-bold">Começo da Partida</span>
               </label>
               <select id="directTimeSelect" onchange="handleDirectTimeChange()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
-                ${["06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30"].map(t => `<option value="${t}" ${t === '19:00' ? 'selected' : ''}>${t}</option>`).join('')}
+                ${["06:00","06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30"].map(t => `<option value="${t}" ${t === '19:00' ? 'selected' : ''}>${t}</option>`).join('')}
               </select>
             </div>
 
             <div>
               <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
                 <span>Hora de Fim (Término) *</span>
-                <span class="text-[10px] text-emerald-700 font-bold">Término da Partida</span>
+                <span class="text-[10px] text-emerald-700 font-bold">Término da Partida (Até 22:00)</span>
               </label>
               <select id="directEndTimeSelect" onchange="handleDirectEndTimeChange()" required class="w-full p-3 border border-slate-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 bg-white">
-                ${["06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00","23:30","23:59","00:00","00:30","01:00","02:00"].map(t => `<option value="${t}" ${t === '20:00' ? 'selected' : ''}>${t}</option>`).join('')}
+                ${["06:30","07:00","07:30","08:00","08:30","09:00","09:30","10:00","10:30","11:00","11:30","12:00","12:30","13:00","13:30","14:00","14:30","15:00","15:30","16:00","16:30","17:00","17:30","18:00","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00"].map(t => `<option value="${t}" ${t === '20:00' ? 'selected' : ''}>${t}</option>`).join('')}
               </select>
             </div>
           </div>
@@ -12671,6 +13347,25 @@ async function handleDirectBookingSubmit(e) {
     obs = obs ? `${obs} [Emergência: ${emergency}]` : `[Emergência: ${emergency}]`;
   }
 
+  const court = state.courts.find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 90 };
+
+  // VERIFICAÇÃO RIGOROSA DE HORÁRIO E PREÇO (06:00 às 22:00, Promoção 09:00 às 16:00)
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    courtId,
+    startTime,
+    endTime,
+    date,
+    durationMin: duration,
+    isMensalista: bookingType === 'mensalista'
+  });
+
+  if (!verification.isValid) {
+    alert(`⛔ BLOQUEIO DE AGENDAMENTO (REGRA OFICIAL DA ARENA):\n\n` + verification.errors.join('\n'));
+    if (submitBtn) submitBtn.disabled = false;
+    return;
+  }
+
   // ANTI-CHOQUE RIGOROSO NA RESERVA DIRETA: Bloqueio estrito — Apenas 1 jogo por campo e horário
   const conflict = checkScheduleConflict(courtId, date, startTime, endTime);
   if (conflict.conflict) {
@@ -12679,8 +13374,7 @@ async function handleDirectBookingSubmit(e) {
     return;
   }
 
-  const court = state.courts.find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 140 };
-  const courtPrice = (court.basePricePerHour || court.base_price_per_hour || 140) * (duration / 60);
+  const courtPrice = verification.totalPrice;
 
   // Cart de bebidas selecionadas
   const selectedCheckboxes = document.querySelectorAll('input[name="directProd"]:checked');
@@ -12892,17 +13586,16 @@ async function handleDirectBookingSubmit(e) {
   renderStepContent();
   if (window.lucide) lucide.createIcons();
 
-  // Abre confirmação de envio WhatsApp
+  // Abre confirmação de envio WhatsApp com mensagem 100% verificada
+  const firstBooking = bookingsToCreate[0];
+  const zapMsg = generateVerifiedWhatsAppBookingMessage(firstBooking);
   const cleanPhone = phone.replace(/\D/g, '');
-  const zapMsg = totalWeeks > 1
-    ? `🏟️ *ARENA LIMOEIRO - MENSALISTA FIXO CONFIRMADO*\n\nOlá ${name}! Seu horário fixo foi reservado com sucesso:\n📍 Quadra: ${court.name}\n📅 Início: ${formatDisplayDate(date)} (${totalWeeks} jogos nos próximos ${repeatMonths} meses)\n⏰ Horário: ${startTime} às ${endTime}\n💳 Valor Mensal: R$ ${(courtPrice * 4).toFixed(2).replace('.', ',')}\n\nAguardamos seu time na Arena Limoeiro!`
-    : `🏟️ *ARENA LIMOEIRO - RESERVA CONFIRMADA*\n\nOlá ${name}! Sua partida foi confirmada com sucesso:\n📍 Quadra: ${court.name}\n📅 Data: ${formatDisplayDate(date)}\n⏰ Horário: ${startTime} às ${endTime}\n💳 Valor Total: R$ ${totalPrice.toFixed(2).replace('.', ',')}\n\nAguardamos sua equipe na Arena Limoeiro!`;
   const zapUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`;
 
   setTimeout(() => {
     if (confirm(totalWeeks > 1 
-      ? `✓ Horário Fixo com ${totalWeeks} jogos nos próximos ${repeatMonths} meses agendado com sucesso!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?`
-      : `✓ Reserva no Balcão confirmada com sucesso para ${formatDisplayDate(date)} às ${startTime}!\n\nDeseja abrir o WhatsApp agora para enviar o comprovante ao cliente?`)) {
+      ? `✓ Horário Fixo com ${totalWeeks} jogos agendado com sucesso!\n\nHorário e valores 100% verificados:\nQuadra: ${court.name}\nHorário: ${startTime} às ${endTime} (${verification.formattedDuration})\nValor Mensal: R$ ${(courtPrice * 4).toFixed(2).replace('.', ',')}\n\nDeseja abrir o WhatsApp agora para enviar o comprovante verificado ao cliente?`
+      : `✓ Reserva no Balcão confirmada com sucesso!\n\nHorário e valores 100% verificados:\nQuadra: ${court.name}\nData: ${formatDisplayDate(date)}\nHorário: ${startTime} às ${endTime} (${verification.formattedDuration})\nValor: R$ ${totalPrice.toFixed(2).replace('.', ',')}\n\nDeseja abrir o WhatsApp agora para enviar o comprovante verificado ao cliente?`)) {
       window.open(zapUrl, '_blank');
     }
   }, 250);
@@ -13185,8 +13878,10 @@ function handleMatchModalFilter() {
   const isRecep = isReceptionUser();
   container.innerHTML = filtered.map(m => {
     const cleanPhone = (m.customer_phone || '').replace(/\D/g, '');
-    const zapMsg = `Olá ${m.customer_name}! Falamos da Arena Limoeiro sobre o seu jogo no dia ${formatDisplayDate(m.date)} (${m.time}) na quadra ${m.courtName}.`;
-    const zapUrl = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`;
+    const zapMsg = generateVerifiedWhatsAppBookingMessage(m);
+    const zapUrl = cleanPhone.length >= 10 
+      ? `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(zapMsg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(zapMsg)}`;
 
     let statusBadge = '';
     if (m.status === 'live') {
@@ -13317,6 +14012,11 @@ function handleMatchModalFilter() {
               <span>Editar Partida</span>
             </button>
           ` : ''}
+
+          <button type="button" onclick="openVerifiedBookingWhatsApp('${m.id}')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer shadow-2xs" title="Enviar comprovante com horário e valor verificados no WhatsApp">
+            <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>WhatsApp</span>
+          </button>
 
           ${canDeleteBookings() ? `
             <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Apagar este jogo permanentemente do sistema">
@@ -13865,19 +14565,32 @@ function openEditMatchModal(matchId) {
   const matchStatus = match.status || 'confirmed';
   const isMensal = !!(match.isMensalista || (typeof isMensalistaBooking === 'function' && isMensalistaBooking(match)) || match.monthly_member_id || String(matchId).startsWith('monthly-'));
 
-  const timeSlots = [];
-  for (let h = 6; h <= 23; h++) {
+  const startSlots = [];
+  for (let h = 6; h <= 21; h++) {
     const hh = String(h).padStart(2, '0');
-    timeSlots.push(`${hh}:00`);
-    timeSlots.push(`${hh}:30`);
+    startSlots.push(`${hh}:00`);
+    startSlots.push(`${hh}:30`);
   }
+  const endSlots = [];
+  for (let h = 6; h <= 22; h++) {
+    const hh = String(h).padStart(2, '0');
+    if (h > 6) endSlots.push(`${hh}:00`);
+    if (h < 22) endSlots.push(`${hh}:30`);
+  }
+  if (!startSlots.includes(startTime)) startSlots.push(startTime);
+  if (!endSlots.includes(endTime)) endSlots.push(endTime);
+  startSlots.sort();
+  endSlots.sort();
 
-  const sMin = timeToMinutes(startTime);
-  const eMin = timeToMinutes(endTime);
-  const durMins = Math.max(30, eMin - sMin);
-  const durHours = Math.floor(durMins / 60);
-  const remMins = durMins % 60;
-  const durLabel = durHours > 0 ? (remMins > 0 ? `${durHours}h ${remMins}min` : `${durHours}h`) : `${durMins} min`;
+  const court = (state.courts || []).find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 90 };
+  const initialVerify = verifyMatchTimeAndPricing({
+    court,
+    courtId,
+    date: matchDate,
+    startTime,
+    endTime,
+    isMensalista: isMensal
+  });
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
@@ -13959,7 +14672,7 @@ function openEditMatchModal(matchId) {
           <div class="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200 space-y-3">
             <div class="flex items-center space-x-1.5 text-xs font-black text-slate-700 uppercase tracking-wider">
               <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>Espaço, Data & Horário</span>
+              <span>Espaço, Data & Horário (06:00 às 22:00)</span>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -13975,32 +14688,35 @@ function openEditMatchModal(matchId) {
 
               <div>
                 <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data da Partida *</label>
-                <input type="date" id="editMatchDate" required value="${escapeHtmlAttr(matchDate)}"
+                <input type="date" id="editMatchDate" required onchange="recalcEditMatchPrice()" value="${escapeHtmlAttr(matchDate)}"
                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
               </div>
 
               <div>
-                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Horário de Início *</label>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Horário de Início * (06:00 às 21:30)</label>
                 <select id="editMatchStartTime" required onchange="handleEditMatchTimeChange()"
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
-                  ${timeSlots.map(t => `<option value="${t}" ${t === startTime ? 'selected' : ''}>${t}</option>`).join('')}
+                  ${startSlots.map(t => `<option value="${t}" ${t === startTime ? 'selected' : ''}>${t}</option>`).join('')}
                 </select>
               </div>
 
               <div>
-                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Horário de Término *</label>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Horário de Término * (Até 22:00)</label>
                 <select id="editMatchEndTime" required onchange="handleEditMatchTimeChange()"
                         class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
-                  ${timeSlots.map(t => `<option value="${t}" ${t === endTime ? 'selected' : ''}>${t}</option>`).join('')}
+                  ${endSlots.map(t => `<option value="${t}" ${t === endTime ? 'selected' : ''}>${t}</option>`).join('')}
                 </select>
               </div>
             </div>
 
-            <div class="flex items-center justify-between pt-1 text-xs">
-              <span class="text-slate-600 font-semibold flex items-center gap-1.5">
+            <div class="flex items-center justify-between pt-1 text-xs flex-wrap gap-2">
+              <span class="text-slate-600 font-semibold flex items-center gap-1.5 flex-wrap">
                 <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-500"></i>
                 Duração:
-                <strong id="editMatchDurationBadge" class="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md font-black">${durLabel} (${durMins} min)</strong>
+                <strong id="editMatchDurationBadge" class="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md font-black">
+                  ${initialVerify.formattedDuration} (${initialVerify.durationMin} min)
+                  ${initialVerify.isPromo ? '<span class="ml-1 text-[10px] text-amber-700 bg-amber-100 px-1 py-0.5 rounded font-black">🔥 Promoção</span>' : ''}
+                </strong>
               </span>
               <button type="button" onclick="recalcEditMatchPrice()" class="text-[11px] font-bold text-sky-700 hover:text-sky-900 underline flex items-center gap-1 cursor-pointer">
                 <i data-lucide="refresh-cw" class="w-3 h-3"></i>
@@ -14056,16 +14772,23 @@ function openEditMatchModal(matchId) {
           </div>
 
           <!-- FOOTER / BOTÕES -->
-          <div class="pt-3 border-t border-slate-200 flex items-center justify-end space-x-2.5">
-            <button type="button" onclick="closeModal()" 
-                    class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer">
-              Cancelar
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
+            <button type="button" onclick="openVerifiedBookingWhatsApp('${escapeHtmlAttr(match.id)}')" 
+                    class="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs">
+              <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
+              <span>Enviar no WhatsApp</span>
             </button>
-            <button type="submit" id="btnSaveEditMatch"
-                    class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-black shadow-md flex items-center space-x-2 transition-all cursor-pointer">
-              <i data-lucide="check" class="w-4 h-4"></i>
-              <span>Salvar Alterações (Supabase)</span>
-            </button>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="closeModal()" 
+                      class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer">
+                Cancelar
+              </button>
+              <button type="submit" id="btnSaveEditMatch"
+                      class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-black shadow-md flex items-center space-x-2 transition-all cursor-pointer">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Salvar Alterações (Supabase)</span>
+              </button>
+            </div>
           </div>
 
         </form>
@@ -14080,40 +14803,49 @@ window.openEditMatchModal = openEditMatchModal;
 function handleEditMatchTimeChange() {
   const startEl = document.getElementById('editMatchStartTime');
   const endEl = document.getElementById('editMatchEndTime');
-  const durEl = document.getElementById('editMatchDurationBadge');
   if (!startEl || !endEl) return;
   const sMin = timeToMinutes(startEl.value);
   let eMin = timeToMinutes(endEl.value);
   if (eMin <= sMin) {
-    eMin = sMin + 60;
-    endEl.value = minutesToTime(Math.min(eMin, 23 * 60 + 30));
+    eMin = Math.min(sMin + 60, 22 * 60);
+    endEl.value = minutesToTime(eMin);
+  } else if (eMin > 22 * 60) {
+    endEl.value = '22:00';
   }
-  const durMins = Math.max(30, eMin - sMin);
-  const durHours = Math.floor(durMins / 60);
-  const remMins = durMins % 60;
-  const durLabel = durHours > 0 ? (remMins > 0 ? `${durHours}h ${remMins}min` : `${durHours}h`) : `${durMins} min`;
-  if (durEl) durEl.textContent = `${durLabel} (${durMins} min)`;
+  recalcEditMatchPrice();
 }
 window.handleEditMatchTimeChange = handleEditMatchTimeChange;
 
 function recalcEditMatchPrice() {
   const courtEl = document.getElementById('editMatchCourtId');
+  const dateEl = document.getElementById('editMatchDate');
   const startEl = document.getElementById('editMatchStartTime');
   const endEl = document.getElementById('editMatchEndTime');
   const priceEl = document.getElementById('editMatchPrice');
+  const durEl = document.getElementById('editMatchDurationBadge');
   if (!courtEl || !startEl || !endEl || !priceEl) return;
 
   const court = (state.courts || []).find(c => c.id === courtEl.value);
   if (!court) return;
 
-  const sMin = timeToMinutes(startEl.value);
-  const eMin = timeToMinutes(endEl.value);
-  const durMins = Math.max(30, eMin - sMin);
-  const hoursFraction = durMins / 60;
+  const matchDate = dateEl ? dateEl.value : (state.selectedDate || getFormattedDate(new Date()));
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    courtId: courtEl.value,
+    date: matchDate,
+    startTime: startEl.value,
+    endTime: endEl.value
+  });
 
-  const hourlyRate = typeof getCourtHourlyPrice === 'function' ? getCourtHourlyPrice(court, startEl.value) : (court.basePricePerHour || 60);
-  const calculatedPrice = hourlyRate * hoursFraction;
-  priceEl.value = calculatedPrice.toFixed(2);
+  priceEl.value = verification.totalPrice.toFixed(2);
+
+  if (durEl) {
+    if (verification.isPromo) {
+      durEl.innerHTML = `${verification.formattedDuration} (${verification.durationMin} min) <span class="ml-1 text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-black">🔥 Promoção</span>`;
+    } else {
+      durEl.textContent = `${verification.formattedDuration} (${verification.durationMin} min)`;
+    }
+  }
 }
 window.recalcEditMatchPrice = recalcEditMatchPrice;
 
@@ -14150,13 +14882,25 @@ async function handleSaveEditMatch(event, matchId) {
       return;
     }
 
-    const sMin = timeToMinutes(startTime);
-    const eMin = timeToMinutes(endTime);
-    if (eMin <= sMin) {
-      alert('O horário de término deve ser posterior ao horário de início.');
+    const court = (state.courts || []).find(c => c.id === courtId) || { name: 'Quadra', basePricePerHour: 90 };
+    const verification = verifyMatchTimeAndPricing({
+      court,
+      courtId,
+      startTime,
+      endTime,
+      date: matchDate,
+      isMensalista: String(matchId).startsWith('monthly-'),
+      excludeBookingId: matchId
+    });
+
+    if (!verification.isValid) {
+      alert(`⛔ HORÁRIO NÃO PERMITIDO PELA ARENA (06:00 às 22:00):\n\n` + verification.errors.join('\n'));
       if (btn) { btn.disabled = false; btn.innerHTML = '<span>Salvar Alterações (Supabase)</span>'; }
       return;
     }
+
+    const sMin = timeToMinutes(startTime);
+    const eMin = timeToMinutes(endTime);
     const durMins = eMin - sMin;
 
     // Checagem de conflito com outros jogos ativos no mesmo dia e quadra
@@ -14315,6 +15059,12 @@ async function handleSaveEditMatch(event, matchId) {
     if (typeof renderAgendaTimelineView === 'function') renderAgendaTimelineView();
     if (typeof renderSubtabBookings === 'function') renderSubtabBookings();
     if (typeof requestSchedule === 'function') requestSchedule();
+
+    setTimeout(() => {
+      if (confirm(`✓ Partida de ${custName} atualizada com sucesso!\n\nHorário e valor verificados:\n⏰ ${startTime} às ${endTime} (${verification.formattedDuration})\n💳 R$ ${priceVal.toFixed(2).replace('.', ',')}\n\nDeseja enviar os dados verificados para o jogador via WhatsApp agora?`)) {
+        openVerifiedBookingWhatsApp(matchId);
+      }
+    }, 200);
 
   } catch (err) {
     console.error('Erro ao salvar edição da partida:', err);
@@ -17629,10 +18379,15 @@ function openCheckoutModal() {
   const court = state.selectedCourt;
   calculateDuration();
   const isMensal = state.bookingType === 'mensalista';
-  const hoursFraction = state.selectedDuration / 60;
-  
-  const basePrice = getCourtHourlyPrice(court);
-  const courtPrice = isMensal ? getCourtMonthlyPrice(court) : (basePrice * hoursFraction);
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    startTime: state.startTime,
+    endTime: state.endTime,
+    date: state.selectedDate,
+    durationMin: state.selectedDuration,
+    isMensalista: isMensal
+  });
+  const courtPrice = verification.totalPrice;
 
   let discountAmount = 0;
   if (state.appliedCoupon) {
@@ -17694,7 +18449,8 @@ function openCheckoutModal() {
           <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
             <div>
               <span class="font-black text-slate-900 block">${court.name.split(' - ')[0]}</span>
-              <span>${isMensal ? `Toda ${state.monthlyDayOfWeek}-feira` : formatDisplayDate(state.selectedDate)} • ${state.startTime} às ${state.endTime}</span>
+              <span>${isMensal ? `Toda ${state.monthlyDayOfWeek}-feira` : formatDisplayDate(state.selectedDate)} • ${verification.startTime} às ${verification.endTime} (${verification.formattedDuration})</span>
+              ${verification.isPromo ? `<span class="block text-[10px] font-bold text-amber-600">🔥 Horário Promocional (09h-16h)</span>` : ''}
             </div>
             <div class="text-right">
               <span class="text-[10px] text-slate-400 block font-bold uppercase">Total do Campo</span>
@@ -17856,7 +18612,27 @@ async function submitBooking(grandTotal) {
     }
   }
 
-  // 1. ANTI-CHOQUE RIGOROSO: Verifica conflito antes de salvar
+  // 1. VERIFICAÇÃO RIGOROSA DE HORÁRIO E PREÇO (06:00 às 22:00)
+  const bookingVerification = verifyMatchTimeAndPricing({
+    court: state.selectedCourt,
+    startTime: state.startTime,
+    endTime: state.endTime,
+    date: state.selectedDate,
+    durationMin: state.selectedDuration,
+    isMensalista: state.bookingType === 'mensalista'
+  });
+
+  if (!bookingVerification.isValid) {
+    alert('⛔ HORÁRIO NÃO PERMITIDO PELA ARENA (06:00 às 22:00):\n\n' + bookingVerification.errors.join('\n'));
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4"></i><span>Confirmar e Reservar</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
+    return;
+  }
+
+  // ANTI-CHOQUE RIGOROSO: Verifica conflito antes de salvar
   const localCheck = checkScheduleConflict(state.selectedCourt.id, state.selectedDate, state.startTime, state.endTime);
   if (localCheck.conflict) {
     alert('⚠️ Choque de Agendamento Evitado!\n\n' + localCheck.reason + '\n\nPor favor, escolha outro horário livre ou outro campo da Arena Limoeiro.');
@@ -18189,14 +18965,10 @@ function showConfirmationSuccessModal(booking) {
     return prod ? `${qty}x ${prod.name}` : '';
   }).filter(Boolean).join(', ');
 
-  const shareText = encodeURIComponent(`Fala galera! ⚽ Agendamento confirmado na Arena Limoeiro!
-🏟️ Espaço: ${courtName}
-📅 Data: ${booking.date}
-⏰ Horário: ${booking.time} (${state.selectedDuration} min)${savedItemsText ? `
-🥤 Itens Guardados no Bar: ${savedItemsText}` : ''}
-${waterReceiptNote}
-Código: #${booking.id}
-Bora pro jogo!`);
+  const verifiedMessage = generateVerifiedWhatsAppBookingMessage(booking);
+  const shareText = encodeURIComponent(verifiedMessage);
+  const cleanPhoneDigits = (custPhone || '').replace(/\D/g, '');
+  const directAthleteUrl = `https://wa.me/55${cleanPhoneDigits}?text=${shareText}`;
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-sm">
@@ -18213,7 +18985,7 @@ Bora pro jogo!`);
           Código: #${booking.id}
         </h2>
         <p class="text-xs sm:text-sm text-slate-500 mb-6">
-          Comprovante enviado para o WhatsApp <strong class="text-slate-800">${custPhone}</strong>
+          Comprovante com horários e valores verificados para o WhatsApp <strong class="text-slate-800">${custPhone}</strong>
         </p>
 
         <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100 text-left space-y-2 mb-6 text-xs sm:text-sm">
@@ -18240,10 +19012,18 @@ Bora pro jogo!`);
         </div>
 
         <div class="space-y-3">
+          ${cleanPhoneDigits ? `
+            <a href="${directAthleteUrl}" target="_blank" 
+               class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-extrabold flex items-center justify-center space-x-2 transition-all shadow-md">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span>Enviar Comprovante ao Atleta (${custPhone})</span>
+            </a>
+          ` : ''}
+
           <a href="https://api.whatsapp.com/send?text=${shareText}" target="_blank" 
-             class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-extrabold flex items-center justify-center space-x-2 transition-all shadow-md">
-            <i data-lucide="share-2" class="w-4 h-4"></i>
-            <span>Compartilhar no WhatsApp do Time</span>
+             class="w-full py-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all shadow-2xs">
+            <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
+            <span>Compartilhar no Grupo do Time</span>
           </a>
 
           ${booking.isMensalista ? `
@@ -18306,9 +19086,15 @@ function renderBottomBar() {
 
   calculateDuration();
   const isMensal = state.bookingType === 'mensalista';
-  const hoursFraction = (state.selectedDuration || 60) / 60;
-  const basePrice = getCourtHourlyPrice(court);
-  const courtPrice = court ? (isMensal ? getCourtMonthlyPrice(court) : (basePrice * hoursFraction)) : 0;
+  const verification = verifyMatchTimeAndPricing({
+    court,
+    startTime: state.startTime,
+    endTime: state.endTime,
+    date: state.selectedDate,
+    durationMin: state.selectedDuration,
+    isMensalista: isMensal
+  });
+  const courtPrice = verification.totalPrice;
 
   bar.innerHTML = `
     <div class="max-w-5xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2">
@@ -18323,7 +19109,7 @@ function renderBottomBar() {
       <div class="flex items-center space-x-2 sm:space-x-4">
         ${court && state.currentStep >= 3 ? `
           <div class="text-right">
-            <span class="text-[10px] sm:text-[11px] text-slate-400 block font-bold leading-tight">${isMensal ? 'Mensal' : (isCourtDiscountTime(court, state.startTime) ? '🔥 Total c/ Desconto' : 'Total Horas')}</span>
+            <span class="text-[10px] sm:text-[11px] text-slate-400 block font-bold leading-tight">${isMensal ? 'Mensal' : (verification.isPromo ? '🔥 Total c/ Promoção' : 'Total Horas')}</span>
             <span class="text-sm sm:text-base font-black text-emerald-900 leading-tight">
               R$ ${courtPrice.toFixed(2).replace('.', ',')}
             </span>
