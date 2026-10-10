@@ -2843,76 +2843,76 @@ function renderStep3Content() {
                   const isStart = state.startTime === slot.time;
                   const isEnd = state.endTime === slot.time;
                   let slotBadge = '';
-                  const durLabel = state.selectedDuration === 30 ? '30 min' : (state.selectedDuration === 60 ? '1h Fechada' : (state.selectedDuration === 90 ? '1h30 Fechada' : (state.selectedDuration === 120 ? '2h Fechadas' : `${state.selectedDuration} min`)));
+                  const durBadge = state.selectedDuration === 30 ? '30m' : (state.selectedDuration === 60 ? '1h' : (state.selectedDuration === 90 ? '1h30' : (state.selectedDuration === 120 ? '2h' : `${state.selectedDuration}m`)));
 
                   if (isStart && isEnd) {
-                    slotBadge = `<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ ${durLabel}</span>`;
+                    slotBadge = `<span class="text-[8px] xs:text-[8.5px] font-black bg-white/20 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap block truncate text-center">✓ ${durBadge} (${slot.time})</span>`;
                   } else if (isStart) {
-                    slotBadge = `<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full">✓ Início (${slot.time})${isDiscountSlot ? ' 🔥' : ''}</span>`;
+                    slotBadge = `<span class="text-[8px] xs:text-[8.5px] font-black bg-white/20 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap block truncate text-center">✓ Início (${slot.time})${isDiscountSlot ? ' 🔥' : ''}</span>`;
                   } else if (isEnd) {
-                    slotBadge = `<span class="text-[10px] font-black bg-white/30 text-white px-2 py-0.5 rounded-full ring-2 ring-white/50 shadow-xs">✓ Término (${slot.time}) • ${durLabel}</span>`;
+                    slotBadge = `<span class="text-[8px] xs:text-[8.5px] font-black bg-white/30 text-white px-1.5 py-0.5 rounded-full ring-1 ring-white/50 shadow-xs whitespace-nowrap block truncate text-center tracking-tight" title="Término (${slot.time}) • ${durBadge}">✓ Término (${slot.time}) • ${durBadge}</span>`;
                   } else {
-                    slotBadge = '<span class="text-[10px] font-bold bg-white/10 px-1.5 py-0.5 rounded-full">✓ No Jogo</span>';
+                    slotBadge = '<span class="text-[8px] xs:text-[8.5px] font-bold bg-white/15 text-white px-1.5 py-0.5 rounded-full whitespace-nowrap block truncate text-center">✓ No Jogo</span>';
                   }
                   cardClass = 'bg-emerald-600 border-2 border-emerald-700 text-white shadow-lg ring-2 ring-emerald-400 cursor-pointer transform scale-[1.02] transition-all';
                   badge = slotBadge;
                   icon = isEnd ? '🏁' : (isDiscountSlot ? '🔥' : '🟢');
                 } else if (slot.endsBooking) {
                   const prevDur = slot.endsBooking.duration || (timeToMinutes(slot.endsBooking.endTime || slot.endsBooking.end_time) - timeToMinutes(slot.endsBooking.startTime || slot.endsBooking.start_time)) || 60;
-                  const prevDurLabel = prevDur === 30 ? '30 min' : (prevDur === 60 ? '1h Fechada' : (prevDur === 90 ? '1h30' : `${prevDur} min`));
+                  const prevDurBadge = prevDur === 30 ? '30m' : (prevDur === 60 ? '1h' : (prevDur === 90 ? '1h30' : `${prevDur}m`));
                   cardClass = 'bg-emerald-50/90 border-2 border-dashed border-emerald-400 text-emerald-950 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all shadow-xs';
-                  badge = `<span class="text-[10px] font-black text-emerald-900 bg-emerald-200/90 px-1.5 py-0.5 rounded-md block truncate">🏁 Fim de Jogo às ${slot.time} • ${prevDurLabel} (${slot.endsBooking.customerName})</span>`;
+                  badge = `<span class="text-[8px] xs:text-[8.5px] font-black text-emerald-900 bg-emerald-200/90 px-1.5 py-0.5 rounded-md block truncate whitespace-nowrap text-center">🏁 Fim às ${slot.time} • ${prevDurBadge}</span>`;
                   icon = '🏁';
-                  nameLabel = `<span class="text-[10px] text-emerald-700 font-bold block mt-0.5">🟢 Livre a partir das ${slot.time}</span>`;
+                  nameLabel = `<span class="text-[8.5px] text-emerald-700 font-bold block mt-0.5 truncate text-center">🟢 Livre às ${slot.time}</span>`;
                 } else {
                   if (isDiscountSlot) {
                     cardClass = 'bg-amber-50/90 border-2 border-amber-400 text-amber-950 hover:bg-amber-100 hover:border-amber-500 cursor-pointer transition-all shadow-xs';
-                    badge = '<span class="text-[10px] font-black text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded-md">🔥 R$ ' + dInfo.discountPrice.toFixed(0) + '/h (Desconto)</span>';
+                    badge = '<span class="text-[8px] xs:text-[8.5px] font-black text-amber-800 bg-amber-200/80 px-1.5 py-0.5 rounded-md whitespace-nowrap block truncate text-center">🔥 R$ ' + dInfo.discountPrice.toFixed(0) + '/h</span>';
                     icon = '🔥';
                   } else {
                     cardClass = 'bg-emerald-50 border-2 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-500 cursor-pointer transition-all';
-                    badge = '<span class="text-[10px] font-bold text-emerald-700">Livre ✓</span>';
+                    badge = '<span class="text-[8.5px] font-bold text-emerald-700 whitespace-nowrap block truncate text-center">Livre ✓</span>';
                     icon = '🟢';
                   }
                 }
                 clickable = `onclick="handleSlotClick('${slot.time}')"`;
               } else if (isLiveNow) {
                 cardClass = 'bg-rose-600 border-2 border-rose-700 text-white cursor-not-allowed shadow-md';
-                badge = '<span class="text-[10px] font-black bg-white/20 px-1.5 py-0.5 rounded-full animate-pulse">🔴 EM JOGO AGORA</span>';
+                badge = '<span class="text-[8px] xs:text-[8.5px] font-black bg-white/20 px-1.5 py-0.5 rounded-full animate-pulse whitespace-nowrap block truncate text-center">🔴 EM JOGO AGORA</span>';
                 icon = '⚽';
-                nameLabel = slot.customerName ? `<span class="text-[10px] opacity-80 truncate block mt-0.5">${slot.customerName}</span>` : '';
+                nameLabel = slot.customerName ? `<span class="text-[8.5px] opacity-80 truncate block mt-0.5 text-center">${slot.customerName}</span>` : '';
               } else if (isBooked) {
                 if (slot.isMensalista) {
                   cardClass = 'bg-amber-50/90 border-2 border-amber-300 text-amber-950 cursor-not-allowed shadow-2xs';
-                  badge = '<span class="text-[10px] font-black bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-300 inline-flex items-center gap-1">👑 Horário Fixo</span>';
+                  badge = '<span class="text-[8px] xs:text-[8.5px] font-black bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-300 inline-flex items-center justify-center gap-1 whitespace-nowrap truncate max-w-full">👑 Horário Fixo</span>';
                   icon = '👑';
-                  nameLabel = slot.customerName ? `<span class="text-[10px] text-amber-900 font-extrabold truncate block mt-0.5">Time: ${slot.customerName}</span>` : '';
+                  nameLabel = slot.customerName ? `<span class="text-[8.5px] text-amber-900 font-extrabold truncate block mt-0.5 text-center">Time: ${slot.customerName}</span>` : '';
                 } else {
                   cardClass = 'bg-slate-100 border-2 border-slate-300 text-slate-500 cursor-not-allowed';
-                  badge = '<span class="text-[10px] font-bold text-slate-500">Reservado</span>';
+                  badge = '<span class="text-[8.5px] font-bold text-slate-500 whitespace-nowrap block truncate text-center">Reservado</span>';
                   icon = '🔒';
-                  nameLabel = slot.customerName ? `<span class="text-[10px] text-slate-400 truncate block mt-0.5">${slot.customerName}</span>` : '';
+                  nameLabel = slot.customerName ? `<span class="text-[8.5px] text-slate-400 truncate block mt-0.5 text-center">${slot.customerName}</span>` : '';
                 }
               } else if (isMaint) {
                 cardClass = 'bg-amber-50 border-2 border-amber-300 text-amber-800 cursor-not-allowed';
-                badge = '<span class="text-[10px] font-bold text-amber-700">Manutenção</span>';
+                badge = '<span class="text-[8.5px] font-bold text-amber-700 whitespace-nowrap block truncate text-center">Manutenção</span>';
                 icon = '🔧';
-                nameLabel = slot.statusLabel ? `<span class="text-[10px] text-amber-600 truncate block mt-0.5">${slot.statusLabel}</span>` : '';
+                nameLabel = slot.statusLabel ? `<span class="text-[8.5px] text-amber-600 truncate block mt-0.5 text-center">${slot.statusLabel}</span>` : '';
               } else if (isPast) {
                 cardClass = 'bg-slate-100/70 border-2 border-slate-200 text-slate-400 cursor-not-allowed opacity-60';
-                badge = '<span class="text-[10px] font-bold text-slate-400">Encerrado ⏰</span>';
+                badge = '<span class="text-[8.5px] font-bold text-slate-400 whitespace-nowrap block truncate text-center">Encerrado ⏰</span>';
                 icon = '⏳';
-                nameLabel = '<span class="text-[10px] text-slate-400 truncate block mt-0.5">Horário já passou</span>';
+                nameLabel = '<span class="text-[8.5px] text-slate-400 truncate block mt-0.5 text-center">Já passou</span>';
               }
 
               return `
-                <div class="p-3 rounded-2xl ${cardClass} select-none" ${clickable}>
+                <div class="p-2 sm:p-2.5 rounded-2xl ${cardClass} select-none overflow-hidden min-w-0" ${clickable}>
                   <div class="flex items-center justify-between mb-0.5">
-                    <span class="text-base font-black">${slot.time}</span>
-                    <span class="text-base">${icon}</span>
+                    <span class="text-sm sm:text-base font-black leading-tight">${slot.time}</span>
+                    <span class="text-sm sm:text-base leading-none">${icon}</span>
                   </div>
-                  <span class="text-[10px] font-semibold opacity-75 block mb-1">(${slot.time} às ${minutesToTime(slotMin + 30)})</span>
-                  ${badge}
+                  <span class="text-[8.5px] sm:text-[9.5px] font-semibold opacity-75 block mb-1 whitespace-nowrap truncate leading-tight">(${slot.time} às ${minutesToTime(slotMin + 30)})</span>
+                  <div class="w-full flex justify-center items-center overflow-hidden min-w-0">${badge}</div>
                   ${nameLabel}
                 </div>
               `;

@@ -89,6 +89,11 @@ function buildApk(targetApkName) {
   fs.copyFileSync(apkSource, apkDest);
   const sizeMb = (fs.statSync(apkDest).size / (1024 * 1024)).toFixed(2);
   console.log(`✅ APK criado com sucesso: ${apkDest} (${sizeMb} MB)`);
+
+  const publicApksDir = path.join(rootDir, 'public', 'apks');
+  if (!fs.existsSync(publicApksDir)) fs.mkdirSync(publicApksDir, { recursive: true });
+  fs.copyFileSync(apkSource, path.join(publicApksDir, targetApkName));
+  console.log(`   └─ Copiado também para: ${path.join(publicApksDir, targetApkName)}`);
 }
 
 async function main() {
