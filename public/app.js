@@ -959,9 +959,14 @@ function triggerAdminLoginIfRequested() {
 
 // Se acessar a URL secreta criptografada, solicita as credenciais
 if (_isAdminUrl) {
-  window.addEventListener('DOMContentLoaded', () => {
+  const launchAdminLogin = () => {
     setTimeout(triggerAdminLoginIfRequested, 350);
-  });
+  };
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', launchAdminLogin);
+  } else {
+    launchAdminLogin();
+  }
 }
 
 window.addEventListener('hashchange', () => {
@@ -1770,27 +1775,29 @@ function calculateDuration() {
   state.selectedDuration = Math.max(30, endMin - startMin);
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function initArenaApplication() {
   // 1. Carrega dados padrão locais imediatamente para que o estado básico esteja pronto
   loadInitialData();
   initEventListeners();
 
-  // 2. ⚡ SINCRONIZAÇÃO INSTANTÂNEA ANTES DE RENDERIZAR:
-  // Carrega os dados reais da nuvem em paralelo (<150ms) ANTES da primeira renderização da tela.
-  // Isso elimina o atraso de 1s e impede totalmente que o site mostre informações antigas ao abrir.
+  // ⚡ RENDERIZAÇÃO INSTANTÂNEA: A tela NUNCA fica branca!
+  // O usuário vê imediatamente todas as informações de agendamento (quadras, horários, preços)
+  renderApp();
+
+  // 2. ⚡ SINCRONIZAÇÃO EM SEGUNDO PLANO COM O SUPABASE:
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       await Promise.race([
         syncDataFromSupabase(true),
         new Promise(resolve => setTimeout(resolve, 800)) // timeout de proteção de 800ms
       ]);
+      // Re-renderiza com dados atualizados da nuvem
+      renderApp();
     } catch (e) {
       console.warn('Aviso sincronização inicial:', e);
     }
   }
 
-  // 3. Renderiza o site com os dados 100% atualizados em primeira mão
-  renderApp();
   requestSchedule();
 
   autoAdvanceFinishedMatches();
@@ -1804,8 +1811,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
   }, 30000); // Atualiza os horários para ocultar os que acabaram de passar
-
-  // Service Worker registrado via index.html
 
   // Desbloqueia o canal de áudio e solicita permissão nativa de notificação no mobile no 1º toque
   const unlockAudioAndNotif = () => {
@@ -1863,7 +1868,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   ['pointerdown', 'keydown', 'touchstart'].forEach(evt => {
     window.addEventListener(evt, registerUserActivity, { passive: true });
   });
-});
+}
+
+// 🛡️ GARANTIA ABSOLUTA DE INICIALIZAÇÃO:
+// Se o navegador já carregou o DOM (readyState 'interactive' ou 'complete'), executa imediatamente!
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initArenaApplication);
+} else {
+  initArenaApplication();
+}
 
 // BATIMENTO AO VIVO: Atualiza a contagem dos cronômetros sem resetar o scroll da tela
 function liveDashboardHeartbeat() {
@@ -2832,10 +2845,14 @@ window.getCourtFixedMembers = getCourtFixedMembers;
 
 // ETAPA 1: VISÃO TOTALMENTE LIMPA PARA O CLIENTE
 function renderStep1(container) {
-  let displayCourts = [...state.courts].filter(court => {
+  if (!container) return;
+  if (!state.courts || state.courts.length === 0 || !state.categories || state.categories.length === 0) {
+    loadInitialData();
+  }
+  let displayCourts = [...(state.courts || [])].filter(court => {
     const matchesCat = state.selectedCategory === 'all' || court.category === state.selectedCategory;
-    const matchesSearch = court.name.toLowerCase().includes(state.searchQuery.toLowerCase()) ||
-                          court.categoryLabel.toLowerCase().includes(state.searchQuery.toLowerCase());
+    const matchesSearch = (court.name || '').toLowerCase().includes((state.searchQuery || '').toLowerCase()) ||
+                          (court.categoryLabel || '').toLowerCase().includes((state.searchQuery || '').toLowerCase());
     return matchesCat && matchesSearch;
   });
 
@@ -6102,6 +6119,8 @@ window.handleReceivedClearLogs = handleReceivedClearLogs;
 function renderAdminView(container) {
   if (!isManagerLoggedIn()) {
     state.currentMode = 'client';
+    renderStep1(container);
+    renderStepper();
     openLoginModal(() => {
       state.currentMode = 'admin';
       state.adminTab = 'live_dashboard';
@@ -19001,8 +19020,13 @@ function openCheckoutModal() {
 
 function closeModal() {
   const modalRoot = document.getElementById('modalRoot');
-  if (!modalRoot) return;
-  modalRoot.innerHTML = '';
+  if (modalRoot) modalRoot.innerHTML = '';
+  
+  const main = document.getElementById('mainContent');
+  if (main && (!main.innerHTML || main.innerHTML.trim() === '')) {
+    state.currentMode = 'client';
+    renderApp();
+  }
 }
 
 async function submitBooking(grandTotal) {
