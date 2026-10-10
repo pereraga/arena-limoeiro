@@ -565,7 +565,7 @@ function openSystemInfoModal() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-1">
               <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">Versão do Sistema</span>
-              <strong class="text-sm font-black text-white block">Arena Pro v3.8.5 (Build 2026.10)</strong>
+              <strong class="text-sm font-black text-white block">Arena Pro v5.2.6 (Atualizado)</strong>
               <span class="text-[11px] text-emerald-400 font-semibold">🟢 100% Estável & Supabase Conectado</span>
             </div>
 
