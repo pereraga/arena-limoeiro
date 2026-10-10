@@ -11,7 +11,7 @@
   <!-- Invalidação Imediata de Cache e Service Worker Antigo v5.2.7 (100% Supabase Cloud) -->
   <script>
     (function() {
-      const CURRENT_APP_VERSION = '5.2.7';
+      const CURRENT_APP_VERSION = '5.2.8';
       const storedVersion = localStorage.getItem('arena_app_version');
       if (storedVersion !== CURRENT_APP_VERSION) {
         localStorage.setItem('arena_app_version', CURRENT_APP_VERSION);
@@ -40,13 +40,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Favicon & Ícones Mobile/PWA (Monograma A com Folhas) -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.2.7">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.2.7">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.2.7">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.2.7">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.2.7">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.2.7">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.2.7">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.2.8">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.2.8">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.2.8">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -56,14 +56,14 @@
   
   <!-- Supabase JS Client & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/supabase-client.js?v=5.2.7"></script>
-  <script src="/default-data.js?v=5.2.7"></script>
+  <script src="/supabase-client.js?v=5.2.8"></script>
+  <script src="/default-data.js?v=5.2.8"></script>
 
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=5.2.7').then(reg => {
+        navigator.serviceWorker.register('/sw.js?v=5.2.8').then(reg => {
           reg.update();
         }).catch(console.error);
       });
@@ -71,7 +71,7 @@
   </script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="/styles.css?v=5.2.7">
+  <link rel="stylesheet" href="/styles.css?v=5.2.8">
 </head>
 <body class="bg-slate-50 min-h-screen flex flex-col pb-24">
 
@@ -162,17 +162,789 @@
 
   <!-- CONTEÚDO PRINCIPAL -->
   <main id="mainContent" class="flex-1">
-    <!-- Fallback visual instantâneo para eliminar qualquer tela branca durante conexão -->
-    <div id="initialAppLoadingPlaceholder" class="max-w-6xl mx-auto px-4 py-8 flex flex-col items-center justify-center min-h-[50vh] text-center">
-      <div class="w-14 h-14 rounded-2xl bg-emerald-600/10 border border-emerald-500/30 flex items-center justify-center mb-4">
-        <svg class="w-8 h-8 text-emerald-600 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
-          <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
-        </svg>
+
+    <div class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
+      
+
+      <!-- Barra de Pesquisa Limpa -->
+      <div class="relative w-full mb-6">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+          <i data-lucide="search" class="w-5 h-5"></i>
+        </div>
+        <input type="text" id="courtSearchInput" value="" 
+               placeholder="Pesquisar quadra ou campo na Arena Limoeiro..." 
+               class="w-full pl-11 pr-4 py-3.5 bg-white border border-slate-300 rounded-2xl text-slate-800 placeholder-slate-400 
+                      focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent shadow-sm transition-all text-sm sm:text-base"
+               oninput="handleSearch(this.value)">
       </div>
-      <h2 class="text-base sm:text-lg font-black text-slate-800 uppercase tracking-tight">Carregando Arena Limoeiro...</h2>
-      <p class="text-xs text-slate-500 mt-1 max-w-sm">Conectando ao sistema de agendamento online e verificando horários disponíveis.</p>
+
+      <!-- Filtros por Categoria -->
+      <div class="flex items-center space-x-2 overflow-x-auto scrollbar-none mb-6 pb-2">
+        
+          <button onclick="selectCategory('all')" 
+                  class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 whitespace-nowrap transition-all
+                         bg-emerald-600 text-white shadow-md shadow-emerald-600/20">
+            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+            <span>Todos os Espaços</span>
+          </button>
+        
+          <button onclick="selectCategory('poliesportiva')" 
+                  class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 whitespace-nowrap transition-all
+                         bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+            <i data-lucide="trophy" class="w-3.5 h-3.5"></i>
+            <span>Quadra Poliesportiva</span>
+          </button>
+        
+          <button onclick="selectCategory('beach')" 
+                  class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 whitespace-nowrap transition-all
+                         bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+            <i data-lucide="sun" class="w-3.5 h-3.5"></i>
+            <span>Arena Beach</span>
+          </button>
+        
+          <button onclick="selectCategory('society')" 
+                  class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 whitespace-nowrap transition-all
+                         bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+            <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+            <span>Society</span>
+          </button>
+        
+          <button onclick="selectCategory('foot-skill')" 
+                  class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-1.5 whitespace-nowrap transition-all
+                         bg-white text-slate-700 border border-slate-200 hover:bg-slate-50">
+            <i data-lucide="target" class="w-3.5 h-3.5"></i>
+            <span>Foot-Skill</span>
+          </button>
+        
+      </div>
+
+      <!-- Grid de Quadras / Espaços -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+            <div onclick="selectCourt('court-society-1')" 
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
+              
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-court-society-1"
+                   ontouchstart="handleCourtTouchStart(event, 'court-society-1')"
+                   ontouchend="handleCourtTouchEnd(event, 'court-society-1')">
+                
+                <img id="court-img-court-society-1" src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80" alt="FUT 5 - SOCCER 5" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                
+                  <button type="button" 
+                          onclick="changeCourtImage('court-society-1', -1, event)" 
+                          title="Foto anterior"
+                          class="court-nav-arrow absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg cursor-pointer hover:scale-110 active:scale-95">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  </button>
+
+                  <button type="button" 
+                          onclick="changeCourtImage('court-society-1', 1, event)" 
+                          title="Próxima foto"
+                          class="court-nav-arrow absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg cursor-pointer hover:scale-110 active:scale-95">
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </button>
+
+                  <!-- Indicador de Bolinhas (Dots) -->
+                  <div id="court-dots-court-society-1" class="absolute bottom-2.5 right-3 flex items-center space-x-1.5 z-10 pointer-events-none">
+                    
+                      <span class="inline-block transition-all duration-300 rounded-full shadow-sm w-3.5 h-1.5 bg-emerald-400"></span>
+                    
+                      <span class="inline-block transition-all duration-300 rounded-full shadow-sm w-1.5 h-1.5 bg-white/60"></span>
+                    
+                  </div>
+
+                  <!-- Contador de Fotos -->
+                  <div class="absolute top-3 right-3 z-10 pointer-events-none">
+                    <span id="court-counter-court-society-1" class="bg-black/75 backdrop-blur-md text-white text-[10px] font-black px-2 py-0.5 rounded-md border border-white/20 shadow-sm flex items-center gap-1">
+                      <i data-lucide="camera" class="w-3 h-3 text-emerald-400"></i>
+                      <span>1/2</span>
+                    </span>
+                  </div>
+                
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+                  <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                    Quadra Poliesportiva
+                  </span>
+                  
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        🔥 Mais Agendada da Semana
+                      </span>
+                    
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
+                  <span class="text-[10px] font-bold text-emerald-300 flex items-center">
+                    <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
+                    48 agendamentos este mês
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
+                    FUT 5 - SOCCER 5
+                  </h3>
+                  
+                    <p class="text-xs text-slate-500 mb-3 line-clamp-2">Espaço projetado para jogos ágeis e de muita movimentação. Com dimensões otimizadas para o futebol rápido, possui amortecimento e excelente absorção de impacto.</p>
+                  
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
+                    <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+                    10 a 12 Jogadores
+                  </p>
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
+                    Grama Sintética 60mm
+                  </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: Grama Sintética 60mm</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>10 a 12 Jogadores</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ 90,00/hora (Normal)</span>
+                    </p>
+                    
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>09:00 às 16:00: R$ 50,00/h (Desconto)</span>
+                          </p>
+                        
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: 06:00 às 22:00</span>
+                    </p>
+                  </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  
+                </div>
+
+                <div>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ 90,00</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  
+                </div>
+
+              </div>
+            </div>
+          
+            <div onclick="selectCourt('court-society-2')" 
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
+              
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-court-society-2"
+                   ontouchstart="handleCourtTouchStart(event, 'court-society-2')"
+                   ontouchend="handleCourtTouchEnd(event, 'court-society-2')">
+                
+                <img id="court-img-court-society-2" src="https://images.unsplash.com/photo-1529900245534-47fbf8204bca?w=800&auto=format&fit=crop&q=80" alt="FUT 6 - SOCCER 6" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                
+                  <button type="button" 
+                          onclick="changeCourtImage('court-society-2', -1, event)" 
+                          title="Foto anterior"
+                          class="court-nav-arrow absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg cursor-pointer hover:scale-110 active:scale-95">
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  </button>
+
+                  <button type="button" 
+                          onclick="changeCourtImage('court-society-2', 1, event)" 
+                          title="Próxima foto"
+                          class="court-nav-arrow absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center backdrop-blur-md border border-white/20 shadow-lg cursor-pointer hover:scale-110 active:scale-95">
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </button>
+
+                  <!-- Indicador de Bolinhas (Dots) -->
+                  <div id="court-dots-court-society-2" class="absolute bottom-2.5 right-3 flex items-center space-x-1.5 z-10 pointer-events-none">
+                    
+                      <span class="inline-block transition-all duration-300 rounded-full shadow-sm w-3.5 h-1.5 bg-emerald-400"></span>
+                    
+                      <span class="inline-block transition-all duration-300 rounded-full shadow-sm w-1.5 h-1.5 bg-white/60"></span>
+                    
+                  </div>
+
+                  <!-- Contador de Fotos -->
+                  <div class="absolute top-3 right-3 z-10 pointer-events-none">
+                    <span id="court-counter-court-society-2" class="bg-black/75 backdrop-blur-md text-white text-[10px] font-black px-2 py-0.5 rounded-md border border-white/20 shadow-sm flex items-center gap-1">
+                      <i data-lucide="camera" class="w-3 h-3 text-emerald-400"></i>
+                      <span>1/2</span>
+                    </span>
+                  </div>
+                
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+                  <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                    Quadra Poliesportiva
+                  </span>
+                  
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        ⭐ Preferida da Galera
+                      </span>
+                    
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
+                  <span class="text-[10px] font-bold text-emerald-300 flex items-center">
+                    <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
+                    42 agendamentos este mês
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
+                    FUT 6 - SOCCER 6
+                  </h3>
+                  
+                    <p class="text-xs text-slate-500 mb-3 line-clamp-2">O meio-termo ideal entre o jogo rápido de salão e o campo tradicional. Com gramado sintético de alta durabilidade e iluminação potente para partidas noturnas.</p>
+                  
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
+                    <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+                    12 a 14 Jogadores
+                  </p>
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
+                    Grama Sintética 60mm
+                  </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: Grama Sintética 60mm</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>12 a 14 Jogadores</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ 100,00/hora (Normal)</span>
+                    </p>
+                    
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>09:00 às 16:00: R$ 60,00/h (Desconto)</span>
+                          </p>
+                        
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: 06:00 às 22:00</span>
+                    </p>
+                  </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  
+                </div>
+
+                <div>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ 100,00</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  
+                </div>
+
+              </div>
+            </div>
+          
+            <div onclick="selectCourt('court-beach-1')" 
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
+              
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-court-beach-1"
+                   ontouchstart="handleCourtTouchStart(event, 'court-beach-1')"
+                   ontouchend="handleCourtTouchEnd(event, 'court-beach-1')">
+                
+                <img id="court-img-court-beach-1" src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80" alt="FUT 7 - SOCCER 7" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+                  <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                    Quadra Poliesportiva
+                  </span>
+                  
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        🔥 Mais Agendada da Semana
+                      </span>
+                    
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
+                  <span class="text-[10px] font-bold text-emerald-300 flex items-center">
+                    <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
+                    39 agendamentos este mês
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
+                    FUT 7 - SOCCER 7
+                  </h3>
+                  
+                    <p class="text-xs text-slate-500 mb-3 line-clamp-2">Estrutura padrão de futebol society com dimensões oficiais e grama sintética de alto rendimento. Perfeita para campeonatos, torneios e partidas com amigos.</p>
+                  
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
+                    <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+                    14 a 20 Jogadores
+                  </p>
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
+                    Grama Sintética 60mm
+                  </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: Grama Sintética 60mm</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>14 a 20 Jogadores</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ 110,00/hora (Normal)</span>
+                    </p>
+                    
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>09:00 às 16:00: R$ 70,00/h (Desconto)</span>
+                          </p>
+                        
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: 06:00 às 22:00</span>
+                    </p>
+                  </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  
+                </div>
+
+                <div>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ 110,00</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  
+                </div>
+
+              </div>
+            </div>
+          
+            <div onclick="selectCourt('court-esportes-de-quadra-1788962671043')" 
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
+              
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-court-esportes-de-quadra-1788962671043"
+                   ontouchstart="handleCourtTouchStart(event, 'court-esportes-de-quadra-1788962671043')"
+                   ontouchend="handleCourtTouchEnd(event, 'court-esportes-de-quadra-1788962671043')">
+                
+                <img id="court-img-court-esportes-de-quadra-1788962671043" src="https://images.unsplash.com/photo-1518604666864-7423958f7660?w=800&auto=format&fit=crop&q=80" alt="FOOT TABLE - FUTMESA" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+                  <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                    Foot-Skill
+                  </span>
+                  
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        🎯 Melhor Custo-Benefício
+                      </span>
+                    
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
+                  <span class="text-[10px] font-bold text-emerald-300 flex items-center">
+                    <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
+                    48 agendamentos este mês
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
+                    FOOT TABLE - FUTMESA
+                  </h3>
+                  
+                    <p class="text-xs text-slate-500 mb-3 line-clamp-2">Área dedicada à prática de futmesa com piso nivelado e mesa de alta qualidade com curvatura padrão oficial para treinos de técnica e disputas dinâmicas.</p>
+                  
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
+                    <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+                    10 a 14 Jogadores
+                  </p>
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
+                    Grama Sintética 60mm
+                  </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: Grama Sintética 60mm</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>10 a 14 Jogadores</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ 35,00/hora (Normal)</span>
+                    </p>
+                    
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>09:00 às 16:00: R$ 25,00/h (Desconto)</span>
+                          </p>
+                        
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: 06:00 às 22:00</span>
+                    </p>
+                  </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  
+                </div>
+
+                <div>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ 35,00</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  
+                </div>
+
+              </div>
+            </div>
+          
+            <div onclick="selectCourt('court-beach-2')" 
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
+              
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-court-beach-2"
+                   ontouchstart="handleCourtTouchStart(event, 'court-beach-2')"
+                   ontouchend="handleCourtTouchEnd(event, 'court-beach-2')">
+                
+                <img id="court-img-court-beach-2" src="https://images.unsplash.com/photo-1592656094267-764a45160876?w=800&auto=format&fit=crop&q=80" alt="QUADRA DE AREIA - SAND COURT" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+                  <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                    Arena Beach
+                  </span>
+                  
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        🏖️ Areia Fina Tratada
+                      </span>
+                    
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
+                  <span class="text-[10px] font-bold text-emerald-300 flex items-center">
+                    <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
+                    26 agendamentos este mês
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
+                    QUADRA DE AREIA - SAND COURT
+                  </h3>
+                  
+                    <p class="text-xs text-slate-500 mb-3 line-clamp-2">Quadra de areia nivelada e higienizada, projetada para absorção de impacto e máximo esforço físico sem sobrecarga articular. Ideal para futevôlei e beach tennis.</p>
+                  
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
+                    <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+                    4 a 8 Jogadores
+                  </p>
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
+                    Areia Branca
+                  </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: Areia Branca</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>4 a 8 Jogadores</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ 50,00/hora (Normal)</span>
+                    </p>
+                    
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>09:00 às 16:00: R$ 30,00/h (Desconto)</span>
+                          </p>
+                        
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: 06:00 às 22:00</span>
+                    </p>
+                  </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  
+                </div>
+
+                <div>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ 50,00</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  
+                </div>
+
+              </div>
+            </div>
+          
+            <div onclick="selectCourt('court-futsal-1788963178368')" 
+                 class="court-card bg-white rounded-3xl overflow-hidden cursor-pointer relative flex flex-col border border-slate-200 shadow-sm">
+              
+              <!-- Carrossel de Fotos da Quadra -->
+              <div class="relative h-48 w-full overflow-hidden bg-slate-900 court-carousel group select-none"
+                   id="court-carousel-court-futsal-1788963178368"
+                   ontouchstart="handleCourtTouchStart(event, 'court-futsal-1788963178368')"
+                   ontouchend="handleCourtTouchEnd(event, 'court-futsal-1788963178368')">
+                
+                <img id="court-img-court-futsal-1788963178368" src="https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop&q=80" alt="QUADRA SOCIETY" 
+                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     class="w-full h-full object-cover transition-opacity duration-300">
+                
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+
+                <!-- Setinhas de navegação para Desktop / Cliques -->
+                
+
+                <!-- Badges de Categoria e Manutenção -->
+                <div class="absolute top-3 left-3 flex flex-wrap gap-1.5 z-10 pointer-events-none">
+                  <span class="bg-black/80 backdrop-blur-md text-emerald-400 text-[11px] font-black px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                    Society
+                  </span>
+                  
+                      <span class="bg-emerald-950/90 text-amber-300 text-[10px] font-black px-2.5 py-1 rounded-lg border border-amber-400/40 shadow-md flex items-center">
+                        ⚡ Alta Procura
+                      </span>
+                    
+                </div>
+
+                <div class="absolute bottom-2.5 left-3 text-white z-10 pointer-events-none">
+                  <span class="text-[10px] font-bold text-emerald-300 flex items-center">
+                    <i data-lucide="trending-up" class="w-3 h-3 mr-1"></i>
+                    49 agendamentos este mês
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="text-base sm:text-lg font-black text-slate-900 leading-snug mb-1.5">
+                    QUADRA SOCIETY
+                  </h3>
+                  
+                    <p class="text-xs text-slate-500 mb-3 line-clamp-2">Quadra poliesportiva em piso de cimento polido, ideal para jogos rápidos e com alto controle de bola. Espaço versátil com marcações esportivas atualizadas.</p>
+                  
+                  <p class="text-xs text-slate-600 font-semibold mb-2 flex items-center">
+                    <i data-lucide="users" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+                    10 a 14 Jogadores
+                  </p>
+                  <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 mb-2.5 line-clamp-1">
+                    Cimento Polido
+                  </p>
+
+                  <!-- Detalhes solicitados: Piso, Capacidade, Valor Normal, Desconto e Horários -->
+                  <div class="text-xs text-slate-600 space-y-1.5 pt-1 pb-1">
+                    <p class="flex items-center">
+                      <i data-lucide="layers" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Piso: Cimento Polido</span>
+                    </p>
+                    <p class="flex items-center">
+                      <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>10 a 14 Jogadores</span>
+                    </p>
+                    <p class="flex items-center font-bold text-slate-900">
+                      <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600 mr-1.5 shrink-0"></i> 
+                      <span>R$ 60,00/hora (Normal)</span>
+                    </p>
+                    
+                          <p class="flex items-center font-black text-amber-800 bg-amber-50 px-2 py-1 rounded-lg border border-amber-200 shadow-xs">
+                            <span class="mr-1">🔥</span> 
+                            <span>09:00 às 16:00: R$ 40,00/h (Desconto)</span>
+                          </p>
+                        
+                    <p class="flex items-center text-slate-500 font-medium">
+                      <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
+                      <span>Horários: 06:00 às 22:00</span>
+                    </p>
+                  </div>
+
+                  <!-- AVISO PRÉVIO DE MANUTENÇÃO (QUANDO ATIVADO PELA GERÊNCIA) -->
+                  
+                </div>
+
+                <div>
+                  <div class="pt-3 border-t border-slate-100">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <span class="text-[11px] text-slate-400 font-medium block">Valor Normal da Hora</span>
+                        <div class="flex items-baseline">
+                          <strong class="text-xl font-black text-emerald-700 leading-tight">R$ 60,00</strong>
+                          <span class="text-xs font-semibold text-slate-400 ml-1">/ hora</span>
+                        </div>
+                      </div>
+                      
+                    </div>
+                  </div>
+
+                  <!-- RODAPÉ DE HORÁRIOS FIXOS: SÓ APARECE SE TIVER FIXO CADASTRADO NA GERÊNCIA -->
+                  
+                </div>
+
+              </div>
+            </div>
+          
+      </div>
+
+      <!-- INFORMAÇÕES DO SISTEMA & REGRAS OFICIAIS -->
+      <div class="mt-10 p-5 sm:p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center space-x-3.5">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-700 shrink-0">
+            <i data-lucide="info" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-black uppercase tracking-wider text-emerald-800">Arena Pro Limoeiro v3.8.5</span>
+              <span class="text-[10px] bg-emerald-100 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full">🕒 06:00 às 22:00</span>
+              <span class="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-2 py-0.5 rounded-full">🔥 Promo 09:00 às 16:00</span>
+            </div>
+            <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">Informações do Sistema, Preços & Regras</h3>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Consulte a tabela de valores das modalidades, horários promocionais, controle de 5h e regras de funcionamento.
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+          <button type="button" onclick="openSystemInfoModal()" 
+                  class="w-full md:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+            <i data-lucide="info" class="w-4 h-4"></i>
+            <span>Ver Info do Sistema</span>
+          </button>
+        </div>
+      </div>
+
     </div>
+  
   </main>
 
   <!-- BARRA FIXA INFERIOR -->
@@ -183,7 +955,7 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=5.2.7"></script>
+  <script src="/app.js?v=5.2.8"></script>
   <script>
     // 🛡️ Garantia Absoluta de Renderização: Se o placeholder persistir, renderiza imediatamente
     setTimeout(function() {

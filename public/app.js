@@ -6,6 +6,9 @@ if (typeof window !== 'undefined') {
 }
 var lucide = (typeof window !== 'undefined' && window.lucide) ? window.lucide : { createIcons: () => {} };
 var _adminLockTimerInterval = null;
+var state = null;
+var recentNotifiedBookings = (typeof window !== 'undefined' && window.recentNotifiedBookings) ? window.recentNotifiedBookings : new Set();
+if (typeof window !== 'undefined') window.recentNotifiedBookings = recentNotifiedBookings;
 
 function getFormattedDate(date) {
   const y = date.getFullYear();
@@ -565,7 +568,7 @@ function openSystemInfoModal() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-1">
               <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">Versão do Sistema</span>
-              <strong class="text-sm font-black text-white block">Arena Pro v5.2.7 (Estável)</strong>
+              <strong class="text-sm font-black text-white block">Arena Pro v5.2.8 (Estável)</strong>
               <span class="text-[11px] text-emerald-400 font-semibold">🟢 100% Estável & Supabase Conectado</span>
             </div>
 
@@ -826,7 +829,7 @@ window.addEventListener('hashchange', () => {
 // O modo admin é ativado EXCLUSIVAMENTE se for a URL secreta de administração
 const _shouldStartInAdmin = _isAdminUrl && _isUserProperlyLogged;
 
-let state = {
+state = {
   currentStep: 1,
   currentMode: _shouldStartInAdmin ? 'admin' : 'client',
   adminTab: 'live_dashboard',
@@ -895,6 +898,7 @@ let state = {
   maintenanceBlocks: JSON.parse(localStorage.getItem('arena_maintenance_blocks') || '[]'),
   matchDelays: JSON.parse(localStorage.getItem('arena_match_delays') || '{}')
 };
+if (typeof window !== 'undefined') window.state = state;
 
 // ==============================================================================
 // 🏟️ NORMALIZADOR DE QUADRAS / ESPAÇOS (COMPATIBILIDADE SUPABASE & LOCAL)
@@ -1746,7 +1750,7 @@ function liveDashboardHeartbeat() {
     if (!hasOpenModal) {
       const scrollY = window.scrollY;
       renderStepContent();
-      window.scrollTo(0, scrollY);
+      if (typeof window.scrollTo === 'function') window.scrollTo(0, scrollY);
       if (window.lucide) lucide.createIcons();
     }
   }
@@ -5710,7 +5714,7 @@ function isReceptionUser() {
 // ==============================================================================
 // 🛡️ MATRIZ DE PERMISSÕES GRANULARES DO SISTEMA (GRADE 4x3 = 12 PERMISSÕES)
 // ==============================================================================
-const SYSTEM_PERMISSIONS = [
+var SYSTEM_PERMISSIONS = [
   // Coluna 1: Operação de Jogos
   { id: 'can_delete_bookings', col: 1, colTitle: '🎮 Operação de Jogos', label: 'Apagar / Cancelar Jogos', desc: 'Permite apagar jogos do sistema e liberar horário imediatamente', defaultRoles: ['Administrador Geral', 'Gerente do Sistema'] },
   { id: 'can_start_matches', col: 1, colTitle: '🎮 Operação de Jogos', label: 'Liberar e Iniciar Partidas', desc: 'Botão de liberar entrada/iniciar jogo e cronômetro ao vivo', defaultRoles: ['Administrador Geral', 'Gerente do Sistema', 'Recepção & Atendimento'] },
@@ -19819,7 +19823,7 @@ function showToastNotification(htmlContent, duration = 6500) {
   }, duration);
 }
 
-const recentNotifiedBookings = new Set();
+if (!recentNotifiedBookings) recentNotifiedBookings = new Set();
 
 function triggerBookingNotification(booking, type = 'new') {
   // 1. Nunca notifica atualizações de status (início de jogo, encerramento, edição ou cancelamento)
