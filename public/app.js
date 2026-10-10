@@ -565,7 +565,7 @@ function openSystemInfoModal() {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div class="p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.08] space-y-1">
               <span class="text-[11px] font-bold text-slate-400 block uppercase tracking-wider">Versão do Sistema</span>
-              <strong class="text-sm font-black text-white block">Arena Pro v5.2.6 (Atualizado)</strong>
+              <strong class="text-sm font-black text-white block">Arena Pro v5.2.7 (Estável)</strong>
               <span class="text-[11px] text-emerald-400 font-semibold">🟢 100% Estável & Supabase Conectado</span>
             </div>
 
@@ -1625,12 +1625,25 @@ function calculateDuration() {
 
 async function initArenaApplication() {
   // 1. Carrega dados padrão locais imediatamente para que o estado básico esteja pronto
-  loadInitialData();
-  initEventListeners();
+  try {
+    loadInitialData();
+  } catch(e) {
+    console.error('Erro ao carregar dados iniciais:', e);
+  }
+
+  try {
+    initEventListeners();
+  } catch(e) {
+    console.error('Erro ao inicializar ouvintes:', e);
+  }
 
   // ⚡ RENDERIZAÇÃO INSTANTÂNEA: A tela NUNCA fica branca!
   // O usuário vê imediatamente todas as informações de agendamento (quadras, horários, preços)
-  renderApp();
+  try {
+    renderApp();
+  } catch(e) {
+    console.error('Erro na renderização inicial:', e);
+  }
 
   // 2. ⚡ SINCRONIZAÇÃO EM SEGUNDO PLANO COM O SUPABASE:
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
@@ -1769,8 +1782,9 @@ function isMensalistaActive(m) {
 window.isMensalistaActive = isMensalistaActive;
 
 function loadInitialData() {
-  if (window.ARENA_DEFAULT_DATA) {
-    const d = window.ARENA_DEFAULT_DATA;
+  try {
+    if (window.ARENA_DEFAULT_DATA) {
+      const d = window.ARENA_DEFAULT_DATA;
     state.arenaInfo = d.arenaInfo;
     const defaultCats = d.categories || [];
     const localCats = JSON.parse(localStorage.getItem('arena_categories') || 'null');
@@ -1888,7 +1902,7 @@ function loadInitialData() {
         if (exDay !== mDay) return false;
         const exS = timeToMinutes(ex.start_time || ex.startTime || ex.time || '19:00');
         const exE = timeToMinutes(ex.end_time || ex.endTime || minutesToTime(exS + 60));
-        return Math.max(mS, exS) < Math.min(eMin, exE);
+        return Math.max(mS, exS) < Math.min(mE, exE);
       });
 
       if (!conflict) {
@@ -1924,6 +1938,9 @@ function loadInitialData() {
       }
     } catch(e) {}
   }
+} catch(err) {
+  console.error('Erro em loadInitialData:', err);
+}
 }
 
 
@@ -19426,10 +19443,10 @@ function renderBottomBar() {
   if (!bar) return;
 
   if (state.currentMode === 'admin' || state.currentStep === 1) {
-    bar.classList.add('hidden');
+    if (bar.classList) bar.classList.add('hidden');
     return;
   }
-  bar.classList.remove('hidden');
+  if (bar.classList) bar.classList.remove('hidden');
 
   const court = state.selectedCourt;
   const canProceed = canAdvanceFromStep(state.currentStep);
