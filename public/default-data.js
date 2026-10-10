@@ -84,8 +84,8 @@ const initialCourts = [
       features: ["Iluminação LED", "Vestiários", "Churrasqueira Anexa"],
       status: "Disponível",
       opening_time: "06:00",
-      closing_time: "23:00",
-      discount_price_per_hour: 60.00,
+      closing_time: "22:00",
+      discount_price_per_hour: 50.00,
       discount_start_time: "09:00",
       discount_end_time: "16:00",
       gallery: [
@@ -93,8 +93,8 @@ const initialCourts = [
         "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80"
       ]
     },
-    discountPricePerHour: 60.00,
-    discount_price_per_hour: 60.00,
+    discountPricePerHour: 50.00,
+    discount_price_per_hour: 50.00,
     discountStartTime: "09:00",
     discountEndTime: "16:00"
   },
@@ -118,7 +118,7 @@ const initialCourts = [
       features: ["Iluminação LED", "Vestiários", "100% Coberto"],
       status: "Disponível",
       opening_time: "06:00",
-      closing_time: "23:00",
+      closing_time: "22:00",
       discount_price_per_hour: 60.00,
       discount_start_time: "09:00",
       discount_end_time: "16:00",
@@ -152,16 +152,16 @@ const initialCourts = [
       features: ["Iluminação LED", "Vestiários", "Placar Digital"],
       status: "Disponível",
       opening_time: "06:00",
-      closing_time: "23:00",
-      discount_price_per_hour: 90.00,
+      closing_time: "22:00",
+      discount_price_per_hour: 70.00,
       discount_start_time: "09:00",
       discount_end_time: "16:00",
       gallery: [
         "https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80"
       ]
     },
-    discountPricePerHour: 90.00,
-    discount_price_per_hour: 90.00,
+    discountPricePerHour: 70.00,
+    discount_price_per_hour: 70.00,
     discountStartTime: "09:00",
     discountEndTime: "16:00"
   },
@@ -185,7 +185,7 @@ const initialCourts = [
       features: ["Mesa Oficial", "Iluminação LED", "Vestiários"],
       status: "Disponível",
       opening_time: "06:00",
-      closing_time: "23:00",
+      closing_time: "22:00",
       discount_price_per_hour: 25.00,
       discount_start_time: "09:00",
       discount_end_time: "16:00",
@@ -218,7 +218,7 @@ const initialCourts = [
       features: ["Areia Lavada", "Refletores LED", "Duchas Anexas"],
       status: "Disponível",
       opening_time: "06:00",
-      closing_time: "23:00",
+      closing_time: "22:00",
       discount_price_per_hour: 30.00,
       discount_start_time: "09:00",
       discount_end_time: "16:00",
@@ -251,7 +251,7 @@ const initialCourts = [
       features: ["Piso Polido", "Iluminação LED", "Vestiários"],
       status: "Disponível",
       opening_time: "06:00",
-      closing_time: "23:00",
+      closing_time: "22:00",
       discount_price_per_hour: 40.00,
       discount_start_time: "09:00",
       discount_end_time: "16:00",

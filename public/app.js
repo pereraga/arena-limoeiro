@@ -1201,7 +1201,7 @@ function calculateLocalSchedule(courtId, date) {
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
     "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
     "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
-    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
+    "21:00", "21:30", "22:00"
   ];
 
   const currentCourt = (state.courts || []).find(c => c.id === courtId);
@@ -1955,7 +1955,7 @@ function renderStep1(container) {
                     })()}
                     <p class="flex items-center text-slate-500 font-medium">
                       <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> 
-                      <span>Horários: ${specs.opening_time || court.openingTime || '06:00'} às ${specs.closing_time || court.closingTime || '23:00'}</span>
+                      <span>Horários: ${specs.opening_time || court.openingTime || '06:00'} às ${specs.closing_time || court.closingTime || '22:00'}</span>
                     </p>
                   </div>
 
@@ -2651,12 +2651,12 @@ function renderStep3Content() {
 
   // Se não houver horários carregados ainda, gera lista padrão filtrando ocupados
   const fallbackHours = [
-        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+    "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
     "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
     "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
     "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
-    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
+    "21:00", "21:30", "22:00"
   ];
 
   const nowStep3 = new Date();
@@ -4755,11 +4755,16 @@ function canManageCustomers() { return hasPermission('can_manage_customers'); }
 function canManageMonthly() { return hasPermission('can_manage_monthly'); }
 function canManageProducts() { return hasPermission('can_manage_products'); }
 function canManageSettings() { return hasPermission('can_manage_settings'); }
+function canEditBookings() {
+  if (!isManagerLoggedIn()) return false;
+  return canDeleteBookings() || canDirectBooking() || canStartMatches();
+}
 
 window.SYSTEM_PERMISSIONS = SYSTEM_PERMISSIONS;
 window.userHasPermission = userHasPermission;
 window.hasPermission = hasPermission;
 window.canDeleteBookings = canDeleteBookings;
+window.canEditBookings = canEditBookings;
 window.canStartMatches = canStartMatches;
 window.canFinishMatches = canFinishMatches;
 window.canManageBar = canManageBar;
@@ -5998,6 +6003,14 @@ function renderLiveDashboardTab() {
                         </button>
                       ` : ''}
 
+                      <!-- Botão de Editar Partida (Janela para editar a partida já criada) -->
+                      ${canEditBookings() ? `
+                        <button onclick="openEditMatchModal('${match.id}')" class="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 text-sky-800 hover:text-sky-950 border border-sky-300 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Editar dados desta partida (cliente, horário, quadra, valor...)">
+                          <i data-lucide="edit-3" class="w-4 h-4 text-sky-600"></i>
+                          <span>Editar Partida</span>
+                        </button>
+                      ` : ''}
+
                       <!-- Botão de Apagar Jogo (Apenas Gerente do Sistema e Administrador Geral) -->
                       ${canDeleteBookings() ? `
                         <button onclick="handleCancelBooking('${match.id}')" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs touch-manipulation" title="Apagar este jogo do sistema e liberar o horário imediatamente">
@@ -6376,12 +6389,20 @@ function renderCourtsControlTab() {
                           <span class="w-2 h-2 rounded-full bg-amber-600 mr-1.5 animate-ping"></span>
                           Partida ao Vivo em Andamento
                         </div>
-                        ${canDeleteBookings() ? `
-                          <button onclick="handleCancelBooking('${liveBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all touch-manipulation" title="Apagar este jogo do sistema">
-                            <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
-                            <span>Apagar Jogo</span>
-                          </button>
-                        ` : ''}
+                        <div class="flex items-center space-x-1">
+                          ${canEditBookings() ? `
+                            <button onclick="openEditMatchModal('${liveBooking.id}')" class="px-2 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all" title="Editar dados desta partida">
+                              <i data-lucide="edit-3" class="w-3 h-3 text-sky-600"></i>
+                              <span>Editar</span>
+                            </button>
+                          ` : ''}
+                          ${canDeleteBookings() ? `
+                            <button onclick="handleCancelBooking('${liveBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all touch-manipulation" title="Apagar este jogo do sistema">
+                              <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                              <span>Apagar Jogo</span>
+                            </button>
+                          ` : ''}
+                        </div>
                       </div>
                       <p class="font-medium text-[11px] text-amber-800 flex items-center gap-1.5 flex-wrap"><span>${liveBooking.customer_name}</span> ${isMensalistaBooking(liveBooking) ? '<span class="font-black text-indigo-900 bg-indigo-100 px-1.5 py-0.5 rounded text-[9px] border border-indigo-200">⭐ Mensalista</span>' : ''} <span>(${liveBooking.start_time} às ${liveBooking.end_time})</span></p>
                     </div>
@@ -6392,12 +6413,20 @@ function renderCourtsControlTab() {
                           <i data-lucide="clock" class="w-4 h-4 text-blue-600 mr-1.5"></i>
                           Próxima Partida Hoje
                         </div>
-                        ${canDeleteBookings() ? `
-                          <button onclick="handleCancelBooking('${nextBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all touch-manipulation" title="Apagar este jogo do sistema">
-                            <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
-                            <span>Apagar Jogo</span>
-                          </button>
-                        ` : ''}
+                        <div class="flex items-center space-x-1">
+                          ${canEditBookings() ? `
+                            <button onclick="openEditMatchModal('${nextBooking.id}')" class="px-2 py-0.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all" title="Editar dados desta partida">
+                              <i data-lucide="edit-3" class="w-3 h-3 text-sky-600"></i>
+                              <span>Editar</span>
+                            </button>
+                          ` : ''}
+                          ${canDeleteBookings() ? `
+                            <button onclick="handleCancelBooking('${nextBooking.id}')" class="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black flex items-center space-x-1 cursor-pointer transition-all touch-manipulation" title="Apagar este jogo do sistema">
+                              <i data-lucide="trash-2" class="w-3 h-3 text-rose-600"></i>
+                              <span>Apagar Jogo</span>
+                            </button>
+                          ` : ''}
+                        </div>
                       </div>
                       <p class="font-medium text-[11px] text-blue-800 flex items-center gap-1.5 flex-wrap"><span>${nextBooking.customer_name}</span> ${isMensalistaBooking(nextBooking) ? '<span class="font-black text-indigo-900 bg-indigo-100 px-1.5 py-0.5 rounded text-[9px] border border-indigo-200">⭐ Mensalista</span>' : ''} <span>às ${nextBooking.start_time || (nextBooking.time ? nextBooking.time.split(' ')[0] : '')}</span></p>
                     </div>
@@ -6421,7 +6450,7 @@ function renderCourtsControlTab() {
                         <span>${specs.discount_start_time || '09:00'} às ${specs.discount_end_time || '16:00'}: R$ ${parseFloat(specs.discount_price_per_hour).toFixed(2).replace('.', ',')}/h (Desconto)</span>
                       </p>
                     ` : ''}
-                    <p class="flex items-center text-slate-500 font-medium"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Horários: ${specs.opening_time || '06:00'} às ${specs.closing_time || '23:00'}</span></p>
+                    <p class="flex items-center text-slate-500 font-medium"><i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0"></i> <span>Horários: ${specs.opening_time || '06:00'} às ${specs.closing_time || '22:00'}</span></p>
                   </div>
                 </div>
               </div>
@@ -10781,6 +10810,13 @@ function renderSubtabBookingsItems(bookings) {
             <span>Comanda</span>
           </button>
 
+          ${canEditBookings() ? `
+            <button onclick="openEditMatchModal('${b.id}')" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all cursor-pointer shadow-2xs" title="Editar dados desta reserva">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>Editar</span>
+            </button>
+          ` : ''}
+
           ${canDeleteBookings() ? `
             <button onclick="handleCancelBooking('${b.id}')" class="px-3.5 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Apagar este jogo do sistema e liberar o horário imediatamente">
               <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
@@ -13275,6 +13311,13 @@ function handleMatchModalFilter() {
             <span>Comanda Bar</span>
           </button>
 
+          ${canEditBookings() ? `
+            <button type="button" onclick="openEditMatchModal('${m.id}')" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 rounded-xl text-xs font-bold transition-all flex items-center space-x-1 cursor-pointer shadow-2xs" title="Editar dados desta partida">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-sky-600"></i>
+              <span>Editar Partida</span>
+            </button>
+          ` : ''}
+
           ${canDeleteBookings() ? `
             <button type="button" onclick="handleCancelBooking('${m.id}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Apagar este jogo permanentemente do sistema">
               <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
@@ -13404,12 +13447,12 @@ function renderAdminMatrix() {
   if (!container) return;
 
   const operatingHours = [
-        "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
+    "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
     "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
     "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
     "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
     "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
-    "21:00", "21:30", "22:00", "22:30", "23:00", "23:30"
+    "21:00", "21:30", "22:00"
   ];
 
   let html = `
@@ -13783,6 +13826,507 @@ function openEditContractFromMatch(matchId) {
   }
 }
 window.openEditContractFromMatch = openEditContractFromMatch;
+
+// ==============================================================================
+// ✏️ JANELA / MODAL PARA EDITAR A PARTIDA JÁ CRIADA (DIRETO NO SUPABASE NA NUVEM)
+// ==============================================================================
+function escapeHtmlAttr(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function openEditMatchModal(matchId) {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const match = (state.bookings || []).find(b => String(b.id) === String(matchId)) ||
+                ((Array.isArray(state.matches) ? state.matches : []).find(m => String(m.id) === String(matchId)));
+
+  if (!match) {
+    alert('Partida não encontrada no sistema.');
+    return;
+  }
+
+  const customerName = match.customer_name || match.customerName || '';
+  const customerPhone = match.customer_phone || match.customerPhone || '';
+  const customerCpf = match.customer_cpf || match.customerCpf || match.customerCPF || '';
+  const emergencyContact = match.emergency_contact || match.emergencyContact || '';
+  const observation = match.observation || match.notes || '';
+  const courtId = match.court_id || match.courtId || (state.courts[0]?.id || '');
+  const matchDate = match.date || state.selectedDate || getFormattedDate(new Date());
+  const startTime = match.start_time || match.startTime || '19:00';
+  const endTime = match.end_time || match.endTime || '20:00';
+  const totalPrice = Number(match.total_price || match.price || match.totalPrice || 0);
+  const paymentMethod = match.payment_method || match.paymentMethod || 'local';
+  const matchStatus = match.status || 'confirmed';
+  const isMensal = !!(match.isMensalista || (typeof isMensalistaBooking === 'function' && isMensalistaBooking(match)) || match.monthly_member_id || String(matchId).startsWith('monthly-'));
+
+  const timeSlots = [];
+  for (let h = 6; h <= 23; h++) {
+    const hh = String(h).padStart(2, '0');
+    timeSlots.push(`${hh}:00`);
+    timeSlots.push(`${hh}:30`);
+  }
+
+  const sMin = timeToMinutes(startTime);
+  const eMin = timeToMinutes(endTime);
+  const durMins = Math.max(30, eMin - sMin);
+  const durHours = Math.floor(durMins / 60);
+  const remMins = durMins % 60;
+  const durLabel = durHours > 0 ? (remMins > 0 ? `${durHours}h ${remMins}min` : `${durHours}h`) : `${durMins} min`;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+      <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col my-auto max-h-[94vh]">
+        
+        <!-- Header -->
+        <div class="arena-header-bg p-4 sm:p-5 text-white flex items-center justify-between shrink-0 border-b border-emerald-700/50">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-sky-500/20 flex items-center justify-center border border-sky-400/30 text-sky-300">
+              <i data-lucide="edit-3" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-sm sm:text-base font-black uppercase tracking-wide flex items-center gap-2">
+                <span>Editar Partida Criada</span>
+                ${isMensal ? '<span class="text-[10px] font-black bg-indigo-500/40 text-indigo-100 border border-indigo-400/40 px-2 py-0.5 rounded-full normal-case">⭐ Fixo / Mensalista</span>' : '<span class="text-[10px] font-black bg-sky-500/40 text-sky-100 border border-sky-400/40 px-2 py-0.5 rounded-full normal-case">Reserva Avulsa</span>'}
+              </h3>
+              <p class="text-xs text-emerald-200/90 font-medium">Modifique cliente, espaço, data, horário ou valores no banco de dados</p>
+            </div>
+          </div>
+          <button type="button" onclick="closeModal()" class="text-slate-300 hover:text-white p-1 rounded-xl hover:bg-white/10 transition-colors cursor-pointer" title="Fechar Janela">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Form Body -->
+        <form onsubmit="handleSaveEditMatch(event, '${escapeHtmlAttr(match.id)}')" class="p-4 sm:p-6 space-y-4 overflow-y-auto text-slate-800" autocomplete="off">
+          
+          ${isMensal ? `
+            <div class="p-3 bg-indigo-50/90 border border-indigo-200 rounded-2xl text-xs text-indigo-950 flex items-center justify-between gap-2 shadow-2xs">
+              <div class="flex items-center space-x-2">
+                <span class="text-base">👑</span>
+                <span>Esta partida pertence a um <strong>Horário Fixo Mensalista</strong>.</span>
+              </div>
+              <button type="button" onclick="closeModal(); openEditContractFromMatch('${escapeHtmlAttr(match.id)}')" class="text-xs font-black text-indigo-700 hover:text-indigo-900 underline whitespace-nowrap cursor-pointer">
+                Editar Contrato Fixo
+              </button>
+            </div>
+          ` : ''}
+
+          <!-- SEÇÃO 1: CLIENTE / RESPONSÁVEL -->
+          <div class="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200 space-y-3">
+            <div class="flex items-center space-x-1.5 text-xs font-black text-slate-700 uppercase tracking-wider">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Dados do Cliente / Time</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nome do Cliente / Time *</label>
+                <input type="text" id="editMatchCustomerName" required value="${escapeHtmlAttr(customerName)}" 
+                       placeholder="Ex: Gabriel Alves ou Amigos FC"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Telefone / WhatsApp *</label>
+                <input type="tel" id="editMatchCustomerPhone" required value="${escapeHtmlAttr(formatPhone(customerPhone))}"
+                       placeholder="(81) 99999-9999" oninput="this.value = formatPhone(this.value)"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">CPF do Cliente</label>
+                <input type="text" id="editMatchCustomerCpf" value="${escapeHtmlAttr(formatCPF(customerCpf))}"
+                       placeholder="000.000.000-00" oninput="this.value = formatCPF(this.value)"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Contato de Emergência</label>
+                <input type="text" id="editMatchEmergencyContact" value="${escapeHtmlAttr(emergencyContact)}"
+                       placeholder="Ex: +55 81 9999-9999"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 2: ESPAÇO, DATA E HORÁRIO -->
+          <div class="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200 space-y-3">
+            <div class="flex items-center space-x-1.5 text-xs font-black text-slate-700 uppercase tracking-wider">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Espaço, Data & Horário</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Quadra / Espaço *</label>
+                <select id="editMatchCourtId" required onchange="handleEditMatchCourtChange()"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  ${(state.courts || []).map(c => `
+                    <option value="${c.id}" ${c.id === courtId ? 'selected' : ''}>${c.name} (${c.categoryLabel || 'Campo'})</option>
+                  `).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Data da Partida *</label>
+                <input type="date" id="editMatchDate" required value="${escapeHtmlAttr(matchDate)}"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Horário de Início *</label>
+                <select id="editMatchStartTime" required onchange="handleEditMatchTimeChange()"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  ${timeSlots.map(t => `<option value="${t}" ${t === startTime ? 'selected' : ''}>${t}</option>`).join('')}
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Horário de Término *</label>
+                <select id="editMatchEndTime" required onchange="handleEditMatchTimeChange()"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  ${timeSlots.map(t => `<option value="${t}" ${t === endTime ? 'selected' : ''}>${t}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1 text-xs">
+              <span class="text-slate-600 font-semibold flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-500"></i>
+                Duração:
+                <strong id="editMatchDurationBadge" class="text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md font-black">${durLabel} (${durMins} min)</strong>
+              </span>
+              <button type="button" onclick="recalcEditMatchPrice()" class="text-[11px] font-bold text-sky-700 hover:text-sky-900 underline flex items-center gap-1 cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                Recalcular Preço da Quadra
+              </button>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 3: VALOR, PAGAMENTO E STATUS -->
+          <div class="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200 space-y-3">
+            <div class="flex items-center space-x-1.5 text-xs font-black text-slate-700 uppercase tracking-wider">
+              <i data-lucide="dollar-sign" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Financeiro & Status do Jogo</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Valor Total (R$) *</label>
+                <input type="number" id="editMatchPrice" step="0.01" min="0" required value="${totalPrice.toFixed(2)}"
+                       class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-black text-emerald-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Forma de Pagamento</label>
+                <select id="editMatchPaymentMethod"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  <option value="local" ${paymentMethod === 'local' ? 'selected' : ''}>Recepção / Balcão</option>
+                  <option value="pix" ${paymentMethod === 'pix' ? 'selected' : ''}>PIX</option>
+                  <option value="dinheiro" ${paymentMethod === 'dinheiro' ? 'selected' : ''}>Dinheiro</option>
+                  <option value="cartao_credito" ${paymentMethod === 'cartao_credito' ? 'selected' : ''}>Cartão de Crédito</option>
+                  <option value="cartao_debito" ${paymentMethod === 'cartao_debito' ? 'selected' : ''}>Cartão de Débito</option>
+                  <option value="isento" ${paymentMethod === 'isento' ? 'selected' : ''}>Cortesia / Isento</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Status da Partida</label>
+                <select id="editMatchStatus"
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                  <option value="confirmed" ${matchStatus === 'confirmed' ? 'selected' : ''}>Agendado</option>
+                  <option value="in_progress" ${matchStatus === 'in_progress' ? 'selected' : ''}>🟢 Bola Rolando</option>
+                  <option value="finished" ${matchStatus === 'finished' ? 'selected' : ''}>✓ Finalizado</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- SEÇÃO 4: OBSERVAÇÕES -->
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Observações Internas</label>
+            <textarea id="editMatchObservation" rows="2" placeholder="Observações sobre a partida ou cliente..."
+                      class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">${escapeHtmlAttr(observation)}</textarea>
+          </div>
+
+          <!-- FOOTER / BOTÕES -->
+          <div class="pt-3 border-t border-slate-200 flex items-center justify-end space-x-2.5">
+            <button type="button" onclick="closeModal()" 
+                    class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer">
+              Cancelar
+            </button>
+            <button type="submit" id="btnSaveEditMatch"
+                    class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-xs font-black shadow-md flex items-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="check" class="w-4 h-4"></i>
+              <span>Salvar Alterações (Supabase)</span>
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openEditMatchModal = openEditMatchModal;
+
+function handleEditMatchTimeChange() {
+  const startEl = document.getElementById('editMatchStartTime');
+  const endEl = document.getElementById('editMatchEndTime');
+  const durEl = document.getElementById('editMatchDurationBadge');
+  if (!startEl || !endEl) return;
+  const sMin = timeToMinutes(startEl.value);
+  let eMin = timeToMinutes(endEl.value);
+  if (eMin <= sMin) {
+    eMin = sMin + 60;
+    endEl.value = minutesToTime(Math.min(eMin, 23 * 60 + 30));
+  }
+  const durMins = Math.max(30, eMin - sMin);
+  const durHours = Math.floor(durMins / 60);
+  const remMins = durMins % 60;
+  const durLabel = durHours > 0 ? (remMins > 0 ? `${durHours}h ${remMins}min` : `${durHours}h`) : `${durMins} min`;
+  if (durEl) durEl.textContent = `${durLabel} (${durMins} min)`;
+}
+window.handleEditMatchTimeChange = handleEditMatchTimeChange;
+
+function recalcEditMatchPrice() {
+  const courtEl = document.getElementById('editMatchCourtId');
+  const startEl = document.getElementById('editMatchStartTime');
+  const endEl = document.getElementById('editMatchEndTime');
+  const priceEl = document.getElementById('editMatchPrice');
+  if (!courtEl || !startEl || !endEl || !priceEl) return;
+
+  const court = (state.courts || []).find(c => c.id === courtEl.value);
+  if (!court) return;
+
+  const sMin = timeToMinutes(startEl.value);
+  const eMin = timeToMinutes(endEl.value);
+  const durMins = Math.max(30, eMin - sMin);
+  const hoursFraction = durMins / 60;
+
+  const hourlyRate = typeof getCourtHourlyPrice === 'function' ? getCourtHourlyPrice(court, startEl.value) : (court.basePricePerHour || 60);
+  const calculatedPrice = hourlyRate * hoursFraction;
+  priceEl.value = calculatedPrice.toFixed(2);
+}
+window.recalcEditMatchPrice = recalcEditMatchPrice;
+
+function handleEditMatchCourtChange() {
+  recalcEditMatchPrice();
+}
+window.handleEditMatchCourtChange = handleEditMatchCourtChange;
+
+async function handleSaveEditMatch(event, matchId) {
+  event.preventDefault();
+  const btn = document.getElementById('btnSaveEditMatch');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>Salvando no Supabase...</span>';
+  }
+
+  try {
+    const custName = (document.getElementById('editMatchCustomerName')?.value || '').trim();
+    const custPhone = (document.getElementById('editMatchCustomerPhone')?.value || '').trim();
+    const custCpf = (document.getElementById('editMatchCustomerCpf')?.value || '').trim();
+    const emerg = (document.getElementById('editMatchEmergencyContact')?.value || '').trim();
+    const courtId = document.getElementById('editMatchCourtId')?.value || '';
+    const matchDate = document.getElementById('editMatchDate')?.value || '';
+    const startTime = document.getElementById('editMatchStartTime')?.value || '';
+    const endTime = document.getElementById('editMatchEndTime')?.value || '';
+    const priceVal = parseFloat(document.getElementById('editMatchPrice')?.value || '0');
+    const paymentMethod = document.getElementById('editMatchPaymentMethod')?.value || 'local';
+    const matchStatus = document.getElementById('editMatchStatus')?.value || 'confirmed';
+    const rawObs = (document.getElementById('editMatchObservation')?.value || '').trim();
+
+    if (!custName) {
+      alert('Por favor, informe o nome do cliente.');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span>Salvar Alterações (Supabase)</span>'; }
+      return;
+    }
+
+    const sMin = timeToMinutes(startTime);
+    const eMin = timeToMinutes(endTime);
+    if (eMin <= sMin) {
+      alert('O horário de término deve ser posterior ao horário de início.');
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span>Salvar Alterações (Supabase)</span>'; }
+      return;
+    }
+    const durMins = eMin - sMin;
+
+    // Checagem de conflito com outros jogos ativos no mesmo dia e quadra
+    const conflict = (state.bookings || []).find(b => {
+      if (String(b.id) === String(matchId)) return false;
+      if (b.status === 'cancelled') return false;
+      const bCourt = b.court_id || b.courtId;
+      if (bCourt !== courtId) return false;
+      if (b.date !== matchDate) return false;
+      const bS = timeToMinutes(b.start_time || b.startTime);
+      const bE = timeToMinutes(b.end_time || b.endTime);
+      return Math.max(sMin, bS) < Math.min(eMin, bE);
+    });
+
+    if (conflict) {
+      const proceed = confirm(`⚠️ Conflito de Horário Detectado:\n\nJá existe a reserva "${conflict.customer_name || conflict.customerName}" nesta quadra das ${conflict.start_time || conflict.startTime} às ${conflict.end_time || conflict.endTime}.\n\nDeseja salvar mesmo assim com sobreposição manual?`);
+      if (!proceed) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span>Salvar Alterações (Supabase)</span>'; }
+        return;
+      }
+    }
+
+    // Monta observação unificada preservando CPF e Emergência
+    const cleanObs = rawObs.replace(/\[CPF:[^\]]+\]/g, '').replace(/\[Emergência:[^\]]+\]/g, '').trim();
+    const cpfTag = custCpf ? `[CPF: ${formatCPF(custCpf)}]` : '';
+    const emergTag = emerg ? `[Emergência: ${emerg}]` : '';
+    const fullObs = [cleanObs, cpfTag, emergTag].filter(Boolean).join(' | ');
+
+    // 1. Atualiza no Supabase (Nuvem)
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+
+        // Se for id de mensalista do tipo monthly-UUID
+        if (String(matchId).startsWith('monthly-')) {
+          const rawMemberId = String(matchId).replace('monthly-', '');
+          await client.from('monthly_members').update({
+            team_name: custName,
+            phone: formatPhone(custPhone),
+            court_id: courtId,
+            start_time: startTime,
+            end_time: endTime,
+            time: `${startTime} às ${endTime}`,
+            observation: fullObs
+          }).eq('id', rawMemberId);
+        } else {
+          // Atualiza na tabela bookings
+          const updatePayload = {
+            customer_name: custName,
+            customer_phone: formatPhone(custPhone),
+            court_id: courtId,
+            date: matchDate,
+            start_time: startTime,
+            end_time: endTime,
+            time: `${startTime} às ${endTime}`,
+            duration: durMins,
+            total_price: priceVal,
+            payment_method: paymentMethod,
+            status: matchStatus,
+            observation: fullObs
+          };
+
+          const extendedPayload = {
+            ...updatePayload,
+            customer_cpf: custCpf ? formatCPF(custCpf) : null,
+            emergency_contact: emerg || null
+          };
+
+          const { error: updErr } = await client.from('bookings').update(extendedPayload).eq('id', matchId);
+          if (updErr) {
+            console.warn('Tentativa com payload simplificado no Supabase:', updErr);
+            await client.from('bookings').update(updatePayload).eq('id', matchId);
+          }
+        }
+      } catch (dbErr) {
+        console.warn('Erro ao atualizar partida no Supabase:', dbErr);
+      }
+    }
+
+    // 2. Atualiza estado em memória imediatamente (latência de milissegundos)
+    const bIdx = (state.bookings || []).findIndex(b => String(b.id) === String(matchId));
+    if (bIdx >= 0) {
+      state.bookings[bIdx] = {
+        ...state.bookings[bIdx],
+        customer_name: custName,
+        customerName: custName,
+        customer_phone: formatPhone(custPhone),
+        customerPhone: formatPhone(custPhone),
+        customer_cpf: custCpf ? formatCPF(custCpf) : '',
+        customerCpf: custCpf ? formatCPF(custCpf) : '',
+        customerCPF: custCpf ? formatCPF(custCpf) : '',
+        emergency_contact: emerg,
+        emergencyContact: emerg,
+        court_id: courtId,
+        courtId: courtId,
+        date: matchDate,
+        start_time: startTime,
+        startTime: startTime,
+        end_time: endTime,
+        endTime: endTime,
+        time: `${startTime} às ${endTime}`,
+        duration: durMins,
+        total_price: priceVal,
+        totalPrice: priceVal,
+        price: priceVal,
+        payment_method: paymentMethod,
+        paymentMethod: paymentMethod,
+        status: matchStatus,
+        observation: fullObs
+      };
+    }
+
+    // Também atualiza em state.matches se existir
+    if (Array.isArray(state.matches)) {
+      const mIdx = state.matches.findIndex(m => String(m.id) === String(matchId));
+      if (mIdx >= 0) {
+        state.matches[mIdx] = {
+          ...state.matches[mIdx],
+          customer_name: custName,
+          customer_phone: formatPhone(custPhone),
+          customer_cpf: custCpf ? formatCPF(custCpf) : '',
+          emergency_contact: emerg,
+          court_id: courtId,
+          date: matchDate,
+          start_time: startTime,
+          end_time: endTime,
+          time: `${startTime} às ${endTime}`,
+          duration: durMins,
+          total_price: priceVal,
+          payment_method: paymentMethod,
+          status: matchStatus,
+          observation: fullObs
+        };
+      }
+    }
+
+    // Salva cópia local no storage
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+    } catch(e) {}
+
+    // Fecha a janela modal
+    closeModal();
+
+    // Notificação toast de sucesso
+    if (typeof showToastNotification === 'function') {
+      showToastNotification(`
+        <strong class="text-emerald-400 font-bold block text-sm mb-0.5">✅ Partida Atualizada com Sucesso!</strong>
+        <p class="text-slate-300">As alterações da partida de <strong>${custName}</strong> foram salvas diretamente no banco de dados Supabase.</p>
+      `, 4000);
+    }
+
+    // Rerender instantâneo da interface
+    if (typeof renderMatchesList === 'function') renderMatchesList();
+    if (typeof renderAdminDashboard === 'function') renderAdminDashboard();
+    if (typeof renderAgendaTimelineView === 'function') renderAgendaTimelineView();
+    if (typeof renderSubtabBookings === 'function') renderSubtabBookings();
+    if (typeof requestSchedule === 'function') requestSchedule();
+
+  } catch (err) {
+    console.error('Erro ao salvar edição da partida:', err);
+    alert('Erro ao salvar alterações da partida: ' + (err.message || err));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>Salvar Alterações (Supabase)</span>';
+    }
+  }
+}
+window.handleSaveEditMatch = handleSaveEditMatch;
 
 function handleMonthlyCourtChange() {
   const courtSelect = document.getElementById('monthlyCourtId');
@@ -15441,7 +15985,7 @@ function openCourtModal(courtIdToEdit = null) {
   const specs = court ? (typeof court.specs === 'string' ? JSON.parse(court.specs || '{}') : (court.specs || {})) : {};
 
   const currentOpenTime = specs.opening_time || '06:00';
-  const currentCloseTime = specs.closing_time || '23:00';
+  const currentCloseTime = specs.closing_time || '22:00';
   const currentImage = court ? court.image : 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
 
   const initialGallery = (specs && Array.isArray(specs.gallery) && specs.gallery.length > 0)
@@ -15524,7 +16068,7 @@ function openCourtModal(courtIdToEdit = null) {
           <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
             <div class="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-wide">
               <i data-lucide="clock" class="w-4 h-4 text-emerald-600"></i>
-              <span>Horários de Funcionamento (Horas Normais 06:00 às 22:00 / 23:00)</span>
+              <span>Horários de Funcionamento (Horas Normais 06:00 às 22:00)</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
               <div>
@@ -15733,7 +16277,7 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
   const description = document.getElementById('courtDescription').value.trim();
   const observation = document.getElementById('courtObservation').value.trim();
   const openingTime = document.getElementById('courtOpeningTime')?.value || '06:00';
-  const closingTime = document.getElementById('courtClosingTime')?.value || '23:00';
+  const closingTime = document.getElementById('courtClosingTime')?.value || '22:00';
   const discountPrice = parseFloat(document.getElementById('courtDiscountPrice')?.value) || 0;
   const discountStart = document.getElementById('courtDiscountStart')?.value || '09:00';
   const discountEnd = document.getElementById('courtDiscountEnd')?.value || '16:00';

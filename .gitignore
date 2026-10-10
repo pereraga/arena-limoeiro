@@ -1,4 +1,4 @@
-﻿node_modules/
+node_modules/
 .env
 *.log
 .DS_Store
@@ -13,4 +13,4 @@ android/.idea
 *.iml
 .gradle/
 local.properties
-
+release-apks/
