@@ -63,7 +63,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=5.2.4').then(reg => {
+        navigator.serviceWorker.register('/sw.js?v=5.2.5').then(reg => {
           reg.update();
         }).catch(console.error);
       });
@@ -131,12 +131,9 @@
     <!-- Renderizado pelo app.js -->
   </footer>
 
-  <!-- BANNER INFERIOR DE COOKIES (ESTILO BASEFY) -->
-  <div id="cookieBannerRoot"></div>
-
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=5.2.4"></script>
+  <script src="/app.js?v=5.2.5"></script>
 </body>
 </html>

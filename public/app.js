@@ -507,94 +507,8 @@ function saveCustomCookiePreferences() {
 }
 window.saveCustomCookiePreferences = saveCustomCookiePreferences;
 
-// MODAL DA POLÍTICA DE PRIVACIDADE COMPLETA (LGPD)
-function openPrivacyPolicyModal() {
-  const modalRoot = document.getElementById('modalRoot');
-  if (!modalRoot) return;
-
-  modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/90 backdrop-blur-md animate-fade-in overflow-y-auto">
-      <div class="bg-[#0b150f] rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-white/[0.1] flex flex-col text-slate-100 my-auto max-h-[90vh]">
-        
-        <!-- Header -->
-        <div class="p-5 border-b border-white/[0.08] flex items-center justify-between bg-black/40 sticky top-0 z-10 backdrop-blur">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <i data-lucide="shield-check" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <h3 class="text-base font-black text-white">Política de Privacidade</h3>
-              <p class="text-xs text-emerald-400 font-semibold">Arena Limoeiro • Conforme a LGPD</p>
-            </div>
-          </div>
-          <button type="button" onclick="closeModal()" class="text-slate-400 hover:text-white p-1.5 rounded-xl transition-colors cursor-pointer">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-
-        <!-- Conteúdo Scrollável -->
-        <div class="p-6 space-y-5 overflow-y-auto text-xs sm:text-sm text-slate-300 leading-relaxed">
-          <div class="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-200">
-            A <strong>Arena Limoeiro</strong> valoriza a sua privacidade. Esta política descreve como tratamos e protegemos seus dados em total respeito à Lei Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).
-          </div>
-
-          <div class="space-y-1.5">
-            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
-              <span>1. Dados Pessoais Coletados</span>
-            </h4>
-            <p><strong>Fornecidos voluntariamente:</strong> Nome completo, telefone/WhatsApp para envio de comprovantes de reserva, CPF para contratos de mensalistas e registros de pagamentos esportivos.</p>
-            <p><strong>Coletados automaticamente:</strong> Informações de dispositivo (detecção de APK ou Navegador Web), registros de inatividade e cookies técnicos para segurança da sessão.</p>
-          </div>
-
-          <div class="space-y-1.5">
-            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
-              <span>2. Finalidade do Tratamento</span>
-            </h4>
-            <p>Os dados são utilizados estritamente para confirmar partidas, gerar comprovantes instantâneos no WhatsApp, controlar a integridade de horários sem duplicidade e manter a segurança financeira da recepção.</p>
-          </div>
-
-          <div class="space-y-1.5">
-            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
-              <span>3. Política de Cookies: Site vs APK</span>
-            </h4>
-            <p><strong>No Computador / Navegador:</strong> O site solicita permissão de cookies na barra inferior para garantir sessões seguras de até 5 horas e sincronização.</p>
-            <p><strong>No Aplicativo Android (APK):</strong> O app opera de forma nativa e direta pelo armazenamento do dispositivo, <strong>sem necessitar nem solicitar permissão de cookies</strong>.</p>
-          </div>
-
-          <div class="space-y-1.5">
-            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
-              <span>4. Regra de Segurança: Inatividade de 5 Horas</span>
-            </h4>
-            <p>Caso o usuário do painel de controle ou recepção permaneça mais de 5 horas sem entrar ou utilizar o aplicativo, o login expira automaticamente para evitar acessos não autorizados ao caixa.</p>
-          </div>
-
-          <div class="space-y-1.5">
-            <h4 class="font-bold text-white text-sm flex items-center gap-1.5 text-emerald-400">
-              <span>5. Seus Direitos (LGPD)</span>
-            </h4>
-            <p>Você tem o direito de solicitar a confirmação, retificação ou exclusão de seus dados a qualquer momento entrando em contato com a gerência da Arena Limoeiro pelo WhatsApp ou na recepção física.</p>
-          </div>
-        </div>
-
-        <!-- Rodapé do Modal -->
-        <div class="p-5 border-t border-white/[0.08] bg-black/30 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <a href="/privacidade.html" target="_blank" class="text-xs text-purple-400 hover:text-purple-300 underline font-semibold flex items-center gap-1">
-            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-            <span>Abrir Página Completa da Política</span>
-          </a>
-
-          <button type="button" onclick="closeModal()" 
-                  class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer">
-            Entendido / Fechar
-          </button>
-        </div>
-
-      </div>
-    </div>
-  `;
-
-  if (window.lucide) lucide.createIcons();
-}
+// Política de privacidade removida por completo conforme solicitação
+function openPrivacyPolicyModal() {}
 window.openPrivacyPolicyModal = openPrivacyPolicyModal;
 
 // MODAL DE INFORMAÇÕES DO SISTEMA (ARENA LIMOEIRO)
@@ -779,12 +693,7 @@ function openSystemInfoModal() {
         </div>
 
         <!-- Footer -->
-        <div class="p-5 border-t border-emerald-900/60 bg-black/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <button type="button" onclick="closeModal(); openPrivacyPolicyModal();" class="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold flex items-center gap-1.5 cursor-pointer">
-            <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-            <span>Ver Política de Privacidade (LGPD)</span>
-          </button>
-
+        <div class="p-5 border-t border-emerald-900/60 bg-black/40 flex items-center justify-end">
           <button type="button" onclick="closeModal()" 
                   class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs sm:text-sm shadow-md transition-all cursor-pointer">
             Fechar Informações
@@ -3074,14 +2983,9 @@ function renderStep1(container) {
 
         <div class="flex items-center gap-2.5 w-full md:w-auto shrink-0">
           <button type="button" onclick="openSystemInfoModal()" 
-                  class="flex-1 md:flex-initial px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
+                  class="w-full md:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
             <i data-lucide="info" class="w-4 h-4"></i>
             <span>Ver Info do Sistema</span>
-          </button>
-          <button type="button" onclick="openPrivacyPolicyModal()" 
-                  class="flex-1 md:flex-initial px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold border border-slate-200 transition-all flex items-center justify-center space-x-1.5 cursor-pointer">
-            <i data-lucide="shield" class="w-4 h-4 text-emerald-600"></i>
-            <span>Privacidade (LGPD)</span>
           </button>
         </div>
       </div>

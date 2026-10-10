@@ -101,7 +101,7 @@ async function main() {
     // 1. Sincroniza web assets atualizados para o Android
     console.log("📦 Copiando web assets atualizados para android/app/src/main/assets/public/...");
     const publicAssetsDir = path.join(androidDir, 'app', 'src', 'main', 'assets', 'public');
-    ['app.js', 'index.html', 'privacidade.html', 'sw.js', 'supabase-client.js', 'default-data.js', 'styles.css'].forEach(file => {
+    ['app.js', 'index.html', 'sw.js', 'supabase-client.js', 'default-data.js', 'styles.css'].forEach(file => {
       const src = path.join(rootDir, 'public', file);
       const dst = path.join(publicAssetsDir, file);
       if (fs.existsSync(src)) {
