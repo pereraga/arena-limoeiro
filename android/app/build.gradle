@@ -4,7 +4,7 @@ android {
     namespace = "com.arenalimoeiro.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.arenalimoeiro.controle"
+        applicationId "com.arenalimoeiro.cliente"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

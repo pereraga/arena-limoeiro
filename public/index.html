@@ -63,7 +63,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=5.2.3').then(reg => {
+        navigator.serviceWorker.register('/sw.js?v=5.2.4').then(reg => {
           reg.update();
         }).catch(console.error);
       });
@@ -137,6 +137,6 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=5.2.3"></script>
+  <script src="/app.js?v=5.2.4"></script>
 </body>
 </html>

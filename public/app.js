@@ -4,6 +4,8 @@ if (typeof window !== 'undefined') {
     window.lucide = { createIcons: () => {} };
   }
 }
+var lucide = (typeof window !== 'undefined' && window.lucide) ? window.lucide : { createIcons: () => {} };
+var _adminLockTimerInterval = null;
 
 function getFormattedDate(date) {
   const y = date.getFullYear();
@@ -331,78 +333,27 @@ function isApkEnvironment() {
 window.isApkEnvironment = isApkEnvironment;
 
 // ------------------------------------------------------------------------------
-// BANNER INFERIOR DE COOKIES (PADRÃO BASEFY / COMPLIANCE LGPD)
+// SILENCIAMENTO DE COOKIES: O SISTEMA INICIA DIRETO E MOSTRA TUDO SEM PERGUNTAS
 // ------------------------------------------------------------------------------
+try {
+  localStorage.setItem('arena_cookies_accepted', 'all');
+  localStorage.setItem('arena_cookie_prefs', JSON.stringify({ essential: true, performance: true, audio: true }));
+} catch(e) {}
+
 function renderCookieBottomBanner() {
-  // NO APLICATIVO (APK): NÃO precisa de cookies e NÃO mostra nenhuma janela
-  if (isApkEnvironment()) {
-    return;
-  }
-
-  // Se já consentiu anteriormente no computador, não exibe
-  if (isCookieConsentGiven()) {
-    return;
-  }
-
-  let root = document.getElementById('cookieBannerRoot');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = 'cookieBannerRoot';
-    document.body.appendChild(root);
-  }
-
-  root.innerHTML = `
-    <div id="arenaCookieBottomBanner" role="region" aria-label="Aviso sobre uso de cookies" 
-         class="fixed inset-x-0 bottom-0 z-[4500] px-3 pb-3 sm:px-4 sm:pb-4 pointer-events-none transition-all duration-300 transform translate-y-0 opacity-100">
-      <div class="mx-auto flex max-w-4xl flex-col gap-4 rounded-2xl border border-white/[0.08] bg-[#0c120e]/95 p-4 shadow-2xl shadow-black/80 backdrop-blur-md sm:flex-row sm:items-center sm:gap-5 sm:p-5 pointer-events-auto">
-        <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cookie h-5 w-5" aria-hidden="true">
-            <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5"></path>
-            <path d="M8.5 8.5v.01"></path>
-            <path d="M16 15.5v.01"></path>
-            <path d="M12 12v.01"></path>
-            <path d="M11 17v.01"></path>
-            <path d="M7 14v.01"></path>
-          </svg>
-        </span>
-        <p class="min-w-0 flex-1 text-xs leading-relaxed text-zinc-300 sm:text-sm">
-          Utilizamos cookies para melhorar sua experiência em nosso site. Alguns são essenciais para o funcionamento, enquanto outros nos ajudam a entender como você utiliza a plataforma. 
-          <a onclick="openPrivacyPolicyModal()" class="font-medium text-purple-400 underline underline-offset-2 transition-colors hover:text-white cursor-pointer">Política de Privacidade</a>
-        </p>
-        <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <button type="button" onclick="acceptAllCookies()" 
-                  class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all outline-none bg-purple-600 hover:bg-purple-500 active:bg-purple-700 text-white shadow-lg shadow-purple-600/30 cursor-pointer">
-            Aceitar todos
-          </button>
-          <button type="button" onclick="rejectAllCookies()" 
-                  class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all outline-none border border-white/[0.12] bg-white/[0.04] text-white hover:border-white/25 hover:bg-white/[0.08] cursor-pointer">
-            Recusar todos
-          </button>
-          <button type="button" onclick="openCookieSettingsModal()" 
-                  class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all outline-none border border-white/[0.12] bg-white/[0.04] text-white hover:border-white/25 hover:bg-white/[0.08] sm:px-3 cursor-pointer">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings h-4 w-4" aria-hidden="true">
-              <path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            Configurar
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  if (window.lucide) lucide.createIcons();
+  // Desativado: o sistema carrega direto e mostra tudo sem perguntar sobre cookies
+  removeCookieBottomBanner();
 }
 window.renderCookieBottomBanner = renderCookieBottomBanner;
 
 function removeCookieBottomBanner() {
   const banner = document.getElementById('arenaCookieBottomBanner');
-  if (banner) {
-    banner.style.opacity = '0';
-    banner.style.transform = 'translateY(24px)';
-    setTimeout(() => {
-      if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
-    }, 320);
+  if (banner && banner.parentNode) {
+    banner.parentNode.removeChild(banner);
+  }
+  const root = document.getElementById('cookieBannerRoot');
+  if (root) {
+    root.innerHTML = '';
   }
 }
 window.removeCookieBottomBanner = removeCookieBottomBanner;
@@ -849,9 +800,7 @@ function openSystemInfoModal() {
 window.openSystemInfoModal = openSystemInfoModal;
 
 function promptCookieActivationModal(force = false) {
-  if (isApkEnvironment()) return;
-  if (!force && isCookieConsentGiven()) return;
-  renderCookieBottomBanner();
+  removeCookieBottomBanner();
 }
 window.promptCookieActivationModal = promptCookieActivationModal;
 
@@ -861,18 +810,8 @@ function acceptArenaCookies() {
 window.acceptArenaCookies = acceptArenaCookies;
 
 function checkAndPromptCookiePermission() {
-  // NO APK: NÃO pede cookies e funciona normal
-  if (isApkEnvironment()) {
-    removeCookieBottomBanner();
-    return;
-  }
-
-  // NO COMPUTADOR: Abre a barra inferior conforme o padrão solicitado
-  if (!isCookieConsentGiven()) {
-    setTimeout(() => {
-      renderCookieBottomBanner();
-    }, 600);
-  }
+  // Desativado: o sistema carrega direto e silencioso sem pedir cookies
+  removeCookieBottomBanner();
 }
 window.checkAndPromptCookiePermission = checkAndPromptCookiePermission;
 
@@ -2585,20 +2524,25 @@ function applyPlatformAttributes() {
   state.platform = p;
 
   const html = document.documentElement;
-  html.setAttribute('data-device', p.device);
-  html.setAttribute('data-touch', p.isTouch ? 'true' : 'false');
-  html.setAttribute('data-os', p.os);
-  html.setAttribute('data-orientation', p.orientation);
+  if (!html) return;
+  if (typeof html.setAttribute === 'function') {
+    html.setAttribute('data-device', p.device);
+    html.setAttribute('data-touch', p.isTouch ? 'true' : 'false');
+    html.setAttribute('data-os', p.os);
+    html.setAttribute('data-orientation', p.orientation);
+  }
 
-  html.classList.remove('is-mobile', 'is-tablet', 'is-desktop');
-  html.classList.add('is-' + p.device);
+  if (html.classList) {
+    html.classList.remove('is-mobile', 'is-tablet', 'is-desktop');
+    html.classList.add('is-' + p.device);
 
-  if (p.isTouch) html.classList.add('has-touch');
-  else html.classList.remove('has-touch');
+    if (p.isTouch) html.classList.add('has-touch');
+    else html.classList.remove('has-touch');
+  }
 
   if (isAndroidApk()) {
-    html.classList.add('is-android-apk');
-    if (document.body) document.body.classList.add('is-android-apk');
+    if (html.classList) html.classList.add('is-android-apk');
+    if (document.body && document.body.classList) document.body.classList.add('is-android-apk');
   }
 }
 
@@ -2623,7 +2567,9 @@ function renderApp() {
   renderStepper();
   renderStepContent();
   renderBottomBar();
-  lucide.createIcons();
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
 }
 
 function renderHeader() {
@@ -2678,12 +2624,6 @@ function renderStepper() {
         </div>
 
         <div class="flex items-center space-x-1.5 sm:space-x-2 text-xs flex-shrink-0">
-          <button onclick="promptCookieActivationModal(true)" 
-                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-600/50 text-slate-200 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
-                  title="Configuração de Cookies e Sessão de 5 Horas">
-            <i data-lucide="cookie" class="w-3.5 h-3.5 flex-shrink-0 text-amber-400"></i>
-            <span class="hidden sm:inline">Cookies 100%</span>
-          </button>
           <button onclick="switchToClientView()" 
                   class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-800 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold flex items-center space-x-1 whitespace-nowrap transition-all shadow-sm flex-shrink-0 cursor-pointer" 
                   title="Ver agendamento como cliente">
@@ -4741,7 +4681,7 @@ const ADMIN_MAX_ATTEMPTS = 3;
 const ADMIN_LOCKOUT_MS = 15 * 60 * 1000; // 15 minutos
 const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000; // 4 dias em milissegundos
 
-let _adminLockTimerInterval = null;
+// _adminLockTimerInterval global gerenciado no topo do arquivo
 
 function getAdminLockInfo() {
   try {
