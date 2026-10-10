@@ -711,6 +711,129 @@ function openSystemInfoModal() {
 }
 window.openSystemInfoModal = openSystemInfoModal;
 
+function openDownloadApkModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const currentOrigin = window.location.origin || 'https://arenalimoeiro.vercel.app';
+  const controleApkUrl = `${currentOrigin}/apks/ArenaLimoeiro-Controle.apk`;
+  const clienteApkUrl = `${currentOrigin}/apks/ArenaLimoeiro-Cliente.apk`;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-5 text-white my-auto">
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between border-b border-emerald-900/60 pb-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+              <i data-lucide="download" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                Download dos Aplicativos (APK)
+              </h3>
+              <p class="text-xs text-emerald-400 font-semibold">Instalação direta para Moto G20 e Android</p>
+            </div>
+          </div>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 transition cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Descrição -->
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Baixe os arquivos APK oficiais e instale diretamente no seu aparelho Android (como o Moto G20). Não necessita de Play Store!
+        </p>
+
+        <!-- Cards de Download -->
+        <div class="space-y-3.5">
+          <!-- Card 1: APK CONTROLE -->
+          <div class="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/70 to-slate-900 border border-emerald-500/50 space-y-3 shadow-lg">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-black uppercase tracking-wider text-emerald-300 bg-emerald-900/80 px-2 py-0.5 rounded-md">🛡️ Gestão & Recepção</span>
+                  <span class="text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-md">Moto G20 OK</span>
+                </div>
+                <h4 class="text-sm font-black text-white mt-1">Arena Limoeiro - Controle</h4>
+                <p class="text-xs text-slate-300 mt-0.5">Para gerentes, administradores e recepção. Painel completo, caixa, comandas e relatórios.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center gap-2 pt-1">
+              <a href="${controleApkUrl}" download="ArenaLimoeiro-Controle.apk"
+                 class="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Baixar APK Controle</span>
+              </a>
+              <button onclick="navigator.clipboard.writeText('${controleApkUrl}').then(() => alert('Link do APK Controle copiado!'))"
+                      class="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>Copiar Link</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 2: APK CLIENTE -->
+          <div class="p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-700/80 space-y-3 shadow-md">
+            <div class="flex items-start justify-between">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-black uppercase tracking-wider text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-md">⚽ Clientes & Atletas</span>
+                  <span class="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">Android 8+</span>
+                </div>
+                <h4 class="text-sm font-black text-white mt-1">Arena Limoeiro - Cliente</h4>
+                <p class="text-xs text-slate-300 mt-0.5">Para atletas e clientes agendarem quadras, churrasqueira, bebidas e confirmar via WhatsApp.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-center gap-2 pt-1">
+              <a href="${clienteApkUrl}" download="ArenaLimoeiro-Cliente.apk"
+                 class="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>Baixar APK Cliente</span>
+              </a>
+              <button onclick="navigator.clipboard.writeText('${clienteApkUrl}').then(() => alert('Link do APK Cliente copiado!'))"
+                      class="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>Copiar Link</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instruções de instalação no Moto G20 / Android -->
+        <div class="p-3.5 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-1.5 text-xs text-slate-300">
+          <p class="font-bold text-amber-400 flex items-center gap-1.5">
+            <i data-lucide="help-circle" class="w-4 h-4"></i>
+            Como instalar no Moto G20 / Celular Android:
+          </p>
+          <ol class="list-decimal list-inside space-y-1 text-[11px] text-slate-300 leading-relaxed">
+            <li>Toque em <b class="text-white">Baixar APK</b> no botão acima.</li>
+            <li>Quando o download concluir, abra a notificação ou vá em <b>Downloads</b>.</li>
+            <li>Se o celular avisar <em>"Para sua segurança, o smartphone não tem permissão para instalar..."</em>, toque em <b>Configurações</b> e marque <b>Permitir desta fonte</b>.</li>
+            <li>Toque em <b>Instalar</b> e depois em <b>Abrir</b>. Pronto!</li>
+          </ol>
+        </div>
+
+        <!-- Botão Fechar -->
+        <div class="pt-2 flex justify-end">
+          <button type="button" onclick="closeModal()" 
+                  class="w-full sm:w-auto px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer">
+            Fechar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+window.openDownloadApkModal = openDownloadApkModal;
+
+
 function promptCookieActivationModal(force = false) {
   removeCookieBottomBanner();
 }
@@ -6036,7 +6159,11 @@ function renderAdminView(container) {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0">
+        <div class="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0 flex-wrap">
+          <button onclick="openDownloadApkModal()" class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-amber-600" title="Baixar APK Controle e Cliente">
+            <i data-lucide="download" class="w-4 h-4 text-white flex-shrink-0"></i>
+            <span class="whitespace-nowrap">Baixar APK</span>
+          </button>
           <button onclick="openSystemInfoModal()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-slate-200" title="Ver Informações do Sistema">
             <i data-lucide="info" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
             <span class="whitespace-nowrap">Info Sistema</span>

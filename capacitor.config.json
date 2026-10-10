@@ -1,9 +1,9 @@
 {
-  "appId": "com.arenalimoeiro.cliente",
-  "appName": "Arena Limoeiro",
+  "appId": "com.arenalimoeiro.controle",
+  "appName": "Arena Controle",
   "webDir": "public",
   "server": {
-    "url": "https://arenalimoeiro.vercel.app?app=apk_cliente",
+    "url": "https://arenalimoeiro.vercel.app/adm-sec-x9k7-limoeiro-2026-auth?app=apk_controle",
     "cleartext": false,
     "androidScheme": "https",
     "allowNavigation": [
