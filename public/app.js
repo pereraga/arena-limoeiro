@@ -1772,17 +1772,27 @@ async function initArenaApplication() {
     console.error('Erro na renderização inicial:', e);
   }
 
-  // 2. ⚡ SINCRONIZAÇÃO EM SEGUNDO PLANO COM O SUPABASE:
+  // 2. ⚡ SINCRONIZAÇÃO EM SEGUNDO PLANO COM A NUVEM (ArenaCloudSync & Supabase):
+  try {
+    if (typeof syncDataFromCloud === 'function') {
+      await Promise.race([
+        syncDataFromCloud(false),
+        new Promise(resolve => setTimeout(resolve, 1000))
+      ]);
+    }
+  } catch (e) {
+    console.warn('Aviso sincronização nuvem inicial:', e);
+  }
+
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       await Promise.race([
         syncDataFromSupabase(true),
-        new Promise(resolve => setTimeout(resolve, 800)) // timeout de proteção de 800ms
+        new Promise(resolve => setTimeout(resolve, 800))
       ]);
-      // Re-renderiza com dados atualizados da nuvem
       renderApp();
     } catch (e) {
-      console.warn('Aviso sincronização inicial:', e);
+      console.warn('Aviso sincronização Supabase inicial:', e);
     }
   }
 
@@ -1816,6 +1826,7 @@ async function initArenaApplication() {
   // 4. ⚡ Atualização inteligente ao sair/minimizar e voltar para a aba
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
+      if (typeof syncDataFromCloud === 'function') syncDataFromCloud();
       checkAndSyncBookingsBackground();
       if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
         window.ArenaSupabase.flushPendingQueue();
@@ -1823,13 +1834,21 @@ async function initArenaApplication() {
     }
   });
   window.addEventListener('focus', () => {
+    if (typeof syncDataFromCloud === 'function') syncDataFromCloud();
     checkAndSyncBookingsBackground();
     if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
       window.ArenaSupabase.flushPendingQueue();
     }
   });
 
-  // Sincronização em segundo plano econômica (60s) apenas para gestores logados, poupando cota do Supabase
+  // ☁️ Sincronização contínua automática em nuvem (a cada 20 segundos) para todos os dispositivos
+  setInterval(() => {
+    if (typeof syncDataFromCloud === 'function') {
+      syncDataFromCloud();
+    }
+  }, 20000);
+
+  // Sincronização adicional suave com Supabase (60s) apenas para gestores logados
   setInterval(() => {
     if (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn()) {
       checkAndSyncBookingsBackground();
@@ -2085,7 +2104,10 @@ function loadInitialData() {
 
 
 function initCloudSync() {
-  // Sistema 100% Cloud Serverless no Vercel integrado ao Supabase
+  // Sistema 100% Cloud Serverless no Vercel com sincronização autônoma
+  if (typeof syncDataFromCloud === 'function') {
+    syncDataFromCloud();
+  }
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
     loadAdminUsers();
@@ -10967,145 +10989,118 @@ function renderAdminSubTabContent(tab) {
     return renderAdminCategoriesTab();
   }
   if (tab === 'database') {
-    const cfg = window.ArenaSupabase ? window.ArenaSupabase.getConfig() : { url: 'https://brmclyukjfijommbxhks.supabase.co', anonKey: '', connected: false };
-    const prefillUrl = cfg.url || 'https://brmclyukjfijommbxhks.supabase.co';
-    const isQuotaError = cfg.lastError && (cfg.lastError.includes('exceed_egress_quota') || cfg.lastError.includes('restricted'));
-    const pendingCount = window.ArenaSupabase ? window.ArenaSupabase.getPendingQueue().length : 0;
-
-    let badgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
-    let badgeDot = 'bg-amber-500';
-    let badgeText = '🟡 Aguardando Chave Anon';
-
-    if (cfg.connected) {
-      badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-300';
-      badgeDot = 'bg-emerald-500 animate-pulse';
-      badgeText = '🟢 Conectado ao Supabase';
-    } else if (isQuotaError) {
-      badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
-      badgeDot = 'bg-rose-500 animate-ping';
-      badgeText = '🔴 Cota Supabase Excedida';
-    } else if (cfg.lastError) {
-      badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
-      badgeDot = 'bg-rose-500';
-      badgeText = '🔴 Erro de Conexão';
-    }
+    const courtsCount = (state.courts || []).length;
+    const bookingsCount = (state.bookings || []).length;
+    const membersCount = (state.monthlyMembers || []).length;
+    const customersCount = (state.supabaseCustomers || []).length;
 
     return `
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-          <div>
-            <div class="flex items-center space-x-2">
-              <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="database" class="w-5 h-5"></i></span>
-              <h3 class="text-lg font-black text-slate-900">Vincular Banco de Dados Supabase (Nuvem / Vercel)</h3>
-            </div>
-            <p class="text-xs text-slate-500 mt-1">Conecte o sistema ao seu projeto no Supabase para salvar quadras, clientes e agendamentos na nuvem.</p>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <span class="px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1.5 ${badgeClass}">
-              <span class="w-2 h-2 rounded-full ${badgeDot}"></span>
-              <span>${badgeText}</span>
-            </span>
-          </div>
-        </div>
-
-        ${isQuotaError ? `
-          <div class="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl mb-6 shadow-sm">
-            <div class="flex items-start space-x-3">
-              <span class="text-2xl">⚠️</span>
-              <div class="text-xs text-amber-950 leading-relaxed flex-1">
-                <strong class="font-black text-sm block mb-1 text-amber-900">ALERTA DE COTA: O projeto Supabase atingiu o limite gratuito de transferência (exceed_egress_quota)</strong>
-                <p class="mb-2 text-slate-700">Por esse motivo, o Supabase bloqueou temporariamente gravações e consultas automáticas. Seus dados estão seguros na memória deste dispositivo e prontos para serem enviados assim que o banco for reativado.</p>
-                <div class="bg-white/80 p-3 rounded-xl border border-amber-200 text-slate-800 space-y-1.5 font-sans">
-                  <strong class="block font-bold text-slate-900">Como restabelecer a conexão na nuvem:</strong>
-                  <div><strong>Opção 1:</strong> Acesse seu painel em <a href="https://supabase.com/dashboard" target="_blank" class="text-emerald-700 underline font-bold">supabase.com/dashboard</a>, abra o projeto, vá em <em>Project Settings ➔ Billing</em> e adicione um Spend Cap ou mude de plano para desbloquear na hora.</div>
-                  <div><strong>Opção 2 (100% Grátis):</strong> Crie um novo projeto gratuito no Supabase, clique no botão <em>"Copiar Script SQL"</em> abaixo, cole no <em>SQL Editor</em> do novo projeto, e insira a nova URL e Anon Key aqui. Em seguida clique em <em>"Enviar Dados Locais para o Supabase"</em> para subir tudo com 1 clique!</div>
+      <div class="space-y-6">
+        <!-- STATUS PRINCIPAL DA SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="p-2 rounded-xl bg-emerald-100 text-emerald-800"><i data-lucide="cloud-check" class="w-6 h-6"></i></span>
+                <div>
+                  <h3 class="text-lg font-black text-slate-900">Sincronização em Nuvem (Arena Limoeiro Cloud)</h3>
+                  <p class="text-xs text-slate-500">Sistema 100% autônomo e automático — Não exige intervenção manual.</p>
                 </div>
               </div>
             </div>
-          </div>
-        ` : ''}
 
-        ${pendingCount > 0 ? `
-          <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl mb-6 flex items-center justify-between text-xs text-blue-900">
             <div class="flex items-center space-x-2">
-              <i data-lucide="cloud-off" class="w-4 h-4 text-blue-600"></i>
-              <span><strong>Fila Offline:</strong> Existem <strong>${pendingCount}</strong> operações aguardando envio para o Supabase.</span>
+              <span class="px-3.5 py-1.5 rounded-full text-xs font-black flex items-center space-x-2 bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>🟢 Sincronização Automática Ativa</span>
+              </span>
             </div>
-            <button onclick="handleFlushQueue()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] shadow-sm">
-              Tentar Enviar Agora
-            </button>
-          </div>
-        ` : ''}
-
-        <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-6">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
-              <i data-lucide="globe" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
-              URL do Projeto Supabase (Project URL) *
-            </label>
-            <input type="url" id="supabaseUrlInput" required 
-                   value="${prefillUrl}" 
-                   placeholder="https://brmclyukjfijommbxhks.supabase.co" 
-                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50">
           </div>
 
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
-              <i data-lucide="key" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
-              Chave Pública Anônima (Anon Key / Public API Key) *
-            </label>
-            <input type="password" id="supabaseKeyInput" required 
-                   value="${cfg.anonKey || ''}" 
-                   placeholder="Cole aqui sua chave anon" 
-                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50">
+          <!-- BANNER INFORMATIVO CLARO E POSITIVO -->
+          <div class="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl mb-6 shadow-xs">
+            <div class="flex items-start space-x-3">
+              <span class="text-2xl">☁️</span>
+              <div class="text-xs text-emerald-950 leading-relaxed flex-1">
+                <strong class="font-black text-sm block mb-1 text-emerald-900">Seus dados estão protegidos e sincronizados em tempo real!</strong>
+                <p class="text-slate-700 leading-normal">
+                  Todas as reservas, mensalistas, clientes, produtos e alterações de quadra são salvas imediatamente neste aparelho e sincronizadas automaticamente em nuvem a cada 20 segundos. Qualquer inserção ou exclusão feita por celular, computador ou pelo APK reflete instantaneamente em todos os outros dispositivos.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div id="supabaseStatusMsg" class="hidden p-3.5 rounded-xl text-xs font-bold"></div>
-
-          <div class="pt-2 flex flex-wrap items-center gap-3">
-            <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all">
-              <i data-lucide="save" class="w-4 h-4"></i>
-              <span>Salvar & Conectar</span>
-            </button>
-
-            <button type="button" onclick="handleTestSupabaseConnection()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center space-x-2 transition-all">
-              <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
-              <span>Testar Conexão</span>
-            </button>
-
-            <button type="button" onclick="handleDisconnectSupabase()" class="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all">
-              <i data-lucide="power-off" class="w-4 h-4"></i>
-              <span>Desconectar</span>
-            </button>
+          <!-- GRID DE INDICADORES DE DADOS ATIVOS -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Quadras Ativas</span>
+              <span class="text-2xl font-black text-slate-900 mt-1 block">${courtsCount}</span>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Agendamentos</span>
+              <span class="text-2xl font-black text-slate-900 mt-1 block">${bookingsCount}</span>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Horários Fixos</span>
+              <span class="text-2xl font-black text-slate-900 mt-1 block">${membersCount}</span>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Clientes Registrados</span>
+              <span class="text-2xl font-black text-slate-900 mt-1 block">${customersCount}</span>
+            </div>
           </div>
-        </form>
 
-        <!-- FERRAMENTAS DE SINCRONIZAÇÃO EM MASSA E RESTAURAÇÃO -->
-        <div class="pt-6 border-t border-slate-200">
-          <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-3 flex items-center">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
-            Central de Sincronização & Restauração de Dados
-          </h4>
-          <p class="text-xs text-slate-600 mb-4">Envie todos os agendamentos, quadras, clientes e produtos salvos neste dispositivo diretamente para a nuvem do Supabase, ou recupere o banco completo.</p>
+          <!-- MENSAGEM DINÂMICA DE STATUS -->
+          <div id="cloudSyncStatusMsg" class="hidden p-3.5 rounded-xl text-xs font-bold mb-4"></div>
 
+          <!-- BOTÕES DE CONTROLE RÁPIDO -->
           <div class="flex flex-wrap items-center gap-3">
-            <button type="button" onclick="handlePushAllToSupabase()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-2 transition-all">
+            <button type="button" onclick="handleManualCloudSync()" class="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all cursor-pointer touch-manipulation">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              <span>🔄 Sincronizar com a Nuvem Agora</span>
+            </button>
+
+            <button type="button" onclick="handlePushAllToCloud()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-2 transition-all cursor-pointer touch-manipulation">
               <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-              <span>⬆️ Enviar Todos os Dados Locais para o Supabase</span>
-            </button>
-
-            <button type="button" onclick="handlePullFromSupabase()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center space-x-2 transition-all">
-              <i data-lucide="download-cloud" class="w-4 h-4 text-indigo-600"></i>
-              <span>⬇️ Baixar Dados da Nuvem</span>
-            </button>
-
-            <button type="button" onclick="openSqlScriptModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center space-x-2 transition-all">
-              <i data-lucide="code" class="w-4 h-4 text-emerald-400"></i>
-              <span>📋 Ver / Copiar Script SQL (schema.sql)</span>
+              <span>⬆️ Enviar Dados Deste Aparelho para Nuvem</span>
             </button>
           </div>
         </div>
+
+        <!-- SEÇÃO RETRÁTIL: CONFIGURAÇÕES ADICIONAIS DO SUPABASE (OPCIONAL) -->
+        <details class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm group">
+          <summary class="font-bold text-xs uppercase tracking-wider text-slate-600 cursor-pointer flex items-center justify-between select-none">
+            <span class="flex items-center space-x-2">
+              <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+              <span>Configurações Opcionais de Banco Supabase Externo</span>
+            </span>
+            <span class="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+
+          <div class="pt-5 mt-4 border-t border-slate-100">
+            <p class="text-xs text-slate-500 mb-4">Caso possua um projeto dedicado próprio no Supabase e queira vinculá-lo como backup secundário adicional:</p>
+            
+            <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">URL do Projeto Supabase</label>
+                <input type="url" id="supabaseUrlInput" value="${window.ArenaSupabase?.getConfig()?.url || ''}" placeholder="https://seu-projeto.supabase.co" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Chave Anon Pública (API Key)</label>
+                <input type="password" id="supabaseKeyInput" value="${window.ArenaSupabase?.getConfig()?.anonKey || ''}" placeholder="Cole aqui sua anon key" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50">
+              </div>
+
+              <div id="supabaseStatusMsg" class="hidden p-3 rounded-xl text-xs font-bold"></div>
+
+              <div class="flex items-center gap-2 pt-2">
+                <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl">Salvar Chaves</button>
+                <button type="button" onclick="handleTestSupabaseConnection()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Testar Conexão</button>
+                <button type="button" onclick="openSqlScriptModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Ver Script SQL</button>
+              </div>
+            </form>
+          </div>
+        </details>
       </div>
     `;
   }
@@ -12712,6 +12707,11 @@ async function handleSaveCourtBadge(e, courtId) {
   }
   localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
 
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync && idx !== -1) {
+    window.ArenaCloudSync.push('save_court', state.courts[idx]);
+  }
+
   _refreshAllUI();
 
   // Salva no Supabase
@@ -13360,6 +13360,12 @@ async function handleCancelBooking(bookingId) {
     }
     localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
     try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
+  }
+
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync) {
+    idsToRemove.forEach(bId => window.ArenaCloudSync.push('delete_booking', { id: bId }));
+    if (memberId) window.ArenaCloudSync.push('delete_monthly_member', { id: memberId });
   }
 
   // Limpa seleções pendentes
@@ -14156,6 +14162,30 @@ async function handleDirectBookingSubmit(e) {
     supabaseDbPayloads.forEach(payload => {
       window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
     });
+  }
+
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync) {
+    if (bookingType === 'mensalista') {
+      const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+      const baseDateObj = new Date(sy, sm - 1, sd);
+      const dayOfWeekId = weekDaysMap[baseDateObj.getDay()];
+      window.ArenaCloudSync.push('save_monthly_member', {
+        id: 'mensal-' + Date.now(),
+        team_name: name,
+        responsible_name: name,
+        phone: phone,
+        court_id: courtId,
+        day_of_week: dayOfWeekId,
+        time: startTime,
+        start_time: startTime,
+        end_time: endTime,
+        monthly_price: courtPrice * 4,
+        status: 'active'
+      });
+    }
+    bookingsToCreate.forEach(b => window.ArenaCloudSync.push('save_booking', b));
+    if (savedCust) window.ArenaCloudSync.push('save_customer', savedCust);
   }
 
   // Atualiza cache local de clientes
@@ -15677,6 +15707,11 @@ async function handleSaveEditMatch(event, matchId) {
       localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
     } catch(e) {}
 
+    // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+    if (window.ArenaCloudSync && bIdx >= 0 && state.bookings[bIdx]) {
+      window.ArenaCloudSync.push('save_booking', state.bookings[bIdx]);
+    }
+
     // Fecha a janela modal
     closeModal();
 
@@ -16001,6 +16036,14 @@ async function handleMonthlySubmit(event, editId) {
           await client.from('bookings').insert(bookingsToCreate);
         }
       }
+
+      // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+      if (window.ArenaCloudSync) {
+        window.ArenaCloudSync.push('save_monthly_member', memberRecord);
+        if (bookingsToCreate.length > 0) {
+          bookingsToCreate.forEach(b => window.ArenaCloudSync.push('save_booking', b));
+        }
+      }
     } catch(err) {
       console.warn('Aviso ao gerar reservas de mensalista:', err);
     }
@@ -16084,6 +16127,12 @@ async function deleteMonthlyMember(id) {
       local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
       localStorage.setItem('arena_local_bookings', JSON.stringify(local));
     } catch(e) {}
+  }
+
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('delete_monthly_member', { id });
+    idsToRemove.forEach(bId => window.ArenaCloudSync.push('delete_booking', { id: bId }));
   }
 
   // 4. Deleta do Supabase (monthly_members e bookings)
@@ -17722,6 +17771,11 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     badge_auto_freq: existingSpecs.badge_auto_freq || 'weekly'
   };
 
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('save_court', savedCourt);
+  }
+
   closeModal();
 
   if (isEditing) {
@@ -17803,6 +17857,11 @@ async function deleteCourt(courtId, fromModal = false) {
     localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
   } catch(e) {
     console.warn('Erro ao salvar quadras no localStorage:', e);
+  }
+
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('push_all', { courts: state.courts });
   }
 
   if (fromModal || document.getElementById('modalRoot')?.innerHTML) {
@@ -19539,6 +19598,15 @@ async function submitBooking(grandTotal) {
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
   }
 
+  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
+  if (window.ArenaCloudSync) {
+    if (isMensal) {
+      window.ArenaCloudSync.push('save_monthly_member', dbMemberPayload);
+    }
+    window.ArenaCloudSync.push('save_booking', unifiedBooking);
+    window.ArenaCloudSync.push('save_customer', customerRecord);
+  }
+
   // 5. Finaliza com sucesso
   requestSchedule();
   closeModal();
@@ -19907,7 +19975,65 @@ function initEventListeners() {
   });
 }
 
-// Handlers para Vinculação do Banco de Dados Supabase
+// ==============================================================================
+// ☁️ HANDLERS DA SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM
+// ==============================================================================
+async function handleManualCloudSync() {
+  const statusMsg = document.getElementById('cloudSyncStatusMsg');
+  if (statusMsg) {
+    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
+    statusMsg.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
+    statusMsg.innerText = '⏳ Sincronizando com a nuvem...';
+  }
+  await syncDataFromCloud();
+  if (statusMsg) {
+    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mb-4';
+    statusMsg.innerText = '✓ Sincronização concluída! Todos os dados estão atualizados.';
+    setTimeout(() => {
+      renderStepContent();
+    }, 1200);
+  }
+}
+window.handleManualCloudSync = handleManualCloudSync;
+
+async function handlePushAllToCloud() {
+  const statusMsg = document.getElementById('cloudSyncStatusMsg');
+  if (!window.ArenaCloudSync) {
+    alert('Motor de sincronização em nuvem não carregado.');
+    return;
+  }
+  if (!confirm('Deseja enviar todos os dados salvos neste dispositivo (quadras, clientes, agendamentos, mensalistas e produtos) para a nuvem da Arena Limoeiro agora?')) return;
+
+  if (statusMsg) {
+    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
+    statusMsg.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
+    statusMsg.innerText = '⏳ Enviando todos os dados deste dispositivo para a nuvem...';
+  }
+
+  const ok = await window.ArenaCloudSync.push('push_all', {
+    courts: state.courts,
+    products: state.products,
+    customers: state.supabaseCustomers,
+    monthlyMembers: state.monthlyMembers,
+    bookings: state.bookings,
+    waterSupply: state.waterSupply
+  });
+
+  if (statusMsg) {
+    statusMsg.className = ok
+      ? 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mb-4'
+      : 'p-3.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 mb-4';
+    statusMsg.innerText = ok 
+      ? '✓ Todos os dados deste aparelho foram salvos na nuvem com sucesso!'
+      : 'Aviso: Os dados foram salvos localmente e serão enviados assim que houver rede.';
+    setTimeout(() => {
+      renderStepContent();
+    }, 1500);
+  }
+}
+window.handlePushAllToCloud = handlePushAllToCloud;
+
+// Handlers para Vinculação do Banco de Dados Supabase (Opcional)
 async function handleSaveSupabaseConfig(event) {
   event.preventDefault();
   const url = document.getElementById('supabaseUrlInput').value.trim();
@@ -20515,8 +20641,92 @@ async function requestNotificationPermission() {
   }
 }
 
+// ==============================================================================
+// ☁️ SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM (TRANSPARENTE E TOTALMENTE AUTÔNOMA)
+// Sincroniza dados em tempo real entre celular, APK e PC sem exigir intervenção do usuário
+// ==============================================================================
+async function syncDataFromCloud(skipRender = false) {
+  if (!window.ArenaCloudSync) return;
+  try {
+    const cloud = await window.ArenaCloudSync.pull();
+    if (!cloud) return;
+
+    let updated = false;
+
+    // 1. Quadras
+    if (Array.isArray(cloud.courts) && cloud.courts.length > 0) {
+      state.courts = cloud.courts.map(normalizeCourt);
+      localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+      updated = true;
+    }
+
+    // 2. Produtos & Água
+    if (Array.isArray(cloud.products) && cloud.products.length > 0) {
+      state.products = cloud.products;
+      localStorage.setItem('arena_local_products', JSON.stringify(state.products));
+      updated = true;
+    }
+    if (cloud.waterSupply && typeof cloud.waterSupply === 'object') {
+      state.waterSupply = { ...state.waterSupply, ...cloud.waterSupply };
+      localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+      updated = true;
+    }
+
+    // 3. Mensalistas (Horários Fixos)
+    if (Array.isArray(cloud.monthlyMembers) && cloud.monthlyMembers.length > 0) {
+      const deletedBookingSet = getDeletedBookingIds();
+      const validMembers = cloud.monthlyMembers.filter(m => m && m.id && !deletedBookingSet.has(String(m.id)));
+      state.monthlyMembers = validMembers;
+      localStorage.setItem('arena_monthly_members', JSON.stringify(validMembers));
+      updated = true;
+    }
+
+    // 4. Agendamentos (Preserva locais pendentes e mescla com a nuvem)
+    if (Array.isArray(cloud.bookings)) {
+      const deletedBookingSet = getDeletedBookingIds();
+      const validCloudBookings = cloud.bookings.filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
+      
+      const map = new Map();
+      validCloudBookings.forEach(b => map.set(b.id, b));
+      (state.bookings || []).forEach(b => {
+        if (b && b.id && !map.has(b.id) && !deletedBookingSet.has(String(b.id))) {
+          map.set(b.id, b);
+          // Aproveita para enviar para a nuvem em segundo plano
+          window.ArenaCloudSync.push('save_booking', b);
+        }
+      });
+      state.bookings = Array.from(map.values());
+      localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
+      updated = true;
+    }
+
+    // 5. Clientes
+    if (Array.isArray(cloud.customers) && cloud.customers.length > 0) {
+      state.supabaseCustomers = cloud.customers.map(normalizeCustomer);
+      localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
+      updated = true;
+    }
+
+    // 6. Esvazia fila offline
+    window.ArenaCloudSync.flushQueue();
+
+    if (updated && !skipRender) {
+      requestSchedule();
+      if (typeof renderCurrentSubTab === 'function') renderCurrentSubTab();
+      if (typeof renderBookingsList === 'function') renderBookingsList();
+      if (typeof renderCourtsList === 'function') renderCourtsList();
+      if (state.currentMode === 'admin' && typeof renderStepContent === 'function') renderStepContent();
+    }
+  } catch (err) {
+    console.warn('Aviso sincronização nuvem autônoma:', err);
+  }
+}
+window.syncDataFromCloud = syncDataFromCloud;
 
 async function syncDataFromSupabase(skipRender = false) {
+  // Sincroniza também com a nuvem automática autônoma
+  syncDataFromCloud(skipRender);
+
   if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
   const client = window.ArenaSupabase.getClient();
   if (!client) return;

@@ -588,6 +588,84 @@
     }
   };
 
+  // ==============================================================================
+  // ☁️ MOTOR DE SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM (ZERO INTERVENÇÃO DO USUÁRIO)
+  // Sincroniza Web, Celular, APK e Painel de Controle sem depender de cota do Supabase
+  // ==============================================================================
+  const SYNC_API_ENDPOINT = (window.location.origin && !window.location.origin.includes('capacitor://') && !window.location.origin.includes('file://'))
+    ? '/api/sync'
+    : 'https://arenalimoeiro.vercel.app/api/sync';
+
+  window.ArenaCloudSync = {
+    endpoint: SYNC_API_ENDPOINT,
+
+    async pull() {
+      try {
+        const res = await fetch(SYNC_API_ENDPOINT + '?_t=' + Date.now(), {
+          headers: { 'Cache-Control': 'no-cache, no-store' }
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        if (json && json.success && json.data) {
+          return json.data;
+        }
+      } catch (err) {
+        // Silencioso se offline
+      }
+      return null;
+    },
+
+    async push(action, payload) {
+      try {
+        const res = await fetch(SYNC_API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, payload })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const json = await res.json();
+        return json && json.success;
+      } catch (err) {
+        // Enfileira localmente se falhar a rede para envio posterior
+        this.addToQueue({ action, payload, time: Date.now() });
+        return false;
+      }
+    },
+
+    getQueue() {
+      try {
+        return JSON.parse(localStorage.getItem('arena_cloud_sync_queue') || '[]');
+      } catch(e) { return []; }
+    },
+
+    addToQueue(item) {
+      try {
+        const q = this.getQueue();
+        q.push(item);
+        localStorage.setItem('arena_cloud_sync_queue', JSON.stringify(q));
+      } catch(e) {}
+    },
+
+    async flushQueue() {
+      const q = this.getQueue();
+      if (!q || q.length === 0) return;
+      const remaining = [];
+      for (const item of q) {
+        try {
+          const res = await fetch(SYNC_API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: item.action, payload: item.payload })
+          });
+          if (!res.ok) remaining.push(item);
+        } catch(e) {
+          remaining.push(item);
+        }
+      }
+      localStorage.setItem('arena_cloud_sync_queue', JSON.stringify(remaining));
+    }
+  };
+
   // Inicializa na carga
   initClient();
 })();
