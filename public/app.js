@@ -1813,18 +1813,31 @@ async function initArenaApplication() {
     window.addEventListener(evt, unlockAudioAndNotif, { once: true });
   });
 
-  // 4. ⚡ Atualização instantânea ao sair/minimizar e voltar para a aba (sem nenhum atraso)
+  // 4. ⚡ Atualização inteligente ao sair/minimizar e voltar para a aba
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       checkAndSyncBookingsBackground();
+      if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
+        window.ArenaSupabase.flushPendingQueue();
+      }
     }
   });
   window.addEventListener('focus', () => {
     checkAndSyncBookingsBackground();
+    if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
+      window.ArenaSupabase.flushPendingQueue();
+    }
   });
 
-  // Polling em segundo plano a cada 3.5s para sincronizar agendamentos em tempo real de forma blindada
-  setInterval(checkAndSyncBookingsBackground, 3500);
+  // Sincronização em segundo plano econômica (60s) apenas para gestores logados, poupando cota do Supabase
+  setInterval(() => {
+    if (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn()) {
+      checkAndSyncBookingsBackground();
+      if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
+        window.ArenaSupabase.flushPendingQueue();
+      }
+    }
+  }, 60000);
 
   // 5. 🍪 Verificação de Cookies e Verificação de Login de 5 Horas
   if (window._pendingSessionExpiredNotice) {
@@ -1982,7 +1995,7 @@ function loadInitialData() {
 
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const deletedBookingSet = getDeletedBookingIds();
-    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id) && !isBookingDateInThePast(b.date));
+    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
     cleanedLocal.forEach(b => {
       if (b && (b.id === 'ARENA-6776' || b.id === 'ARENA-9247')) {
         b.product_cart = {};
@@ -10956,6 +10969,27 @@ function renderAdminSubTabContent(tab) {
   if (tab === 'database') {
     const cfg = window.ArenaSupabase ? window.ArenaSupabase.getConfig() : { url: 'https://brmclyukjfijommbxhks.supabase.co', anonKey: '', connected: false };
     const prefillUrl = cfg.url || 'https://brmclyukjfijommbxhks.supabase.co';
+    const isQuotaError = cfg.lastError && (cfg.lastError.includes('exceed_egress_quota') || cfg.lastError.includes('restricted'));
+    const pendingCount = window.ArenaSupabase ? window.ArenaSupabase.getPendingQueue().length : 0;
+
+    let badgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
+    let badgeDot = 'bg-amber-500';
+    let badgeText = '🟡 Aguardando Chave Anon';
+
+    if (cfg.connected) {
+      badgeClass = 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+      badgeDot = 'bg-emerald-500 animate-pulse';
+      badgeText = '🟢 Conectado ao Supabase';
+    } else if (isQuotaError) {
+      badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
+      badgeDot = 'bg-rose-500 animate-ping';
+      badgeText = '🔴 Cota Supabase Excedida';
+    } else if (cfg.lastError) {
+      badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
+      badgeDot = 'bg-rose-500';
+      badgeText = '🔴 Erro de Conexão';
+    }
+
     return `
       <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
@@ -10968,14 +11002,43 @@ function renderAdminSubTabContent(tab) {
           </div>
 
           <div class="flex items-center space-x-2">
-            <span class="px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1.5 ${cfg.connected ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
-              <span class="w-2 h-2 rounded-full ${cfg.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
-              <span>${cfg.connected ? '🟢 Conectado ao Supabase' : '🟡 Aguardando Chave Anon'}</span>
+            <span class="px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1.5 ${badgeClass}">
+              <span class="w-2 h-2 rounded-full ${badgeDot}"></span>
+              <span>${badgeText}</span>
             </span>
           </div>
         </div>
 
-        <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-8">
+        ${isQuotaError ? `
+          <div class="p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl mb-6 shadow-sm">
+            <div class="flex items-start space-x-3">
+              <span class="text-2xl">⚠️</span>
+              <div class="text-xs text-amber-950 leading-relaxed flex-1">
+                <strong class="font-black text-sm block mb-1 text-amber-900">ALERTA DE COTA: O projeto Supabase atingiu o limite gratuito de transferência (exceed_egress_quota)</strong>
+                <p class="mb-2 text-slate-700">Por esse motivo, o Supabase bloqueou temporariamente gravações e consultas automáticas. Seus dados estão seguros na memória deste dispositivo e prontos para serem enviados assim que o banco for reativado.</p>
+                <div class="bg-white/80 p-3 rounded-xl border border-amber-200 text-slate-800 space-y-1.5 font-sans">
+                  <strong class="block font-bold text-slate-900">Como restabelecer a conexão na nuvem:</strong>
+                  <div><strong>Opção 1:</strong> Acesse seu painel em <a href="https://supabase.com/dashboard" target="_blank" class="text-emerald-700 underline font-bold">supabase.com/dashboard</a>, abra o projeto, vá em <em>Project Settings ➔ Billing</em> e adicione um Spend Cap ou mude de plano para desbloquear na hora.</div>
+                  <div><strong>Opção 2 (100% Grátis):</strong> Crie um novo projeto gratuito no Supabase, clique no botão <em>"Copiar Script SQL"</em> abaixo, cole no <em>SQL Editor</em> do novo projeto, e insira a nova URL e Anon Key aqui. Em seguida clique em <em>"Enviar Dados Locais para o Supabase"</em> para subir tudo com 1 clique!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+
+        ${pendingCount > 0 ? `
+          <div class="p-3.5 bg-blue-50 border border-blue-200 rounded-2xl mb-6 flex items-center justify-between text-xs text-blue-900">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="cloud-off" class="w-4 h-4 text-blue-600"></i>
+              <span><strong>Fila Offline:</strong> Existem <strong>${pendingCount}</strong> operações aguardando envio para o Supabase.</span>
+            </div>
+            <button onclick="handleFlushQueue()" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-[11px] shadow-sm">
+              Tentar Enviar Agora
+            </button>
+          </div>
+        ` : ''}
+
+        <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-6">
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
               <i data-lucide="globe" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
@@ -11001,17 +11064,48 @@ function renderAdminSubTabContent(tab) {
           <div id="supabaseStatusMsg" class="hidden p-3.5 rounded-xl text-xs font-bold"></div>
 
           <div class="pt-2 flex flex-wrap items-center gap-3">
-            <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all">
+            <button type="submit" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all">
               <i data-lucide="save" class="w-4 h-4"></i>
-              <span>Salvar & Conectar ao Supabase</span>
+              <span>Salvar & Conectar</span>
             </button>
 
-            <button type="button" onclick="handleTestSupabaseConnection()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl flex items-center space-x-2 transition-all">
+            <button type="button" onclick="handleTestSupabaseConnection()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center space-x-2 transition-all">
               <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
               <span>Testar Conexão</span>
             </button>
+
+            <button type="button" onclick="handleDisconnectSupabase()" class="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all">
+              <i data-lucide="power-off" class="w-4 h-4"></i>
+              <span>Desconectar</span>
+            </button>
           </div>
         </form>
+
+        <!-- FERRAMENTAS DE SINCRONIZAÇÃO EM MASSA E RESTAURAÇÃO -->
+        <div class="pt-6 border-t border-slate-200">
+          <h4 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-3 flex items-center">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-1.5 text-emerald-600"></i>
+            Central de Sincronização & Restauração de Dados
+          </h4>
+          <p class="text-xs text-slate-600 mb-4">Envie todos os agendamentos, quadras, clientes e produtos salvos neste dispositivo diretamente para a nuvem do Supabase, ou recupere o banco completo.</p>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" onclick="handlePushAllToSupabase()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-2 transition-all">
+              <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+              <span>⬆️ Enviar Todos os Dados Locais para o Supabase</span>
+            </button>
+
+            <button type="button" onclick="handlePullFromSupabase()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center space-x-2 transition-all">
+              <i data-lucide="download-cloud" class="w-4 h-4 text-indigo-600"></i>
+              <span>⬇️ Baixar Dados da Nuvem</span>
+            </button>
+
+            <button type="button" onclick="openSqlScriptModal()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs rounded-xl flex items-center space-x-2 transition-all">
+              <i data-lucide="code" class="w-4 h-4 text-emerald-400"></i>
+              <span>📋 Ver / Copiar Script SQL (schema.sql)</span>
+            </button>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -13995,36 +14089,73 @@ async function handleDirectBookingSubmit(e) {
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       try {
         const client = window.ArenaSupabase.getClient();
-        await client.from('monthly_members').insert([memberRecord]);
+        let insertedMem = false;
+        const { error: memErr } = await client.from('monthly_members').insert([memberRecord]);
+        if (memErr) {
+          console.warn('Aviso inserção mensalista Supabase:', memErr);
+          if (memErr.code === '23503') {
+            memberRecord.customer_id = null;
+            const { error: memErr2 } = await client.from('monthly_members').insert([memberRecord]);
+            if (!memErr2) insertedMem = true;
+          }
+        } else {
+          insertedMem = true;
+        }
+        if (!insertedMem && window.ArenaSupabase.addToPendingQueue) {
+          window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: memberRecord, id: memberRecord.id });
+        }
       } catch(e) {
         console.warn('Aviso inserção mensalista Supabase:', e);
+        if (window.ArenaSupabase?.addToPendingQueue) {
+          window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: memberRecord, id: memberRecord.id });
+        }
       }
+    } else if (window.ArenaSupabase?.addToPendingQueue) {
+      window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: memberRecord, id: memberRecord.id });
     }
   }
 
   // Salva no Supabase (Nuvem)
+  const supabaseDbPayloads = bookingsToCreate.map(b => {
+    const { customer_cpf, customerCPF, emergency_contact, ...cleanDb } = b;
+    return cleanDb;
+  });
+
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      const supabaseDbPayloads = bookingsToCreate.map(b => {
-        const { customer_cpf, customerCPF, emergency_contact, ...cleanDb } = b;
-        return cleanDb;
-      });
-
+      let insertedBookings = false;
       const { error: insErr } = await client.from('bookings').insert(supabaseDbPayloads);
       if (insErr) {
         console.warn('Aviso inserção booking admin Supabase:', insErr);
         if (insErr.code === '23503') {
           supabaseDbPayloads.forEach(p => p.customer_id = null);
-          await client.from('bookings').insert(supabaseDbPayloads);
+          const { error: insErr2 } = await client.from('bookings').insert(supabaseDbPayloads);
+          if (!insErr2) insertedBookings = true;
         }
+      } else {
+        insertedBookings = true;
+      }
+      if (!insertedBookings && window.ArenaSupabase.addToPendingQueue) {
+        supabaseDbPayloads.forEach(payload => {
+          window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
+        });
       }
       if (window.ArenaSupabase.broadcastBooking) {
         bookingsToCreate.forEach(b => window.ArenaSupabase.broadcastBooking(b));
       }
     } catch(err) {
-      console.warn('Erro ao salvar no Supabase:', err);
+      console.warn('Erro ao salvar no Supabase, adicionando à fila offline:', err);
+      if (window.ArenaSupabase?.addToPendingQueue) {
+        supabaseDbPayloads.forEach(payload => {
+          window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
+        });
+      }
     }
+  } else if (window.ArenaSupabase?.addToPendingQueue) {
+    supabaseDbPayloads.forEach(payload => {
+      window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
+    });
   }
 
   // Atualiza cache local de clientes
@@ -17617,44 +17748,42 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     showNotification(isEditing ? `Quadra "${name}" atualizada com sucesso!` : `Quadra "${name}" criada com sucesso!`, 'success');
   }
 
+  const courtDbPayload = {
+    id: isEditing ? courtIdToEdit : id,
+    name,
+    category,
+    category_label: savedCourt.categoryLabel,
+    base_price_per_hour: price,
+    monthly_price: monthlyPrice,
+    description,
+    observation,
+    image: savedCourt.image,
+    specs: savedCourt.specs,
+    badge: savedCourt.badge,
+    order_index: isEditing ? (existingCourt?.order_index || existingCourt?.orderIndex || 1) : state.courts.length
+  };
+
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      if (isEditing) {
-        await client.from('courts').update({
-          name, 
-          category, 
-          category_label: savedCourt.categoryLabel,
-          base_price_per_hour: price, 
-          monthly_price: monthlyPrice,
-          description, 
-          observation, 
-          image: savedCourt.image, 
-          specs: savedCourt.specs,
-          badge: savedCourt.badge
-        }).eq('id', courtIdToEdit);
-      } else {
-        await client.from('courts').insert([{
-          id, 
-          name, 
-          category, 
-          category_label: savedCourt.categoryLabel,
-          base_price_per_hour: price, 
-          monthly_price: monthlyPrice,
-          description, 
-          observation, 
-          image: savedCourt.image, 
-          specs: savedCourt.specs,
-          badge: savedCourt.badge,
-          order_index: state.courts.length
-        }]);
+      const { error } = await client.from('courts').upsert([courtDbPayload], { onConflict: 'id' });
+      if (error) {
+        console.warn('Erro ao salvar quadra no Supabase:', error);
+        if (window.ArenaSupabase?.addToPendingQueue) {
+          window.ArenaSupabase.addToPendingQueue({ table: 'courts', action: 'upsert', payload: courtDbPayload, id: courtDbPayload.id });
+        }
       }
       if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
         window.ArenaSupabase.broadcastCourtUpdate(savedCourt);
       }
     } catch(e) {
-      console.warn('Erro ao salvar quadra no Supabase:', e);
+      console.warn('Erro de rede ao salvar quadra no Supabase:', e);
+      if (window.ArenaSupabase?.addToPendingQueue) {
+        window.ArenaSupabase.addToPendingQueue({ table: 'courts', action: 'upsert', payload: courtDbPayload, id: courtDbPayload.id });
+      }
     }
+  } else if (window.ArenaSupabase?.addToPendingQueue) {
+    window.ArenaSupabase.addToPendingQueue({ table: 'courts', action: 'upsert', payload: courtDbPayload, id: courtDbPayload.id });
   }
 }
 
@@ -19323,27 +19452,56 @@ async function submitBooking(grandTotal) {
 
       // Insere no Supabase garantindo que nunca quebre por Foreign Key
       if (isMensal) {
+        let insertedMem = false;
         const { error: insErr } = await client.from('monthly_members').insert([dbMemberPayload]);
         if (insErr) {
           console.warn('Aviso inserção mensalista Supabase:', insErr);
           if (insErr.code === '23503') {
             dbMemberPayload.customer_id = null;
-            await client.from('monthly_members').insert([dbMemberPayload]);
+            const { error: insErr2 } = await client.from('monthly_members').insert([dbMemberPayload]);
+            if (!insErr2) insertedMem = true;
           }
+        } else {
+          insertedMem = true;
+        }
+        if (!insertedMem && window.ArenaSupabase?.addToPendingQueue) {
+          window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: dbMemberPayload, id: dbMemberPayload.id });
         }
       } else {
+        let insertedBooking = false;
         const { error: insErr } = await client.from('bookings').insert([dbBookingPayload]);
         if (insErr) {
           console.warn('Aviso inserção booking Supabase:', insErr);
           if (insErr.code === '23503') {
             dbBookingPayload.customer_id = null;
-            await client.from('bookings').insert([dbBookingPayload]);
+            const { error: insErr2 } = await client.from('bookings').insert([dbBookingPayload]);
+            if (!insErr2) insertedBooking = true;
           }
+        } else {
+          insertedBooking = true;
+        }
+        if (!insertedBooking && window.ArenaSupabase?.addToPendingQueue) {
+          window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload: dbBookingPayload, id: dbBookingPayload.id });
         }
       }
     } catch (err) {
-      console.warn('Erro na conexão com Supabase, salvando localmente:', err);
+      console.warn('Erro na conexão com Supabase, salvando localmente e enfileirando:', err);
+      if (window.ArenaSupabase?.addToPendingQueue) {
+        window.ArenaSupabase.addToPendingQueue({
+          table: isMensal ? 'monthly_members' : 'bookings',
+          action: 'upsert',
+          payload: isMensal ? dbMemberPayload : dbBookingPayload,
+          id: isMensal ? dbMemberPayload.id : dbBookingPayload.id
+        });
+      }
     }
+  } else if (window.ArenaSupabase?.addToPendingQueue) {
+    window.ArenaSupabase.addToPendingQueue({
+      table: isMensal ? 'monthly_members' : 'bookings',
+      action: 'upsert',
+      payload: isMensal ? dbMemberPayload : dbBookingPayload,
+      id: isMensal ? dbMemberPayload.id : dbBookingPayload.id
+    });
   }
 
   // 4. Atualiza estado em memória e localStorage com garantia de compatibilidade
@@ -19812,6 +19970,255 @@ function handleDisconnectSupabase() {
   }
 }
 
+async function handlePushAllToSupabase() {
+  const statusMsg = document.getElementById('supabaseStatusMsg');
+  if (!window.ArenaSupabase) return;
+  const client = window.ArenaSupabase.getClient();
+  if (!client) {
+    alert('Supabase não conectado. Configure a URL e a Chave antes.');
+    return;
+  }
+
+  if (!confirm('Deseja enviar todos os dados salvos localmente (quadras, clientes, agendamentos, mensalistas e produtos) para o Supabase agora?\n\nIsso atualizará o banco na nuvem com todas as informações deste dispositivo.')) return;
+
+  if (statusMsg) {
+    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
+    statusMsg.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
+    statusMsg.innerText = '⏳ Enviando dados locais para o Supabase... Aguarde...';
+  }
+
+  const localCourts = JSON.parse(localStorage.getItem('arena_local_courts') || 'null') || state.courts || [];
+  const localProducts = JSON.parse(localStorage.getItem('arena_local_products') || 'null') || state.products || [];
+  const localCusts = JSON.parse(localStorage.getItem('arena_customers') || 'null') || state.supabaseCustomers || [];
+  const localMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || 'null') || state.monthlyMembers || [];
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || 'null') || state.bookings || [];
+  const waterSupply = state.waterSupply;
+
+  const res = await window.ArenaSupabase.pushAllLocalData({
+    courts: localCourts,
+    products: localProducts,
+    customers: localCusts,
+    monthlyMembers: localMonthly,
+    bookings: localBookings,
+    waterSupply
+  });
+
+  if (statusMsg) {
+    if (res.success) {
+      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+      statusMsg.innerText = '✓ ' + res.message;
+    } else {
+      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
+      statusMsg.innerText = '⚠️ ' + res.message;
+    }
+  }
+  alert(res.message);
+  renderStepContent();
+}
+
+async function handlePullFromSupabase() {
+  const statusMsg = document.getElementById('supabaseStatusMsg');
+  if (statusMsg) {
+    statusMsg.classList.remove('hidden');
+    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200';
+    statusMsg.innerText = '⏳ Baixando dados do Supabase...';
+  }
+  await syncDataFromSupabase();
+  if (statusMsg) {
+    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+    statusMsg.innerText = '✓ Dados do Supabase sincronizados com sucesso!';
+  }
+  alert('✓ Dados sincronizados do Supabase com sucesso!');
+  renderStepContent();
+}
+
+async function handleFlushQueue() {
+  if (!window.ArenaSupabase) return;
+  const res = await window.ArenaSupabase.flushPendingQueue();
+  alert(`Fila offline processada: ${res.flushed} itens enviados com sucesso. Restantes: ${res.remaining}`);
+  renderStepContent();
+}
+
+function openSqlScriptModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const sqlSample = `-- 🏟️ ARENA LIMOEIRO - BANCO DE DADOS (SUPABASE SQL)
+-- Copie todo o conteúdo abaixo e execute no SQL Editor do seu projeto Supabase:
+
+CREATE TABLE IF NOT EXISTS public.customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    document TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.courts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    category_label TEXT NOT NULL,
+    image TEXT,
+    base_price_per_hour NUMERIC(10,2) NOT NULL DEFAULT 90.00,
+    monthly_price NUMERIC(10,2) NOT NULL DEFAULT 500.00,
+    badge TEXT,
+    bookings_count INTEGER DEFAULT 0,
+    order_index INTEGER DEFAULT 1,
+    description TEXT,
+    observation TEXT,
+    specs JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Bebidas',
+    type TEXT NOT NULL DEFAULT 'product',
+    price NUMERIC(10,2) NOT NULL DEFAULT 5.00,
+    unit TEXT DEFAULT 'unid.',
+    image TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.monthly_members (
+    id TEXT PRIMARY KEY,
+    team_name TEXT NOT NULL,
+    responsible_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
+    court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
+    day_of_week TEXT NOT NULL,
+    day_of_week_label TEXT NOT NULL,
+    time TEXT NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    monthly_price NUMERIC(10,2) NOT NULL,
+    status TEXT DEFAULT 'active',
+    start_month TEXT,
+    observation TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.bookings (
+    id TEXT PRIMARY KEY,
+    court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
+    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
+    date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    time TEXT NOT NULL,
+    duration INTEGER NOT NULL DEFAULT 60,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    total_price NUMERIC(10,2) NOT NULL,
+    status TEXT DEFAULT 'confirmed',
+    booking_type TEXT DEFAULT 'avulso',
+    payment_method TEXT DEFAULT 'pix',
+    product_cart JSONB DEFAULT '{}'::jsonb,
+    observation TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Gerente do Sistema',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.blocked_slots (
+    id SERIAL PRIMARY KEY,
+    court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
+    date TEXT NOT NULL,
+    time TEXT NOT NULL,
+    reason TEXT DEFAULT 'Manutenção',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_court_date_time UNIQUE (court_id, date, time)
+);
+
+GRANT ALL ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.courts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.monthly_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.blocked_slots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Permitir gerenciamento completo de quadras" ON public.courts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de produtos" ON public.products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de clientes" ON public.customers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de agendamentos" ON public.bookings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de mensalistas" ON public.monthly_members FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de bloqueios" ON public.blocked_slots FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de gestores" ON public.admin_users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime FOR TABLE public.bookings, public.courts, public.monthly_members, public.blocked_slots, public.products, public.customers;
+COMMIT;`;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+      <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <div class="flex items-center space-x-2">
+            <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="database" class="w-5 h-5"></i></span>
+            <h3 class="text-base font-black text-slate-900">Script SQL do Banco Supabase (schema.sql)</h3>
+          </div>
+          <button onclick="closeModal()" class="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="p-6 overflow-y-auto flex-1 space-y-4">
+          <p class="text-xs text-slate-600">Copie este script e execute no menu <strong>SQL Editor</strong> do seu projeto Supabase para criar ou recriar todas as tabelas, permissões e políticas da Arena Limoeiro:</p>
+          <textarea id="sqlScriptContent" readonly class="w-full h-80 p-4 font-mono text-xs bg-slate-900 text-emerald-400 rounded-xl border border-slate-700 focus:outline-none select-all">${sqlSample}</textarea>
+        </div>
+
+        <div class="p-4 border-t border-slate-100 flex items-center justify-end space-x-3 bg-slate-50">
+          <button onclick="copySqlScript()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-2">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span>Copiar Código SQL</span>
+          </button>
+          <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+
+function copySqlScript() {
+  const ta = document.getElementById('sqlScriptContent');
+  if (ta) {
+    ta.select();
+    navigator.clipboard.writeText(ta.value).then(() => {
+      alert('✓ Código SQL copiado para a área de transferência! Cole no SQL Editor do seu projeto Supabase.');
+    }).catch(() => {
+      document.execCommand('copy');
+      alert('✓ Código SQL copiado! Cole no SQL Editor do seu projeto Supabase.');
+    });
+  }
+}
+
+window.handlePushAllToSupabase = handlePushAllToSupabase;
+window.handlePullFromSupabase = handlePullFromSupabase;
+window.handleFlushQueue = handleFlushQueue;
+window.openSqlScriptModal = openSqlScriptModal;
+window.copySqlScript = copySqlScript;
+
 async function loadSupabaseCustomers() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
@@ -20183,7 +20590,7 @@ async function syncDataFromSupabase(skipRender = false) {
 
     if (dbBookings) {
       const deletedBookingSet = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !isBookingDateInThePast(b.date));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
       state.bookings = validDbBookings;
       localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
 
@@ -20357,7 +20764,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20377,7 +20784,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20393,7 +20800,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20507,7 +20914,7 @@ async function checkAndSyncBookingsBackground() {
 
     if (dbBookings && !error) {
       const delIds = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
       const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
 

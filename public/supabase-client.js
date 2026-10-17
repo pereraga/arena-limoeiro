@@ -63,16 +63,29 @@
       try {
         const { data, error } = await client.from('courts').select('id').limit(1);
         if (error) {
-          return { success: false, message: error.message };
+          const current = getConfig();
+          current.connected = false;
+          current.lastError = error.message;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+          return { 
+            success: false, 
+            message: error.message, 
+            isQuota: error.message.includes('exceed_egress_quota') 
+          };
         }
         
         // Marca como conectado
         const current = getConfig();
         current.connected = true;
+        current.lastError = null;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
 
         return { success: true, message: 'Conectado com sucesso ao Supabase!' };
       } catch (err) {
+        const current = getConfig();
+        current.connected = false;
+        current.lastError = err.message;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
         return { success: false, message: err.message || 'Erro de conexão de rede.' };
       }
     },
@@ -353,6 +366,224 @@
         }
       } catch (err) {
         console.warn('Erro ao transmitir broadcast de limpeza de logs:', err);
+      }
+    },
+
+    // 📦 FILA DE SINCRONIZAÇÃO OFFLINE (RESISTÊNCIA A QUEDA DE CONEXÃO OU LIMITE DE COTA)
+    getPendingQueue() {
+      try {
+        const raw = localStorage.getItem('arena_offline_sync_queue');
+        return raw ? JSON.parse(raw) : [];
+      } catch(e) {
+        return [];
+      }
+    },
+
+    addToPendingQueue(item) {
+      try {
+        const q = this.getPendingQueue();
+        q.push({
+          ...item,
+          queued_at: new Date().toISOString()
+        });
+        localStorage.setItem('arena_offline_sync_queue', JSON.stringify(q));
+      } catch(e) {}
+    },
+
+    async flushPendingQueue() {
+      const client = this.getClient();
+      if (!client) return { flushed: 0, remaining: 0 };
+      const q = this.getPendingQueue();
+      if (!q.length) return { flushed: 0, remaining: 0 };
+
+      const remaining = [];
+      let flushed = 0;
+
+      for (const item of q) {
+        try {
+          if (item.action === 'insert') {
+            const { error } = await client.from(item.table).insert(Array.isArray(item.payload) ? item.payload : [item.payload]);
+            if (error) throw error;
+          } else if (item.action === 'upsert') {
+            const { error } = await client.from(item.table).upsert(Array.isArray(item.payload) ? item.payload : [item.payload], { onConflict: item.onConflict || 'id' });
+            if (error) throw error;
+          } else if (item.action === 'update') {
+            const { error } = await client.from(item.table).update(item.payload).eq('id', item.id);
+            if (error) throw error;
+          } else if (item.action === 'delete') {
+            const { error } = await client.from(item.table).delete().eq('id', item.id);
+            if (error) throw error;
+          }
+          flushed++;
+        } catch(err) {
+          console.warn('Erro ao processar item da fila offline:', err);
+          remaining.push(item);
+        }
+      }
+
+      localStorage.setItem('arena_offline_sync_queue', JSON.stringify(remaining));
+      return { flushed, remaining: remaining.length };
+    },
+
+    // 🚀 ENVIO EM MASSA DE TODOS OS DADOS LOCAIS PARA O SUPABASE (RESTAURAÇÃO COMPLETA)
+    async pushAllLocalData(data) {
+      const client = this.getClient();
+      if (!client) return { success: false, message: 'Cliente Supabase não inicializado.' };
+
+      const results = {
+        courts: 0,
+        products: 0,
+        customers: 0,
+        monthlyMembers: 0,
+        bookings: 0,
+        errors: []
+      };
+
+      try {
+        // 1. Quadras
+        if (Array.isArray(data.courts) && data.courts.length > 0) {
+          const courtsPayload = data.courts.map((c, idx) => ({
+            id: c.id,
+            name: c.name,
+            category: c.category,
+            category_label: c.categoryLabel || c.category_label || 'Quadra',
+            image: c.image || null,
+            base_price_per_hour: Number(c.basePricePerHour || c.base_price_per_hour || 90),
+            monthly_price: Number(c.monthlyPrice || c.monthly_price || 500),
+            badge: c.badge || null,
+            bookings_count: Number(c.bookingsCount || c.bookings_count || 0),
+            order_index: c.orderIndex || c.order_index || (idx + 1),
+            description: c.description || null,
+            observation: c.observation || null,
+            specs: typeof c.specs === 'object' ? c.specs : {}
+          }));
+          const { error: courtsErr } = await client.from('courts').upsert(courtsPayload, { onConflict: 'id' });
+          if (courtsErr) results.errors.push('Quadras: ' + courtsErr.message);
+          else results.courts = courtsPayload.length;
+        }
+
+        // 2. Produtos de Bar
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          const prodsPayload = data.products
+            .filter(p => p && p.id && p.id !== 'arena-water-supply' && p.type !== 'water_supply')
+            .map(p => ({
+              id: p.id,
+              name: p.name,
+              category: p.category || 'Bebidas',
+              type: p.type || 'product',
+              price: Number(p.price || 0),
+              unit: p.unit || 'unid.',
+              image: p.image || null
+            }));
+          if (prodsPayload.length > 0) {
+            const { error: prodsErr } = await client.from('products').upsert(prodsPayload, { onConflict: 'id' });
+            if (prodsErr) results.errors.push('Produtos: ' + prodsErr.message);
+            else results.products = prodsPayload.length;
+          }
+        }
+
+        // 3. Estoque de Água
+        if (data.waterSupply) {
+          try {
+            const waterPayload = {
+              id: 'arena-water-supply',
+              name: 'Estoque Central de Água Mineral da Arena',
+              category: 'Estoque / Controle Interno',
+              type: 'water_supply',
+              price: Number(data.waterSupply.unit_price || 0.75),
+              unit: 'garrafão',
+              image: JSON.stringify(data.waterSupply)
+            };
+            await client.from('products').upsert([waterPayload], { onConflict: 'id' });
+          } catch(wErr) {}
+        }
+
+        // 4. Clientes
+        if (Array.isArray(data.customers) && data.customers.length > 0) {
+          const custPayload = data.customers
+            .filter(c => c && c.id && c.name && c.name !== '__DELETED_CUSTOMER__' && !String(c.id).startsWith('deleted_'))
+            .map(c => ({
+              id: c.id,
+              name: c.name,
+              phone: c.phone || '',
+              email: c.email || '',
+              document: c.document || c.cpf || null,
+              notes: c.notes || (c.emergency_contact ? `Emergência: ${c.emergency_contact}` : null)
+            }));
+          if (custPayload.length > 0) {
+            const { error: custErr } = await client.from('customers').upsert(custPayload, { onConflict: 'id' });
+            if (custErr) results.errors.push('Clientes: ' + custErr.message);
+            else results.customers = custPayload.length;
+          }
+        }
+
+        // 5. Mensalistas
+        if (Array.isArray(data.monthlyMembers) && data.monthlyMembers.length > 0) {
+          const membersPayload = data.monthlyMembers
+            .filter(m => m && m.id && !m.id.startsWith('mock-'))
+            .map(m => ({
+              id: m.id,
+              team_name: m.team_name || m.teamName || 'Mensalista',
+              responsible_name: m.responsible_name || m.responsibleName || 'Responsável',
+              phone: m.phone || '',
+              customer_id: m.customer_id || null,
+              court_id: m.court_id || m.courtId || null,
+              day_of_week: m.day_of_week || m.dayOfWeek || 'segunda',
+              day_of_week_label: m.day_of_week_label || m.dayOfWeekLabel || 'Toda semana',
+              time: m.time || m.start_time || '19:00',
+              start_time: m.start_time || m.startTime || m.time || '19:00',
+              end_time: m.end_time || m.endTime || '20:00',
+              monthly_price: Number(m.monthly_price || m.monthlyPrice || 500),
+              status: m.status || 'active',
+              start_month: m.start_month || null,
+              observation: m.observation || null
+            }));
+          if (membersPayload.length > 0) {
+            const { error: memErr } = await client.from('monthly_members').upsert(membersPayload, { onConflict: 'id' });
+            if (memErr) results.errors.push('Mensalistas: ' + memErr.message);
+            else results.monthlyMembers = membersPayload.length;
+          }
+        }
+
+        // 6. Agendamentos
+        if (Array.isArray(data.bookings) && data.bookings.length > 0) {
+          const bookingsPayload = data.bookings
+            .filter(b => b && b.id && b.status !== 'cancelled')
+            .map(b => ({
+              id: b.id,
+              court_id: b.court_id || b.courtId,
+              customer_id: b.customer_id || null,
+              date: b.date,
+              start_time: b.start_time || b.startTime,
+              end_time: b.end_time || b.endTime,
+              time: b.time || `${b.start_time || b.startTime} às ${b.end_time || b.endTime}`,
+              duration: Number(b.duration || 60),
+              customer_name: b.customer_name || b.customerName || 'Cliente',
+              customer_phone: b.customer_phone || b.customerPhone || '',
+              total_price: Number(b.total_price || b.totalPrice || 0),
+              status: b.status || 'confirmed',
+              booking_type: b.booking_type || b.bookingType || 'avulso',
+              payment_method: b.payment_method || b.paymentMethod || 'local',
+              product_cart: b.product_cart || b.productCart || {},
+              observation: b.observation || null
+            }));
+          if (bookingsPayload.length > 0) {
+            const { error: bErr } = await client.from('bookings').upsert(bookingsPayload, { onConflict: 'id' });
+            if (bErr) results.errors.push('Agendamentos: ' + bErr.message);
+            else results.bookings = bookingsPayload.length;
+          }
+        }
+
+        const success = results.errors.length === 0;
+        return {
+          success,
+          results,
+          message: success 
+            ? `Sincronização concluída com sucesso! (${results.courts} quadras, ${results.bookings} agendamentos, ${results.customers} clientes, ${results.monthlyMembers} mensalistas, ${results.products} produtos).`
+            : `Alguns itens não puderam ser sincronizados: ${results.errors.join('; ')}`
+        };
+      } catch(err) {
+        return { success: false, message: err.message, results };
       }
     }
   };

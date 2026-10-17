@@ -8,19 +8,15 @@
   <meta http-equiv="Expires" content="0">
   <title>Arena Limoeiro - Complexo Poliesportivo e Lazer | Agendamento Online</title>
   
-  <!-- Invalidação Imediata de Cache e Service Worker Antigo v5.2.7 (100% Supabase Cloud) -->
+  <!-- Invalidação Imediata de Cache e Service Worker Antigo v5.3.0 -->
   <script>
     (function() {
-      const CURRENT_APP_VERSION = '5.2.8';
+      const CURRENT_APP_VERSION = '5.3.0';
       const storedVersion = localStorage.getItem('arena_app_version');
       if (storedVersion !== CURRENT_APP_VERSION) {
         localStorage.setItem('arena_app_version', CURRENT_APP_VERSION);
-        try {
-          // Remove backups locais antigos para garantir que a nuvem Supabase seja a única fonte da verdade
-          localStorage.removeItem('arena_monthly_members_backup');
-          localStorage.removeItem('arena_monthly_members');
-          localStorage.removeItem('arena_local_bookings');
-        } catch(e) {}
+        // NUNCA deletar arena_local_bookings ou arena_monthly_members!
+        // Preserva todos os agendamentos e cadastros locais para sincronização íntegra com o Supabase.
         if ('caches' in window) {
           caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
         }
@@ -40,13 +36,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Favicon & Ícones Mobile/PWA (Monograma A com Folhas) -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.2.8">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.2.8">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.2.8">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.2.8">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.2.8">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.2.8">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.2.8">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.3.0">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.3.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.3.0">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.3.0">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.3.0">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.3.0">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -56,8 +52,8 @@
   
   <!-- Supabase JS Client & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/supabase-client.js?v=5.2.8"></script>
-  <script src="/default-data.js?v=5.2.8"></script>
+  <script src="/supabase-client.js?v=5.3.0"></script>
+  <script src="/default-data.js?v=5.3.0"></script>
 
   <!-- Service Worker Registration -->
   <script>
@@ -968,7 +964,7 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=5.2.9"></script>
+  <script src="/app.js?v=5.3.0"></script>
   <script>
     // 🛡️ Garantia Absoluta de Renderização: Se o placeholder persistir, renderiza imediatamente
     setTimeout(function() {
