@@ -716,7 +716,7 @@ function openDownloadApkModal() {
   if (!modalRoot) return;
 
   const currentOrigin = window.location.origin || 'https://arenalimoeiro.vercel.app';
-  const controleApkUrl = `${currentOrigin}/arena-limoeiro-controle.apk`;
+  const controleApkUrl = `${currentOrigin}/apks/ArenaLimoeiro-Controle.apk`;
   const clienteApkUrl = `${currentOrigin}/apks/ArenaLimoeiro-Cliente.apk`;
 
   modalRoot.innerHTML = `
@@ -752,16 +752,12 @@ function openDownloadApkModal() {
           <div class="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/70 to-slate-900 border border-emerald-500/50 space-y-3 shadow-lg">
             <div class="flex items-start justify-between">
               <div>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-2">
                   <span class="text-xs font-black uppercase tracking-wider text-emerald-300 bg-emerald-900/80 px-2 py-0.5 rounded-md">🛡️ Gestão & Recepção</span>
                   <span class="text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-md">Moto G20 OK</span>
-                  <span class="text-[10px] font-black text-emerald-300 bg-emerald-900/60 border border-emerald-400/50 px-2 py-0.5 rounded-md">✨ v5.3.1 Atualizado</span>
                 </div>
                 <h4 class="text-sm font-black text-white mt-1">Arena Limoeiro - Controle</h4>
-                <p class="text-xs text-slate-300 mt-0.5">Para gerentes, administradores e recepção. Painel completo, caixa, comandas, relatórios e sincronização automática.</p>
-                <div class="mt-2 p-2 bg-slate-950/70 rounded-lg border border-slate-800 text-[11px] font-mono text-emerald-400 break-all select-all flex items-center justify-between gap-1">
-                  <span>${controleApkUrl}</span>
-                </div>
+                <p class="text-xs text-slate-300 mt-0.5">Para gerentes, administradores e recepção. Painel completo, caixa, comandas e relatórios.</p>
               </div>
             </div>
 
@@ -769,9 +765,9 @@ function openDownloadApkModal() {
               <a href="${controleApkUrl}" download="ArenaLimoeiro-Controle.apk"
                  class="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer">
                 <i data-lucide="download" class="w-4 h-4"></i>
-                <span>Baixar APK Controle (30 MB)</span>
+                <span>Baixar APK Controle</span>
               </a>
-              <button onclick="navigator.clipboard.writeText('${controleApkUrl}').then(() => alert('Link direto do APK copiado para a área de transferência!'))"
+              <button onclick="navigator.clipboard.writeText('${controleApkUrl}').then(() => alert('Link do APK Controle copiado!'))"
                       class="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
                 <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                 <span>Copiar Link</span>
@@ -1776,27 +1772,17 @@ async function initArenaApplication() {
     console.error('Erro na renderização inicial:', e);
   }
 
-  // 2. ⚡ SINCRONIZAÇÃO EM SEGUNDO PLANO COM A NUVEM (ArenaCloudSync & Supabase):
-  try {
-    if (typeof syncDataFromCloud === 'function') {
-      await Promise.race([
-        syncDataFromCloud(false),
-        new Promise(resolve => setTimeout(resolve, 1000))
-      ]);
-    }
-  } catch (e) {
-    console.warn('Aviso sincronização nuvem inicial:', e);
-  }
-
+  // 2. ⚡ SINCRONIZAÇÃO EM SEGUNDO PLANO COM O SUPABASE:
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       await Promise.race([
         syncDataFromSupabase(true),
-        new Promise(resolve => setTimeout(resolve, 800))
+        new Promise(resolve => setTimeout(resolve, 800)) // timeout de proteção de 800ms
       ]);
+      // Re-renderiza com dados atualizados da nuvem
       renderApp();
     } catch (e) {
-      console.warn('Aviso sincronização Supabase inicial:', e);
+      console.warn('Aviso sincronização inicial:', e);
     }
   }
 
@@ -1827,40 +1813,18 @@ async function initArenaApplication() {
     window.addEventListener(evt, unlockAudioAndNotif, { once: true });
   });
 
-  // 4. ⚡ Atualização inteligente ao sair/minimizar e voltar para a aba
+  // 4. ⚡ Atualização instantânea ao sair/minimizar e voltar para a aba (sem nenhum atraso)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-      if (typeof syncDataFromCloud === 'function') syncDataFromCloud();
       checkAndSyncBookingsBackground();
-      if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
-        window.ArenaSupabase.flushPendingQueue();
-      }
     }
   });
   window.addEventListener('focus', () => {
-    if (typeof syncDataFromCloud === 'function') syncDataFromCloud();
     checkAndSyncBookingsBackground();
-    if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
-      window.ArenaSupabase.flushPendingQueue();
-    }
   });
 
-  // ☁️ Sincronização contínua automática em nuvem (a cada 20 segundos) para todos os dispositivos
-  setInterval(() => {
-    if (typeof syncDataFromCloud === 'function') {
-      syncDataFromCloud();
-    }
-  }, 20000);
-
-  // Sincronização adicional suave com Supabase (60s) apenas para gestores logados
-  setInterval(() => {
-    if (typeof isManagerLoggedIn === 'function' && isManagerLoggedIn()) {
-      checkAndSyncBookingsBackground();
-      if (window.ArenaSupabase && window.ArenaSupabase.flushPendingQueue) {
-        window.ArenaSupabase.flushPendingQueue();
-      }
-    }
-  }, 60000);
+  // Polling inteligente em segundo plano para sincronizar agendamentos em tempo real sem estourar cota do Supabase
+  setInterval(checkAndSyncBookingsBackground, 25000);
 
   // 5. 🍪 Verificação de Cookies e Verificação de Login de 5 Horas
   if (window._pendingSessionExpiredNotice) {
@@ -2018,7 +1982,7 @@ function loadInitialData() {
 
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     const deletedBookingSet = getDeletedBookingIds();
-    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
+    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id) && !isBookingDateInThePast(b.date));
     cleanedLocal.forEach(b => {
       if (b && (b.id === 'ARENA-6776' || b.id === 'ARENA-9247')) {
         b.product_cart = {};
@@ -2108,10 +2072,7 @@ function loadInitialData() {
 
 
 function initCloudSync() {
-  // Sistema 100% Cloud Serverless no Vercel com sincronização autônoma
-  if (typeof syncDataFromCloud === 'function') {
-    syncDataFromCloud();
-  }
+  // Sistema 100% Cloud Serverless no Vercel integrado ao Supabase
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
     loadAdminUsers();
@@ -10993,118 +10954,64 @@ function renderAdminSubTabContent(tab) {
     return renderAdminCategoriesTab();
   }
   if (tab === 'database') {
-    const courtsCount = (state.courts || []).length;
-    const bookingsCount = (state.bookings || []).length;
-    const membersCount = (state.monthlyMembers || []).length;
-    const customersCount = (state.supabaseCustomers || []).length;
-
+    const cfg = window.ArenaSupabase ? window.ArenaSupabase.getConfig() : { url: 'https://brmclyukjfijommbxhks.supabase.co', anonKey: '', connected: false };
+    const prefillUrl = cfg.url || 'https://brmclyukjfijommbxhks.supabase.co';
     return `
-      <div class="space-y-6">
-        <!-- STATUS PRINCIPAL DA SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM -->
-        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="p-2 rounded-xl bg-emerald-100 text-emerald-800"><i data-lucide="cloud-check" class="w-6 h-6"></i></span>
-                <div>
-                  <h3 class="text-lg font-black text-slate-900">Sincronização em Nuvem (Arena Limoeiro Cloud)</h3>
-                  <p class="text-xs text-slate-500">Sistema 100% autônomo e automático — Não exige intervenção manual.</p>
-                </div>
-              </div>
-            </div>
-
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+          <div>
             <div class="flex items-center space-x-2">
-              <span class="px-3.5 py-1.5 rounded-full text-xs font-black flex items-center space-x-2 bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>🟢 Sincronização Automática Ativa</span>
-              </span>
+              <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="database" class="w-5 h-5"></i></span>
+              <h3 class="text-lg font-black text-slate-900">Vincular Banco de Dados Supabase (Nuvem / Vercel)</h3>
             </div>
+            <p class="text-xs text-slate-500 mt-1">Conecte o sistema ao seu projeto no Supabase para salvar quadras, clientes e agendamentos na nuvem.</p>
           </div>
 
-          <!-- BANNER INFORMATIVO CLARO E POSITIVO -->
-          <div class="p-4 bg-emerald-50/80 border border-emerald-200 rounded-2xl mb-6 shadow-xs">
-            <div class="flex items-start space-x-3">
-              <span class="text-2xl">☁️</span>
-              <div class="text-xs text-emerald-950 leading-relaxed flex-1">
-                <strong class="font-black text-sm block mb-1 text-emerald-900">Seus dados estão protegidos e sincronizados em tempo real!</strong>
-                <p class="text-slate-700 leading-normal">
-                  Todas as reservas, mensalistas, clientes, produtos e alterações de quadra são salvas imediatamente neste aparelho e sincronizadas automaticamente em nuvem a cada 20 segundos. Qualquer inserção ou exclusão feita por celular, computador ou pelo APK reflete instantaneamente em todos os outros dispositivos.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- GRID DE INDICADORES DE DADOS ATIVOS -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Quadras Ativas</span>
-              <span class="text-2xl font-black text-slate-900 mt-1 block">${courtsCount}</span>
-            </div>
-            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Agendamentos</span>
-              <span class="text-2xl font-black text-slate-900 mt-1 block">${bookingsCount}</span>
-            </div>
-            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Horários Fixos</span>
-              <span class="text-2xl font-black text-slate-900 mt-1 block">${membersCount}</span>
-            </div>
-            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Clientes Registrados</span>
-              <span class="text-2xl font-black text-slate-900 mt-1 block">${customersCount}</span>
-            </div>
-          </div>
-
-          <!-- MENSAGEM DINÂMICA DE STATUS -->
-          <div id="cloudSyncStatusMsg" class="hidden p-3.5 rounded-xl text-xs font-bold mb-4"></div>
-
-          <!-- BOTÕES DE CONTROLE RÁPIDO -->
-          <div class="flex flex-wrap items-center gap-3">
-            <button type="button" onclick="handleManualCloudSync()" class="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-md flex items-center space-x-2 transition-all cursor-pointer touch-manipulation">
-              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-              <span>🔄 Sincronizar com a Nuvem Agora</span>
-            </button>
-
-            <button type="button" onclick="handlePushAllToCloud()" class="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-2 transition-all cursor-pointer touch-manipulation">
-              <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-              <span>⬆️ Enviar Dados Deste Aparelho para Nuvem</span>
-            </button>
+          <div class="flex items-center space-x-2">
+            <span class="px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1.5 ${cfg.connected ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
+              <span class="w-2 h-2 rounded-full ${cfg.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
+              <span>${cfg.connected ? '🟢 Conectado ao Supabase' : '🟡 Aguardando Chave Anon'}</span>
+            </span>
           </div>
         </div>
 
-        <!-- SEÇÃO RETRÁTIL: CONFIGURAÇÕES ADICIONAIS DO SUPABASE (OPCIONAL) -->
-        <details class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm group">
-          <summary class="font-bold text-xs uppercase tracking-wider text-slate-600 cursor-pointer flex items-center justify-between select-none">
-            <span class="flex items-center space-x-2">
-              <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
-              <span>Configurações Opcionais de Banco Supabase Externo</span>
-            </span>
-            <span class="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
-          </summary>
-
-          <div class="pt-5 mt-4 border-t border-slate-100">
-            <p class="text-xs text-slate-500 mb-4">Caso possua um projeto dedicado próprio no Supabase e queira vinculá-lo como backup secundário adicional:</p>
-            
-            <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-4">
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">URL do Projeto Supabase</label>
-                <input type="url" id="supabaseUrlInput" value="${window.ArenaSupabase?.getConfig()?.url || ''}" placeholder="https://seu-projeto.supabase.co" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50">
-              </div>
-
-              <div>
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Chave Anon Pública (API Key)</label>
-                <input type="password" id="supabaseKeyInput" value="${window.ArenaSupabase?.getConfig()?.anonKey || ''}" placeholder="Cole aqui sua anon key" class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50">
-              </div>
-
-              <div id="supabaseStatusMsg" class="hidden p-3 rounded-xl text-xs font-bold"></div>
-
-              <div class="flex items-center gap-2 pt-2">
-                <button type="submit" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl">Salvar Chaves</button>
-                <button type="button" onclick="handleTestSupabaseConnection()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Testar Conexão</button>
-                <button type="button" onclick="openSqlScriptModal()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Ver Script SQL</button>
-              </div>
-            </form>
+        <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-8">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
+              <i data-lucide="globe" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
+              URL do Projeto Supabase (Project URL) *
+            </label>
+            <input type="url" id="supabaseUrlInput" required 
+                   value="${prefillUrl}" 
+                   placeholder="https://brmclyukjfijommbxhks.supabase.co" 
+                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50">
           </div>
-        </details>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
+              <i data-lucide="key" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
+              Chave Pública Anônima (Anon Key / Public API Key) *
+            </label>
+            <input type="password" id="supabaseKeyInput" required 
+                   value="${cfg.anonKey || ''}" 
+                   placeholder="Cole aqui sua chave anon" 
+                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50">
+          </div>
+
+          <div id="supabaseStatusMsg" class="hidden p-3.5 rounded-xl text-xs font-bold"></div>
+
+          <div class="pt-2 flex flex-wrap items-center gap-3">
+            <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span>Salvar & Conectar ao Supabase</span>
+            </button>
+
+            <button type="button" onclick="handleTestSupabaseConnection()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl flex items-center space-x-2 transition-all">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+              <span>Testar Conexão</span>
+            </button>
+          </div>
+        </form>
       </div>
     `;
   }
@@ -12711,11 +12618,6 @@ async function handleSaveCourtBadge(e, courtId) {
   }
   localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
 
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync && idx !== -1) {
-    window.ArenaCloudSync.push('save_court', state.courts[idx]);
-  }
-
   _refreshAllUI();
 
   // Salva no Supabase
@@ -13364,12 +13266,6 @@ async function handleCancelBooking(bookingId) {
     }
     localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
     try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
-  }
-
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync) {
-    idsToRemove.forEach(bId => window.ArenaCloudSync.push('delete_booking', { id: bId }));
-    if (memberId) window.ArenaCloudSync.push('delete_monthly_member', { id: memberId });
   }
 
   // Limpa seleções pendentes
@@ -14099,97 +13995,36 @@ async function handleDirectBookingSubmit(e) {
     if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
       try {
         const client = window.ArenaSupabase.getClient();
-        let insertedMem = false;
-        const { error: memErr } = await client.from('monthly_members').insert([memberRecord]);
-        if (memErr) {
-          console.warn('Aviso inserção mensalista Supabase:', memErr);
-          if (memErr.code === '23503') {
-            memberRecord.customer_id = null;
-            const { error: memErr2 } = await client.from('monthly_members').insert([memberRecord]);
-            if (!memErr2) insertedMem = true;
-          }
-        } else {
-          insertedMem = true;
-        }
-        if (!insertedMem && window.ArenaSupabase.addToPendingQueue) {
-          window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: memberRecord, id: memberRecord.id });
-        }
+        await client.from('monthly_members').insert([memberRecord]);
       } catch(e) {
         console.warn('Aviso inserção mensalista Supabase:', e);
-        if (window.ArenaSupabase?.addToPendingQueue) {
-          window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: memberRecord, id: memberRecord.id });
-        }
       }
-    } else if (window.ArenaSupabase?.addToPendingQueue) {
-      window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: memberRecord, id: memberRecord.id });
     }
   }
 
   // Salva no Supabase (Nuvem)
-  const supabaseDbPayloads = bookingsToCreate.map(b => {
-    const { customer_cpf, customerCPF, emergency_contact, ...cleanDb } = b;
-    return cleanDb;
-  });
-
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      let insertedBookings = false;
+      const supabaseDbPayloads = bookingsToCreate.map(b => {
+        const { customer_cpf, customerCPF, emergency_contact, ...cleanDb } = b;
+        return cleanDb;
+      });
+
       const { error: insErr } = await client.from('bookings').insert(supabaseDbPayloads);
       if (insErr) {
         console.warn('Aviso inserção booking admin Supabase:', insErr);
         if (insErr.code === '23503') {
           supabaseDbPayloads.forEach(p => p.customer_id = null);
-          const { error: insErr2 } = await client.from('bookings').insert(supabaseDbPayloads);
-          if (!insErr2) insertedBookings = true;
+          await client.from('bookings').insert(supabaseDbPayloads);
         }
-      } else {
-        insertedBookings = true;
-      }
-      if (!insertedBookings && window.ArenaSupabase.addToPendingQueue) {
-        supabaseDbPayloads.forEach(payload => {
-          window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
-        });
       }
       if (window.ArenaSupabase.broadcastBooking) {
         bookingsToCreate.forEach(b => window.ArenaSupabase.broadcastBooking(b));
       }
     } catch(err) {
-      console.warn('Erro ao salvar no Supabase, adicionando à fila offline:', err);
-      if (window.ArenaSupabase?.addToPendingQueue) {
-        supabaseDbPayloads.forEach(payload => {
-          window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
-        });
-      }
+      console.warn('Erro ao salvar no Supabase:', err);
     }
-  } else if (window.ArenaSupabase?.addToPendingQueue) {
-    supabaseDbPayloads.forEach(payload => {
-      window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload, id: payload.id });
-    });
-  }
-
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync) {
-    if (bookingType === 'mensalista') {
-      const weekDaysMap = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
-      const baseDateObj = new Date(sy, sm - 1, sd);
-      const dayOfWeekId = weekDaysMap[baseDateObj.getDay()];
-      window.ArenaCloudSync.push('save_monthly_member', {
-        id: 'mensal-' + Date.now(),
-        team_name: name,
-        responsible_name: name,
-        phone: phone,
-        court_id: courtId,
-        day_of_week: dayOfWeekId,
-        time: startTime,
-        start_time: startTime,
-        end_time: endTime,
-        monthly_price: courtPrice * 4,
-        status: 'active'
-      });
-    }
-    bookingsToCreate.forEach(b => window.ArenaCloudSync.push('save_booking', b));
-    if (savedCust) window.ArenaCloudSync.push('save_customer', savedCust);
   }
 
   // Atualiza cache local de clientes
@@ -15711,11 +15546,6 @@ async function handleSaveEditMatch(event, matchId) {
       localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
     } catch(e) {}
 
-    // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-    if (window.ArenaCloudSync && bIdx >= 0 && state.bookings[bIdx]) {
-      window.ArenaCloudSync.push('save_booking', state.bookings[bIdx]);
-    }
-
     // Fecha a janela modal
     closeModal();
 
@@ -16040,14 +15870,6 @@ async function handleMonthlySubmit(event, editId) {
           await client.from('bookings').insert(bookingsToCreate);
         }
       }
-
-      // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-      if (window.ArenaCloudSync) {
-        window.ArenaCloudSync.push('save_monthly_member', memberRecord);
-        if (bookingsToCreate.length > 0) {
-          bookingsToCreate.forEach(b => window.ArenaCloudSync.push('save_booking', b));
-        }
-      }
     } catch(err) {
       console.warn('Aviso ao gerar reservas de mensalista:', err);
     }
@@ -16131,12 +15953,6 @@ async function deleteMonthlyMember(id) {
       local = local.filter(b => b && !idsToRemove.includes(b.id) && !idsToRemove.includes(String(b.id)));
       localStorage.setItem('arena_local_bookings', JSON.stringify(local));
     } catch(e) {}
-  }
-
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync) {
-    window.ArenaCloudSync.push('delete_monthly_member', { id });
-    idsToRemove.forEach(bId => window.ArenaCloudSync.push('delete_booking', { id: bId }));
   }
 
   // 4. Deleta do Supabase (monthly_members e bookings)
@@ -17775,11 +17591,6 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     badge_auto_freq: existingSpecs.badge_auto_freq || 'weekly'
   };
 
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync) {
-    window.ArenaCloudSync.push('save_court', savedCourt);
-  }
-
   closeModal();
 
   if (isEditing) {
@@ -17806,42 +17617,44 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     showNotification(isEditing ? `Quadra "${name}" atualizada com sucesso!` : `Quadra "${name}" criada com sucesso!`, 'success');
   }
 
-  const courtDbPayload = {
-    id: isEditing ? courtIdToEdit : id,
-    name,
-    category,
-    category_label: savedCourt.categoryLabel,
-    base_price_per_hour: price,
-    monthly_price: monthlyPrice,
-    description,
-    observation,
-    image: savedCourt.image,
-    specs: savedCourt.specs,
-    badge: savedCourt.badge,
-    order_index: isEditing ? (existingCourt?.order_index || existingCourt?.orderIndex || 1) : state.courts.length
-  };
-
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
-      const { error } = await client.from('courts').upsert([courtDbPayload], { onConflict: 'id' });
-      if (error) {
-        console.warn('Erro ao salvar quadra no Supabase:', error);
-        if (window.ArenaSupabase?.addToPendingQueue) {
-          window.ArenaSupabase.addToPendingQueue({ table: 'courts', action: 'upsert', payload: courtDbPayload, id: courtDbPayload.id });
-        }
+      if (isEditing) {
+        await client.from('courts').update({
+          name, 
+          category, 
+          category_label: savedCourt.categoryLabel,
+          base_price_per_hour: price, 
+          monthly_price: monthlyPrice,
+          description, 
+          observation, 
+          image: savedCourt.image, 
+          specs: savedCourt.specs,
+          badge: savedCourt.badge
+        }).eq('id', courtIdToEdit);
+      } else {
+        await client.from('courts').insert([{
+          id, 
+          name, 
+          category, 
+          category_label: savedCourt.categoryLabel,
+          base_price_per_hour: price, 
+          monthly_price: monthlyPrice,
+          description, 
+          observation, 
+          image: savedCourt.image, 
+          specs: savedCourt.specs,
+          badge: savedCourt.badge,
+          order_index: state.courts.length
+        }]);
       }
       if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
         window.ArenaSupabase.broadcastCourtUpdate(savedCourt);
       }
     } catch(e) {
-      console.warn('Erro de rede ao salvar quadra no Supabase:', e);
-      if (window.ArenaSupabase?.addToPendingQueue) {
-        window.ArenaSupabase.addToPendingQueue({ table: 'courts', action: 'upsert', payload: courtDbPayload, id: courtDbPayload.id });
-      }
+      console.warn('Erro ao salvar quadra no Supabase:', e);
     }
-  } else if (window.ArenaSupabase?.addToPendingQueue) {
-    window.ArenaSupabase.addToPendingQueue({ table: 'courts', action: 'upsert', payload: courtDbPayload, id: courtDbPayload.id });
   }
 }
 
@@ -17861,11 +17674,6 @@ async function deleteCourt(courtId, fromModal = false) {
     localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
   } catch(e) {
     console.warn('Erro ao salvar quadras no localStorage:', e);
-  }
-
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync) {
-    window.ArenaCloudSync.push('push_all', { courts: state.courts });
   }
 
   if (fromModal || document.getElementById('modalRoot')?.innerHTML) {
@@ -19515,56 +19323,27 @@ async function submitBooking(grandTotal) {
 
       // Insere no Supabase garantindo que nunca quebre por Foreign Key
       if (isMensal) {
-        let insertedMem = false;
         const { error: insErr } = await client.from('monthly_members').insert([dbMemberPayload]);
         if (insErr) {
           console.warn('Aviso inserção mensalista Supabase:', insErr);
           if (insErr.code === '23503') {
             dbMemberPayload.customer_id = null;
-            const { error: insErr2 } = await client.from('monthly_members').insert([dbMemberPayload]);
-            if (!insErr2) insertedMem = true;
+            await client.from('monthly_members').insert([dbMemberPayload]);
           }
-        } else {
-          insertedMem = true;
-        }
-        if (!insertedMem && window.ArenaSupabase?.addToPendingQueue) {
-          window.ArenaSupabase.addToPendingQueue({ table: 'monthly_members', action: 'upsert', payload: dbMemberPayload, id: dbMemberPayload.id });
         }
       } else {
-        let insertedBooking = false;
         const { error: insErr } = await client.from('bookings').insert([dbBookingPayload]);
         if (insErr) {
           console.warn('Aviso inserção booking Supabase:', insErr);
           if (insErr.code === '23503') {
             dbBookingPayload.customer_id = null;
-            const { error: insErr2 } = await client.from('bookings').insert([dbBookingPayload]);
-            if (!insErr2) insertedBooking = true;
+            await client.from('bookings').insert([dbBookingPayload]);
           }
-        } else {
-          insertedBooking = true;
-        }
-        if (!insertedBooking && window.ArenaSupabase?.addToPendingQueue) {
-          window.ArenaSupabase.addToPendingQueue({ table: 'bookings', action: 'upsert', payload: dbBookingPayload, id: dbBookingPayload.id });
         }
       }
     } catch (err) {
-      console.warn('Erro na conexão com Supabase, salvando localmente e enfileirando:', err);
-      if (window.ArenaSupabase?.addToPendingQueue) {
-        window.ArenaSupabase.addToPendingQueue({
-          table: isMensal ? 'monthly_members' : 'bookings',
-          action: 'upsert',
-          payload: isMensal ? dbMemberPayload : dbBookingPayload,
-          id: isMensal ? dbMemberPayload.id : dbBookingPayload.id
-        });
-      }
+      console.warn('Erro na conexão com Supabase, salvando localmente:', err);
     }
-  } else if (window.ArenaSupabase?.addToPendingQueue) {
-    window.ArenaSupabase.addToPendingQueue({
-      table: isMensal ? 'monthly_members' : 'bookings',
-      action: 'upsert',
-      payload: isMensal ? dbMemberPayload : dbBookingPayload,
-      id: isMensal ? dbMemberPayload.id : dbBookingPayload.id
-    });
   }
 
   // 4. Atualiza estado em memória e localStorage com garantia de compatibilidade
@@ -19600,15 +19379,6 @@ async function submitBooking(grandTotal) {
     const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
     localBookings.push(unifiedBooking);
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
-  }
-
-  // ☁️ Sincronização Automática em Nuvem Instantânea (Sem Intervenção)
-  if (window.ArenaCloudSync) {
-    if (isMensal) {
-      window.ArenaCloudSync.push('save_monthly_member', dbMemberPayload);
-    }
-    window.ArenaCloudSync.push('save_booking', unifiedBooking);
-    window.ArenaCloudSync.push('save_customer', customerRecord);
   }
 
   // 5. Finaliza com sucesso
@@ -19979,65 +19749,7 @@ function initEventListeners() {
   });
 }
 
-// ==============================================================================
-// ☁️ HANDLERS DA SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM
-// ==============================================================================
-async function handleManualCloudSync() {
-  const statusMsg = document.getElementById('cloudSyncStatusMsg');
-  if (statusMsg) {
-    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
-    statusMsg.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
-    statusMsg.innerText = '⏳ Sincronizando com a nuvem...';
-  }
-  await syncDataFromCloud();
-  if (statusMsg) {
-    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mb-4';
-    statusMsg.innerText = '✓ Sincronização concluída! Todos os dados estão atualizados.';
-    setTimeout(() => {
-      renderStepContent();
-    }, 1200);
-  }
-}
-window.handleManualCloudSync = handleManualCloudSync;
-
-async function handlePushAllToCloud() {
-  const statusMsg = document.getElementById('cloudSyncStatusMsg');
-  if (!window.ArenaCloudSync) {
-    alert('Motor de sincronização em nuvem não carregado.');
-    return;
-  }
-  if (!confirm('Deseja enviar todos os dados salvos neste dispositivo (quadras, clientes, agendamentos, mensalistas e produtos) para a nuvem da Arena Limoeiro agora?')) return;
-
-  if (statusMsg) {
-    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
-    statusMsg.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
-    statusMsg.innerText = '⏳ Enviando todos os dados deste dispositivo para a nuvem...';
-  }
-
-  const ok = await window.ArenaCloudSync.push('push_all', {
-    courts: state.courts,
-    products: state.products,
-    customers: state.supabaseCustomers,
-    monthlyMembers: state.monthlyMembers,
-    bookings: state.bookings,
-    waterSupply: state.waterSupply
-  });
-
-  if (statusMsg) {
-    statusMsg.className = ok
-      ? 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 mb-4'
-      : 'p-3.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 mb-4';
-    statusMsg.innerText = ok 
-      ? '✓ Todos os dados deste aparelho foram salvos na nuvem com sucesso!'
-      : 'Aviso: Os dados foram salvos localmente e serão enviados assim que houver rede.';
-    setTimeout(() => {
-      renderStepContent();
-    }, 1500);
-  }
-}
-window.handlePushAllToCloud = handlePushAllToCloud;
-
-// Handlers para Vinculação do Banco de Dados Supabase (Opcional)
+// Handlers para Vinculação do Banco de Dados Supabase
 async function handleSaveSupabaseConfig(event) {
   event.preventDefault();
   const url = document.getElementById('supabaseUrlInput').value.trim();
@@ -20099,255 +19811,6 @@ function handleDisconnectSupabase() {
     renderStepContent();
   }
 }
-
-async function handlePushAllToSupabase() {
-  const statusMsg = document.getElementById('supabaseStatusMsg');
-  if (!window.ArenaSupabase) return;
-  const client = window.ArenaSupabase.getClient();
-  if (!client) {
-    alert('Supabase não conectado. Configure a URL e a Chave antes.');
-    return;
-  }
-
-  if (!confirm('Deseja enviar todos os dados salvos localmente (quadras, clientes, agendamentos, mensalistas e produtos) para o Supabase agora?\n\nIsso atualizará o banco na nuvem com todas as informações deste dispositivo.')) return;
-
-  if (statusMsg) {
-    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
-    statusMsg.classList.add('bg-blue-50', 'text-blue-800', 'border', 'border-blue-200');
-    statusMsg.innerText = '⏳ Enviando dados locais para o Supabase... Aguarde...';
-  }
-
-  const localCourts = JSON.parse(localStorage.getItem('arena_local_courts') || 'null') || state.courts || [];
-  const localProducts = JSON.parse(localStorage.getItem('arena_local_products') || 'null') || state.products || [];
-  const localCusts = JSON.parse(localStorage.getItem('arena_customers') || 'null') || state.supabaseCustomers || [];
-  const localMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || 'null') || state.monthlyMembers || [];
-  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || 'null') || state.bookings || [];
-  const waterSupply = state.waterSupply;
-
-  const res = await window.ArenaSupabase.pushAllLocalData({
-    courts: localCourts,
-    products: localProducts,
-    customers: localCusts,
-    monthlyMembers: localMonthly,
-    bookings: localBookings,
-    waterSupply
-  });
-
-  if (statusMsg) {
-    if (res.success) {
-      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
-      statusMsg.innerText = '✓ ' + res.message;
-    } else {
-      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
-      statusMsg.innerText = '⚠️ ' + res.message;
-    }
-  }
-  alert(res.message);
-  renderStepContent();
-}
-
-async function handlePullFromSupabase() {
-  const statusMsg = document.getElementById('supabaseStatusMsg');
-  if (statusMsg) {
-    statusMsg.classList.remove('hidden');
-    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200';
-    statusMsg.innerText = '⏳ Baixando dados do Supabase...';
-  }
-  await syncDataFromSupabase();
-  if (statusMsg) {
-    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
-    statusMsg.innerText = '✓ Dados do Supabase sincronizados com sucesso!';
-  }
-  alert('✓ Dados sincronizados do Supabase com sucesso!');
-  renderStepContent();
-}
-
-async function handleFlushQueue() {
-  if (!window.ArenaSupabase) return;
-  const res = await window.ArenaSupabase.flushPendingQueue();
-  alert(`Fila offline processada: ${res.flushed} itens enviados com sucesso. Restantes: ${res.remaining}`);
-  renderStepContent();
-}
-
-function openSqlScriptModal() {
-  const modalRoot = document.getElementById('modalRoot');
-  if (!modalRoot) return;
-
-  const sqlSample = `-- 🏟️ ARENA LIMOEIRO - BANCO DE DADOS (SUPABASE SQL)
--- Copie todo o conteúdo abaixo e execute no SQL Editor do seu projeto Supabase:
-
-CREATE TABLE IF NOT EXISTS public.customers (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    email TEXT,
-    document TEXT,
-    notes TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.courts (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL,
-    category_label TEXT NOT NULL,
-    image TEXT,
-    base_price_per_hour NUMERIC(10,2) NOT NULL DEFAULT 90.00,
-    monthly_price NUMERIC(10,2) NOT NULL DEFAULT 500.00,
-    badge TEXT,
-    bookings_count INTEGER DEFAULT 0,
-    order_index INTEGER DEFAULT 1,
-    description TEXT,
-    observation TEXT,
-    specs JSONB DEFAULT '{}'::jsonb,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.products (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    category TEXT NOT NULL DEFAULT 'Bebidas',
-    type TEXT NOT NULL DEFAULT 'product',
-    price NUMERIC(10,2) NOT NULL DEFAULT 5.00,
-    unit TEXT DEFAULT 'unid.',
-    image TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.monthly_members (
-    id TEXT PRIMARY KEY,
-    team_name TEXT NOT NULL,
-    responsible_name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
-    court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
-    day_of_week TEXT NOT NULL,
-    day_of_week_label TEXT NOT NULL,
-    time TEXT NOT NULL,
-    start_time TEXT,
-    end_time TEXT,
-    monthly_price NUMERIC(10,2) NOT NULL,
-    status TEXT DEFAULT 'active',
-    start_month TEXT,
-    observation TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.bookings (
-    id TEXT PRIMARY KEY,
-    court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
-    customer_id TEXT REFERENCES public.customers(id) ON DELETE SET NULL,
-    date TEXT NOT NULL,
-    start_time TEXT NOT NULL,
-    end_time TEXT NOT NULL,
-    time TEXT NOT NULL,
-    duration INTEGER NOT NULL DEFAULT 60,
-    customer_name TEXT NOT NULL,
-    customer_phone TEXT NOT NULL,
-    total_price NUMERIC(10,2) NOT NULL,
-    status TEXT DEFAULT 'confirmed',
-    booking_type TEXT DEFAULT 'avulso',
-    payment_method TEXT DEFAULT 'pix',
-    product_cart JSONB DEFAULT '{}'::jsonb,
-    observation TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.admin_users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Gerente do Sistema',
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS public.blocked_slots (
-    id SERIAL PRIMARY KEY,
-    court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
-    reason TEXT DEFAULT 'Manutenção',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT unique_court_date_time UNIQUE (court_id, date, time)
-);
-
-GRANT ALL ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.courts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.monthly_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.blocked_slots ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Permitir gerenciamento completo de quadras" ON public.courts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir gerenciamento completo de produtos" ON public.products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir gerenciamento completo de clientes" ON public.customers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir gerenciamento completo de agendamentos" ON public.bookings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir gerenciamento completo de mensalistas" ON public.monthly_members FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir gerenciamento completo de bloqueios" ON public.blocked_slots FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir gerenciamento completo de gestores" ON public.admin_users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-BEGIN;
-  DROP PUBLICATION IF EXISTS supabase_realtime;
-  CREATE PUBLICATION supabase_realtime FOR TABLE public.bookings, public.courts, public.monthly_members, public.blocked_slots, public.products, public.customers;
-COMMIT;`;
-
-  modalRoot.innerHTML = `
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-      <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-100">
-        <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <div class="flex items-center space-x-2">
-            <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="database" class="w-5 h-5"></i></span>
-            <h3 class="text-base font-black text-slate-900">Script SQL do Banco Supabase (schema.sql)</h3>
-          </div>
-          <button onclick="closeModal()" class="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-200">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-
-        <div class="p-6 overflow-y-auto flex-1 space-y-4">
-          <p class="text-xs text-slate-600">Copie este script e execute no menu <strong>SQL Editor</strong> do seu projeto Supabase para criar ou recriar todas as tabelas, permissões e políticas da Arena Limoeiro:</p>
-          <textarea id="sqlScriptContent" readonly class="w-full h-80 p-4 font-mono text-xs bg-slate-900 text-emerald-400 rounded-xl border border-slate-700 focus:outline-none select-all">${sqlSample}</textarea>
-        </div>
-
-        <div class="p-4 border-t border-slate-100 flex items-center justify-end space-x-3 bg-slate-50">
-          <button onclick="copySqlScript()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center space-x-2">
-            <i data-lucide="copy" class="w-4 h-4"></i>
-            <span>Copiar Código SQL</span>
-          </button>
-          <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-xl">
-            Fechar
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  if (window.lucide) lucide.createIcons();
-}
-
-function copySqlScript() {
-  const ta = document.getElementById('sqlScriptContent');
-  if (ta) {
-    ta.select();
-    navigator.clipboard.writeText(ta.value).then(() => {
-      alert('✓ Código SQL copiado para a área de transferência! Cole no SQL Editor do seu projeto Supabase.');
-    }).catch(() => {
-      document.execCommand('copy');
-      alert('✓ Código SQL copiado! Cole no SQL Editor do seu projeto Supabase.');
-    });
-  }
-}
-
-window.handlePushAllToSupabase = handlePushAllToSupabase;
-window.handlePullFromSupabase = handlePullFromSupabase;
-window.handleFlushQueue = handleFlushQueue;
-window.openSqlScriptModal = openSqlScriptModal;
-window.copySqlScript = copySqlScript;
 
 async function loadSupabaseCustomers() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
@@ -20645,92 +20108,8 @@ async function requestNotificationPermission() {
   }
 }
 
-// ==============================================================================
-// ☁️ SINCRONIZAÇÃO AUTOMÁTICA EM NUVEM (TRANSPARENTE E TOTALMENTE AUTÔNOMA)
-// Sincroniza dados em tempo real entre celular, APK e PC sem exigir intervenção do usuário
-// ==============================================================================
-async function syncDataFromCloud(skipRender = false) {
-  if (!window.ArenaCloudSync) return;
-  try {
-    const cloud = await window.ArenaCloudSync.pull();
-    if (!cloud) return;
-
-    let updated = false;
-
-    // 1. Quadras
-    if (Array.isArray(cloud.courts) && cloud.courts.length > 0) {
-      state.courts = cloud.courts.map(normalizeCourt);
-      localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
-      updated = true;
-    }
-
-    // 2. Produtos & Água
-    if (Array.isArray(cloud.products) && cloud.products.length > 0) {
-      state.products = cloud.products;
-      localStorage.setItem('arena_local_products', JSON.stringify(state.products));
-      updated = true;
-    }
-    if (cloud.waterSupply && typeof cloud.waterSupply === 'object') {
-      state.waterSupply = { ...state.waterSupply, ...cloud.waterSupply };
-      localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
-      updated = true;
-    }
-
-    // 3. Mensalistas (Horários Fixos)
-    if (Array.isArray(cloud.monthlyMembers) && cloud.monthlyMembers.length > 0) {
-      const deletedBookingSet = getDeletedBookingIds();
-      const validMembers = cloud.monthlyMembers.filter(m => m && m.id && !deletedBookingSet.has(String(m.id)));
-      state.monthlyMembers = validMembers;
-      localStorage.setItem('arena_monthly_members', JSON.stringify(validMembers));
-      updated = true;
-    }
-
-    // 4. Agendamentos (Preserva locais pendentes e mescla com a nuvem)
-    if (Array.isArray(cloud.bookings)) {
-      const deletedBookingSet = getDeletedBookingIds();
-      const validCloudBookings = cloud.bookings.filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
-      
-      const map = new Map();
-      validCloudBookings.forEach(b => map.set(b.id, b));
-      (state.bookings || []).forEach(b => {
-        if (b && b.id && !map.has(b.id) && !deletedBookingSet.has(String(b.id))) {
-          map.set(b.id, b);
-          // Aproveita para enviar para a nuvem em segundo plano
-          window.ArenaCloudSync.push('save_booking', b);
-        }
-      });
-      state.bookings = Array.from(map.values());
-      localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
-      updated = true;
-    }
-
-    // 5. Clientes
-    if (Array.isArray(cloud.customers) && cloud.customers.length > 0) {
-      state.supabaseCustomers = cloud.customers.map(normalizeCustomer);
-      localStorage.setItem('arena_customers', JSON.stringify(state.supabaseCustomers));
-      updated = true;
-    }
-
-    // 6. Esvazia fila offline
-    window.ArenaCloudSync.flushQueue();
-
-    if (updated && !skipRender) {
-      requestSchedule();
-      if (typeof renderCurrentSubTab === 'function') renderCurrentSubTab();
-      if (typeof renderBookingsList === 'function') renderBookingsList();
-      if (typeof renderCourtsList === 'function') renderCourtsList();
-      if (state.currentMode === 'admin' && typeof renderStepContent === 'function') renderStepContent();
-    }
-  } catch (err) {
-    console.warn('Aviso sincronização nuvem autônoma:', err);
-  }
-}
-window.syncDataFromCloud = syncDataFromCloud;
 
 async function syncDataFromSupabase(skipRender = false) {
-  // Sincroniza também com a nuvem automática autônoma
-  syncDataFromCloud(skipRender);
-
   if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
   const client = window.ArenaSupabase.getClient();
   if (!client) return;
@@ -20789,7 +20168,7 @@ async function syncDataFromSupabase(skipRender = false) {
       localStorage.setItem('arena_local_products', JSON.stringify(filteredProducts));
     }
 
-    if (Array.isArray(dbMembers)) {
+    if (Array.isArray(dbMembers) && dbMembers.length > 0) {
       const validDbMembers = dbMembers.filter(m => {
         if (!m || !m.id) return false;
         const idStr = String(m.id);
@@ -20797,16 +20176,19 @@ async function syncDataFromSupabase(skipRender = false) {
         if (isBookingDeleted(idStr)) return false;
         return true;
       });
-      state.monthlyMembers = validDbMembers;
-      localStorage.setItem('arena_monthly_members', JSON.stringify(validDbMembers));
-      try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
+      if (validDbMembers.length > 0) {
+        state.monthlyMembers = validDbMembers;
+        localStorage.setItem('arena_monthly_members', JSON.stringify(validDbMembers));
+      }
     }
 
-    if (dbBookings) {
+    if (dbBookings && Array.isArray(dbBookings) && dbBookings.length > 0) {
       const deletedBookingSet = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
-      state.bookings = validDbBookings;
-      localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !isBookingDateInThePast(b.date));
+      if (validDbBookings.length > 0) {
+        state.bookings = validDbBookings;
+        localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
+      }
 
       const maintFromDb = dbBookings
         .filter(b => b.booking_type === 'manutencao' || b.bookingType === 'manutencao')
@@ -20978,7 +20360,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20998,7 +20380,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -21014,7 +20396,7 @@ async function syncDataFromSupabase(skipRender = false) {
           const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -21128,7 +20510,7 @@ async function checkAndSyncBookingsBackground() {
 
     if (dbBookings && !error) {
       const delIds = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
       const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
       const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
 
@@ -21152,8 +20534,8 @@ async function checkAndSyncBookingsBackground() {
       }
     }
 
-    // Sincroniza mensalistas / planos fixos em segundo plano
-    if (Array.isArray(dbMonthlyMembers)) {
+    // Sincroniza mensalistas / planos fixos em segundo plano (proteção contra perda de dados)
+    if (Array.isArray(dbMonthlyMembers) && dbMonthlyMembers.length > 0) {
       const validMonthly = dbMonthlyMembers.filter(m => {
         if (!m || !m.id) return false;
         const idStr = String(m.id);
@@ -21161,13 +20543,14 @@ async function checkAndSyncBookingsBackground() {
         if (isBookingDeleted(idStr)) return false;
         return true;
       });
-      const currentIds = (state.monthlyMembers || []).map(m => String(m.id)).sort().join(',');
-      const newIds = validMonthly.map(m => String(m.id)).sort().join(',');
-      if (currentIds !== newIds) {
-        state.monthlyMembers = validMonthly;
-        localStorage.setItem('arena_monthly_members', JSON.stringify(validMonthly));
-        try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
-        _refreshAllUI();
+      if (validMonthly.length > 0) {
+        const currentIds = (state.monthlyMembers || []).map(m => String(m.id)).sort().join(',');
+        const newIds = validMonthly.map(m => String(m.id)).sort().join(',');
+        if (currentIds !== newIds) {
+          state.monthlyMembers = validMonthly;
+          localStorage.setItem('arena_monthly_members', JSON.stringify(validMonthly));
+          _refreshAllUI();
+        }
       }
     }
 

@@ -1,7 +1,6 @@
 -- ==============================================================================
--- 🏟️ ARENA LIMOEIRO - BANCO DE DADOS POSTGRESQL (SUPABASE OFICIAL)
--- Execute este script no SQL Editor do seu projeto Supabase para criar ou atualizar
--- a estrutura completa com todas as tabelas, permissões RLS e dados reais das quadras.
+-- 🏟️ ARENA LIMOEIRO - BANCO DE DADOS POSTGRESQL (SUPABASE)
+-- Execute este script no SQL Editor do seu projeto Supabase para criar a estrutura completa.
 -- ==============================================================================
 
 -- 1. TABELA DE CLIENTES (CADASTRO SEPARADO)
@@ -22,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.courts (
     category TEXT NOT NULL,
     category_label TEXT NOT NULL,
     image TEXT,
-    base_price_per_hour NUMERIC(10,2) NOT NULL DEFAULT 90.00,
+    base_price_per_hour NUMERIC(10,2) NOT NULL DEFAULT 140.00,
     monthly_price NUMERIC(10,2) NOT NULL DEFAULT 500.00,
     badge TEXT,
     bookings_count INTEGER DEFAULT 0,
@@ -33,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.courts (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. TABELA DE PRODUTOS & ITENS DE BAR (INCLUINDO ESTOQUE DE ÁGUA)
+-- 3. TABELA DE PRODUTOS & ITENS DE BAR
 CREATE TABLE IF NOT EXISTS public.products (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
@@ -92,11 +91,11 @@ CREATE TABLE IF NOT EXISTS public.admin_users (
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Gerente do Sistema',
+    role TEXT NOT NULL DEFAULT 'Atendente da Recepção',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 7. TABELA DE HORÁRIOS BLOQUEADOS (MANUTENÇÃO / TREINOS FECHADOS)
+-- 7. TABELA DE HORÁRIOS BLOQUEADOS (MANUTENÇÃO)
 CREATE TABLE IF NOT EXISTS public.blocked_slots (
     id SERIAL PRIMARY KEY,
     court_id TEXT REFERENCES public.courts(id) ON DELETE CASCADE,
@@ -108,12 +107,8 @@ CREATE TABLE IF NOT EXISTS public.blocked_slots (
 );
 
 -- ==============================================================================
--- 🔒 PERMISSÕES E POLÍTICAS DE SEGURANÇA (ROW LEVEL SECURITY - RLS)
+-- 🔒 POLÍTICAS DE SEGURANÇA (ROW LEVEL SECURITY - RLS)
 -- ==============================================================================
-GRANT ALL ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.courts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -122,49 +117,61 @@ ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.blocked_slots ENABLE ROW LEVEL SECURITY;
 
--- Limpeza de políticas anteriores
+-- Políticas públicas
 DROP POLICY IF EXISTS "Permitir leitura pública de quadras" ON public.courts;
+CREATE POLICY "Permitir leitura pública de quadras" ON public.courts FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Permitir leitura pública de produtos" ON public.products;
+CREATE POLICY "Permitir leitura pública de produtos" ON public.products FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Permitir leitura pública de agendamentos" ON public.bookings;
+CREATE POLICY "Permitir leitura pública de agendamentos" ON public.bookings FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Permitir inserção de agendamentos" ON public.bookings;
+CREATE POLICY "Permitir inserção de agendamentos" ON public.bookings FOR INSERT WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Permitir leitura pública de clientes" ON public.customers;
+CREATE POLICY "Permitir leitura pública de clientes" ON public.customers FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Permitir inserção de clientes" ON public.customers;
+CREATE POLICY "Permitir inserção de clientes" ON public.customers FOR INSERT WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Permitir leitura pública de mensalistas" ON public.monthly_members;
+CREATE POLICY "Permitir leitura pública de mensalistas" ON public.monthly_members FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Permitir inserção de mensalistas" ON public.monthly_members;
+CREATE POLICY "Permitir inserção de mensalistas" ON public.monthly_members FOR INSERT WITH CHECK (true);
+
 DROP POLICY IF EXISTS "Permitir leitura pública de bloqueios" ON public.blocked_slots;
+CREATE POLICY "Permitir leitura pública de bloqueios" ON public.blocked_slots FOR SELECT USING (true);
+
 DROP POLICY IF EXISTS "Permitir leitura de gestores" ON public.admin_users;
+CREATE POLICY "Permitir leitura de gestores" ON public.admin_users FOR SELECT USING (true);
+
+-- Modificações gerais
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de quadras" ON public.courts;
+CREATE POLICY "Permitir gerenciamento completo de quadras" ON public.courts FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de produtos" ON public.products;
+CREATE POLICY "Permitir gerenciamento completo de produtos" ON public.products FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de mensalistas" ON public.monthly_members;
+CREATE POLICY "Permitir gerenciamento completo de mensalistas" ON public.monthly_members FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de bloqueios" ON public.blocked_slots;
+CREATE POLICY "Permitir gerenciamento completo de bloqueios" ON public.blocked_slots FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de gestores" ON public.admin_users;
+CREATE POLICY "Permitir gerenciamento completo de gestores" ON public.admin_users FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de clientes" ON public.customers;
+CREATE POLICY "Permitir gerenciamento completo de clientes" ON public.customers FOR ALL USING (true);
+
 DROP POLICY IF EXISTS "Permitir gerenciamento completo de agendamentos" ON public.bookings;
-
--- Políticas universais de leitura e escrita para anon e authenticated
-CREATE POLICY "Permitir gerenciamento completo de quadras" 
-ON public.courts FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir gerenciamento completo de produtos" 
-ON public.products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir gerenciamento completo de clientes" 
-ON public.customers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir gerenciamento completo de agendamentos" 
-ON public.bookings FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir gerenciamento completo de mensalistas" 
-ON public.monthly_members FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir gerenciamento completo de bloqueios" 
-ON public.blocked_slots FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-
-CREATE POLICY "Permitir gerenciamento completo de gestores" 
-ON public.admin_users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir gerenciamento completo de agendamentos" ON public.bookings FOR ALL USING (true);
 
 -- ==============================================================================
--- ⚡ ATIVAÇÃO DO SUPABASE REALTIME (WEBSOCKETS)
+-- ⚡ ATIVAÇÃO DO SUPABASE REALTIME
 -- ==============================================================================
 BEGIN;
   DROP PUBLICATION IF EXISTS supabase_realtime;
@@ -178,123 +185,108 @@ BEGIN;
 COMMIT;
 
 -- ==============================================================================
--- 🌱 DADOS INICIAIS (6 QUADRAS REAIS DA ARENA LIMOEIRO + ADMINISTRADORES)
+-- 🌱 DADOS INICIAIS (SEEDS DA ARENA LIMOEIRO)
 -- ==============================================================================
 INSERT INTO public.admin_users (id, name, email, password, role)
 VALUES 
-  ('admin-1', 'Gabriel Alves', 'admin@arenalimoeiro.com.br', 'Alves@157620', 'Administrador Geral'),
-  ('admin-1788989952703', 'Vinicius Melo', 'vinicius.melo@arenalimoeiro.com.br', 'vinicius@2026!', 'Gerente do Sistema')
-ON CONFLICT (id) DO UPDATE SET 
-  name = EXCLUDED.name,
-  password = EXCLUDED.password,
-  role = EXCLUDED.role;
+  ('admin-1', 'Administrador Geral', 'admin@arenalimoeiro.com.br', 'admin123', 'Administrador Geral'),
+  ('admin-2', 'Recepção & Atendimento', 'recepcao@arenalimoeiro.com.br', 'arena123', 'Atendente da Recepção')
+ON CONFLICT (email) DO NOTHING;
 
--- As 6 Quadras Reais da Arena Limoeiro
 INSERT INTO public.courts (id, name, category, category_label, image, base_price_per_hour, monthly_price, badge, bookings_count, order_index, description, observation, specs)
 VALUES
 (
   'court-society-1',
-  'FUT 5 - SOCCER 5',
-  'poliesportiva',
-  'Quadra Poliesportiva',
+  'Campo Society 01 - Grama Sintética Premium',
+  'society',
+  'Futebol Society',
   'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80',
-  90.00,
+  140.00,
   500.00,
-  '🔥 Mais Agendada da Semana',
+  '🔥 Mais Agendado da Semana',
   48,
   1,
-  'Espaço projetado para jogos ágeis e de muita movimentação. Com dimensões otimizadas para o futebol rápido, possui amortecimento e excelente absorção de impacto.',
+  'Campo de futebol society de alto padrão com dimensões oficiais, grama monofilamento macia e excelente drenagem.',
   'Permitido apenas chuteiras society ou tênis (proibido travas de campo).',
-  '{"type": "Grama Sintética 60mm", "surface": "Grama Sintética 60mm", "capacity": "10 a 12 Jogadores", "features": ["Iluminação LED", "Vestiários", "Churrasqueira Anexa"], "status": "Disponível", "opening_time": "06:00", "closing_time": "22:00", "discount_price_per_hour": 50.00, "discount_start_time": "09:00", "discount_end_time": "16:00"}'::jsonb
+  '{"type": "Grama Sintética 60mm Monofilamento (FIFA Quality)", "capacity": "14 a 16 Jogadores (7x7 / 8x8)", "features": ["Iluminação LED 800W Pro", "Placar Eletrônico Digital", "Vestiários com Ducha Quente", "Churrasqueira Anexa"], "status": "Disponível"}'::jsonb
 ),
 (
   'court-society-2',
-  'FUT 6 - SOCCER 6',
-  'poliesportiva',
-  'Quadra Poliesportiva',
+  'Campo Society 02 - Coberto Climatizado',
+  'society',
+  'Futebol Society',
   'https://images.unsplash.com/photo-1529900245534-47fbf8204bca?w=800&auto=format&fit=crop&q=80',
-  100.00,
-  600.00,
-  '⭐ Preferida da Galera',
+  160.00,
+  580.00,
+  '⚡ Alta Procura (100% Coberto)',
   42,
   2,
-  'O meio-termo ideal entre o jogo rápido de salão e o campo tradicional. Com gramado sintético de alta durabilidade e iluminação potente para partidas noturnas.',
-  'Permitido apenas chuteiras society ou tênis (proibido travas de campo).',
-  '{"type": "Grama Sintética 60mm", "surface": "Grama Sintética 60mm", "capacity": "12 a 14 Jogadores", "features": ["Iluminação LED", "Vestiários", "100% Coberto"], "status": "Disponível", "opening_time": "06:00", "closing_time": "22:00", "discount_price_per_hour": 60.00, "discount_start_time": "09:00", "discount_end_time": "16:00"}'::jsonb
+  'Espaço 100% coberto e protegido de chuvas e sol forte, com ventilação forçada e amortecimento reforçado.',
+  'Espaço perfeito para dias de chuva ou jogos nos horários de pico.',
+  '{"type": "Grama Sintética Bicolor Coberta", "capacity": "12 a 14 Jogadores (6x6 / 7x7)", "features": ["100% Coberto (Sem chuva)", "Ventilação Forçada", "Gramado com Amortecimento", "Câmeras de Gravação"], "status": "Disponível"}'::jsonb
 ),
 (
   'court-beach-1',
-  'FUT 7 - SOCCER 7',
-  'poliesportiva',
-  'Quadra Poliesportiva',
-  'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80',
-  110.00,
-  650.00,
-  '🔥 Mais Agendada da Semana',
+  'Quadra de Areia A - Beach Tennis & Futevôlei',
+  'beach',
+  'Beach Tennis / Futevôlei',
+  'https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=800&auto=format&fit=crop&q=80',
+  90.00,
+  320.00,
+  '🔥 Mais Agendado (Beach)',
   39,
   3,
-  'Estrutura padrão de futebol society com dimensões oficiais e grama sintética de alto rendimento. Perfeita para campeonatos, torneios e partidas com amigos.',
-  'Permitido apenas chuteiras society ou tênis (proibido travas de campo).',
-  '{"type": "Grama Sintética 60mm", "surface": "Grama Sintética 60mm", "capacity": "14 a 20 Jogadores", "features": ["Iluminação LED", "Vestiários", "Placar Digital"], "status": "Disponível", "opening_time": "06:00", "closing_time": "22:00", "discount_price_per_hour": 70.00, "discount_start_time": "09:00", "discount_end_time": "16:00"}'::jsonb
-),
-(
-  'court-esportes-de-quadra-1788962671043',
-  'FOOT TABLE - FUTMESA',
-  'foot-skill',
-  'Foot-Skill',
-  'https://images.unsplash.com/photo-1518604666864-7423958f7660?w=800&auto=format&fit=crop&q=80',
-  35.00,
-  200.00,
-  '🎯 Melhor Custo-Benefício',
-  48,
-  4,
-  'Área dedicada à prática de futmesa com piso nivelado e mesa de alta qualidade com curvatura padrão oficial para treinos de técnica e disputas dinâmicas.',
-  'Uso com tênis apropriado ou descalço na área da mesa.',
-  '{"type": "Grama Sintética 60mm", "surface": "Grama Sintética 60mm", "capacity": "10 a 14 Jogadores", "features": ["Mesa Oficial", "Iluminação LED", "Vestiários"], "status": "Disponível", "opening_time": "06:00", "closing_time": "22:00", "discount_price_per_hour": 25.00, "discount_start_time": "09:00", "discount_end_time": "16:00"}'::jsonb
+  'Quadra com areia fina e lavada que não esquenta o pé, nivelamento a laser e rede com regulagem de altura rápida.',
+  'Disponíveis duchas higiênicas logo na saída da quadra.',
+  '{"type": "Areia Especial Tratada e Filtrada (Não queima o pé)", "capacity": "4 a 8 Jogadores", "features": ["Rede Oficial Regulável", "Iluminação Noturna sem Ofuscamento", "Duchas ao Lado", "Kiosk Bar Próximo"], "status": "Disponível"}'::jsonb
 ),
 (
   'court-beach-2',
-  'QUADRA DE AREIA - SAND COURT',
+  'Quadra de Areia B - Beach Sports Master',
   'beach',
-  'Arena Beach',
+  'Beach Tennis / Vôlei',
   'https://images.unsplash.com/photo-1592656094267-764a45160876?w=800&auto=format&fit=crop&q=80',
-  50.00,
+  90.00,
   320.00,
-  '🏖️ Areia Fina Tratada',
+  'Areia Branca',
   26,
-  5,
-  'Quadra de areia nivelada e higienizada, projetada para absorção de impacto e máximo esforço físico sem sobrecarga articular. Ideal para futevôlei e beach tennis.',
-  'Duchas ao lado disponíveis. Aluguel de bolas e raquetes na recepção.',
-  '{"type": "Areia Branca", "surface": "Areia Branca", "capacity": "4 a 8 Jogadores", "features": ["Areia Lavada", "Refletores LED", "Duchas Anexas"], "status": "Disponível", "opening_time": "06:00", "closing_time": "22:00", "discount_price_per_hour": 30.00, "discount_start_time": "09:00", "discount_end_time": "16:00"}'::jsonb
+  4,
+  'Ideal para torneios e jogos entre amigos de Beach Tennis, Vôlei de Praia e Futevôlei.',
+  'Consulte o aluguel de raquetes na recepção se necessário.',
+  '{"type": "Areia de Quartzo Branca Filtrada", "capacity": "4 a 8 Jogadores", "features": ["Rede de Futevôlei / Vôlei / Beach", "Refletores LED Direcionais", "Área de Descanso com Puffs"], "status": "Disponível"}'::jsonb
 ),
 (
-  'court-futsal-1788963178368',
-  'QUADRA SOCIETY',
-  'society',
-  'Society',
+  'court-gym-1',
+  'Ginásio Poliesportivo 01 (Futsal, Basquete e Vôlei)',
+  'futsal',
+  'Ginásio Poliesportivo',
   'https://images.unsplash.com/photo-1546519638-68e109498ffc?w=800&auto=format&fit=crop&q=80',
-  60.00,
+  130.00,
+  460.00,
+  'Piso Flutuante',
+  31,
+  5,
+  'Ginásio coberto de alta absorção com piso modular esportivo, tabelas hidráulicas móveis de basquete e traves de futsal.',
+  'Uso obrigatório de tênis com solado flat (não marcante).',
+  '{"type": "Piso Flutuante de Madeira Tratada / Poliuretano", "capacity": "10 a 20 Jogadores", "features": ["Marcações Oficiais Futsal/Basquete/Vôlei", "Tabelas Hidráulicas", "Placar Eletrônico", "Vestiários Completos"], "status": "Disponível"}'::jsonb
+),
+(
+  'court-padel-1',
+  'Quadra de Padel & Tênis Panorâmica',
+  'padel',
+  'Padel & Tênis',
+  'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=800&auto=format&fit=crop&q=80',
+  110.00,
   400.00,
-  '⚡ Alta Procura',
-  49,
+  'Panorâmica',
+  22,
   6,
-  'Quadra poliesportiva em piso de cimento polido, ideal para jogos rápidos e com alto controle de bola. Espaço versátil com marcações esportivas atualizadas.',
-  'Obrigatório o uso de tênis esportivo ou de futsal. Proibido travas.',
-  '{"type": "Cimento Polido", "surface": "Cimento Polido", "capacity": "10 a 14 Jogadores", "features": ["Piso Polido", "Iluminação LED", "Vestiários"], "status": "Disponível", "opening_time": "06:00", "closing_time": "22:00", "discount_price_per_hour": 40.00, "discount_start_time": "09:00", "discount_end_time": "16:00"}'::jsonb
+  'Quadra panorâmica moderna com vidro temperado de 12mm e iluminação anti-reflexo.',
+  'Raquetes e bolinhas podem ser alugadas à parte.',
+  '{"type": "Vidro Temperado Panorâmico + Grama Fina", "capacity": "4 Jogadores (Duplas)", "features": ["Vidro 12mm Oficial", "Piso de Alta Performance", "Iluminação LED Especial de Alto Contraste"], "status": "Disponível"}'::jsonb
 )
-ON CONFLICT (id) DO UPDATE SET 
-  name = EXCLUDED.name,
-  category = EXCLUDED.category,
-  category_label = EXCLUDED.category_label,
-  base_price_per_hour = EXCLUDED.base_price_per_hour,
-  monthly_price = EXCLUDED.monthly_price,
-  badge = EXCLUDED.badge,
-  order_index = EXCLUDED.order_index,
-  description = EXCLUDED.description,
-  observation = EXCLUDED.observation,
-  specs = EXCLUDED.specs;
+ON CONFLICT (id) DO NOTHING;
 
--- Produtos Iniciais
 INSERT INTO public.products (id, name, category, type, price, unit, image)
 VALUES
   ('prod-agua', 'Água Mineral Crystal 500ml (Gelada)', 'Bebidas', 'product', 4.00, 'unid.', 'https://images.unsplash.com/photo-1559839914-17aae19cec71?w=200&auto=format&fit=crop&q=80'),
@@ -304,8 +296,16 @@ VALUES
   ('prod-gelo', 'Saco de Gelo Filtrado 5kg', 'Bebidas & Gelo', 'product', 15.00, 'saco', 'https://images.unsplash.com/photo-1516715094483-75da7dee9758?w=200&auto=format&fit=crop&q=80'),
   ('prod-espetinho', 'Combo 3 Espetinhos Gourmet na Brasa (Carne / Frango / Queijo)', 'Alimentos', 'product', 28.00, 'combo', 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=200&auto=format&fit=crop&q=80'),
   ('prod-carvao', 'Saco de Carvão Vegetal 3kg + Acendedor', 'Churrasco', 'product', 22.00, 'saco', 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=200&auto=format&fit=crop&q=80')
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  category = EXCLUDED.category,
-  price = EXCLUDED.price,
-  unit = EXCLUDED.unit;
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.customers (id, name, phone, email)
+VALUES
+  ('cust-1', 'Carlos Eduardo', '(81) 99876-1122', 'carlos@exemplo.com'),
+  ('cust-2', 'Matheus Silveira', '(81) 98844-5566', 'matheus@exemplo.com')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.monthly_members (id, team_name, responsible_name, phone, customer_id, court_id, day_of_week, day_of_week_label, time, start_time, end_time, monthly_price, status, start_month, observation)
+VALUES
+  ('mensal-1', 'Pelada dos Amigos da Terça', 'Carlos Eduardo', '(81) 99876-1122', 'cust-1', 'court-society-1', 'terca', 'Toda Terça-feira', '19:00', '19:00', '20:00', 500.00, 'active', 'Setembro/2026', 'Horário fixo semanal'),
+  ('mensal-2', 'Galera do Futsal Noturno', 'Matheus Silveira', '(81) 98844-5566', 'cust-2', 'court-gym-1', 'quinta', 'Toda Quinta-feira', '20:00', '20:00', '21:00', 460.00, 'active', 'Setembro/2026', 'Horário fixo semanal')
+ON CONFLICT (id) DO NOTHING;

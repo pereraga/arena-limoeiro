@@ -8,15 +8,15 @@
   <meta http-equiv="Expires" content="0">
   <title>Arena Limoeiro - Complexo Poliesportivo e Lazer | Agendamento Online</title>
   
-  <!-- Invalidação Imediata de Cache e Service Worker Antigo v5.3.1 -->
+  <!-- Invalidação Imediata de Cache e Service Worker Antigo v5.2.7 (100% Supabase Cloud) -->
   <script>
     (function() {
-      const CURRENT_APP_VERSION = '5.3.1';
+      const CURRENT_APP_VERSION = '5.4.0';
       const storedVersion = localStorage.getItem('arena_app_version');
       if (storedVersion !== CURRENT_APP_VERSION) {
         localStorage.setItem('arena_app_version', CURRENT_APP_VERSION);
-        // NUNCA deletar arena_local_bookings ou arena_monthly_members!
-        // Preserva todos os agendamentos e cadastros locais para sincronização íntegra com o Supabase.
+        // 🛡️ NUNCA deletar agendamentos ou mensalistas locais
+        // Preserva todos os agendamentos e cadastros para integridade total do sistema.
         if ('caches' in window) {
           caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
         }
@@ -36,13 +36,13 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <!-- Favicon & Ícones Mobile/PWA (Monograma A com Folhas) -->
-  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.3.1">
-  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.3.1">
-  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.3.1">
-  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.3.1">
-  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.3.1">
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.3.1">
-  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.3.1">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5.2.8">
+  <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=5.2.8">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=5.2.8">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=5.2.8">
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -52,14 +52,14 @@
   
   <!-- Supabase JS Client & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/supabase-client.js?v=5.3.1"></script>
-  <script src="/default-data.js?v=5.3.1"></script>
+  <script src="/supabase-client.js?v=5.2.8"></script>
+  <script src="/default-data.js?v=5.2.8"></script>
 
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js?v=5.3.1').then(reg => {
+        navigator.serviceWorker.register('/sw.js?v=5.2.8').then(reg => {
           reg.update();
         }).catch(console.error);
       });
@@ -927,7 +927,7 @@
           </div>
           <div>
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-xs font-black uppercase tracking-wider text-emerald-800">Arena Pro Limoeiro v5.3.1</span>
+              <span class="text-xs font-black uppercase tracking-wider text-emerald-800">Arena Pro Limoeiro v3.8.5</span>
               <span class="text-[10px] bg-emerald-100 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full">🕒 06:00 às 22:00</span>
               <span class="text-[10px] bg-amber-100 text-amber-900 font-extrabold px-2 py-0.5 rounded-full">🔥 Promo 09:00 às 16:00</span>
             </div>
@@ -964,7 +964,7 @@
   <!-- MODAIS -->
   <div id="modalRoot"></div>
 
-  <script src="/app.js?v=5.3.2"></script>
+  <script src="/app.js?v=5.4.0"></script>
   <script>
     // 🛡️ Garantia Absoluta de Renderização: Se o placeholder persistir, renderiza imediatamente
     setTimeout(function() {
