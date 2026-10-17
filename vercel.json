@@ -51,6 +51,14 @@
   ],
   "rewrites": [
     {
+      "source": "/apk-controle",
+      "destination": "/arena-limoeiro-controle.apk"
+    },
+    {
+      "source": "/controle.apk",
+      "destination": "/arena-limoeiro-controle.apk"
+    },
+    {
       "source": "/adm-sec-x9k7-limoeiro-2026-auth",
       "destination": "/index.html?adm_token=x9k7_limoeiro_sec2026_auth"
     },

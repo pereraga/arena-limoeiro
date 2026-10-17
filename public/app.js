@@ -716,7 +716,7 @@ function openDownloadApkModal() {
   if (!modalRoot) return;
 
   const currentOrigin = window.location.origin || 'https://arenalimoeiro.vercel.app';
-  const controleApkUrl = `${currentOrigin}/apks/ArenaLimoeiro-Controle.apk`;
+  const controleApkUrl = `${currentOrigin}/arena-limoeiro-controle.apk`;
   const clienteApkUrl = `${currentOrigin}/apks/ArenaLimoeiro-Cliente.apk`;
 
   modalRoot.innerHTML = `
@@ -752,12 +752,16 @@ function openDownloadApkModal() {
           <div class="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/70 to-slate-900 border border-emerald-500/50 space-y-3 shadow-lg">
             <div class="flex items-start justify-between">
               <div>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
                   <span class="text-xs font-black uppercase tracking-wider text-emerald-300 bg-emerald-900/80 px-2 py-0.5 rounded-md">🛡️ Gestão & Recepção</span>
                   <span class="text-[10px] font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 rounded-md">Moto G20 OK</span>
+                  <span class="text-[10px] font-black text-emerald-300 bg-emerald-900/60 border border-emerald-400/50 px-2 py-0.5 rounded-md">✨ v5.3.1 Atualizado</span>
                 </div>
                 <h4 class="text-sm font-black text-white mt-1">Arena Limoeiro - Controle</h4>
-                <p class="text-xs text-slate-300 mt-0.5">Para gerentes, administradores e recepção. Painel completo, caixa, comandas e relatórios.</p>
+                <p class="text-xs text-slate-300 mt-0.5">Para gerentes, administradores e recepção. Painel completo, caixa, comandas, relatórios e sincronização automática.</p>
+                <div class="mt-2 p-2 bg-slate-950/70 rounded-lg border border-slate-800 text-[11px] font-mono text-emerald-400 break-all select-all flex items-center justify-between gap-1">
+                  <span>${controleApkUrl}</span>
+                </div>
               </div>
             </div>
 
@@ -765,9 +769,9 @@ function openDownloadApkModal() {
               <a href="${controleApkUrl}" download="ArenaLimoeiro-Controle.apk"
                  class="w-full sm:flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs flex items-center justify-center space-x-2 shadow-md transition-all cursor-pointer">
                 <i data-lucide="download" class="w-4 h-4"></i>
-                <span>Baixar APK Controle</span>
+                <span>Baixar APK Controle (30 MB)</span>
               </a>
-              <button onclick="navigator.clipboard.writeText('${controleApkUrl}').then(() => alert('Link do APK Controle copiado!'))"
+              <button onclick="navigator.clipboard.writeText('${controleApkUrl}').then(() => alert('Link direto do APK copiado para a área de transferência!'))"
                       class="w-full sm:w-auto py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
                 <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                 <span>Copiar Link</span>
