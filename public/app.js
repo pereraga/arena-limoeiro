@@ -1823,8 +1823,8 @@ async function initArenaApplication() {
     checkAndSyncBookingsBackground();
   });
 
-  // Polling inteligente em segundo plano para sincronizar agendamentos em tempo real sem estourar cota do Supabase
-  setInterval(checkAndSyncBookingsBackground, 25000);
+  // Polling em segundo plano para sincronizar agendamentos em tempo real entre todos os dispositivos
+  setInterval(checkAndSyncBookingsBackground, 10000);
 
   // 5. 🍪 Verificação de Cookies e Verificação de Login de 5 Horas
   if (window._pendingSessionExpiredNotice) {
@@ -7979,6 +7979,11 @@ window.loadWaterSupplyFromDatabase = loadWaterSupplyFromDatabase;
 
 async function saveWaterSupplyToDatabase() {
   localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+  if (window.ArenaCloudSync) {
+    try {
+      window.ArenaCloudSync.push('sync_all', { water_supply: state.waterSupply });
+    } catch(e) {}
+  }
   if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
   try {
     const client = window.ArenaSupabase.getClient();
@@ -12195,6 +12200,9 @@ async function setCourtMaintenance(courtId, inMaintenance, reason = '') {
     state.courts[courtIdx] = normalizeCourt({ ...court });
   }
   localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+  if (window.ArenaCloudSync) {
+    try { window.ArenaCloudSync.push('sync_all', { courts: state.courts }); } catch(e) {}
+  }
 
   // Re-renderiza imediatamente a interface
   _refreshAllUI();
@@ -12343,6 +12351,9 @@ async function handleSaveMaintenanceNotice(e, courtId) {
     state.courts[idx] = normalizeCourt({ ...court });
   }
   localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+  if (window.ArenaCloudSync) {
+    try { window.ArenaCloudSync.push('sync_all', { courts: state.courts }); } catch(e) {}
+  }
 
   _refreshAllUI();
 
@@ -12386,6 +12397,9 @@ async function handleRemoveMaintenanceNotice(courtId) {
     state.courts[idx] = normalizeCourt({ ...court });
   }
   localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+  if (window.ArenaCloudSync) {
+    try { window.ArenaCloudSync.push('sync_all', { courts: state.courts }); } catch(e) {}
+  }
 
   _refreshAllUI();
 
@@ -12891,6 +12905,11 @@ async function handleSaveMaintenanceBlock(e) {
   localBookings.push(bookingPayload);
   localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
 
+  // Salva no ArenaCloudSync para compartilhamento instantâneo entre celulares
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('push_booking', bookingPayload);
+  }
+
   // Salva no Supabase se disponível
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
@@ -12918,6 +12937,10 @@ async function deleteMaintenanceBlock(blockId) {
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
   const filtered = localBookings.filter(b => b.id !== blockId);
   localStorage.setItem('arena_local_bookings', JSON.stringify(filtered));
+
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('delete_booking', { id: blockId });
+  }
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
@@ -13328,7 +13351,20 @@ async function handleCancelBooking(bookingId) {
     targetId: bookingId
   });
 
-  // ☁️ 6. Exclusão assíncrona no Supabase em segundo plano (direto DELETE sem update e sem travar UI)
+  // ☁️ 6. Exclusão assíncrona no ArenaCloudSync para atualização imediata em todos os aparelhos
+  if (window.ArenaCloudSync) {
+    idsToRemove.forEach(id => {
+      window.ArenaCloudSync.push('delete_booking', { id });
+    });
+    if (memberId) {
+      window.ArenaCloudSync.push('delete_monthly_member', { id: memberId });
+    }
+    if (deleteAllMensalista && matchedMember && matchedMember.id && matchedMember.id !== memberId) {
+      window.ArenaCloudSync.push('delete_monthly_member', { id: matchedMember.id });
+    }
+  }
+
+  // ☁️ 7. Exclusão assíncrona no Supabase em segundo plano (direto DELETE sem update e sem travar UI)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
@@ -13999,6 +14035,16 @@ async function handleDirectBookingSubmit(e) {
       } catch(e) {
         console.warn('Aviso inserção mensalista Supabase:', e);
       }
+    }
+  }
+
+  // ☁️ Sincronização em nuvem de alta velocidade para todos os celulares e APK
+  if (window.ArenaCloudSync) {
+    bookingsToCreate.forEach(b => {
+      window.ArenaCloudSync.push('push_booking', b);
+    });
+    if (bookingType === 'mensalista' && typeof memberRecord !== 'undefined' && memberRecord) {
+      window.ArenaCloudSync.push('push_monthly_member', memberRecord);
     }
   }
 
@@ -15955,7 +16001,15 @@ async function deleteMonthlyMember(id) {
     } catch(e) {}
   }
 
-  // 4. Deleta do Supabase (monthly_members e bookings)
+  // 4. Deleta da nuvem ArenaCloudSync (compartilhamento instantâneo)
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('delete_monthly_member', { id });
+    idsToRemove.forEach(bId => {
+      window.ArenaCloudSync.push('delete_booking', { id: bId });
+    });
+  }
+
+  // 5. Deleta do Supabase (monthly_members e bookings)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
       const client = window.ArenaSupabase.getClient();
@@ -19381,6 +19435,14 @@ async function submitBooking(grandTotal) {
     localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
   }
 
+  // ☁️ Sincronização em nuvem de alta velocidade para todos os celulares e APK
+  if (window.ArenaCloudSync) {
+    window.ArenaCloudSync.push('push_booking', unifiedBooking);
+    if (isMensal && dbMemberPayload) {
+      window.ArenaCloudSync.push('push_monthly_member', dbMemberPayload);
+    }
+  }
+
   // 5. Finaliza com sucesso
   requestSchedule();
   closeModal();
@@ -20110,12 +20172,89 @@ async function requestNotificationPermission() {
 
 
 async function syncDataFromSupabase(skipRender = false) {
+  // ☁️ 1. Sincronização em Nuvem de Alta Velocidade (Compartilhamento entre Celulares, APK e Site)
+  if (window.ArenaCloudSync) {
+    try {
+      const cloudData = await window.ArenaCloudSync.pull();
+      if (cloudData) {
+        // Quadras oficiais
+        if (Array.isArray(cloudData.courts) && cloudData.courts.length > 0) {
+          state.courts = cloudData.courts.map(normalizeCourt);
+          localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+        }
+
+        // Agendamentos (Mesclagem Inteligente de Celular Principal para Nuvem)
+        if (Array.isArray(cloudData.bookings)) {
+          const delIds = getDeletedBookingIds();
+          const cloudBookings = cloudData.bookings.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
+          const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+          
+          const cloudMap = new Map(cloudBookings.map(b => [String(b.id), b]));
+          let localNeedsPush = false;
+          for (const lb of localBookings) {
+            if (lb && lb.id && !cloudMap.has(String(lb.id)) && !delIds.has(String(lb.id))) {
+              cloudMap.set(String(lb.id), lb);
+              localNeedsPush = true;
+            }
+          }
+          const mergedBookings = Array.from(cloudMap.values());
+          if (mergedBookings.length > 0) {
+            state.bookings = mergedBookings;
+            localStorage.setItem('arena_local_bookings', JSON.stringify(mergedBookings));
+          }
+          if (localNeedsPush) {
+            window.ArenaCloudSync.push('sync_all', { bookings: mergedBookings });
+          }
+        }
+
+        // Mensalistas
+        if (Array.isArray(cloudData.monthly_members)) {
+          const delIds = getDeletedBookingIds();
+          const cloudMembers = cloudData.monthly_members.filter(m => m && m.id && !delIds.has(String(m.id)));
+          const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+          const memberMap = new Map(cloudMembers.map(m => [String(m.id), m]));
+          let membersNeedPush = false;
+          for (const lm of localMembers) {
+            if (lm && lm.id && !memberMap.has(String(lm.id)) && !delIds.has(String(lm.id))) {
+              memberMap.set(String(lm.id), lm);
+              membersNeedPush = true;
+            }
+          }
+          const mergedMembers = Array.from(memberMap.values());
+          if (mergedMembers.length > 0) {
+            state.monthlyMembers = mergedMembers;
+            localStorage.setItem('arena_monthly_members', JSON.stringify(mergedMembers));
+          }
+          if (membersNeedPush) {
+            window.ArenaCloudSync.push('sync_all', { monthly_members: mergedMembers });
+          }
+        }
+
+        // Produtos
+        if (Array.isArray(cloudData.products) && cloudData.products.length > 0) {
+          state.products = cloudData.products;
+          localStorage.setItem('arena_local_products', JSON.stringify(cloudData.products));
+        }
+
+        // Estoque de Água
+        if (cloudData.water_supply) {
+          state.waterSupply = { ...state.waterSupply, ...cloudData.water_supply };
+          localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+        }
+
+        if (!skipRender) _refreshAllUI();
+      }
+    } catch(errCloud) {
+      console.warn('Aviso sincronização nuvem rápida:', errCloud);
+    }
+  }
+
+  // 2. Sincronização Supabase (se disponível e não bloqueado por cota)
   if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
   const client = window.ArenaSupabase.getClient();
   if (!client) return;
 
   try {
-    // ⚡ Consultas paralelas de alta velocidade (1 única rodada de rede HTTP/2)
     const [
       { data: dbCourts },
       { data: dbProducts },
@@ -20465,120 +20604,179 @@ function _refreshAllUI() {
   if (window.lucide) lucide.createIcons();
 }
 
-// Sincronização em segundo plano a cada 3.5s que garante atualização mesmo se o WebSocket fechar
+// Sincronização em segundo plano que garante atualização em tempo real entre celulares, APK e site
 let _isSyncingBg = false;
 async function checkAndSyncBookingsBackground() {
   if (_isSyncingBg) return;
-  if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
-  const client = window.ArenaSupabase.getClient();
-  if (!client) return;
-
   _isSyncingBg = true;
-  try {
-    const [
-      { data: dbBookings, error },
-      { data: dbCourts },
-      { data: dbWaterProduct },
-      { data: dbMonthlyMembers }
-    ] = await Promise.all([
-      client.from('bookings').select('*'),
-      client.from('courts').select('*').order('order_index', { ascending: true }),
-      client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle(),
-      client.from('monthly_members').select('*')
-    ]);
 
-    // Sincroniza estoque de água em segundo plano
-    if (dbWaterProduct && dbWaterProduct.image) {
+  try {
+    // ☁️ 1. Sincronização Cloud rápida e infalível (Vercel API / Gist Sync)
+    if (window.ArenaCloudSync) {
       try {
-        const parsedW = JSON.parse(dbWaterProduct.image);
-        if (parsedW && (typeof parsedW.full === 'number' || typeof parsedW.empty === 'number')) {
-          const prevFull = state.waterSupply ? state.waterSupply.full : null;
-          const prevEmpty = state.waterSupply ? state.waterSupply.empty : null;
-          if (prevFull !== parsedW.full || prevEmpty !== parsedW.empty) {
-            state.waterSupply = {
-              ...state.waterSupply,
-              ...parsedW,
-              full: typeof parsedW.full === 'number' ? parsedW.full : (state.waterSupply?.full || 0),
-              empty: typeof parsedW.empty === 'number' ? parsedW.empty : 0
-            };
-            localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+        const cloudData = await window.ArenaCloudSync.pull();
+        if (cloudData) {
+          const delIds = getDeletedBookingIds();
+
+          // Quadras
+          if (Array.isArray(cloudData.courts) && cloudData.courts.length > 0) {
+            const normCourts = cloudData.courts.map(normalizeCourt);
+            if (JSON.stringify(normCourts) !== JSON.stringify(state.courts)) {
+              state.courts = normCourts;
+              localStorage.setItem('arena_local_courts', JSON.stringify(normCourts));
+              _refreshAllUI();
+            }
+          }
+
+          // Agendamentos
+          if (Array.isArray(cloudData.bookings)) {
+            const cloudBookings = cloudData.bookings.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+            
+            // Mescla reservas locais que ainda não subiram (garante que dados do celular principal subam)
+            const cloudMap = new Map(cloudBookings.map(b => [String(b.id), b]));
+            let hasLocalOnly = false;
+            for (const lb of localBookings) {
+              if (lb && lb.id && !cloudMap.has(String(lb.id)) && !delIds.has(String(lb.id)) && !isBookingDateInThePast(lb.date)) {
+                cloudMap.set(String(lb.id), lb);
+                hasLocalOnly = true;
+              }
+            }
+
+            const merged = Array.from(cloudMap.values());
+            const curBookingsStr = JSON.stringify((state.bookings || []).map(b => b.id).sort());
+            const newBookingsStr = JSON.stringify(merged.map(b => b.id).sort());
+
+            if (curBookingsStr !== newBookingsStr || merged.length !== (state.bookings || []).length) {
+              state.bookings = merged;
+              localStorage.setItem('arena_local_bookings', JSON.stringify(merged));
+              _refreshAllUI();
+            }
+
+            if (hasLocalOnly) {
+              window.ArenaCloudSync.push('sync_all', { bookings: merged });
+            }
+          }
+
+          // Mensalistas
+          if (Array.isArray(cloudData.monthly_members)) {
+            const cloudMembers = cloudData.monthly_members.filter(m => m && m.id && !delIds.has(String(m.id)));
+            const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+            const memberMap = new Map(cloudMembers.map(m => [String(m.id), m]));
+            let hasLocalMemberOnly = false;
+            for (const lm of localMembers) {
+              if (lm && lm.id && !memberMap.has(String(lm.id)) && !delIds.has(String(lm.id))) {
+                memberMap.set(String(lm.id), lm);
+                hasLocalMemberOnly = true;
+              }
+            }
+            const mergedMembers = Array.from(memberMap.values());
+            const curMemStr = JSON.stringify((state.monthlyMembers || []).map(m => m.id).sort());
+            const newMemStr = JSON.stringify(mergedMembers.map(m => m.id).sort());
+            if (curMemStr !== newMemStr || mergedMembers.length !== (state.monthlyMembers || []).length) {
+              state.monthlyMembers = mergedMembers;
+              localStorage.setItem('arena_monthly_members', JSON.stringify(mergedMembers));
+              _refreshAllUI();
+            }
+            if (hasLocalMemberOnly) {
+              window.ArenaCloudSync.push('sync_all', { monthly_members: mergedMembers });
+            }
+          }
+
+          // Estoque de Água
+          if (cloudData.water_supply) {
+            const pw = cloudData.water_supply;
+            if (state.waterSupply && (state.waterSupply.full !== pw.full || state.waterSupply.empty !== pw.empty)) {
+              state.waterSupply = { ...state.waterSupply, ...pw };
+              localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+              _refreshAllUI();
+            }
+          }
+        }
+      } catch (errCloud) {
+        console.warn('Aviso sincronização nuvem rápida em bg:', errCloud);
+      }
+    }
+
+    // 2. Sincronização Supabase adicional (se disponível e não bloqueado por cota)
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      const client = window.ArenaSupabase.getClient();
+      if (client) {
+        const [
+          { data: dbBookings, error },
+          { data: dbCourts },
+          { data: dbWaterProduct },
+          { data: dbMonthlyMembers }
+        ] = await Promise.all([
+          client.from('bookings').select('*'),
+          client.from('courts').select('*').order('order_index', { ascending: true }),
+          client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle(),
+          client.from('monthly_members').select('*')
+        ]);
+
+        if (dbWaterProduct && dbWaterProduct.image) {
+          try {
+            const parsedW = JSON.parse(dbWaterProduct.image);
+            if (parsedW && (typeof parsedW.full === 'number' || typeof parsedW.empty === 'number')) {
+              const prevFull = state.waterSupply ? state.waterSupply.full : null;
+              const prevEmpty = state.waterSupply ? state.waterSupply.empty : null;
+              if (prevFull !== parsedW.full || prevEmpty !== parsedW.empty) {
+                state.waterSupply = {
+                  ...state.waterSupply,
+                  ...parsedW,
+                  full: typeof parsedW.full === 'number' ? parsedW.full : (state.waterSupply?.full || 0),
+                  empty: typeof parsedW.empty === 'number' ? parsedW.empty : 0
+                };
+                localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
+                _refreshAllUI();
+              }
+            }
+          } catch(e) {}
+        }
+
+        if (dbBookings && !error) {
+          const delIds = getDeletedBookingIds();
+          const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+          const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
+          const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
+
+          const updatedBookings = [];
+          for (const dbB of validDbBookings) {
+            const cur = existingMap.get(dbB.id);
+            if (cur && (cur.status !== dbB.status || cur.start_time !== dbB.start_time || cur.date !== dbB.date || cur.court_id !== dbB.court_id)) {
+              updatedBookings.push(dbB);
+            }
+          }
+
+          const newIds = new Set(validDbBookings.map(b => b.id));
+          const hasDeleted = (state.bookings || []).some(b => b && b.id && !newIds.has(b.id));
+          let hasChanges = brandNew.length > 0 || updatedBookings.length > 0 || hasDeleted || validDbBookings.length !== (state.bookings || []).length;
+
+          if (hasChanges) {
+            state.bookings = validDbBookings;
+            localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
             _refreshAllUI();
           }
         }
-      } catch(e) {}
-    }
 
-    if (dbBookings && !error) {
-      const delIds = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
-      const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
-      const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
-
-      const updatedBookings = [];
-      for (const dbB of validDbBookings) {
-        const cur = existingMap.get(dbB.id);
-        if (cur && (cur.status !== dbB.status || cur.start_time !== dbB.start_time || cur.date !== dbB.date || cur.court_id !== dbB.court_id)) {
-          updatedBookings.push(dbB);
-        }
-      }
-
-      const newIds = new Set(validDbBookings.map(b => b.id));
-      const hasDeleted = (state.bookings || []).some(b => b && b.id && !newIds.has(b.id));
-      let hasChanges = brandNew.length > 0 || updatedBookings.length > 0 || hasDeleted || validDbBookings.length !== (state.bookings || []).length;
-
-      if (hasChanges) {
-        state.bookings = validDbBookings;
-        localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
-
-        _refreshAllUI();
-      }
-    }
-
-    // Sincroniza mensalistas / planos fixos em segundo plano (proteção contra perda de dados)
-    if (Array.isArray(dbMonthlyMembers) && dbMonthlyMembers.length > 0) {
-      const validMonthly = dbMonthlyMembers.filter(m => {
-        if (!m || !m.id) return false;
-        const idStr = String(m.id);
-        if (idStr.includes('ARENA-') || idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
-        if (isBookingDeleted(idStr)) return false;
-        return true;
-      });
-      if (validMonthly.length > 0) {
-        const currentIds = (state.monthlyMembers || []).map(m => String(m.id)).sort().join(',');
-        const newIds = validMonthly.map(m => String(m.id)).sort().join(',');
-        if (currentIds !== newIds) {
-          state.monthlyMembers = validMonthly;
-          localStorage.setItem('arena_monthly_members', JSON.stringify(validMonthly));
-          _refreshAllUI();
-        }
-      }
-    }
-
-    // Sincroniza quadras em segundo plano (detecta liberação, manutenção ou aviso prévio)
-    if (dbCourts && Array.isArray(dbCourts) && dbCourts.length > 0) {
-      const normCourts = dbCourts.map(normalizeCourt);
-      let courtsChanged = false;
-      if (normCourts.length !== state.courts.length) {
-        courtsChanged = true;
-      } else {
-        for (let i = 0; i < normCourts.length; i++) {
-          const nc = normCourts[i];
-          const sc = state.courts.find(c => c.id === nc.id);
-          if (!sc) { courtsChanged = true; break; }
-          const scNotice = (sc.specs && sc.specs.maintenance_notice) || sc.maintenance_notice || '';
-          const ncNotice = (nc.specs && nc.specs.maintenance_notice) || nc.maintenance_notice || '';
-          const scStatus = (sc.specs && sc.specs.status) || sc.status || '';
-          const ncStatus = (nc.specs && nc.specs.status) || nc.status || '';
-          if (scStatus !== ncStatus || scNotice !== ncNotice || sc.isMaintenance !== nc.isMaintenance) {
-            courtsChanged = true;
-            break;
+        if (Array.isArray(dbMonthlyMembers) && dbMonthlyMembers.length > 0) {
+          const validMonthly = dbMonthlyMembers.filter(m => {
+            if (!m || !m.id) return false;
+            const idStr = String(m.id);
+            if (idStr.includes('ARENA-') || idStr.startsWith('mock-fixo-') || idStr.startsWith('arena-fixo-mock-')) return false;
+            if (isBookingDeleted(idStr)) return false;
+            return true;
+          });
+          if (validMonthly.length > 0) {
+            const currentIds = (state.monthlyMembers || []).map(m => String(m.id)).sort().join(',');
+            const newIds = validMonthly.map(m => String(m.id)).sort().join(',');
+            if (currentIds !== newIds) {
+              state.monthlyMembers = validMonthly;
+              localStorage.setItem('arena_monthly_members', JSON.stringify(validMonthly));
+              _refreshAllUI();
+            }
           }
         }
-      }
-      if (courtsChanged) {
-        state.courts = normCourts;
-        localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
-        _refreshAllUI();
       }
     }
   } catch(err) {

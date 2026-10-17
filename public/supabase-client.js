@@ -359,4 +359,43 @@
 
   // Inicializa na carga
   initClient();
+
+  // ☁️ Sincronização em Nuvem de Alta Velocidade (Realtime Cross-Device Sync)
+  const SYNC_API_ENDPOINT = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('capacitor://') && !window.location.origin.includes('file://'))
+    ? '/api/sync'
+    : 'https://arenalimoeiro.vercel.app/api/sync';
+
+  window.ArenaCloudSync = {
+    endpoint: SYNC_API_ENDPOINT,
+
+    async pull() {
+      try {
+        const res = await fetch(SYNC_API_ENDPOINT + '?_t=' + Date.now(), {
+          headers: { 'Cache-Control': 'no-cache, no-store' }
+        });
+        if (!res.ok) return null;
+        const json = await res.json();
+        if (json && json.success && json.data) {
+          return json.data;
+        }
+      } catch (err) {}
+      return null;
+    },
+
+    async push(action, payload) {
+      try {
+        const res = await fetch(SYNC_API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, payload })
+        });
+        if (!res.ok) return false;
+        const json = await res.json();
+        return json && json.success;
+      } catch (err) {
+        return false;
+      }
+    }
+  };
 })();
+
