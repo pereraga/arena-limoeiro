@@ -36,6 +36,36 @@ function isBookingDateInThePast(dateVal) {
   return normalized < todayStr;
 }
 
+// Retorna a data limite de 3 dias atrás (YYYY-MM-DD) para otimização e limpeza
+function getActiveBookingCutoffDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - 3);
+  return getFormattedDate(d);
+}
+
+// Limpa automaticamente agendamentos anteriores a 3 dias do Supabase e da Nuvem
+async function cleanupOldBookingsFromDatabase() {
+  const cutoffDate = getActiveBookingCutoffDate();
+
+  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+    try {
+      const client = window.ArenaSupabase.getClient();
+      if (client) {
+        await client.from('bookings').delete().lt('date', cutoffDate);
+      }
+    } catch (e) {
+      console.warn('Aviso limpeza automática Supabase:', e);
+    }
+  }
+
+  if (window.ArenaCloudSync) {
+    try {
+      window.ArenaCloudSync.push('cleanup_old', { cutoffDate });
+    } catch (e) {}
+  }
+}
+window.cleanupOldBookingsFromDatabase = cleanupOldBookingsFromDatabase;
+
 function timeToMinutes(timeStr) {
   if (!timeStr) return 0;
   const [h, m] = timeStr.split(':').map(Number);
@@ -20266,10 +20296,13 @@ async function syncDataFromSupabase(skipRender = false) {
       client.from('courts').select('*').order('order_index', { ascending: true }),
       client.from('products').select('*'),
       client.from('monthly_members').select('*'),
-      client.from('bookings').select('*'),
+      client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate()),
       client.from('customers').select('*').order('created_at', { ascending: false }),
       client.from('admin_users').select('*').order('created_at', { ascending: true })
     ]);
+
+    // Executa limpeza assíncrona de registros com mais de 3 dias no Supabase
+    cleanupOldBookingsFromDatabase().catch(() => {});
 
     if (dbCourts && dbCourts.length > 0) {
       state.courts = dbCourts.map(normalizeCourt);
@@ -20496,7 +20529,7 @@ async function syncDataFromSupabase(skipRender = false) {
             }
           }
 
-          const { data } = await client.from('bookings').select('*');
+          const { data } = await client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate());
           if (data) { 
             const delIds = getDeletedBookingIds();
             state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
@@ -20516,7 +20549,7 @@ async function syncDataFromSupabase(skipRender = false) {
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
           }
-          const { data } = await client.from('bookings').select('*');
+          const { data } = await client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate());
           if (data) { 
             const delIds = getDeletedBookingIds();
             state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
@@ -20532,7 +20565,7 @@ async function syncDataFromSupabase(skipRender = false) {
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
           }
-          const { data } = await client.from('bookings').select('*');
+          const { data } = await client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate());
           if (data) { 
             const delIds = getDeletedBookingIds();
             state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
@@ -20708,11 +20741,14 @@ async function checkAndSyncBookingsBackground() {
           { data: dbWaterProduct },
           { data: dbMonthlyMembers }
         ] = await Promise.all([
-          client.from('bookings').select('*'),
+          client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate()),
           client.from('courts').select('*').order('order_index', { ascending: true }),
           client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle(),
           client.from('monthly_members').select('*')
         ]);
+
+        // Rotina de limpeza periódica de agendamentos com mais de 3 dias
+        cleanupOldBookingsFromDatabase().catch(() => {});
 
         if (dbWaterProduct && dbWaterProduct.image) {
           try {
