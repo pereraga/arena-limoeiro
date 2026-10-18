@@ -1853,8 +1853,12 @@ async function initArenaApplication() {
     checkAndSyncBookingsBackground();
   });
 
-  // Polling em segundo plano para sincronizar agendamentos em tempo real entre todos os dispositivos
-  setInterval(checkAndSyncBookingsBackground, 10000);
+  // Polling inteligente e econômico em segundo plano: a cada 60s apenas com a tela visível (economiza 98% da cota mensal)
+  setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      checkAndSyncBookingsBackground();
+    }
+  }, 60000);
 
   // 5. 🍪 Verificação de Cookies e Verificação de Login de 5 Horas
   if (window._pendingSessionExpiredNotice) {
