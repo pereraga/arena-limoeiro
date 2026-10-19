@@ -10784,8 +10784,9 @@ function renderAdminTabContent() {
   if (canManageCustomers()) allowedSubTabs.push('customers');
   if (canManageSettings()) allowedSubTabs.push('users', 'database');
   if (isMasterAdmin) allowedSubTabs.push('audit_logs');
+  allowedSubTabs.push('backup');
 
-  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','database','audit_logs'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','database','audit_logs','backup'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
   if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeSubTab)) {
     activeSubTab = allowedSubTabs[0];
     state.adminSubTab = activeSubTab;
@@ -10794,60 +10795,60 @@ function renderAdminTabContent() {
   return `
     <div class="space-y-6">
       
-      <!-- Sub-navegação de Cadastros (Grid 2 colunas no mobile, 3 ou 4 no tablet, flex no desktop) -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:flex xl:flex-wrap items-center gap-2 pb-2 w-full">
+      <!-- Sub-navegação de Cadastros -->
+      <div class="flex flex-wrap items-center gap-2 pb-2 w-full">
         ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('spaces')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('spaces')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">Espaços / Quadras</span>
           </button>
         ` : ''}
 
         ${(canDeleteBookings() || canStartMatches()) ? `
-          <button onclick="setAdminSubTab('bookings')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('bookings')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">⚽ Jogos (${(state.bookings || []).length})</span>
           </button>
         ` : ''}
 
         ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('positions')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('positions')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'positions' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">Posições dos Jogos</span>
           </button>
         ` : ''}
 
         ${canManageMonthly() ? `
-          <button onclick="setAdminSubTab('monthly')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('monthly')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'monthly' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">Horários Fixos (${state.monthlyMembers.length})</span>
           </button>
         ` : ''}
 
         ${canManageSettings() ? `
-          <button onclick="setAdminSubTab('users')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('users')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'users' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">👑 Gestores & Acessos</span>
           </button>
         ` : ''}
 
         ${canManageCustomers() ? `
-          <button onclick="setAdminSubTab('customers')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('customers')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">Clientes Cadastrados</span>
           </button>
         ` : ''}
 
         ${canManageSettings() ? `
-          <button onclick="setAdminSubTab('database')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('database')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'database' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">Conexão Supabase</span>
           </button>
         ` : ''}
 
         ${isMasterAdmin ? `
-          <button onclick="setAdminSubTab('audit_logs')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
+          <button onclick="setAdminSubTab('audit_logs')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'audit_logs' ? 'bg-amber-600 text-white shadow font-black border border-amber-600 ring-2 ring-amber-400/40' : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 shadow-xs'}">
             <i data-lucide="shield-alert" class="w-3.5 h-3.5 shrink-0 ${activeSubTab === 'audit_logs' ? 'text-white' : 'text-amber-700'}"></i>
             <span class="truncate">📜 Logs</span>
           </button>
         ` : ''}
 
-        <button onclick="setAdminSubTab('backup')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'backup' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600 ring-2 ring-emerald-400/40' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-          <i data-lucide="database" class="w-3.5 h-3.5 shrink-0 ${activeSubTab === 'backup' ? 'text-white' : 'text-emerald-600'}"></i>
-          <span class="truncate">💾 Backup de Dados</span>
+        <button onclick="setAdminSubTab('backup')" class="px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'backup' ? 'bg-emerald-700 text-white shadow-md font-black border border-emerald-700 ring-2 ring-emerald-400/50' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 shadow-xs'}">
+          <i data-lucide="database" class="w-3.5 h-3.5 shrink-0 ${activeSubTab === 'backup' ? 'text-white' : 'text-emerald-700'}"></i>
+          <span>💾 Backup de Dados</span>
         </button>
       </div>
 
