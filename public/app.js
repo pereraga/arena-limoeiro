@@ -43,26 +43,9 @@ function getActiveBookingCutoffDate() {
   return getFormattedDate(d);
 }
 
-// Limpa automaticamente agendamentos anteriores a 3 dias do Supabase e da Nuvem
+// Limpeza automática desativada para manter 100% dos registros e controle da pelada permanentemente
 async function cleanupOldBookingsFromDatabase() {
-  const cutoffDate = getActiveBookingCutoffDate();
-
-  if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
-    try {
-      const client = window.ArenaSupabase.getClient();
-      if (client) {
-        await client.from('bookings').delete().lt('date', cutoffDate);
-      }
-    } catch (e) {
-      console.warn('Aviso limpeza automática Supabase:', e);
-    }
-  }
-
-  if (window.ArenaCloudSync) {
-    try {
-      window.ArenaCloudSync.push('cleanup_old', { cutoffDate });
-    } catch (e) {}
-  }
+  return;
 }
 window.cleanupOldBookingsFromDatabase = cleanupOldBookingsFromDatabase;
 
@@ -1960,8 +1943,9 @@ function loadInitialData() {
       try { localStorage.setItem('arena_categories', JSON.stringify(state.categories)); } catch(e) {}
     }
     const localCourts = JSON.parse(localStorage.getItem('arena_local_courts') || 'null');
-    const hasOldMockCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && c.name.includes('Campo Society 01'));
-    if (localCourts !== null && Array.isArray(localCourts) && localCourts.length > 0 && !hasOldMockCourts) {
+    const hasOldMockCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && (c.name.includes('Campo Society 01') || c.name.includes('Quadra de Areia A') || c.name.includes('Ginásio Poliesportivo 01') || c.name.includes('Quadra de Padel')));
+    const hasFutCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
+    if (localCourts !== null && Array.isArray(localCourts) && localCourts.length > 0 && !hasOldMockCourts && hasFutCourts) {
       state.courts = localCourts.map(normalizeCourt);
     } else {
       state.courts = (d.initialCourts || []).map(normalizeCourt);
@@ -1976,7 +1960,21 @@ function loadInitialData() {
 
     // Leitura e saneamento dos contratos de mensalistas / horários fixos
     const rawLocalMonthly = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
-    let cleanLocalMonthly = (Array.isArray(rawLocalMonthly) ? rawLocalMonthly : []).filter(m => {
+    const deletedBookingSet = getDeletedBookingIds();
+
+    // Mescla com os mensalistas oficiais de default-data para garantir integridade total
+    const memberMap = new Map();
+    (d.initialMonthlyMembers || []).forEach(m => {
+      if (m && m.id && !deletedBookingSet.has(String(m.id))) memberMap.set(String(m.id), m);
+    });
+    (Array.isArray(rawLocalMonthly) ? rawLocalMonthly : []).forEach(m => {
+      if (m && m.id && !deletedBookingSet.has(String(m.id))) {
+        const existing = memberMap.get(String(m.id));
+        memberMap.set(String(m.id), existing ? { ...existing, ...m } : m);
+      }
+    });
+
+    let cleanLocalMonthly = Array.from(memberMap.values()).filter(m => {
       if (!m || !m.id) return false;
       const idStr = String(m.id);
       if (isBookingDeleted(idStr)) return false;
@@ -2015,8 +2013,21 @@ function loadInitialData() {
     state.coupons = d.coupons;
 
     const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-    const deletedBookingSet = getDeletedBookingIds();
-    const cleanedLocal = (Array.isArray(localSaved) ? localSaved : []).filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id) && !isBookingDateInThePast(b.date));
+
+    // Mescla as 261 reservas oficiais restauradas em default-data com quaisquer alterações locais
+    const bookingMap = new Map();
+    (d.initialBookings || []).forEach(b => {
+      if (b && b.id && !deletedBookingSet.has(String(b.id))) bookingMap.set(String(b.id), b);
+    });
+    (Array.isArray(localSaved) ? localSaved : []).forEach(b => {
+      if (b && b.id && !deletedBookingSet.has(String(b.id))) {
+        const existing = bookingMap.get(String(b.id));
+        bookingMap.set(String(b.id), existing ? { ...existing, ...b } : b);
+      }
+    });
+
+    const mergedList = Array.from(bookingMap.values());
+    const cleanedLocal = mergedList.filter(b => b && b.id && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !['ARENA-1001', 'ARENA-1002', 'ARENA-1004'].includes(b.id));
     cleanedLocal.forEach(b => {
       if (b && (b.id === 'ARENA-6776' || b.id === 'ARENA-9247')) {
         b.product_cart = {};
@@ -2035,6 +2046,7 @@ function loadInitialData() {
 
       // Se já houver um jogo aceito no mesmo campo e data com horário sobreposto:
       const hasConflict = dedupedLocal.some(existing => {
+        if (existing.id === b.id) return false;
         const exCourtId = existing.court_id || existing.courtId;
         if (exCourtId !== bCourtId || existing.date !== bDate) return false;
         const exS = timeToMinutes(existing.start_time || existing.startTime || (existing.time ? existing.time.split(' ')[0] : '00:00'));
@@ -10832,6 +10844,11 @@ function renderAdminTabContent() {
             <span class="truncate">📜 Logs</span>
           </button>
         ` : ''}
+
+        <button onclick="setAdminSubTab('backup')" class="w-full xl:w-auto justify-center text-center px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'backup' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600 ring-2 ring-emerald-400/40' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <i data-lucide="database" class="w-3.5 h-3.5 shrink-0 ${activeSubTab === 'backup' ? 'text-white' : 'text-emerald-600'}"></i>
+          <span class="truncate">💾 Backup de Dados</span>
+        </button>
       </div>
 
       <!-- Conteúdo da Sub-aba -->
@@ -11451,6 +11468,10 @@ function renderAdminSubTabContent(tab) {
     return renderSystemAuditLogsTab();
   }
 
+  if (tab === 'backup') {
+    return renderAdminBackupTab();
+  }
+
   if (tab === 'users') {
     const isMasterAdmin = (state.currentUser?.role || 'Administrador Geral') === 'Administrador Geral';
     if (!isMasterAdmin) {
@@ -11931,6 +11952,985 @@ function confirmClearSystemLogs() {
 }
 window.confirmClearSystemLogs = confirmClearSystemLogs;
 window.renderSystemAuditLogsTab = renderSystemAuditLogsTab;
+
+// ==============================================================================
+// MÓDULO DE BACKUP DE DADOS & EXPORTAÇÃO OFICIAL (EXCEL E PDF) - ARENA LIMOEIRO
+// ==============================================================================
+
+function downloadExportFile(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 250);
+}
+
+function getCourtNameForExport(courtId) {
+  if (!courtId) return 'Quadra Esportiva';
+  const c = (state.courts || []).find(x => x && (x.id === courtId || x.courtId === courtId));
+  return c ? c.name : courtId;
+}
+
+function extractCpfFromObs(obs) {
+  if (!obs || typeof obs !== 'string') return '';
+  const match = obs.match(/\[CPF:\s*([^\]]+)\]/i);
+  return match ? match[1].trim() : '';
+}
+
+function formatBarItemsForExport(productCart) {
+  if (!productCart || typeof productCart !== 'object') return 'Nenhum';
+  const items = [];
+  (state.products || []).forEach(p => {
+    if (productCart[p.id] && productCart[p.id] > 0) {
+      items.push(`${p.name} (x${productCart[p.id]})`);
+    }
+  });
+  return items.length > 0 ? items.join(', ') : 'Nenhum';
+}
+
+function csvCell(val) {
+  if (val === null || val === undefined) return '""';
+  const str = String(val).replace(/"/g, '""').replace(/\r?\n/g, ' ');
+  return `"${str}"`;
+}
+
+// 1. 📥 EXPORTAR APENAS JOGOS REGISTRADOS PARA EXCEL (.CSV)
+function exportBookingsExcel() {
+  const todayStr = getFormattedDate(new Date());
+  const bookings = state.bookings || [];
+
+  const headers = [
+    'ID da Reserva',
+    'Data',
+    'Horário Início',
+    'Horário Fim',
+    'Horário Completo',
+    'Espaço / Quadra',
+    'Nome do Cliente / Time',
+    'Telefone',
+    'CPF',
+    'Tipo de Jogo',
+    'Status',
+    'Valor Total (R$)',
+    'Forma de Pagamento',
+    'Itens do Bar / Bebidas',
+    'Observações'
+  ];
+
+  const rows = [headers.map(csvCell).join(';')];
+
+  bookings.forEach(b => {
+    const isFixo = b.booking_type === 'mensalista' || isMensalistaBooking(b);
+    const cName = getCourtNameForExport(b.court_id || b.courtId);
+    const cpf = b.customer_cpf || b.customerCPF || extractCpfFromObs(b.observation) || '';
+    const sTime = b.start_time || (b.time ? b.time.split(' ')[0] : '');
+    const eTime = b.end_time || (b.time ? b.time.split(' às ')[1] : '');
+    const bar = formatBarItemsForExport(b.product_cart);
+    const priceStr = Number(b.total_price || b.totalPrice || 0).toFixed(2).replace('.', ',');
+
+    rows.push([
+      csvCell(b.id || ''),
+      csvCell(b.date || ''),
+      csvCell(sTime),
+      csvCell(eTime),
+      csvCell(b.time || ''),
+      csvCell(cName),
+      csvCell(b.customer_name || b.customerName || 'Cliente'),
+      csvCell(b.customer_phone || b.customerPhone || ''),
+      csvCell(cpf),
+      csvCell(isFixo ? 'Mensalista Fixo' : 'Jogo Avulso'),
+      csvCell(b.status || 'confirmed'),
+      csvCell(priceStr),
+      csvCell(b.payment_method || 'Balcão / Presencial'),
+      csvCell(bar),
+      csvCell(b.observation || '')
+    ].join(';'));
+  });
+
+  const csvContent = '\uFEFF' + rows.join('\r\n');
+  downloadExportFile(csvContent, `arena_limoeiro_jogos_registrados_${todayStr}.csv`, 'text/csv;charset=utf-8;');
+}
+
+// 2. 📥 EXPORTAR APENAS MENSALISTAS / HORÁRIOS FIXOS PARA EXCEL (.CSV)
+function exportMonthlyExcel() {
+  const todayStr = getFormattedDate(new Date());
+  const members = state.monthlyMembers || [];
+
+  const headers = [
+    'ID Contrato',
+    'Time / Responsável',
+    'Nome do Responsável',
+    'Telefone',
+    'CPF',
+    'Espaço / Quadra',
+    'Dia da Semana',
+    'Horário Início',
+    'Horário Fim',
+    'Horário Completo',
+    'Mensalidade (R$)',
+    'Status',
+    'Observações'
+  ];
+
+  const rows = [headers.map(csvCell).join(';')];
+
+  members.forEach(m => {
+    const cName = getCourtNameForExport(m.court_id || m.courtId);
+    const sTime = m.start_time || m.startTime || m.time || '';
+    const eTime = m.end_time || m.endTime || '';
+    const dayLabel = m.day_of_week_label || ('Toda ' + (m.day_of_week || m.dayOfWeek || '') + '-feira');
+    const priceStr = Number(m.monthly_price || m.monthlyPrice || 0).toFixed(2).replace('.', ',');
+
+    rows.push([
+      csvCell(m.id || ''),
+      csvCell(m.team_name || m.teamName || 'Time Mensalista'),
+      csvCell(m.responsible_name || m.responsibleName || ''),
+      csvCell(m.phone || ''),
+      csvCell(m.cpf || ''),
+      csvCell(cName),
+      csvCell(dayLabel),
+      csvCell(sTime),
+      csvCell(eTime),
+      csvCell(sTime && eTime ? `${sTime} às ${eTime}` : (m.time || '')),
+      csvCell(priceStr),
+      csvCell(m.status || 'active'),
+      csvCell(m.observation || '')
+    ].join(';'));
+  });
+
+  const csvContent = '\uFEFF' + rows.join('\r\n');
+  downloadExportFile(csvContent, `arena_limoeiro_horarios_fixos_mensalistas_${todayStr}.csv`, 'text/csv;charset=utf-8;');
+}
+
+// 3. 📊 EXPORTAR OS 2 EM UMA PLANILHA SÓ COM ABAS NO EXCEL (SPREADSHEETML .XLS)
+function exportUnifiedExcel() {
+  const todayStr = getFormattedDate(new Date());
+  const bookings = state.bookings || [];
+  const members = state.monthlyMembers || [];
+
+  function xmlEscape(val) {
+    if (val === null || val === undefined) return '';
+    return String(val)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function makeRow(cells, isHeader = false) {
+    const styleAttr = isHeader ? ' ss:StyleID="HeaderStyle"' : '';
+    const cellsXml = cells.map(c => `<Cell${styleAttr}><Data ss:Type="String">${xmlEscape(c)}</Data></Cell>`).join('');
+    return `<Row>${cellsXml}</Row>`;
+  }
+
+  // Folha 1: Jogos Registrados
+  const bookingHeaders = ['ID', 'Data', 'Horário Início', 'Horário Fim', 'Espaço / Quadra', 'Cliente / Time', 'Telefone', 'CPF', 'Tipo', 'Status', 'Valor (R$)', 'Pagamento', 'Itens Bar', 'Observações'];
+  const bookingRowsXml = [makeRow(bookingHeaders, true)];
+  bookings.forEach(b => {
+    const isFixo = b.booking_type === 'mensalista' || isMensalistaBooking(b);
+    const cName = getCourtNameForExport(b.court_id || b.courtId);
+    const cpf = b.customer_cpf || b.customerCPF || extractCpfFromObs(b.observation) || '';
+    const sTime = b.start_time || (b.time ? b.time.split(' ')[0] : '');
+    const eTime = b.end_time || (b.time ? b.time.split(' às ')[1] : '');
+    const bar = formatBarItemsForExport(b.product_cart);
+    const priceStr = 'R$ ' + Number(b.total_price || b.totalPrice || 0).toFixed(2).replace('.', ',');
+
+    bookingRowsXml.push(makeRow([
+      b.id || '',
+      b.date || '',
+      sTime,
+      eTime,
+      cName,
+      b.customer_name || b.customerName || 'Cliente',
+      b.customer_phone || b.customerPhone || '',
+      cpf,
+      isFixo ? 'Mensalista Fixo' : 'Jogo Avulso',
+      b.status || 'confirmed',
+      priceStr,
+      b.payment_method || 'Balcão / Presencial',
+      bar,
+      b.observation || ''
+    ]));
+  });
+
+  // Folha 2: Horários Fixos (Mensalistas)
+  const memberHeaders = ['ID Contrato', 'Time / Responsável', 'Responsável', 'Telefone', 'CPF', 'Espaço / Quadra', 'Dia da Semana', 'Horário Início', 'Horário Fim', 'Mensalidade', 'Status', 'Observações'];
+  const memberRowsXml = [makeRow(memberHeaders, true)];
+  members.forEach(m => {
+    const cName = getCourtNameForExport(m.court_id || m.courtId);
+    const sTime = m.start_time || m.startTime || m.time || '';
+    const eTime = m.end_time || m.endTime || '';
+    const dayLabel = m.day_of_week_label || ('Toda ' + (m.day_of_week || m.dayOfWeek || '') + '-feira');
+    const priceStr = 'R$ ' + Number(m.monthly_price || m.monthlyPrice || 0).toFixed(2).replace('.', ',');
+
+    memberRowsXml.push(makeRow([
+      m.id || '',
+      m.team_name || m.teamName || 'Time Mensalista',
+      m.responsible_name || m.responsibleName || '',
+      m.phone || '',
+      m.cpf || '',
+      cName,
+      dayLabel,
+      sTime,
+      eTime,
+      priceStr,
+      m.status || 'active',
+      m.observation || ''
+    ]));
+  });
+
+  // Folha 3: Clientes Únicos
+  const clientHeaders = ['Nome do Cliente / Atleta', 'Telefone WhatsApp', 'CPF Cadastrado', 'Total de Partidas'];
+  const clientRowsXml = [makeRow(clientHeaders, true)];
+  const clientsMap = new Map();
+  bookings.forEach(b => {
+    if (!b) return;
+    const phone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+    const name = b.customer_name || b.customerName || '';
+    if (phone || name) {
+      const key = phone || name;
+      if (!clientsMap.has(key)) {
+        clientsMap.set(key, {
+          name,
+          phone: b.customer_phone || b.customerPhone || '',
+          cpf: b.customer_cpf || b.customerCPF || extractCpfFromObs(b.observation) || '',
+          count: 1
+        });
+      } else {
+        clientsMap.get(key).count++;
+      }
+    }
+  });
+  Array.from(clientsMap.values()).forEach(c => {
+    clientRowsXml.push(makeRow([
+      c.name,
+      c.phone,
+      c.cpf,
+      String(c.count)
+    ]));
+  });
+
+  const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#1E293B"/>
+  </Style>
+  <Style ss:ID="HeaderStyle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#0F172A"/>
+   </Borders>
+   <Font ss:FontName="Calibri" x:Family="Swiss" ss:Size="11" ss:Color="#FFFFFF" ss:Bold="1"/>
+   <Interior ss:Color="#065F46" ss:Pattern="Solid"/>
+  </Style>
+ </Styles>
+ <Worksheet ss:Name="Jogos Registrados">
+  <Table>
+   ${bookingRowsXml.join('')}
+  </Table>
+ </Worksheet>
+ <Worksheet ss:Name="Horários Fixos">
+  <Table>
+   ${memberRowsXml.join('')}
+  </Table>
+ </Worksheet>
+ <Worksheet ss:Name="Clientes Cadastrados">
+  <Table>
+   ${clientRowsXml.join('')}
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+  downloadExportFile(xmlContent, `arena_limoeiro_backup_completo_jogos_e_fixos_${todayStr}.xls`, 'application/vnd.ms-excel;charset=utf-8;');
+}
+
+// 4. 📄 BAIXAR RELATÓRIO PDF - JOGOS REGISTRADOS
+function exportBookingsPDF() {
+  const todayStr = getFormattedDate(new Date());
+  const bookings = state.bookings || [];
+  const totalRevenue = bookings.reduce((acc, b) => acc + (Number(b.total_price || b.totalPrice || 0) || 0), 0);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Relatório de Jogos Registrados - Arena Limoeiro</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #1e293b; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 16px; }
+        .logo-title h1 { margin: 0; font-size: 20px; font-weight: 900; color: #065f46; text-transform: uppercase; }
+        .logo-title p { margin: 2px 0 0; font-size: 11px; color: #64748b; }
+        .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 8px; }
+        .stat-box { flex: 1; }
+        .stat-label { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #64748b; }
+        .stat-val { font-size: 15px; font-weight: 900; color: #0f172a; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        th { background: #065f46; color: #ffffff; padding: 6px 8px; text-align: left; font-weight: 800; text-transform: uppercase; }
+        td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 800; }
+        .badge-fixo { background: #fef3c7; color: #92400e; }
+        .badge-avulso { background: #e2e8f0; color: #334155; }
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="margin-bottom: 15px;">
+        <button onclick="window.print()" style="background: #059669; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+          🖨️ Salvar como PDF / Imprimir
+        </button>
+      </div>
+
+      <div class="header">
+        <div class="logo-title">
+          <h1>Arena Limoeiro - Relatório de Jogos</h1>
+          <p>Relatório Oficial de Agendamentos e Peladas • Limoeiro - PE</p>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <strong>Emissão:</strong> ${new Date().toLocaleString('pt-BR')}<br>
+          <strong>Total de Registros:</strong> ${bookings.length} jogos
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-box">
+          <div class="stat-label">Total de Jogos</div>
+          <div class="stat-val">${bookings.length}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Faturamento Total</div>
+          <div class="stat-val">R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Origem dos Dados</div>
+          <div class="stat-val" style="color: #059669;">100% Preservados</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Data</th>
+            <th>Horário</th>
+            <th>Espaço / Quadra</th>
+            <th>Cliente / Time</th>
+            <th>Telefone</th>
+            <th>CPF</th>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bookings.map(b => {
+            const isFixo = b.booking_type === 'mensalista' || isMensalistaBooking(b);
+            const cName = getCourtNameForExport(b.court_id || b.courtId);
+            const cpf = b.customer_cpf || b.customerCPF || extractCpfFromObs(b.observation) || '-';
+            const price = 'R$ ' + Number(b.total_price || b.totalPrice || 0).toFixed(2).replace('.', ',');
+            return `
+              <tr>
+                <td><strong>${b.id}</strong></td>
+                <td>${b.date}</td>
+                <td>${b.time || (b.start_time + ' às ' + b.end_time)}</td>
+                <td>${cName}</td>
+                <td><strong>${b.customer_name || b.customerName || 'Cliente'}</strong></td>
+                <td>${b.customer_phone || b.customerPhone || '-'}</td>
+                <td>${cpf}</td>
+                <td><span class="badge ${isFixo ? 'badge-fixo' : 'badge-avulso'}">${isFixo ? 'Fixo' : 'Avulso'}</span></td>
+                <td>${b.status || 'confirmed'}</td>
+                <td><strong>${price}</strong></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 400);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+  } else {
+    alert('Por favor, permita pop-ups para abrir o relatório em PDF.');
+  }
+}
+
+// 5. 📄 BAIXAR RELATÓRIO PDF - HORÁRIOS FIXOS / MENSALISTAS
+function exportMonthlyPDF() {
+  const members = state.monthlyMembers || [];
+  const totalRevenue = members.reduce((acc, m) => acc + (Number(m.monthly_price || m.monthlyPrice || 0) || 0), 0);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Relatório de Horários Fixos - Arena Limoeiro</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #1e293b; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #b45309; padding-bottom: 12px; margin-bottom: 16px; }
+        .logo-title h1 { margin: 0; font-size: 20px; font-weight: 900; color: #92400e; text-transform: uppercase; }
+        .logo-title p { margin: 2px 0 0; font-size: 11px; color: #64748b; }
+        .stats-bar { display: flex; gap: 12px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; padding: 10px 14px; border-radius: 8px; }
+        .stat-box { flex: 1; }
+        .stat-label { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #92400e; }
+        .stat-val { font-size: 15px; font-weight: 900; color: #78350f; }
+        table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        th { background: #92400e; color: #ffffff; padding: 6px 8px; text-align: left; font-weight: 800; text-transform: uppercase; }
+        td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="margin-bottom: 15px;">
+        <button onclick="window.print()" style="background: #92400e; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer;">
+          🖨️ Salvar como PDF / Imprimir
+        </button>
+      </div>
+
+      <div class="header">
+        <div class="logo-title">
+          <h1>Arena Limoeiro - Horários Fixos (Mensalistas)</h1>
+          <p>Relação Oficial de Contratos Mensalistas Ativos • Limoeiro - PE</p>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <strong>Emissão:</strong> ${new Date().toLocaleString('pt-BR')}<br>
+          <strong>Total de Contratos:</strong> ${members.length} mensalistas
+        </div>
+      </div>
+
+      <div class="stats-bar">
+        <div class="stat-box">
+          <div class="stat-label">Contratos Ativos</div>
+          <div class="stat-val">${members.length} mensalistas</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-label">Receita Recorrente Mensal</div>
+          <div class="stat-val">R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / mês</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Time / Mensalista</th>
+            <th>Responsável</th>
+            <th>Telefone</th>
+            <th>CPF</th>
+            <th>Espaço / Quadra</th>
+            <th>Dia da Semana</th>
+            <th>Horário</th>
+            <th>Mensalidade</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${members.map(m => {
+            const cName = getCourtNameForExport(m.court_id || m.courtId);
+            const sTime = m.start_time || m.startTime || m.time || '';
+            const eTime = m.end_time || m.endTime || '';
+            const dayLabel = m.day_of_week_label || ('Toda ' + (m.day_of_week || m.dayOfWeek || '') + '-feira');
+            const price = 'R$ ' + Number(m.monthly_price || m.monthlyPrice || 0).toFixed(2).replace('.', ',');
+            return `
+              <tr>
+                <td><strong>${m.team_name || m.teamName || 'Time Mensalista'}</strong></td>
+                <td>${m.responsible_name || m.responsibleName || '-'}</td>
+                <td>${m.phone || '-'}</td>
+                <td>${m.cpf || '-'}</td>
+                <td><strong>${cName}</strong></td>
+                <td>${dayLabel}</td>
+                <td>${sTime} às ${eTime}</td>
+                <td><strong>${price}</strong></td>
+                <td><span style="color: #059669; font-weight: bold;">Ativo</span></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 400);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+  } else {
+    alert('Por favor, permita pop-ups para abrir o relatório em PDF.');
+  }
+}
+
+// 6. 📄 BAIXAR RELATÓRIO PDF GERAL UNIFICADO (JOGOS + FIXOS + CLIENTES)
+function exportUnifiedPDF() {
+  const bookings = state.bookings || [];
+  const members = state.monthlyMembers || [];
+  const totalRevenue = bookings.reduce((acc, b) => acc + (Number(b.total_price || b.totalPrice || 0) || 0), 0);
+  const monthlyRevenue = members.reduce((acc, m) => acc + (Number(m.monthly_price || m.monthlyPrice || 0) || 0), 0);
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Backup Geral Completo - Arena Limoeiro</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; color: #1e293b; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #065f46; padding-bottom: 12px; margin-bottom: 20px; }
+        .logo-title h1 { margin: 0; font-size: 22px; font-weight: 900; color: #065f46; text-transform: uppercase; }
+        .logo-title p { margin: 2px 0 0; font-size: 11px; color: #64748b; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; }
+        .stat-title { font-size: 9px; text-transform: uppercase; font-weight: 800; color: #64748b; }
+        .stat-number { font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 4px; }
+        h2 { font-size: 14px; font-weight: 900; color: #065f46; text-transform: uppercase; margin: 24px 0 10px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
+        table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 20px; }
+        th { background: #065f46; color: #ffffff; padding: 6px 8px; text-align: left; font-weight: 800; text-transform: uppercase; }
+        td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) { background-color: #f8fafc; }
+        @media print {
+          body { margin: 0; }
+          .no-print { display: none; }
+          h2 { page-break-after: avoid; }
+          tr { page-break-inside: avoid; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="margin-bottom: 15px;">
+        <button onclick="window.print()" style="background: #059669; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 900; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+          🖨️ Salvar como PDF / Imprimir Documento Completo
+        </button>
+      </div>
+
+      <div class="header">
+        <div class="logo-title">
+          <h1>Arena Limoeiro - Relatório Geral Unificado</h1>
+          <p>Backup Geral Oficial de Dados: Jogos, Mensalistas Fixos e Diretório de Atletas</p>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #64748b;">
+          <strong>Data de Extração:</strong> ${new Date().toLocaleString('pt-BR')}<br>
+          <strong>Arena Limoeiro</strong> • Telefone: (81) 98463-4126
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-title">Total de Jogos</div>
+          <div class="stat-number">${bookings.length} jogos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Mensalistas Fixos</div>
+          <div class="stat-number">${members.length} contratos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Faturamento dos Jogos</div>
+          <div class="stat-number">R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-title">Receita Mensal Recorrente</div>
+          <div class="stat-number">R$ ${monthlyRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês</div>
+        </div>
+      </div>
+
+      <h2>1. Contratos de Horários Fixos (Mensalistas) - ${members.length} Ativos</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time / Mensalista</th>
+            <th>Responsável</th>
+            <th>Telefone</th>
+            <th>Quadra</th>
+            <th>Dia da Semana</th>
+            <th>Horário</th>
+            <th>Mensalidade</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${members.map(m => {
+            const cName = getCourtNameForExport(m.court_id || m.courtId);
+            const sTime = m.start_time || m.startTime || m.time || '';
+            const eTime = m.end_time || m.endTime || '';
+            const dayLabel = m.day_of_week_label || ('Toda ' + (m.day_of_week || m.dayOfWeek || '') + '-feira');
+            const price = 'R$ ' + Number(m.monthly_price || m.monthlyPrice || 0).toFixed(2).replace('.', ',');
+            return `
+              <tr>
+                <td><strong>${m.team_name || m.teamName || 'Time Mensalista'}</strong></td>
+                <td>${m.responsible_name || m.responsibleName || '-'}</td>
+                <td>${m.phone || '-'}</td>
+                <td><strong>${cName}</strong></td>
+                <td>${dayLabel}</td>
+                <td>${sTime} às ${eTime}</td>
+                <td><strong>${price}</strong></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <h2>2. Registro Completo de Jogos - ${bookings.length} Partidas</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Data</th>
+            <th>Horário</th>
+            <th>Quadra</th>
+            <th>Cliente / Time</th>
+            <th>Telefone</th>
+            <th>CPF</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${bookings.map(b => {
+            const isFixo = b.booking_type === 'mensalista' || isMensalistaBooking(b);
+            const cName = getCourtNameForExport(b.court_id || b.courtId);
+            const cpf = b.customer_cpf || b.customerCPF || extractCpfFromObs(b.observation) || '-';
+            const price = 'R$ ' + Number(b.total_price || b.totalPrice || 0).toFixed(2).replace('.', ',');
+            return `
+              <tr>
+                <td><strong>${b.id}</strong></td>
+                <td>${b.date}</td>
+                <td>${b.time || (b.start_time + ' às ' + b.end_time)}</td>
+                <td>${cName}</td>
+                <td><strong>${b.customer_name || b.customerName || 'Cliente'}</strong></td>
+                <td>${b.customer_phone || b.customerPhone || '-'}</td>
+                <td>${cpf}</td>
+                <td>${isFixo ? 'Fixo' : 'Avulso'}</td>
+                <td><strong>${price}</strong></td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+
+      <script>
+        window.onload = function() {
+          setTimeout(function() { window.print(); }, 400);
+        };
+      </script>
+    </body>
+    </html>
+  `;
+
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+  } else {
+    alert('Por favor, permita pop-ups para abrir o relatório em PDF.');
+  }
+}
+
+// 7. 💾 BAIXAR BACKUP JSON COMPLETO (RESTAURAÇÃO TOTAL DO SISTEMA)
+function exportFullJSON() {
+  const todayStr = getFormattedDate(new Date());
+  const backup = {
+    app: 'Arena Limoeiro',
+    version: '2.0-cloud-localhost',
+    export_date: new Date().toISOString(),
+    stats: {
+      total_bookings: (state.bookings || []).length,
+      total_monthly_members: (state.monthlyMembers || []).length,
+      total_courts: (state.courts || []).length
+    },
+    courts: state.courts || [],
+    monthly_members: state.monthlyMembers || [],
+    bookings: state.bookings || [],
+    products: state.products || [],
+    water_supply: state.waterSupply || {}
+  };
+
+  const jsonStr = JSON.stringify(backup, null, 2);
+  downloadExportFile(jsonStr, `arena_limoeiro_backup_completo_${todayStr}.json`, 'application/json;charset=utf-8;');
+}
+
+// 8. RENDERIZAÇÃO DA ABA NO PAINEL ADMIN
+function renderAdminBackupTab() {
+  const totalBookings = (state.bookings || []).length;
+  const totalMonthly = (state.monthlyMembers || []).length;
+
+  const clientsMap = new Map();
+  (state.bookings || []).forEach(b => {
+    if (!b) return;
+    const phone = (b.customer_phone || b.customerPhone || '').replace(/\D/g, '');
+    const name = b.customer_name || b.customerName || '';
+    if (phone || name) {
+      const key = phone || name;
+      if (!clientsMap.has(key)) {
+        clientsMap.set(key, {
+          name,
+          phone: b.customer_phone || b.customerPhone || 'Não informado',
+          cpf: b.customer_cpf || b.customerCPF || extractCpfFromObs(b.observation) || 'Não informado',
+          count: 1
+        });
+      } else {
+        clientsMap.get(key).count++;
+      }
+    }
+  });
+  const totalClients = clientsMap.size;
+  const totalRevenue = (state.bookings || []).reduce((acc, b) => acc + (Number(b.total_price || b.totalPrice || 0) || 0), 0);
+
+  return `
+    <div class="space-y-6">
+      
+      <!-- Cabeçalho Principal -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div>
+            <div class="flex items-center space-x-2.5">
+              <span class="p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 shadow-xs">
+                <i data-lucide="database" class="w-6 h-6"></i>
+              </span>
+              <div>
+                <h3 class="text-lg sm:text-xl font-black text-slate-900">Backup de Dados & Exportação Oficial</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Exporte e salve planilhas de Excel e relatórios em PDF de todos os jogos, mensalistas e clientes</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Base Localhost & Nuvem Protegida
+            </span>
+            <button onclick="exportFullJSON()" class="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl shadow flex items-center space-x-1.5 cursor-pointer transition-all">
+              <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+              <span>Backup JSON Geral</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Indicadores Rápidos -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-6">
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">⚽ Jogos Registrados</span>
+            <span class="text-xl sm:text-2xl font-black text-slate-900 mt-1 block">${totalBookings}</span>
+            <span class="text-[10px] text-emerald-600 font-bold">100% preservados</span>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">👑 Horários Fixos</span>
+            <span class="text-xl sm:text-2xl font-black text-slate-900 mt-1 block">${totalMonthly}</span>
+            <span class="text-[10px] text-emerald-600 font-bold">Contratos ativos</span>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">👥 Clientes Únicos</span>
+            <span class="text-xl sm:text-2xl font-black text-slate-900 mt-1 block">${totalClients}</span>
+            <span class="text-[10px] text-slate-500 font-medium">Cadastrados e jogos</span>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200">
+            <span class="text-[11px] font-bold text-emerald-800 uppercase tracking-wider block">💰 Faturamento Total</span>
+            <span class="text-xl sm:text-2xl font-black text-emerald-900 mt-1 block">R$ ${totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span class="text-[10px] text-emerald-700 font-bold">Histórico de reservas</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARDS DE EXPORTAÇÃO (PLANILHAS SEPARADAS & UNIFICADA) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- CARD 1: APENAS JOGOS REGISTRADOS -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:border-emerald-300 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shadow-2xs">
+              <i data-lucide="table-2" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">Planilha Separada</span>
+              <h4 class="text-base font-black text-slate-900 mt-1.5">Jogos Registrados</h4>
+              <p class="text-xs text-slate-500 mt-1">Exporta exclusivamente todos os ${totalBookings} jogos e peladas avulsas registrados no sistema com data, horário, campo, cliente, telefone, CPF, método de pagamento e itens do bar.</p>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-100">
+            <button onclick="exportBookingsExcel()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center justify-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+              <span>Baixar Planilha Excel (Jogos)</span>
+            </button>
+            <button onclick="exportBookingsPDF()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="file-text" class="w-4 h-4 text-rose-400"></i>
+              <span>Baixar Relatório PDF (Jogos)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD 2: APENAS HORÁRIOS FIXOS / MENSALISTAS -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between space-y-4 hover:border-emerald-300 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shadow-2xs">
+              <i data-lucide="calendar-check" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">Planilha Separada</span>
+              <h4 class="text-base font-black text-slate-900 mt-1.5">Horários Fixos (Mensalistas)</h4>
+              <p class="text-xs text-slate-500 mt-1">Exporta exclusivamente os ${totalMonthly} mensalistas fixos oficiais (Davi, Jajá, Waldesio, Monica, Davison, Betinho, etc.) com time, dia da semana, quadra, horário e valor da mensalidade.</p>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-100">
+            <button onclick="exportMonthlyExcel()" class="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow flex items-center justify-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+              <span>Baixar Planilha Excel (Fixos)</span>
+            </button>
+            <button onclick="exportMonthlyPDF()" class="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="file-text" class="w-4 h-4 text-amber-400"></i>
+              <span>Baixar Relatório PDF (Fixos)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD 3: TUDO EM UMA PLANILHA SÓ (JOGOS + FIXOS + CLIENTES) -->
+        <div class="bg-gradient-to-br from-emerald-950 to-slate-900 rounded-3xl p-6 shadow-lg text-white flex flex-col justify-between space-y-4 border border-emerald-800/50">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-inner">
+              <i data-lucide="layers" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-400/30">Recomendado • Tudo em Um</span>
+              <h4 class="text-base font-black text-white mt-1.5">Planilha Completa Geral</h4>
+              <p class="text-xs text-slate-300 mt-1">Baixa os 2 em uma única planilha com abas (Jogos Registrados + Horários Fixos + Dados e Fichas dos Clientes) ou relatório geral unificado em PDF.</p>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2 border-t border-slate-700/60">
+            <button onclick="exportUnifiedExcel()" class="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-xs shadow-lg flex items-center justify-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-4.5 h-4.5"></i>
+              <span>Baixar 2 em 1: Excel Completo</span>
+            </button>
+            <button onclick="exportUnifiedPDF()" class="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-xl text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer">
+              <i data-lucide="printer" class="w-4 h-4 text-emerald-300"></i>
+              <span>Baixar PDF Completo Geral</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- PRÉVIA DOS REGISTROS SALVOS -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+          <div>
+            <h4 class="text-base font-black text-slate-900">Prévia dos Registros Salvos no Sistema</h4>
+            <p class="text-xs text-slate-500">Visualização imediata dos dados que serão baixados nas planilhas</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+              Total de Linhas Prontas: <strong>${totalBookings + totalMonthly}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-96">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead class="bg-slate-50 text-slate-600 font-black uppercase text-[10px] sticky top-0 border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-3">Tipo</th>
+                <th class="py-2.5 px-3">Identificador</th>
+                <th class="py-2.5 px-3">Data / Dia</th>
+                <th class="py-2.5 px-3">Horário</th>
+                <th class="py-2.5 px-3">Espaço / Quadra</th>
+                <th class="py-2.5 px-3">Cliente / Time</th>
+                <th class="py-2.5 px-3">Telefone</th>
+                <th class="py-2.5 px-3">Valor</th>
+                <th class="py-2.5 px-3">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              ${(state.monthlyMembers || []).map(m => {
+                const cName = getCourtNameForExport(m.court_id || m.courtId);
+                return `
+                  <tr class="hover:bg-amber-50/40 bg-amber-50/15">
+                    <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">Fixo</span></td>
+                    <td class="py-2 px-3 font-mono font-bold text-slate-700">${m.id}</td>
+                    <td class="py-2 px-3 font-bold text-slate-800">${m.day_of_week_label || ('Toda ' + m.day_of_week)}</td>
+                    <td class="py-2 px-3 font-semibold text-slate-700">${m.start_time || m.time || ''} às ${m.end_time || ''}</td>
+                    <td class="py-2 px-3 text-slate-800 font-bold">${cName}</td>
+                    <td class="py-2 px-3 text-slate-900 font-black">${m.team_name || m.teamName || 'Mensalista'}</td>
+                    <td class="py-2 px-3 text-slate-600 font-mono">${m.phone || '-'}</td>
+                    <td class="py-2 px-3 font-black text-emerald-700">R$ ${Number(m.monthly_price || m.monthlyPrice || 0).toFixed(2).replace('.', ',')}</td>
+                    <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Ativo</span></td>
+                  </tr>
+                `;
+              }).join('')}
+              ${(state.bookings || []).slice(0, 30).map(b => {
+                const cName = getCourtNameForExport(b.court_id || b.courtId);
+                const isFixo = b.booking_type === 'mensalista' || isMensalistaBooking(b);
+                return `
+                  <tr class="hover:bg-slate-50">
+                    <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full ${isFixo ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-700'} font-bold text-[10px]">${isFixo ? 'Fixo' : 'Avulso'}</span></td>
+                    <td class="py-2 px-3 font-mono text-slate-600">${b.id}</td>
+                    <td class="py-2 px-3 text-slate-800">${b.date}</td>
+                    <td class="py-2 px-3 text-slate-700">${b.time || (b.start_time + ' às ' + b.end_time)}</td>
+                    <td class="py-2 px-3 text-slate-800">${cName}</td>
+                    <td class="py-2 px-3 text-slate-900 font-bold">${b.customer_name || b.customerName || 'Cliente'}</td>
+                    <td class="py-2 px-3 text-slate-600 font-mono">${b.customer_phone || b.customerPhone || '-'}</td>
+                    <td class="py-2 px-3 font-black text-emerald-700">R$ ${(b.total_price || b.totalPrice || 0).toFixed(2).replace('.', ',')}</td>
+                    <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">${b.status}</span></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        ${totalBookings > 30 ? `
+          <p class="text-[11px] text-slate-400 text-center mt-3 pt-2 border-t border-slate-100">Mostrando os 12 mensalistas fixos e os primeiros 30 jogos na tela. As planilhas e relatórios contêm <strong>TODOS OS ${totalBookings + totalMonthly} REGISTROS</strong> completos.</p>
+        ` : ''}
+      </div>
+
+    </div>
+  `;
+}
+
+window.renderAdminBackupTab = renderAdminBackupTab;
+window.exportBookingsExcel = exportBookingsExcel;
+window.exportMonthlyExcel = exportMonthlyExcel;
+window.exportUnifiedExcel = exportUnifiedExcel;
+window.exportBookingsPDF = exportBookingsPDF;
+window.exportMonthlyPDF = exportMonthlyPDF;
+window.exportUnifiedPDF = exportUnifiedPDF;
+window.exportFullJSON = exportFullJSON;
 
 // ==============================================================================
 // ABA DEDICADA DE GESTÃO DE AGENDAMENTOS NO PAINEL ADMIN (APAGAR E GERENCIAR JOGOS)
@@ -13159,6 +14159,16 @@ async function handleSaveBarItems(e, bookingId) {
   } else {
     b.product_cart = {};
   }
+
+  // Salva imediatamente no localStorage do celular para controle offline/localhost
+  const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+  const idx = localBookings.findIndex(x => x.id === bookingId);
+  if (idx !== -1) {
+    localBookings[idx] = b;
+  } else {
+    localBookings.push(b);
+  }
+  localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
 
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
@@ -20300,21 +21310,25 @@ async function syncDataFromSupabase(skipRender = false) {
       client.from('courts').select('*').order('order_index', { ascending: true }),
       client.from('products').select('*'),
       client.from('monthly_members').select('*'),
-      client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate()),
+      client.from('bookings').select('*'),
       client.from('customers').select('*').order('created_at', { ascending: false }),
       client.from('admin_users').select('*').order('created_at', { ascending: true })
     ]);
 
-    // Executa limpeza assíncrona de registros com mais de 3 dias no Supabase
+    // Limpeza de agendamentos desativada
     cleanupOldBookingsFromDatabase().catch(() => {});
 
     if (dbCourts && dbCourts.length > 0) {
-      state.courts = dbCourts.map(normalizeCourt);
-      if (state.selectedCourt) {
-        const matching = state.courts.find(c => c.id === state.selectedCourt.id);
-        if (matching) state.selectedCourt = matching;
+      const hasMock = dbCourts.some(c => c && c.name && (c.name.includes('Campo Society 01') || c.name.includes('Quadra de Areia A') || c.name.includes('Ginásio Poliesportivo 01') || c.name.includes('Quadra de Padel')));
+      const hasFutCourts = dbCourts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
+      if (!hasMock && hasFutCourts) {
+        state.courts = dbCourts.map(normalizeCourt);
+        if (state.selectedCourt) {
+          const matching = state.courts.find(c => c.id === state.selectedCourt.id);
+          if (matching) state.selectedCourt = matching;
+        }
+        localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
       }
-      localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
     }
 
     if (dbProducts && dbProducts.length > 0) {
@@ -20353,17 +21367,33 @@ async function syncDataFromSupabase(skipRender = false) {
         return true;
       });
       if (validDbMembers.length > 0) {
-        state.monthlyMembers = validDbMembers;
-        localStorage.setItem('arena_monthly_members', JSON.stringify(validDbMembers));
+        const localMembers = JSON.parse(localStorage.getItem('arena_monthly_members') || '[]');
+        const memMap = new Map(validDbMembers.map(m => [String(m.id), m]));
+        (Array.isArray(localMembers) ? localMembers : []).forEach(lm => {
+          if (lm && lm.id && !memMap.has(String(lm.id)) && !isBookingDeleted(String(lm.id))) {
+            memMap.set(String(lm.id), lm);
+          }
+        });
+        const mergedMem = Array.from(memMap.values());
+        state.monthlyMembers = mergedMem;
+        localStorage.setItem('arena_monthly_members', JSON.stringify(mergedMem));
       }
     }
 
     if (dbBookings && Array.isArray(dbBookings) && dbBookings.length > 0) {
       const deletedBookingSet = getDeletedBookingIds();
-      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)) && !isBookingDateInThePast(b.date));
+      const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !deletedBookingSet.has(String(b.id)));
       if (validDbBookings.length > 0) {
-        state.bookings = validDbBookings;
-        localStorage.setItem('arena_local_bookings', JSON.stringify(validDbBookings));
+        const localSaved = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+        const map = new Map(validDbBookings.map(b => [String(b.id), b]));
+        (Array.isArray(localSaved) ? localSaved : []).forEach(lb => {
+          if (lb && lb.id && !map.has(String(lb.id)) && !deletedBookingSet.has(String(lb.id))) {
+            map.set(String(lb.id), lb);
+          }
+        });
+        const merged = Array.from(map.values());
+        state.bookings = merged;
+        localStorage.setItem('arena_local_bookings', JSON.stringify(merged));
       }
 
       const maintFromDb = dbBookings
@@ -20533,10 +21563,10 @@ async function syncDataFromSupabase(skipRender = false) {
             }
           }
 
-          const { data } = await client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate());
+          const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20553,10 +21583,10 @@ async function syncDataFromSupabase(skipRender = false) {
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
           }
-          const { data } = await client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate());
+          const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20569,10 +21599,10 @@ async function syncDataFromSupabase(skipRender = false) {
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI();
           }
-          const { data } = await client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate());
+          const { data } = await client.from('bookings').select('*');
           if (data) { 
             const delIds = getDeletedBookingIds();
-            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            state.bookings = data.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
             _refreshAllUI(); 
           }
@@ -20657,24 +21687,28 @@ async function checkAndSyncBookingsBackground() {
 
           // Quadras
           if (Array.isArray(cloudData.courts) && cloudData.courts.length > 0) {
-            const normCourts = cloudData.courts.map(normalizeCourt);
-            if (JSON.stringify(normCourts) !== JSON.stringify(state.courts)) {
-              state.courts = normCourts;
-              localStorage.setItem('arena_local_courts', JSON.stringify(normCourts));
-              _refreshAllUI();
+            const hasMock = cloudData.courts.some(c => c && c.name && (c.name.includes('Campo Society 01') || c.name.includes('Quadra de Areia A') || c.name.includes('Ginásio Poliesportivo 01') || c.name.includes('Quadra de Padel')));
+            const hasFutCourts = cloudData.courts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
+            if (!hasMock && hasFutCourts) {
+              const normCourts = cloudData.courts.map(normalizeCourt);
+              if (JSON.stringify(normCourts) !== JSON.stringify(state.courts)) {
+                state.courts = normCourts;
+                localStorage.setItem('arena_local_courts', JSON.stringify(normCourts));
+                _refreshAllUI();
+              }
             }
           }
 
           // Agendamentos
           if (Array.isArray(cloudData.bookings)) {
-            const cloudBookings = cloudData.bookings.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+            const cloudBookings = cloudData.bookings.filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
             const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
             
             // Mescla reservas locais que ainda não subiram (garante que dados do celular principal subam)
             const cloudMap = new Map(cloudBookings.map(b => [String(b.id), b]));
             let hasLocalOnly = false;
             for (const lb of localBookings) {
-              if (lb && lb.id && !cloudMap.has(String(lb.id)) && !delIds.has(String(lb.id)) && !isBookingDateInThePast(lb.date)) {
+              if (lb && lb.id && !cloudMap.has(String(lb.id)) && !delIds.has(String(lb.id))) {
                 cloudMap.set(String(lb.id), lb);
                 hasLocalOnly = true;
               }
@@ -20745,13 +21779,13 @@ async function checkAndSyncBookingsBackground() {
           { data: dbWaterProduct },
           { data: dbMonthlyMembers }
         ] = await Promise.all([
-          client.from('bookings').select('*').gte('date', getActiveBookingCutoffDate()),
+          client.from('bookings').select('*'),
           client.from('courts').select('*').order('order_index', { ascending: true }),
           client.from('products').select('*').eq('id', 'arena-water-supply').maybeSingle(),
           client.from('monthly_members').select('*')
         ]);
 
-        // Rotina de limpeza periódica de agendamentos com mais de 3 dias
+        // Rotina de limpeza periódica de agendamentos desativada
         cleanupOldBookingsFromDatabase().catch(() => {});
 
         if (dbWaterProduct && dbWaterProduct.image) {
@@ -20776,7 +21810,7 @@ async function checkAndSyncBookingsBackground() {
 
         if (dbBookings && !error) {
           const delIds = getDeletedBookingIds();
-          const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)) && !isBookingDateInThePast(b.date));
+          const validDbBookings = (dbBookings || []).filter(b => b && b.status !== 'cancelled' && !delIds.has(String(b.id)));
           const existingMap = new Map((state.bookings || []).map(b => [b.id, b]));
           const brandNew = validDbBookings.filter(b => b && b.id && !existingMap.has(b.id));
 

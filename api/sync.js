@@ -217,22 +217,7 @@ export default async function handler(req, res) {
         modified = true;
       }
 
-      // ── Ação: Limpeza Automática de Agendamentos Antigos (> 3 dias) ──
-      else if (action === 'cleanup_old' && payload && payload.cutoffDate) {
-        if (Array.isArray(current.bookings)) {
-          const beforeCount = current.bookings.length;
-          current.bookings = current.bookings.filter(b => !b.date || b.date >= payload.cutoffDate);
-          if (current.bookings.length !== beforeCount) modified = true;
-        }
-      }
 
-      // Poda automática contínua de agendamentos com mais de 3 dias para máxima economia de tráfego
-      const threeDaysAgo = new Date();
-      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-      const autoCutoff = threeDaysAgo.toISOString().slice(0, 10);
-      if (Array.isArray(current.bookings)) {
-        current.bookings = current.bookings.filter(b => !b.date || b.date >= autoCutoff);
-      }
 
       if (modified) {
         await saveCloudData(current);
