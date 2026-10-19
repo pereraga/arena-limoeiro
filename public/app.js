@@ -7367,6 +7367,11 @@ function renderLiveDashboardTab() {
                         <span class="text-[10px] font-medium opacity-85">até ${match.end_time}</span>
                       </div>
 
+                      <img src="${court.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
+                           alt="${court.name}" 
+                           onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+                           class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
+
                       <div class="space-y-1">
                         <div class="flex flex-wrap items-center gap-1.5">
                           <span class="text-xs font-black text-emerald-900 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-200 flex items-center gap-1">
@@ -11689,40 +11694,47 @@ function renderAdminSubTabContent(tab) {
 
               return `
                 <div class="p-4 sm:p-5 border border-slate-200 bg-white hover:border-emerald-300 rounded-2xl sm:rounded-3xl flex flex-col justify-between gap-3 shadow-2xs transition-all">
-                  <div class="flex items-start justify-between gap-2">
-                    <div class="space-y-1">
-                      <div class="flex items-center space-x-2 flex-wrap gap-y-1">
-                        <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                          <i data-lucide="map-pin" class="w-3 h-3"></i>
-                          ${courtName}
-                        </span>
-                        ${isFixo ? `
-                          <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
-                            <i data-lucide="clock" class="w-3 h-3 text-amber-700"></i>
-                            ⏰ Horário Fixo (Paga pós-jogo)
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-start space-x-3.5 min-w-0">
+                      <img src="${court ? court.image : 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
+                           alt="${courtName}" 
+                           onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+                           class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
+
+                      <div class="space-y-1 min-w-0">
+                        <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                          <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                            <i data-lucide="map-pin" class="w-3 h-3"></i>
+                            ${courtName}
                           </span>
-                        ` : `
-                          <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 flex items-center gap-1 shadow-2xs">
-                            <i data-lucide="star" class="w-3 h-3 text-indigo-700"></i>
-                            ⭐ Mensalista Fechado
+                          ${isFixo ? `
+                            <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                              <i data-lucide="clock" class="w-3 h-3 text-amber-700"></i>
+                              ⏰ Horário Fixo (Paga pós-jogo)
+                            </span>
+                          ` : `
+                            <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 flex items-center gap-1 shadow-2xs">
+                              <i data-lucide="star" class="w-3 h-3 text-indigo-700"></i>
+                              ⭐ Mensalista Fechado
+                            </span>
+                          `}
+                          <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                            ${m.status === 'inactive' ? 'Inativo' : 'Ativo'}
                           </span>
-                        `}
-                        <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                          ${m.status === 'inactive' ? 'Inativo' : 'Ativo'}
-                        </span>
+                        </div>
+                        <h4 class="text-base font-black text-slate-900 pt-1">${m.team_name || m.teamName || 'Time Mensalista'}</h4>
+                        <p class="text-xs text-slate-600 flex items-center space-x-1.5 flex-wrap gap-1">
+                          <span class="inline-flex items-center space-x-1">
+                            <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+                            <span>${m.responsible_name || m.responsibleName || 'Responsável'}</span>
+                          </span>
+                          <span class="text-slate-300">•</span>
+                          <span class="inline-flex items-center space-x-1">
+                            <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
+                            <span class="font-mono">${m.phone || '-'}</span>
+                          </span>
+                        </p>
                       </div>
-                      <h4 class="text-base font-black text-slate-900 pt-1">${m.team_name || m.teamName || 'Time Mensalista'}</h4>
-                      <p class="text-xs text-slate-600 flex items-center space-x-1.5 flex-wrap gap-1">
-                        <span class="inline-flex items-center space-x-1">
-                          <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
-                          <span>${m.responsible_name || m.responsibleName || 'Responsável'}</span>
-                        </span>
-                        <span class="text-slate-300">•</span>
-                        <span class="inline-flex items-center space-x-1">
-                          <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
-                          <span class="font-mono">${m.phone || '-'}</span>
-                        </span>
-                      </p>
                     </div>
 
                     <div class="text-right shrink-0">
@@ -13273,40 +13285,47 @@ function renderSubtabBookingsItems(bookings) {
     return `
       <div class="p-4 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-3.5">
         
-        <!-- Bloco de Informações do Jogo -->
-        <div class="space-y-1.5 flex-1 min-w-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
-              🏟️ ${court.name}
-            </span>
-            <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 flex items-center gap-1">
-              <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
-              ${formatDisplayDate(b.date)} • ${timeDisplay}
-            </span>
-            ${statusBadge}
-            ${isMensalistaBooking(b) ? '<span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-1 shadow-2xs">⭐ Mensalista</span>' : ''}
-          </div>
+        <div class="flex items-start sm:items-center space-x-3.5 flex-1 min-w-0">
+          <img src="${court.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
+               alt="${court.name}" 
+               onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+               class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
 
-          <div class="flex flex-wrap items-center gap-3 text-xs text-slate-700">
-            <div class="flex items-center space-x-1.5 font-black text-slate-900 flex-wrap">
-              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
-              <span>${b.customer_name || 'Cliente'}</span>
-              ${isMensalistaBooking(b) ? '<span class="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">⭐ Mensalista</span>' : ''}
-            </div>
-            ${b.customer_cpf ? `
-              <span class="font-mono text-[11px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-600">
-                CPF: ${formatCPF(b.customer_cpf)}
+          <!-- Bloco de Informações do Jogo -->
+          <div class="space-y-1.5 flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                🏟️ ${court.name}
               </span>
-            ` : ''}
-            ${cleanPhone ? `
-              <a href="${zapUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 hover:underline">
-                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-                <span>${formatPhone(b.customer_phone)}</span>
-              </a>
-            ` : ''}
-            <span class="font-black text-emerald-700 bg-emerald-50/50 px-2 py-0.5 rounded">
-              R$ ${price} (${(b.payment_method || 'PIX').toUpperCase()})
-            </span>
+              <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 flex items-center gap-1">
+                <i data-lucide="calendar" class="w-3.5 h-3.5 text-emerald-600"></i>
+                ${formatDisplayDate(b.date)} • ${timeDisplay}
+              </span>
+              ${statusBadge}
+              ${isMensalistaBooking(b) ? '<span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-1 shadow-2xs">⭐ Mensalista</span>' : ''}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-700">
+              <div class="flex items-center space-x-1.5 font-black text-slate-900 flex-wrap">
+                <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>${b.customer_name || 'Cliente'}</span>
+                ${isMensalistaBooking(b) ? '<span class="text-[10px] font-black text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">⭐ Mensalista</span>' : ''}
+              </div>
+              ${b.customer_cpf ? `
+                <span class="font-mono text-[11px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-600">
+                  CPF: ${formatCPF(b.customer_cpf)}
+                </span>
+              ` : ''}
+              ${cleanPhone ? `
+                <a href="${zapUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 hover:underline">
+                  <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                  <span>${formatPhone(b.customer_phone)}</span>
+                </a>
+              ` : ''}
+              <span class="font-black text-emerald-700 bg-emerald-50/50 px-2 py-0.5 rounded">
+                R$ ${price} (${(b.payment_method || 'PIX').toUpperCase()})
+              </span>
+            </div>
           </div>
         </div>
 

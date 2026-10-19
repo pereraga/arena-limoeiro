@@ -1,5 +1,5 @@
 // Service Worker da Arena Limoeiro para Notificações Mobile em Segundo Plano
-const CACHE_NAME = 'arena-sw-v5.6.1';
+const CACHE_NAME = 'arena-sw-v5.6.2';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
