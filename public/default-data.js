@@ -103,7 +103,7 @@ const initialCourts = [
     name: "FUT 6 - SOCCER 6",
     category: "poliesportiva",
     categoryLabel: "Quadra Poliesportiva",
-    image: "https://images.unsplash.com/photo-1529900245534-47fbf8204bca?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80",
     basePricePerHour: 100.00,
     monthlyPrice: 600.00,
     badge: "⭐ Preferida da Galera",
@@ -123,7 +123,7 @@ const initialCourts = [
       discount_start_time: "09:00",
       discount_end_time: "16:00",
       gallery: [
-        "https://images.unsplash.com/photo-1529900245534-47fbf8204bca?w=800&auto=format&fit=crop&q=80",
+        "https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80",
         "https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800&auto=format&fit=crop&q=80"
       ]
     },
@@ -170,7 +170,7 @@ const initialCourts = [
     name: "FOOT TABLE - FUTMESA",
     category: "foot-skill",
     categoryLabel: "Foot-Skill",
-    image: "https://images.unsplash.com/photo-1518604666864-7423958f7660?w=800&auto=format&fit=crop&q=80",
+    image: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?w=800&auto=format&fit=crop&q=80",
     basePricePerHour: 35.00,
     monthlyPrice: 200.00,
     badge: "🎯 Melhor Custo-Benefício",
@@ -190,7 +190,7 @@ const initialCourts = [
       discount_start_time: "09:00",
       discount_end_time: "16:00",
       gallery: [
-        "https://images.unsplash.com/photo-1518604666864-7423958f7660?w=800&auto=format&fit=crop&q=80"
+        "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?w=800&auto=format&fit=crop&q=80"
       ]
     },
     discountPricePerHour: 25.00,

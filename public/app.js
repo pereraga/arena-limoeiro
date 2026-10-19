@@ -1039,6 +1039,21 @@ if (typeof window !== 'undefined') window.state = state;
 // ==============================================================================
 // 🏟️ NORMALIZADOR DE QUADRAS / ESPAÇOS (COMPATIBILIDADE SUPABASE & LOCAL)
 // ==============================================================================
+function sanitizeCourtUrl(url) {
+  if (!url || typeof url !== 'string') return 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
+  if (url.includes('photo-1529900245534-47fbf8204bca') || url.includes('photo-1508098682722-e99c43a406b2')) {
+    return 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80';
+  }
+  if (url.includes('photo-1518604666864-7423958f7660')) {
+    return 'https://images.unsplash.com/photo-1526232761682-d26e03ac148e?w=800&auto=format&fit=crop&q=80';
+  }
+  if (url.includes('photo-1517649763962-0c623266ddc0')) {
+    return 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
+  }
+  return url;
+}
+if (typeof window !== 'undefined') window.sanitizeCourtUrl = sanitizeCourtUrl;
+
 function normalizeCourt(c) {
   if (!c) return null;
   const price = parseFloat(c.basePricePerHour || c.base_price_per_hour || 140);
@@ -1066,8 +1081,8 @@ function normalizeCourt(c) {
   let specsGallery = (specsObj && Array.isArray(specsObj.gallery) && specsObj.gallery.length > 0)
     ? specsObj.gallery
     : (c.gallery && Array.isArray(c.gallery) && c.gallery.length > 0 ? c.gallery : (c.image ? [c.image] : []));
-  specsGallery = specsGallery.filter(Boolean);
-  if (specsGallery.length === 0 && c.image) specsGallery = [c.image];
+  specsGallery = specsGallery.filter(Boolean).map(sanitizeCourtUrl);
+  if (specsGallery.length === 0 && c.image) specsGallery = [sanitizeCourtUrl(c.image)];
   if (specsGallery.length === 0) specsGallery = ['https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'];
   specsObj.gallery = specsGallery;
 
@@ -1105,7 +1120,7 @@ function normalizeCourt(c) {
     discount_price_per_hour: parseFloat(c.discountPricePerHour || c.discount_price_per_hour || specsObj.discount_price_per_hour || 0),
     discountStartTime: specsObj.discount_start_time || c.discountStartTime || '09:00',
     discountEndTime: specsObj.discount_end_time || c.discountEndTime || '16:00',
-    image: specsGallery[0] || c.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'
+    image: sanitizeCourtUrl(specsGallery[0] || c.image)
   };
 }
 
@@ -1947,6 +1962,7 @@ function loadInitialData() {
     const hasFutCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
     if (localCourts !== null && Array.isArray(localCourts) && localCourts.length > 0 && !hasOldMockCourts && hasFutCourts) {
       state.courts = localCourts.map(normalizeCourt);
+      try { localStorage.setItem('arena_local_courts', JSON.stringify(state.courts)); } catch(e) {}
     } else {
       state.courts = (d.initialCourts || []).map(normalizeCourt);
       try { localStorage.setItem('arena_local_courts', JSON.stringify(state.courts)); } catch(e) {}
@@ -3346,7 +3362,7 @@ function renderStep2(container) {
       <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-3xl p-4 sm:p-6 text-white mb-6 shadow-xl border border-emerald-800/50">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-3.5 sm:space-x-4">
-            <img src="${court.image}" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
+            <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
             <div>
               <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
                 Campo Selecionado
@@ -4606,7 +4622,7 @@ function renderStep4(container) {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <img src="${court.image}" class="w-12 h-12 rounded-xl object-cover flex-shrink-0">
+          <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-12 h-12 rounded-xl object-cover flex-shrink-0">
           <div class="overflow-hidden">
             <span class="text-[11px] font-bold text-slate-400 block uppercase">Espaço Esportivo</span>
             <p class="text-sm font-extrabold text-slate-800 truncate">${court.name.split(' - ')[0]}</p>
@@ -6790,6 +6806,78 @@ function renderHorizontalDayCalendar(selectedDate, allBookings, monthlyMembers) 
   `;
 }
 
+// Card visual com foto para campos que não têm agendamento (100% livres ou disponíveis)
+function renderFreeCourtCard(court, selectedDate, isPartialDay = false) {
+  if (!court) return '';
+  const pricePerHour = parseFloat(court.basePricePerHour || court.base_price_per_hour || 100);
+  const dInfo = getCourtDiscountInfo(court);
+  let specs = court.specs || {};
+  if (typeof specs === 'string') {
+    try { specs = JSON.parse(specs); } catch(e) { specs = {}; }
+  }
+  const capacity = specs.capacity || 'Uso esportivo';
+  const surface = specs.surface || specs.type || 'Oficial';
+  const courtImg = sanitizeCourtUrl(court.image || (specs.gallery && specs.gallery[0]));
+
+  return `
+    <div class="group bg-white rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+      <div>
+        <div class="relative h-40 sm:h-44 w-full overflow-hidden bg-slate-900">
+          <img src="${courtImg}" 
+               alt="${court.name}" 
+               onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+          <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
+
+          <!-- Badges no Topo da Foto -->
+          <div class="absolute top-2.5 left-2.5 flex flex-wrap gap-1.5 pr-2">
+            <span class="bg-black/80 backdrop-blur-xs text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded-lg border border-emerald-500/30">
+              ${court.categoryLabel || 'Esporte'}
+            </span>
+            <span class="bg-emerald-600/90 text-white text-[10px] font-black px-2 py-0.5 rounded-lg shadow-xs flex items-center">
+              ✓ ${isPartialDay ? 'LIVRE NESTE HORÁRIO' : '100% LIVRE HOJE'}
+            </span>
+          </div>
+
+          <!-- Preço sobreposto no rodapé da foto -->
+          <div class="absolute bottom-2.5 left-3 right-3 flex items-end justify-between text-white">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-slate-300 block">Valor por hora</span>
+              <span class="text-base font-black text-white">R$ ${pricePerHour.toFixed(2).replace('.', ',')}</span>
+            </div>
+            ${dInfo.hasDiscount ? `
+              <span class="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md shadow-xs flex items-center">
+                🔥 ${dInfo.startHour}-${dInfo.endHour}: R$ ${dInfo.discountPrice.toFixed(2).replace('.', ',')}
+              </span>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Conteúdo do Card -->
+        <div class="p-3.5 sm:p-4">
+          <h4 class="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-snug">${court.name}</h4>
+          <p class="text-xs text-slate-500 mt-1 line-clamp-2">${court.description || 'Quadra pronta para uso, sem agendamento no período.'}</p>
+          
+          <div class="mt-2.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+            <span class="flex items-center"><i data-lucide="users" class="w-3.5 h-3.5 mr-1 text-slate-400"></i> ${capacity}</span>
+            <span class="flex items-center"><i data-lucide="shield-check" class="w-3.5 h-3.5 mr-1 text-emerald-600"></i> ${surface}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ações -->
+      <div class="p-3.5 sm:p-4 pt-0">
+        <button onclick="openDirectBookingModal('${court.id}')" 
+                class="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer">
+          <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          <span>Agendar Neste Campo</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+if (typeof window !== 'undefined') window.renderFreeCourtCard = renderFreeCourtCard;
+
 // 1. ABA DE MOVIMENTAÇÃO DOS JOGOS (HOJE & AO VIVO)
 function renderLiveDashboardTab() {
   const isRecep = isReceptionUser();
@@ -7030,6 +7118,16 @@ function renderLiveDashboardTab() {
   // Ordena por horário de início
   filteredMatches.sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
 
+  // Identifica quadras sem agendamento na data selecionada
+  const courtIdsWithMatchToday = new Set(matchesList.map(m => m.court_id || m.courtId));
+  const courtsWithoutMatchToday = (state.adminFilterCourt && state.adminFilterCourt !== 'all')
+    ? (!courtIdsWithMatchToday.has(state.adminFilterCourt) ? state.courts.filter(c => c.id === state.adminFilterCourt) : [])
+    : state.courts.filter(c => !courtIdsWithMatchToday.has(c.id));
+
+  const emptyStateCourts = (state.adminFilterCourt && state.adminFilterCourt !== 'all')
+    ? state.courts.filter(c => c.id === state.adminFilterCourt)
+    : state.courts;
+
   return `
     <div class="space-y-6">
       ${typeof renderWaterSupplyDashboardBanner === 'function' ? renderWaterSupplyDashboardBanner() : ''}
@@ -7153,20 +7251,43 @@ function renderLiveDashboardTab() {
         </div>
 
         ${filteredMatches.length === 0 ? `
-          <div class="text-center py-12 px-4">
-            <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
-              <i data-lucide="calendar" class="w-8 h-8"></i>
+          <div class="space-y-6">
+            <div class="p-4 sm:p-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border border-emerald-200 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div class="flex items-center space-x-3.5">
+                <div class="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <i data-lucide="calendar-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm sm:text-base font-black text-emerald-950">Nenhum jogo agendado para ${formatDisplayDate(selectedDate)}</h4>
+                  <p class="text-xs text-emerald-700 font-medium mt-0.5">Todos os campos estão 100% disponíveis com fotos, horários e reserva direta rápida.</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button onclick="openDirectBookingModal()" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer transition-all">
+                  <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                  <span>⚡ Nova Reserva Balcão</span>
+                </button>
+                <button onclick="openSearchMatchesModal()" class="w-full sm:w-auto px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold shadow-xs flex items-center justify-center space-x-1.5 cursor-pointer transition-all">
+                  <i data-lucide="search" class="w-4 h-4 text-emerald-600"></i>
+                  <span>🔍 Buscar Jogos</span>
+                </button>
+              </div>
             </div>
-            <h4 class="text-sm sm:text-base font-black text-slate-800">Nenhum jogo agendado para esta data</h4>
-            <div class="flex flex-wrap items-center justify-center gap-2.5">
-              <button onclick="openDirectBookingModal()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-sm inline-flex items-center space-x-1.5 cursor-pointer">
-                <i data-lucide="plus" class="w-4 h-4"></i>
-                <span>+ Fazer Reserva Direta Agora</span>
-              </button>
-              <button onclick="openSearchMatchesModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold shadow-xs inline-flex items-center space-x-1.5 cursor-pointer">
-                <i data-lucide="search" class="w-4 h-4 text-emerald-600"></i>
-                <span>🔍 Pesquisar Outros Jogos</span>
-              </button>
+
+            <!-- Grid com Fotos e Detalhes de Todos os Campos Livres -->
+            <div>
+              <div class="flex items-center justify-between mb-3 px-1">
+                <span class="text-xs font-black uppercase text-slate-700 flex items-center">
+                  <i data-lucide="camera" class="w-4 h-4 text-emerald-600 mr-1.5"></i>
+                  Fotos e Detalhes dos Campos Disponíveis (${emptyStateCourts.length})
+                </span>
+                <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-md">
+                  100% Livres
+                </span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${emptyStateCourts.map(court => renderFreeCourtCard(court, selectedDate, false)).join('')}
+              </div>
             </div>
           </div>
         ` : `
@@ -7555,6 +7676,28 @@ function renderLiveDashboardTab() {
               `;
             }).join('')}
           </div>
+
+          ${courtsWithoutMatchToday.length > 0 ? `
+            <!-- Seção de Campos Livres Sem Agendamento na Data -->
+            <div class="mt-8 pt-6 border-t border-slate-200">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                <div>
+                  <h4 class="text-sm sm:text-base font-black text-slate-900 flex items-center">
+                    <i data-lucide="camera" class="w-4 h-4 text-emerald-600 mr-2"></i>
+                    Campos Sem Agendamento nesta Data (${courtsWithoutMatchToday.length})
+                  </h4>
+                  <p class="text-xs text-slate-500 mt-0.5">Estes espaços não possuem nenhum jogo agendado para ${formatDisplayDate(selectedDate)} e estão 100% livres para reserva</p>
+                </div>
+                <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 self-start sm:self-center">
+                  100% Disponíveis Hoje
+                </span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${courtsWithoutMatchToday.map(court => renderFreeCourtCard(court, selectedDate, false)).join('')}
+              </div>
+            </div>
+          ` : ''}
         `}
       </div>
 
@@ -7640,7 +7783,7 @@ function renderCourtsControlTab() {
               
               <div>
                 <div class="relative h-44 w-full overflow-hidden bg-slate-900">
-                  <img src="${court.image}" class="w-full h-full object-cover">
+                  <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-full h-full object-cover">
                   <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
 
                   <!-- Badges de Categoria e Status -->
@@ -11443,7 +11586,7 @@ function renderAdminSubTabContent(tab) {
           ${(state.adminCategoryFilter && state.adminCategoryFilter !== 'all' ? state.courts.filter(c => c.category === state.adminCategoryFilter) : state.courts).map(court => `
             <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
               <div>
-                <img src="${court.image}" class="h-40 w-full object-cover">
+                <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="h-40 w-full object-cover">
                 <div class="p-4">
                   <span class="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase">${court.categoryLabel || 'Esporte'}</span>
                   <h4 class="text-base font-black text-slate-900 mt-1">${court.name}</h4>
@@ -11484,14 +11627,18 @@ function renderAdminSubTabContent(tab) {
         <h3 class="text-base font-black text-slate-800 mb-4">Ajustar Posições de Exibição das Quadras</h3>
         <div class="space-y-2">
           ${list.map((court, idx) => `
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center">${idx + 1}</span>
-                <span class="text-xs font-black text-slate-900">${court.name}</span>
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
+              <div class="flex items-center space-x-3 min-w-0">
+                <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-xs">${idx + 1}</span>
+                <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs">
+                <div class="min-w-0">
+                  <span class="text-xs font-black text-slate-900 block truncate">${court.name}</span>
+                  <span class="text-[10px] text-emerald-700 font-bold block">${court.categoryLabel || 'Esporte'}</span>
+                </div>
               </div>
-              <div class="flex items-center space-x-1">
-                <button onclick="moveCourtOrder('${court.id}', -1)" class="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600"><i data-lucide="arrow-up" class="w-4 h-4"></i></button>
-                <button onclick="moveCourtOrder('${court.id}', 1)" class="p-1.5 hover:bg-slate-200 rounded-lg text-slate-600"><i data-lucide="arrow-down" class="w-4 h-4"></i></button>
+              <div class="flex items-center space-x-1 shrink-0">
+                <button onclick="moveCourtOrder('${court.id}', -1)" class="p-2 hover:bg-slate-200 rounded-xl text-slate-600 transition-all cursor-pointer"><i data-lucide="arrow-up" class="w-4 h-4"></i></button>
+                <button onclick="moveCourtOrder('${court.id}', 1)" class="p-2 hover:bg-slate-200 rounded-xl text-slate-600 transition-all cursor-pointer"><i data-lucide="arrow-down" class="w-4 h-4"></i></button>
               </div>
             </div>
           `).join('')}
@@ -14917,12 +15064,13 @@ window.highlightSelectedDirectSlot = highlightSelectedDirectSlot;
 window.updateDirectDurationDisplay = updateDirectDurationDisplay;
 
 // 6. MODAL DE FAZER RESERVA DIRETA (BALCÃO / WHATSAPP)
-function openDirectBookingModal() {
+function openDirectBookingModal(initialCourtId = null) {
   const modalRoot = document.getElementById('modalRoot');
   if (!modalRoot) return;
 
   const realToday = getFormattedDate(new Date());
   const selectedDefaultDate = state.adminFilterDate || realToday;
+  const targetCourtId = initialCourtId || (state.courts[0] ? state.courts[0].id : '');
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
@@ -14950,7 +15098,7 @@ function openDirectBookingModal() {
                 ${state.courts.map(c => {
                   const specs = typeof c.specs === 'string' ? JSON.parse(c.specs || '{}') : (c.specs || {});
                   const isM = c.isMaintenance || specs.status === 'maintenance';
-                  return `<option value="${c.id}">${c.name} ${isM ? '(⚠️ Em Manutenção)' : ''}</option>`;
+                  return `<option value="${c.id}" ${c.id === targetCourtId ? 'selected' : ''}>${c.name} ${isM ? '(⚠️ Em Manutenção)' : ''}</option>`;
                 }).join('')}
               </select>
             </div>
