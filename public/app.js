@@ -2137,7 +2137,7 @@ async function autoAdvanceFinishedMatches() {
   const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
 
   for (const b of (state.bookings || [])) {
-    if (b.status === 'cancelled' || b.status === 'finished') continue;
+    if (b.status === 'cancelled' || b.status === 'finished' || b.status === 'no_show') continue;
 
     // Se for de um dia anterior, finaliza automaticamente
     if (b.date < todayStr) {
@@ -2157,17 +2157,76 @@ async function autoAdvanceFinishedMatches() {
     if (b.date === todayStr) {
       const eMin = timeToMinutes(b.end_time || (b.time ? b.time.split(' às ')[1] : ''));
       const delay = (state.matchDelays && state.matchDelays[b.id]?.minutes) || 0;
-      // Permite tolerância de 20 minutos além do atraso antes de encerrar silenciosamente,
-      // permitindo que o gestor acompanhe o estouro de tempo ao vivo e acerte os atrasos
-      if (eMin && currentMinutes >= (eMin + delay + 20)) {
+      // Ao encerrar o horário oficial (mais atraso se houver), finaliza a partida e libera a quadra imediatamente
+      if (eMin && currentMinutes >= (eMin + delay)) {
         b.status = 'finished';
+        if (b.product_cart && typeof b.product_cart === 'object') {
+          const pKeys = Object.keys(b.product_cart).filter(k => !k.startsWith('_'));
+          if (pKeys.some(k => b.product_cart[k] > 0)) {
+            b.product_cart._status = 'delivered';
+            b.bar_status = 'delivered';
+          }
+        }
         hasUpdates = true;
         if (client) {
-          try { await client.from('bookings').update({ status: 'finished' }).eq('id', b.id); } catch(e) {}
+          try {
+            const pLoad = { status: 'finished' };
+            if (b.product_cart) pLoad.product_cart = b.product_cart;
+            await client.from('bookings').update(pLoad).eq('id', b.id);
+          } catch(e) {}
         }
       }
     }
   }
+
+  // Verifica horários fixos de hoje em state.monthlyMembers que já terminaram o horário
+  const currentDayOfWeek = normalizeDayOfWeek(getDayOfWeek(now));
+  (state.monthlyMembers || []).forEach(m => {
+    if (!m || m.status === 'inactive') return;
+    const day = normalizeDayOfWeek(m.day_of_week || m.dayOfWeek);
+    if (day !== currentDayOfWeek) return;
+
+    const eMin = timeToMinutes(m.end_time || m.endTime || '20:00');
+    const delay = (state.matchDelays && state.matchDelays['monthly-' + m.id]?.minutes) || 0;
+    if (eMin && currentMinutes >= (eMin + delay)) {
+      const alreadyHasToday = (state.bookings || []).some(b => {
+        if (!b || b.date !== todayStr) return false;
+        if (b.monthly_member_id === m.id || String(b.id) === 'monthly-' + m.id) return true;
+        const bCourt = b.court_id || b.courtId;
+        const mCourt = m.court_id || m.courtId;
+        if (bCourt !== mCourt) return false;
+        const bS = timeToMinutes(b.start_time || b.startTime);
+        const mS = timeToMinutes(m.start_time || m.startTime);
+        return bS === mS;
+      });
+
+      if (!alreadyHasToday) {
+        const newFin = {
+          id: 'ARENA-AUTO-FIN-' + m.id + '-' + todayStr,
+          court_id: m.court_id || m.courtId,
+          date: todayStr,
+          start_time: m.start_time || m.startTime || '19:00',
+          end_time: m.end_time || m.endTime || '20:00',
+          duration: 60,
+          price: (m.monthly_price || 0) / 4,
+          total_price: (m.monthly_price || 0) / 4,
+          status: 'finished',
+          payment_method: m.contract_type === 'fixo' ? 'pos_jogo' : 'mensalidade',
+          customer_name: (m.team_name || 'Time') + ' (' + (m.responsible_name || 'Responsável') + ')',
+          customer_phone: m.phone || '',
+          monthly_member_id: m.id,
+          booking_type: m.contract_type === 'fixo' ? 'fixo' : 'mensalista',
+          observation: 'Partida finalizada automaticamente ao término do horário agendado'
+        };
+        if (!state.bookings) state.bookings = [];
+        state.bookings.push(newFin);
+        hasUpdates = true;
+        if (client) {
+          try { client.from('bookings').insert([newFin]).then(); } catch(e) {}
+        }
+      }
+    }
+  });
 
   if (hasUpdates) {
     const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
@@ -5940,7 +5999,10 @@ function hasPermission(permKey) {
 }
 
 // Helpers de Checagem Rápida
-function canDeleteBookings() { return hasPermission('can_delete_bookings'); }
+function canDeleteBookings() { 
+  if (state && state.currentMode === 'admin') return true;
+  return hasPermission('can_delete_bookings'); 
+}
 function canStartMatches() { return hasPermission('can_start_matches'); }
 function canFinishMatches() { return hasPermission('can_finish_matches'); }
 function canManageBar() { return hasPermission('can_manage_bar'); }
@@ -6445,9 +6507,43 @@ function startMatchNow(matchId) {
 // ⏹ FINALIZAR JOGO MANUALMENTE (a qualquer momento após iniciar)
 function finishMatchManual(matchId) {
   const now = new Date();
+  const todayStr = getFormattedDate(now);
   const nowStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
 
-  const booking = (state.bookings || []).find(b => b.id === matchId);
+  let booking = (state.bookings || []).find(b => b && (b.id === matchId || String(b.id) === String(matchId)));
+
+  // Se for ID dinâmico de mensalista semanal (ex: monthly-uuid)
+  if (!booking && String(matchId).startsWith('monthly-')) {
+    const rawMemberId = String(matchId).replace('monthly-', '');
+    const m = (state.monthlyMembers || []).find(x => String(x.id) === rawMemberId);
+    booking = {
+      id: 'ARENA-FIN-' + rawMemberId + '-' + todayStr,
+      court_id: m ? (m.court_id || m.courtId) : (state.courts[0]?.id || ''),
+      date: todayStr,
+      start_time: m ? (m.start_time || m.startTime || '19:00') : '19:00',
+      end_time: nowStr,
+      duration: 60,
+      price: m ? (Number(m.monthly_price || 0) / 4) : 90,
+      total_price: m ? (Number(m.monthly_price || 0) / 4) : 90,
+      status: 'finished',
+      payment_method: m && m.contract_type === 'fixo' ? 'pos_jogo' : 'mensalidade',
+      customer_name: m ? ((m.team_name || '') + (m.responsible_name ? ` (${m.responsible_name})` : '')) : 'Mensalista',
+      customer_phone: m ? m.phone : '',
+      monthly_member_id: rawMemberId,
+      booking_type: m && m.contract_type === 'fixo' ? 'fixo' : 'mensalista',
+      observation: `Partida finalizada manualmente em ${todayStr} às ${nowStr}`
+    };
+    if (!state.bookings) state.bookings = [];
+    state.bookings.push(booking);
+
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        client.from('bookings').insert([booking]).then(() => {});
+      } catch(e) {}
+    }
+  }
+
   if (booking) {
     booking.status = 'finished';
     booking.end_time = nowStr;
@@ -6464,16 +6560,18 @@ function finishMatchManual(matchId) {
 
   // Atualiza no localStorage
   const localBookings = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
-  const idx = localBookings.findIndex(b => b.id === matchId);
+  const idx = localBookings.findIndex(b => b.id === matchId || (booking && b.id === booking.id));
   if (idx !== -1 && booking) {
     localBookings[idx] = booking;
-    localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
+  } else if (booking) {
+    localBookings.push(booking);
   }
+  localStorage.setItem('arena_local_bookings', JSON.stringify(localBookings));
 
   const client = (window.ArenaSupabase && window.ArenaSupabase.isReady()) ? window.ArenaSupabase.getClient() : null;
-  if (client) {
+  if (client && booking && !String(matchId).startsWith('monthly-')) {
     const payload = { status: 'finished', end_time: nowStr };
-    if (booking && booking.product_cart) payload.product_cart = booking.product_cart;
+    if (booking.product_cart) payload.product_cart = booking.product_cart;
     client.from('bookings').update(payload).eq('id', matchId).then(() => {});
   }
 
@@ -6489,12 +6587,23 @@ function finishMatchManual(matchId) {
     actionType: 'FINISH_MATCH',
     actionLabel: 'Finalização de Partida',
     courtName: bCourtFin ? bCourtFin.name : 'Quadra',
-    details: `Partida de ${booking ? (booking.customer_name || 'Cliente') : 'Cliente'} finalizada manualmente às ${nowStr}.`,
+    details: `Partida de ${booking ? (booking.customer_name || 'Cliente') : 'Cliente'} finalizada manualmente às ${nowStr}. Quadra liberada.`,
     targetId: matchId
   });
 
-  renderStepContent();
+  _refreshAllUI();
+  if (state.currentMode === 'admin') {
+    renderStepContent();
+  }
+  requestSchedule();
   if (window.lucide) lucide.createIcons();
+
+  if (typeof showToastNotification === 'function') {
+    showToastNotification(`
+      <strong class="text-emerald-400 font-bold block text-sm mb-0.5">✓ Partida Finalizada com Sucesso</strong>
+      <p class="text-slate-300">A quadra foi liberada imediatamente e o status atualizado no sistema.</p>
+    `, 4000);
+  }
 }
 
 function scrollHorizontalCalendar(direction) {
@@ -6747,11 +6856,12 @@ function renderLiveDashboardTab() {
           time: m.time || (startT + ' às ' + endT),
           total_price: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4,
           status: 'confirmed',
-          booking_type: 'fixo',
-          isMensalista: true,
-          payment_method: 'fixo',
+          booking_type: m.contract_type === 'fixo' ? 'fixo' : 'mensalista',
+          contract_type: m.contract_type || 'fixo',
+          isMensalista: m.contract_type !== 'fixo',
+          payment_method: m.contract_type === 'fixo' ? 'pos_jogo' : 'mensalidade',
           product_cart: {},
-          observation: 'Horário Fixo Semanal'
+          observation: m.contract_type === 'fixo' ? 'Horário Fixo Semanal (Paga no jogo)' : 'Mensalista Semanal'
         });
       }
     }
@@ -6826,6 +6936,7 @@ function renderLiveDashboardTab() {
         total_price: parseFloat(b.total_price || b.totalPrice || 0),
         status: matchStatus,
         booking_type: b.booking_type || b.bookingType || (isMensal ? 'mensalista' : 'avulso'),
+        contract_type: b.contract_type || b.contractType || (b.booking_type === 'fixo' ? 'fixo' : (isMensal ? 'mensalista' : 'avulso')),
         isMensalista: isMensal,
         payment_method: b.payment_method || b.paymentMethod || (isMensal ? 'fixo' : 'pix'),
         product_cart: b.product_cart || b.productCart || {},
@@ -6859,7 +6970,7 @@ function renderLiveDashboardTab() {
     m.effectiveStartStr = effectiveStartStr;
 
     if (isSelectedDateToday && m.status !== 'cancelled') {
-      if (m.status === 'finished') {
+      if (m.status === 'finished' || m.status === 'no_show') {
         m.isPast = true;
       } else if (m.status === 'in_progress' || (currentMinutes >= sMin && currentMinutes < effectiveEndMin)) {
         m.isLive = true;
@@ -6868,8 +6979,15 @@ function renderLiveDashboardTab() {
         const totalWithDelay = m.durationMin + delayMin;
         m.progressPercent = totalWithDelay > 0 ? Math.min(100, Math.round((m.elapsedMinutes / totalWithDelay) * 100)) : 0;
       } else if (currentMinutes >= effectiveEndMin) {
-        m.isOvertime = true;
-        m.overtimeMinutes = currentMinutes - effectiveEndMin;
+        // Encerramento automático ao término do horário: não fica rodando sem necessidade
+        m.status = 'finished';
+        m.isPast = true;
+        m.isLive = false;
+        m.isOvertime = false;
+        const origB = (state.bookings || []).find(x => x && (x.id === m.id || String(x.id) === String(m.id)));
+        if (origB && origB.status !== 'finished' && origB.status !== 'no_show') {
+          origB.status = 'finished';
+        }
       } else {
         m.isUpcoming = true;
       }
@@ -6882,7 +7000,7 @@ function renderLiveDashboardTab() {
 
   // Métricas do Topo
   const totalMatchesToday = matchesList.length;
-  const liveCount = matchesList.filter(m => m.isLive || m.isOvertime).length;
+  const liveCount = matchesList.filter(m => m.isLive).length;
   const totalRevenue = matchesList.reduce((acc, m) => acc + (m.total_price || 0), 0);
   
   // Pedidos de Bar Pendentes
@@ -6901,11 +7019,11 @@ function renderLiveDashboardTab() {
   }
   if (state.adminFilterStatus && state.adminFilterStatus !== 'all') {
     if (state.adminFilterStatus === 'live') {
-      filteredMatches = filteredMatches.filter(m => m.isLive || m.isOvertime);
+      filteredMatches = filteredMatches.filter(m => m.isLive);
     } else if (state.adminFilterStatus === 'upcoming') {
       filteredMatches = filteredMatches.filter(m => m.isUpcoming);
     } else if (state.adminFilterStatus === 'finished') {
-      filteredMatches = filteredMatches.filter(m => m.isPast || m.status === 'finished');
+      filteredMatches = filteredMatches.filter(m => m.isPast || m.status === 'finished' || m.status === 'no_show');
     }
   }
 
@@ -7143,19 +7261,23 @@ function renderLiveDashboardTab() {
                         </div>
 
                         <div class="flex flex-wrap items-center gap-2">
-                          ${match.isMensalista ? `
+                          ${(match.contract_type === 'fixo' || (!match.contract_type && match.booking_type === 'fixo')) ? `
+                            <span class="text-[11px] font-black text-amber-950 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
+                              <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-700 mr-1"></i> ⏰ Horário Fixo (Paga pós-jogo)
+                            </span>
+                          ` : (match.isMensalista ? `
                             <span class="text-[11px] font-black text-indigo-950 bg-indigo-100 border border-indigo-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
-                              <i data-lucide="crown" class="w-3.5 h-3.5 text-indigo-600 mr-1"></i> ⭐ Mensalista / Horário Fixo
+                              <i data-lucide="crown" class="w-3.5 h-3.5 text-indigo-600 mr-1"></i> ⭐ Mensalista
                             </span>
                           ` : `
                             <span class="text-[11px] font-black text-sky-900 bg-sky-100 border border-sky-300 px-2.5 py-0.5 rounded-full flex items-center shadow-xs">
                               <i data-lucide="zap" class="w-3.5 h-3.5 text-sky-600 mr-1"></i> Reserva Avulsa
                             </span>
-                          `}
+                          `)}
 
-                          ${match.isOvertime ? `
-                            <span class="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-400 px-2.5 py-0.5 rounded-full flex items-center animate-pulse">
-                              <span class="w-1.5 h-1.5 rounded-full bg-rose-600 mr-1.5"></span> 🚨 TEMPO ESGOTADO (+${match.overtimeMinutes}m)
+                          ${match.status === 'no_show' ? `
+                            <span class="text-[10px] font-black text-rose-800 bg-rose-100 border border-rose-300 px-2.5 py-0.5 rounded-full flex items-center">
+                              🚫 NÃO COMPARECEU (FALTA)
                             </span>
                           ` : (match.isLive ? `
                             <span class="text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-400 px-2.5 py-0.5 rounded-full flex items-center animate-pulse">
@@ -7178,30 +7300,38 @@ function renderLiveDashboardTab() {
 
                     <!-- Botões de Ação do Jogo -->
                     <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 w-full md:w-auto pt-2 sm:pt-0">
-                      ${(match.isLive || match.isOvertime) ? (canFinishMatches() ? `
+                      ${match.isLive ? (canFinishMatches() ? `
                         <!-- Jogo em andamento: Finalizar Jogo (atualiza bar para entregue automaticamente) -->
                         <button onclick="finishMatchManual('${match.id}')" class="px-3.5 py-2 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Finalizar o jogo agora (atualiza o bar para entregue se houver pedidos)">
                           <span class="text-sm leading-none">⏹️</span>
                           <span>Finalizar Jogo</span>
                         </button>
-                      ` : '') : (match.status !== 'finished' && isSelectedDateToday ? (canStartMatches() ? `
+                      ` : '') : (match.status !== 'finished' && match.status !== 'no_show' && isSelectedDateToday ? (canStartMatches() ? `
                         <!-- Jogo agendado hoje: Liberar Entrada / Iniciar Jogo -->
                         <button onclick="startMatchNow('${match.id}')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer" title="Liberar entrada e iniciar jogo agora">
                           <i data-lucide="play" class="w-4 h-4 fill-current"></i>
                           <span>Liberar Jogo</span>
                         </button>
-                      ` : '') : (match.status !== 'finished' ? (canStartMatches() ? `
+                      ` : '') : (match.status !== 'finished' && match.status !== 'no_show' ? (canStartMatches() ? `
                         <button onclick="updateMatchStatus('${match.id}', 'in_progress')" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
                           <i data-lucide="play" class="w-4 h-4 fill-current"></i>
                           <span>Liberar Jogo</span>
                         </button>
                       ` : '') : ''))}
 
+                      <!-- Botão "Não Veio Jogar" (Falta / W.O.) -->
+                      ${(match.status !== 'finished' && match.status !== 'no_show' && match.status !== 'cancelled') ? `
+                        <button onclick="handleMatchNoShow('${match.id}')" class="px-3.5 py-2 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-300 hover:border-rose-300 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-2xs touch-manipulation" title="Registrar que o time/cliente não compareceu (Falta) e liberar o horário imediatamente">
+                          <span class="text-sm leading-none">🚫</span>
+                          <span>Não Veio Jogar</span>
+                        </button>
+                      ` : ''}
+
                       <!-- Botão de Editar Contrato do Mensalista -->
                       ${(match.isMensalista || isMensalistaBooking(match)) ? `
                         <button onclick="openEditContractFromMatch('${match.id}')" class="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border border-indigo-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs" title="Editar o contrato semanal deste horário fixo">
                           <i data-lucide="edit-3" class="w-4 h-4 text-indigo-700"></i>
-                          <span>Editar Contrato Fixo</span>
+                          <span>Editar Contrato</span>
                         </button>
                       ` : ''}
 
@@ -7228,7 +7358,7 @@ function renderLiveDashboardTab() {
                       </button>
 
                       <!-- Botão de Apagar Jogo (Apenas Gerente do Sistema e Administrador Geral) -->
-                      ${canDeleteBookings() ? `
+                      ${(canDeleteBookings() || (state && state.currentMode === 'admin')) ? `
                         <button onclick="handleCancelBooking('${match.id}')" class="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 hover:text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition-all flex items-center space-x-1.5 cursor-pointer shadow-xs touch-manipulation" title="Apagar este jogo do sistema e liberar o horário imediatamente">
                           <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
                           <span>Apagar Jogo</span>
@@ -7245,11 +7375,15 @@ function renderLiveDashboardTab() {
                         <div class="flex items-center space-x-1.5 flex-wrap">
                           <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
                           <span class="text-sm sm:text-base font-black text-slate-900">${match.customer_name}</span>
-                          ${(match.isMensalista || isMensalistaBooking(match)) ? `
+                          ${(match.contract_type === 'fixo' || (!match.contract_type && match.booking_type === 'fixo')) ? `
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                              ⏰ Horário Fixo (Paga pós-jogo)
+                            </span>
+                          ` : ((match.isMensalista || isMensalistaBooking(match)) ? `
                             <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-900 border border-indigo-200 flex items-center gap-1 shadow-2xs">
                               ⭐ Mensalista
                             </span>
-                          ` : ''}
+                          ` : '')}
                         </div>
                         ${match.customer_cpf ? `<span class="text-[11px] font-mono text-slate-600 font-bold bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">CPF: ${formatCPF(match.customer_cpf)}</span>` : ''}
                       </div>
@@ -11403,6 +11537,7 @@ function renderAdminSubTabContent(tab) {
               const courtName = court ? court.name : (m.court_name || 'Quadra da Arena');
               const dayLabel = m.day_of_week_label || m.dayOfWeekLabel || (m.day_of_week ? 'Toda ' + m.day_of_week : 'Semanal');
               const timeDisplay = (m.start_time && m.end_time) ? `${m.start_time} às ${m.end_time}` : (m.time || 'Horário a definir');
+              const isFixo = (m.contract_type === 'fixo' || m.contractType === 'fixo');
               const priceDisplay = Number(m.monthly_price || m.monthlyPrice || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
               return `
@@ -11414,6 +11549,17 @@ function renderAdminSubTabContent(tab) {
                           <i data-lucide="map-pin" class="w-3 h-3"></i>
                           ${courtName}
                         </span>
+                        ${isFixo ? `
+                          <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                            <i data-lucide="clock" class="w-3 h-3 text-amber-700"></i>
+                            ⏰ Horário Fixo (Paga pós-jogo)
+                          </span>
+                        ` : `
+                          <span class="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 flex items-center gap-1 shadow-2xs">
+                            <i data-lucide="star" class="w-3 h-3 text-indigo-700"></i>
+                            ⭐ Mensalista Fechado
+                          </span>
+                        `}
                         <span class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
                           ${m.status === 'inactive' ? 'Inativo' : 'Ativo'}
                         </span>
@@ -11433,8 +11579,15 @@ function renderAdminSubTabContent(tab) {
                     </div>
 
                     <div class="text-right shrink-0">
-                      <div class="text-[10px] font-bold text-slate-400 uppercase">Mensalidade</div>
-                      <div class="text-sm sm:text-base font-black text-emerald-700">${priceDisplay}</div>
+                      ${isFixo ? `
+                        <div class="text-[10px] font-bold text-amber-700 uppercase">Por Jogo (Pós-Partida)</div>
+                        <div class="text-sm sm:text-base font-black text-amber-900">${priceDisplay} <span class="text-[10px] font-normal text-slate-500">/jogo</span></div>
+                        <div class="text-[9px] text-slate-500 font-semibold">PIX ou Dinheiro</div>
+                      ` : `
+                        <div class="text-[10px] font-bold text-indigo-700 uppercase">Mensalidade Fechada</div>
+                        <div class="text-sm sm:text-base font-black text-indigo-900">${priceDisplay} <span class="text-[10px] font-normal text-slate-500">/mês</span></div>
+                        <div class="text-[9px] text-slate-500 font-semibold">Plano Mensal Fixo</div>
+                      `}
                     </div>
                   </div>
 
@@ -14187,8 +14340,8 @@ async function handleSaveBarItems(e, bookingId) {
 async function handleCancelBooking(bookingId) {
   if (!bookingId) return;
 
-  if (!canDeleteBookings()) {
-    alert('Acesso Negado: O nível de acesso da Recepção não tem permissão para apagar jogos.\n\nPara apagar jogos agendados, faça login com a conta de Gerente do Sistema (Vinicius Melo) ou Administrador Geral.');
+  if (!canDeleteBookings() && !isManagerLoggedIn() && (!state || state.currentMode !== 'admin')) {
+    alert('Acesso Negado: Para apagar jogos agendados, faça login com a conta de Gerente do Sistema ou Administrador Geral.');
     return;
   }
 
@@ -14259,12 +14412,19 @@ async function handleCancelBooking(bookingId) {
   let deleteAllMensalista = false;
   if (isMensal || matchedMember || memberId) {
     const memberNameDisplay = matchedMember ? (matchedMember.team_name || matchedMember.responsible_name) : custName;
-    deleteAllMensalista = confirm(
-      `⭐ ATENÇÃO: Este jogo pertence ao MENSALISTA "${memberNameDisplay}"!\n\n` +
-      `Deseja excluir TODOS OS JOGOS deste mensalista e cancelar o contrato no banco de dados Supabase?\n\n` +
-      `• [OK] = Excluir TODOS os jogos e cancelar o contrato em nuvem (Supabase)\n` +
-      `• [Cancelar] = Apagar APENAS este jogo de hoje`
+    const choice = confirm(
+      `⭐ ATENÇÃO: Este jogo pertence a "${memberNameDisplay}"!\n\n` +
+      `Deseja apagar APENAS esta partida de hoje ou cancelar TODO O CONTRATO?\n\n` +
+      `• [OK] = Apagar APENAS este jogo de hoje e liberar a quadra\n` +
+      `• [Cancelar] = Cancelar definitivamente TODO O CONTRATO`
     );
+    if (!choice) {
+      if (confirm(`Deseja realmente cancelar definitivamente TODO O CONTRATO de "${memberNameDisplay}" e excluir todos os seus jogos futuros no sistema e na nuvem?`)) {
+        deleteAllMensalista = true;
+      } else {
+        return; // Usuário desistiu da ação
+      }
+    }
   }
 
   let idsToRemove = [String(bookingId)];
@@ -14307,7 +14467,7 @@ async function handleCancelBooking(bookingId) {
     addNotifiedBookingId(id);
     if (typeof recentNotifiedBookings !== 'undefined') recentNotifiedBookings.add(String(id));
   });
-  if (memberId) {
+  if (memberId && deleteAllMensalista) {
     addDeletedBookingId(memberId);
     addDeletedBookingId('monthly-' + memberId);
     addNotifiedBookingId(memberId);
@@ -14326,7 +14486,7 @@ async function handleCancelBooking(bookingId) {
     localStorage.setItem('arena_local_bookings', JSON.stringify(local));
   } catch(e) {}
 
-  if (deleteAllMensalista || String(bookingId).startsWith('monthly-') || (matchedMember && !bToDelete)) {
+  if (deleteAllMensalista) {
     if (memberId) {
       state.monthlyMembers = (state.monthlyMembers || []).filter(m => m && String(m.id) !== memberId && String(m.id) !== String(bookingId));
     } else if (matchedMember) {
@@ -14334,6 +14494,27 @@ async function handleCancelBooking(bookingId) {
     }
     localStorage.setItem('arena_monthly_members', JSON.stringify(state.monthlyMembers));
     try { localStorage.removeItem('arena_monthly_members_backup'); } catch(e) {}
+  } else if (String(bookingId).startsWith('monthly-') || (matchedMember && !bToDelete)) {
+    // Se apagou apenas o jogo de hoje de um mensalista semanal, registra um cancelamento no dia de hoje para liberar o campo
+    const todayStr = getFormattedDate(new Date());
+    const cancelTodayRec = {
+      id: 'ARENA-CANCELLED-' + (memberId || bookingId) + '-' + todayStr,
+      court_id: matchedMember ? (matchedMember.court_id || matchedMember.courtId) : (state.courts[0]?.id || ''),
+      date: todayStr,
+      start_time: matchedMember ? (matchedMember.start_time || '19:00') : '19:00',
+      end_time: matchedMember ? (matchedMember.end_time || '20:00') : '20:00',
+      status: 'cancelled',
+      monthly_member_id: memberId,
+      customer_name: custName,
+      observation: `Partida do dia ${todayStr} cancelada manualmente pelo gestor.`
+    };
+    if (!state.bookings) state.bookings = [];
+    state.bookings.push(cancelTodayRec);
+    try {
+      const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+      local.push(cancelTodayRec);
+      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+    } catch(e) {}
   }
 
   // Limpa seleções pendentes
@@ -14431,6 +14612,121 @@ async function handleCancelBooking(bookingId) {
   }
 }
 window.handleCancelBooking = handleCancelBooking;
+
+// ==============================================================================
+// 🚫 REGISTRO DE FALTA / NÃO COMPARECEU (NÃO VEIO JOGAR) E LIBERAÇÃO DA QUADRA
+// ==============================================================================
+async function handleMatchNoShow(matchId) {
+  if (!matchId) return;
+
+  const now = new Date();
+  const todayStr = getFormattedDate(now);
+
+  const match = (state.bookings || []).find(b => b && (b.id === matchId || String(b.id) === String(matchId))) ||
+                ((Array.isArray(state.matches) ? state.matches : []).find(m => String(m.id) === String(matchId)));
+  const custName = match ? (match.customer_name || match.customerName || 'Cliente') : 'Cliente';
+
+  if (!confirm(`Confirmar que "${custName}" NÃO VEIO JOGAR (Falta / W.O.)?\n\n• O horário da quadra será liberado imediatamente no sistema\n• O status ficará registrado como "Não Compareceu (Falta)" no histórico da Arena\n• Registro no relatório de auditoria do sistema`)) {
+    return;
+  }
+
+  // Se for id de mensalista do tipo monthly-UUID
+  if (String(matchId).startsWith('monthly-')) {
+    const rawMemberId = String(matchId).replace('monthly-', '');
+    const m = (state.monthlyMembers || []).find(x => String(x.id) === rawMemberId);
+    const noShowBooking = {
+      id: 'ARENA-NOSHOW-' + rawMemberId + '-' + todayStr,
+      court_id: m ? (m.court_id || m.courtId) : (state.courts[0]?.id || ''),
+      date: todayStr,
+      start_time: m ? (m.start_time || m.startTime || '19:00') : '19:00',
+      end_time: m ? (m.end_time || m.endTime || '20:00') : '20:00',
+      duration: 60,
+      price: m ? (Number(m.monthly_price || 0) / 4) : 0,
+      total_price: m ? (Number(m.monthly_price || 0) / 4) : 0,
+      status: 'no_show',
+      payment_method: m && m.contract_type === 'fixo' ? 'pos_jogo' : 'mensalidade',
+      customer_name: m ? ((m.team_name || '') + (m.responsible_name ? ` (${m.responsible_name})` : '')) : custName,
+      customer_phone: m ? m.phone : '',
+      monthly_member_id: rawMemberId,
+      booking_type: m && m.contract_type === 'fixo' ? 'fixo' : 'mensalista',
+      observation: `[NÃO COMPARECEU / NÃO VEIO JOGAR - FALTA REGISTRADA EM ${todayStr}]`
+    };
+
+    if (!state.bookings) state.bookings = [];
+    state.bookings.push(noShowBooking);
+
+    try {
+      const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+      local.push(noShowBooking);
+      localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+    } catch(e) {}
+
+    if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+      try {
+        const client = window.ArenaSupabase.getClient();
+        await client.from('bookings').insert([noShowBooking]);
+      } catch(e) {}
+    }
+  } else {
+    // Booking existente
+    const b = (state.bookings || []).find(x => x && (x.id === matchId || String(x.id) === String(matchId)));
+    if (b) {
+      b.status = 'no_show';
+      const cleanObs = (b.observation || '').replace(/\[NÃO COMPARECEU[^\]]*\]/g, '').trim();
+      b.observation = [cleanObs, `[NÃO COMPARECEU / NÃO VEIO JOGAR - FALTA REGISTRADA EM ${todayStr}]`].filter(Boolean).join(' | ');
+
+      try {
+        const local = JSON.parse(localStorage.getItem('arena_local_bookings') || '[]');
+        const idx = local.findIndex(x => x && (x.id === matchId || String(x.id) === String(matchId)));
+        if (idx !== -1) {
+          local[idx].status = 'no_show';
+          local[idx].observation = b.observation;
+          localStorage.setItem('arena_local_bookings', JSON.stringify(local));
+        }
+      } catch(e) {}
+
+      if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+        try {
+          const client = window.ArenaSupabase.getClient();
+          await client.from('bookings').update({
+            status: 'no_show',
+            observation: b.observation
+          }).eq('id', b.id);
+        } catch(e) {}
+      }
+    }
+  }
+
+  // Remove de matchDelays se houver
+  if (state.matchDelays && state.matchDelays[matchId]) {
+    delete state.matchDelays[matchId];
+    localStorage.setItem('arena_match_delays', JSON.stringify(state.matchDelays));
+  }
+
+  // Log de auditoria
+  logSystemAction({
+    actionType: 'MATCH_NO_SHOW',
+    actionLabel: 'Falta / Não Compareceu',
+    courtName: match ? (match.court_name || 'Quadra') : 'Quadra',
+    details: `Cliente/Time "${custName}" não compareceu ao jogo agendado em ${todayStr}. Horário liberado na Arena.`,
+    targetId: matchId
+  });
+
+  _refreshAllUI();
+  if (state.currentMode === 'admin') {
+    renderStepContent();
+  }
+  requestSchedule();
+  if (window.lucide) lucide.createIcons();
+
+  if (typeof showToastNotification === 'function') {
+    showToastNotification(`
+      <strong class="text-rose-400 font-bold block text-sm mb-0.5">🚫 Falta Registrada com Sucesso</strong>
+      <p class="text-slate-300">"${custName}" foi marcado como não compareceu. O horário está liberado na quadra.</p>
+    `, 4000);
+  }
+}
+window.handleMatchNoShow = handleMatchNoShow;
 
 // HELPER PARA RESERVA DIRETA (BALCÃO): Grade visual de horários e seleção de Início e Término
 function updateDirectBookingSlots() {
@@ -15903,6 +16199,7 @@ function openMonthlyModal(memberId = null) {
   const currentStartTime = existing ? (existing.start_time || existing.startTime || existing.time || '19:00') : '19:00';
   const currentEndTime = existing ? (existing.end_time || existing.endTime || '20:00') : '20:00';
   const currentDay = existing ? (existing.day_of_week || existing.dayOfWeek || 'segunda') : 'segunda';
+  const currentContractType = existing ? (existing.contract_type || existing.contractType || (existing.booking_type === 'mensalista' ? 'mensalista' : 'fixo')) : 'fixo';
 
   modalRoot.innerHTML = `
     <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
@@ -15915,8 +16212,8 @@ function openMonthlyModal(memberId = null) {
               <i data-lucide="${isEditing ? 'edit-3' : 'calendar-clock'}" class="w-5 h-5 text-emerald-300"></i>
             </div>
             <div>
-              <h3 class="text-base font-black uppercase tracking-wide">${isEditing ? 'Editar Horário Fixo (Mensalista)' : 'Novo Horário Fixo (Mensalista)'}</h3>
-              <p class="text-xs text-emerald-300 font-medium">${isEditing ? 'Altere os dados do contrato, dia ou horário' : 'Reserve um horário semanal garantido para um time ou grupo'}</p>
+              <h3 class="text-base font-black uppercase tracking-wide">${isEditing ? 'Editar Horário Fixo / Mensalista' : 'Novo Horário Fixo / Mensalista'}</h3>
+              <p class="text-xs text-emerald-300 font-medium">${isEditing ? 'Altere os dados do contrato, modalidade, dia ou horário' : 'Configure se o cliente é Horário Fixo (paga por jogo) ou Mensalista'}</p>
             </div>
           </div>
           <button onclick="closeModal()" class="text-emerald-300 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
@@ -15927,6 +16224,30 @@ function openMonthlyModal(memberId = null) {
         <!-- Form Body -->
         <form onsubmit="handleMonthlySubmit(event, '${isEditing ? existing.id : ''}')" class="p-5 sm:p-6 space-y-4 overflow-y-auto" autocomplete="off">
           
+          <!-- SELEÇÃO: HORÁRIO FIXO VS MENSALISTA -->
+          <div class="p-3.5 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <label class="block text-xs font-black text-slate-800 uppercase tracking-wide">
+              Tipo de Reserva Semanal *
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label id="contractTypeFixoLabel" class="relative flex items-start p-3 rounded-xl border cursor-pointer transition-all ${currentContractType === 'fixo' ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-400/30' : 'bg-white border-slate-200 hover:bg-slate-50'}">
+                <input type="radio" name="monthlyContractType" value="fixo" ${currentContractType === 'fixo' ? 'checked' : ''} onchange="handleMonthlyContractTypeToggle('fixo')" class="mt-0.5 text-amber-600 focus:ring-amber-500">
+                <div class="ml-2.5">
+                  <span class="block text-xs font-black text-amber-950 flex items-center gap-1">⏰ Horário Fixo</span>
+                  <span class="block text-[11px] text-slate-600 font-medium leading-tight mt-0.5">Vem todo dia de horário marcado e <strong>faz o PIX ou dá em dinheiro após o jogo</strong>.</span>
+                </div>
+              </label>
+
+              <label id="contractTypeMensalistaLabel" class="relative flex items-start p-3 rounded-xl border cursor-pointer transition-all ${currentContractType === 'mensalista' ? 'bg-indigo-50/80 border-indigo-400 ring-2 ring-indigo-400/30' : 'bg-white border-slate-200 hover:bg-slate-50'}">
+                <input type="radio" name="monthlyContractType" value="mensalista" ${currentContractType === 'mensalista' ? 'checked' : ''} onchange="handleMonthlyContractTypeToggle('mensalista')" class="mt-0.5 text-indigo-600 focus:ring-indigo-500">
+                <div class="ml-2.5">
+                  <span class="block text-xs font-black text-indigo-950 flex items-center gap-1">⭐ Mensalista</span>
+                  <span class="block text-[11px] text-slate-600 font-medium leading-tight mt-0.5">Paga <strong>mensalidade fechada</strong> no mês com plano pré-estabelecido.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <!-- Quadra e Dia da Semana -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
@@ -16015,13 +16336,18 @@ function openMonthlyModal(memberId = null) {
           <!-- Preço Mensal e Status -->
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mensalidade Total (R$) *</label>
+              <label id="monthlyPriceLabel" class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                ${currentContractType === 'fixo' ? 'Valor por Partida / Jogo (R$) *' : 'Mensalidade Total do Mês (R$) *'}
+              </label>
               <div class="relative">
                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">R$</span>
-                <input type="number" step="10" id="monthlyPrice" required placeholder="500.00"
+                <input type="number" step="10" id="monthlyPrice" required placeholder="100.00"
                        value="${existing ? (Number(existing.monthly_price || existing.monthlyPrice || defaultPrice).toFixed(2)) : (Number(defaultPrice).toFixed(2))}"
                        class="w-full pl-9 pr-3 py-3 border border-slate-300 rounded-xl text-sm font-black text-emerald-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
               </div>
+              <p id="monthlyPriceSubtext" class="text-[10px] text-slate-500 font-medium mt-1">
+                ${currentContractType === 'fixo' ? 'Quem é fixo paga o jogo após a partida (PIX ou Dinheiro).' : 'Mensalista paga valor fixo mensal fechado.'}
+              </p>
             </div>
 
             <div>
@@ -16067,6 +16393,25 @@ function openMonthlyModal(memberId = null) {
   if (window.lucide) lucide.createIcons();
 }
 window.openMonthlyModal = openMonthlyModal;
+
+function handleMonthlyContractTypeToggle(type) {
+  const fixoLabel = document.getElementById('contractTypeFixoLabel');
+  const mensLabel = document.getElementById('contractTypeMensalistaLabel');
+  const priceLabel = document.getElementById('monthlyPriceLabel');
+  const priceSub = document.getElementById('monthlyPriceSubtext');
+  if (type === 'fixo') {
+    if (fixoLabel) fixoLabel.className = 'relative flex items-start p-3 rounded-xl border cursor-pointer transition-all bg-amber-50/80 border-amber-400 ring-2 ring-amber-400/30';
+    if (mensLabel) mensLabel.className = 'relative flex items-start p-3 rounded-xl border cursor-pointer transition-all bg-white border-slate-200 hover:bg-slate-50';
+    if (priceLabel) priceLabel.innerText = 'Valor por Partida / Jogo (R$) *';
+    if (priceSub) priceSub.innerText = 'Quem é fixo paga o jogo após a partida (PIX ou Dinheiro).';
+  } else {
+    if (mensLabel) mensLabel.className = 'relative flex items-start p-3 rounded-xl border cursor-pointer transition-all bg-indigo-50/80 border-indigo-400 ring-2 ring-indigo-400/30';
+    if (fixoLabel) fixoLabel.className = 'relative flex items-start p-3 rounded-xl border cursor-pointer transition-all bg-white border-slate-200 hover:bg-slate-50';
+    if (priceLabel) priceLabel.innerText = 'Mensalidade Total do Mês (R$) *';
+    if (priceSub) priceSub.innerText = 'Mensalista paga valor fixo mensal fechado.';
+  }
+}
+window.handleMonthlyContractTypeToggle = handleMonthlyContractTypeToggle;
 
 function openEditContractFromMatch(matchId) {
   let member = null;
@@ -16354,6 +16699,8 @@ function openEditMatchModal(matchId) {
                   <option value="confirmed" ${matchStatus === 'confirmed' ? 'selected' : ''}>Agendado</option>
                   <option value="in_progress" ${matchStatus === 'in_progress' ? 'selected' : ''}>🟢 Bola Rolando</option>
                   <option value="finished" ${matchStatus === 'finished' ? 'selected' : ''}>✓ Finalizado</option>
+                  <option value="no_show" ${matchStatus === 'no_show' ? 'selected' : ''}>🚫 Não Veio Jogar (Falta / W.O.)</option>
+                  <option value="cancelled" ${matchStatus === 'cancelled' ? 'selected' : ''}>❌ Cancelado</option>
                 </select>
               </div>
             </div>
@@ -16368,11 +16715,19 @@ function openEditMatchModal(matchId) {
 
           <!-- FOOTER / BOTÕES -->
           <div class="pt-3 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
-            <button type="button" onclick="openVerifiedBookingWhatsApp('${escapeHtmlAttr(match.id)}')" 
-                    class="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs">
-              <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
-              <span>Enviar no WhatsApp</span>
-            </button>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button type="button" onclick="openVerifiedBookingWhatsApp('${escapeHtmlAttr(match.id)}')" 
+                      class="px-3.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs">
+                <i data-lucide="share-2" class="w-4 h-4 text-emerald-600"></i>
+                <span>Enviar no WhatsApp</span>
+              </button>
+              <button type="button" onclick="closeModal(); handleCancelBooking('${escapeHtmlAttr(match.id)}')"
+                      class="px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 active:bg-rose-200 text-rose-700 border border-rose-300 text-xs font-black flex items-center space-x-1.5 transition-all cursor-pointer shadow-2xs touch-manipulation"
+                      title="Apagar ou cancelar esta partida do sistema">
+                <i data-lucide="trash-2" class="w-4 h-4 text-rose-600"></i>
+                <span>Apagar Partida</span>
+              </button>
+            </div>
             <div class="flex items-center space-x-2">
               <button type="button" onclick="closeModal()" 
                       class="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer">
@@ -16606,6 +16961,48 @@ async function handleSaveEditMatch(event, matchId) {
         status: matchStatus,
         observation: fullObs
       };
+    } else if (String(matchId).startsWith('monthly-')) {
+      const rawMemberId = String(matchId).replace('monthly-', '');
+      const m = (state.monthlyMembers || []).find(x => String(x.id) === rawMemberId);
+      const isFixo = m ? (m.contract_type === 'fixo' || m.contractType === 'fixo') : false;
+      const materializedBooking = {
+        id: 'monthly-' + rawMemberId + '-' + matchDate,
+        court_id: courtId,
+        courtId: courtId,
+        date: matchDate,
+        start_time: startTime,
+        startTime: startTime,
+        end_time: endTime,
+        endTime: endTime,
+        time: `${startTime} às ${endTime}`,
+        duration: durMins,
+        price: priceVal,
+        total_price: priceVal,
+        totalPrice: priceVal,
+        status: matchStatus,
+        payment_method: paymentMethod || (isFixo ? 'pos_jogo' : 'mensalidade'),
+        customer_name: custName,
+        customerName: custName,
+        customer_phone: formatPhone(custPhone),
+        customerPhone: formatPhone(custPhone),
+        customer_cpf: custCpf ? formatCPF(custCpf) : '',
+        monthly_member_id: rawMemberId,
+        booking_type: isFixo ? 'fixo' : 'mensalista',
+        contract_type: isFixo ? 'fixo' : 'mensalista',
+        observation: fullObs
+      };
+      if (!state.bookings) state.bookings = [];
+      const exIdx = state.bookings.findIndex(b => b && (b.id === materializedBooking.id || (b.monthly_member_id === rawMemberId && b.date === matchDate)));
+      if (exIdx >= 0) {
+        state.bookings[exIdx] = materializedBooking;
+      } else {
+        state.bookings.push(materializedBooking);
+      }
+      if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
+        try {
+          window.ArenaSupabase.getClient().from('bookings').upsert([materializedBooking]).then();
+        } catch(e) {}
+      }
     }
 
     // Também atualiza em state.matches se existir
@@ -16789,6 +17186,7 @@ async function handleMonthlySubmit(event, editId) {
     domingo: 'Todo Domingo'
   };
 
+  const contractType = document.querySelector('input[name="monthlyContractType"]:checked')?.value || 'fixo';
   const memberId = editId || ('monthly-' + Date.now());
   const memberRecord = {
     id: memberId,
@@ -16799,6 +17197,8 @@ async function handleMonthlySubmit(event, editId) {
     phone: phone,
     court_id: courtId,
     courtId: courtId,
+    contract_type: contractType,
+    contractType: contractType,
     day_of_week: dayOfWeek,
     dayOfWeek: dayOfWeek,
     day_of_week_label: dayLabels[dayOfWeek] || 'Semanal',
@@ -16836,6 +17236,7 @@ async function handleMonthlySubmit(event, editId) {
         responsible_name: responsibleName,
         phone: phone,
         court_id: courtId,
+        contract_type: contractType,
         day_of_week: dayOfWeek,
         day_of_week_label: dayLabels[dayOfWeek] || 'Semanal',
         time: startTime,
@@ -16867,6 +17268,11 @@ async function handleMonthlySubmit(event, editId) {
       b.customerPhone = phone;
       b.court_id = courtId;
       b.courtId = courtId;
+      b.booking_type = contractType === 'fixo' ? 'fixo' : 'mensalista';
+      b.bookingType = contractType === 'fixo' ? 'fixo' : 'mensalista';
+      b.contract_type = contractType;
+      b.contractType = contractType;
+      b.payment_method = contractType === 'fixo' ? 'pos_jogo' : 'mensalidade';
       b.start_time = startTime;
       b.startTime = startTime;
       b.end_time = endTime;
@@ -16876,7 +17282,9 @@ async function handleMonthlySubmit(event, editId) {
       b.price = monthlyPrice / 4;
       b.total_price = monthlyPrice / 4;
       b.totalPrice = monthlyPrice / 4;
-      b.observation = `Contrato de Horário Fixo Semanal (${teamName})`;
+      b.observation = contractType === 'fixo'
+        ? `Horário Fixo Semanal (${teamName}) - Paga no jogo via PIX/Dinheiro`
+        : `Contrato de Mensalista Semanal (${teamName}) - Mensalidade Fechada`;
     });
 
     try {
@@ -16888,6 +17296,8 @@ async function handleMonthlySubmit(event, editId) {
             customer_name: b.customer_name,
             customer_phone: b.customer_phone,
             court_id: b.court_id,
+            booking_type: b.booking_type,
+            payment_method: b.payment_method,
             start_time: b.start_time,
             end_time: b.end_time,
             price: b.price,
@@ -16935,14 +17345,18 @@ async function handleMonthlySubmit(event, editId) {
               price: monthlyPrice / 4,
               total_price: monthlyPrice / 4,
               status: 'confirmed',
-              payment_status: 'paid',
-              payment_method: 'mensalidade',
+              payment_status: contractType === 'fixo' ? 'pending' : 'paid',
+              payment_method: contractType === 'fixo' ? 'pos_jogo' : 'mensalidade',
               customer_name: `${teamName} (${responsibleName})`,
               customer_phone: phone,
               monthly_member_id: memberId,
-              booking_type: 'mensalista',
-              bookingType: 'mensalista',
-              observation: `Contrato de Horário Fixo Semanal (${teamName})`
+              booking_type: contractType === 'fixo' ? 'fixo' : 'mensalista',
+              bookingType: contractType === 'fixo' ? 'fixo' : 'mensalista',
+              contract_type: contractType,
+              contractType: contractType,
+              observation: contractType === 'fixo'
+                ? `Horário Fixo Semanal (${teamName}) - Paga no jogo via PIX/Dinheiro`
+                : `Contrato de Mensalista Semanal (${teamName}) - Mensalidade Fechada`
             };
             bookingsToCreate.push(newBooking);
           }
