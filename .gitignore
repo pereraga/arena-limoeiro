@@ -14,3 +14,4 @@ android/.idea
 .gradle/
 local.properties
 release-apks/
+/apks/
