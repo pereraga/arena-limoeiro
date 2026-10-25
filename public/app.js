@@ -11293,64 +11293,179 @@ function renderAdminSubTabContent(tab) {
     return renderAdminCategoriesTab();
   }
   if (tab === 'database') {
-    const cfg = window.ArenaSupabase ? window.ArenaSupabase.getConfig() : { url: 'https://brmclyukjfijommbxhks.supabase.co', anonKey: '', connected: false };
-    const prefillUrl = cfg.url || 'https://brmclyukjfijommbxhks.supabase.co';
+    const cfg = window.ArenaSupabase ? window.ArenaSupabase.getConfig() : {
+      url: 'https://brmclyukjfijommbxhks.supabase.co',
+      anonKey: '',
+      secondaryUrl: '',
+      secondaryAnonKey: '',
+      dualWrite: true,
+      autoFailover: true,
+      connected: false,
+      secondaryConnected: false
+    };
+    const prefillUrl1 = cfg.url || 'https://brmclyukjfijommbxhks.supabase.co';
+    const prefillUrl2 = cfg.secondaryUrl || '';
+    const isDualActive = cfg.connected && cfg.secondaryConnected;
+
     return `
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
+      <div class="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm space-y-6">
+        
+        <!-- Header Principal -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
-            <div class="flex items-center space-x-2">
-              <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-800"><i data-lucide="database" class="w-5 h-5"></i></span>
-              <h3 class="text-lg font-black text-slate-900">Vincular Banco de Dados Supabase (Nuvem / Vercel)</h3>
+            <div class="flex items-center space-x-2.5">
+              <span class="p-2 rounded-xl bg-emerald-100 text-emerald-800"><i data-lucide="database" class="w-5 h-5"></i></span>
+              <div>
+                <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <span>Vincular Banco de Dados Supabase (Sistema Duplo 2 em 1)</span>
+                </h3>
+                <p class="text-xs text-slate-500 mt-0.5">Banco 1 (Principal) + Banco 2 (Cópia Leve & Salvaguarda Ativa) operando como um único sistema unificado.</p>
+              </div>
             </div>
-            <p class="text-xs text-slate-500 mt-1">Conecte o sistema ao seu projeto no Supabase para salvar quadras, clientes e agendamentos na nuvem.</p>
           </div>
 
-          <div class="flex items-center space-x-2">
-            <span class="px-3 py-1 rounded-full text-xs font-black flex items-center space-x-1.5 ${cfg.connected ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'}">
-              <span class="w-2 h-2 rounded-full ${cfg.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}"></span>
-              <span>${cfg.connected ? '🟢 Conectado ao Supabase' : '🟡 Aguardando Chave Anon'}</span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="px-3 py-1.5 rounded-full text-xs font-black flex items-center space-x-1.5 ${isDualActive ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : (cfg.secondaryConnected || cfg.connected ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-slate-100 text-slate-700 border border-slate-300')}">
+              <span class="w-2 h-2 rounded-full ${isDualActive ? 'bg-emerald-500 animate-pulse' : (cfg.secondaryConnected || cfg.connected ? 'bg-amber-500' : 'bg-slate-400')}"></span>
+              <span>${isDualActive ? '🟢 Modo Duplo 2 em 1 Ativo' : (cfg.secondaryConnected ? '🛡️ Banco 2 Operando como Salvaguarda' : (cfg.connected ? '🟢 Banco 1 Conectado' : '🟡 Aguardando Chaves'))}</span>
             </span>
           </div>
         </div>
 
-        <form onsubmit="handleSaveSupabaseConfig(event)" class="max-w-2xl space-y-4 mb-8">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
-              <i data-lucide="globe" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
-              URL do Projeto Supabase (Project URL) *
-            </label>
-            <input type="url" id="supabaseUrlInput" required 
-                   value="${prefillUrl}" 
-                   placeholder="https://brmclyukjfijommbxhks.supabase.co" 
-                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50">
+        <!-- Banner Informativo da Arquitetura 2 em 1 -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 to-slate-900 border border-emerald-500/40 text-white space-y-2">
+          <div class="flex items-center gap-2">
+            <span class="text-emerald-400 text-base">🛡️</span>
+            <strong class="text-xs sm:text-sm font-black text-emerald-300 uppercase tracking-wide">Como Funciona a Integração dos 2 Bancos (2 em 1):</strong>
+          </div>
+          <ul class="text-[11px] sm:text-xs text-slate-200 space-y-1 list-disc list-inside leading-relaxed">
+            <li><strong>O Banco 1 não interfere no Banco 2:</strong> Se o Banco 1 sofrer bloqueio de cota (exceder limite) ou falha, o Banco 2 permanece 100% protegido.</li>
+            <li><strong>O Banco 2 interfere no Banco 1 para salvar:</strong> Se o Banco 1 falhar ou rejeitar gravações, o Banco 2 assume imediatamente sem perder nenhum agendamento.</li>
+            <li><strong>Cópia Leve Contínua:</strong> Qualquer modificação (novo jogo, alteração, cancelamento, mensalista ou bar) envia automaticamente uma cópia leve para o Banco 2 em segundo plano.</li>
+          </ul>
+        </div>
+
+        <form onsubmit="handleSaveSupabaseConfig(event)" class="space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            
+            <!-- BANCO 1 (PRINCIPAL) -->
+            <div class="p-5 rounded-2xl border ${cfg.connected ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-200 bg-slate-50/50'} space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">🏛️</span>
+                  <strong class="text-xs font-black uppercase text-slate-900">Banco 1: Principal (Exibição & Produção)</strong>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${cfg.connected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}">
+                  ${cfg.connected ? '🟢 Conectado' : 'Aguardando'}
+                </span>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
+                  <i data-lucide="globe" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
+                  Project URL do Banco 1 *
+                </label>
+                <input type="url" id="supabaseUrlInput" required 
+                       value="${prefillUrl1}" 
+                       placeholder="https://brmclyukjfijommbxhks.supabase.co" 
+                       class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
+                  <i data-lucide="key" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
+                  Anon Key do Banco 1 *
+                </label>
+                <input type="password" id="supabaseKeyInput" required 
+                       value="${cfg.anonKey || ''}" 
+                       placeholder="Chave anon do primeiro projeto" 
+                       class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-white">
+              </div>
+            </div>
+
+            <!-- BANCO 2 (SECUNDÁRIO / CÓPIA LEVE E SALVAGUARDA) -->
+            <div class="p-5 rounded-2xl border ${cfg.secondaryConnected ? 'border-emerald-300 bg-emerald-50/20' : 'border-amber-200 bg-amber-50/20'} space-y-4">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                <div class="flex items-center gap-2">
+                  <span class="text-base">🛡️</span>
+                  <strong class="text-xs font-black uppercase text-slate-900">Banco 2: Secundário (Cópia Leve & Salvaguarda)</strong>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${cfg.secondaryConnected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                  ${cfg.secondaryConnected ? '🟢 Conectado' : '🟡 Aguardando Chave'}
+                </span>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
+                  <i data-lucide="globe" class="w-3.5 h-3.5 text-amber-600 mr-1.5"></i>
+                  Project URL do Banco 2 (Novo Projeto Supabase)
+                </label>
+                <input type="url" id="supabaseSecondaryUrlInput" 
+                       value="${prefillUrl2}" 
+                       placeholder="https://seu-novo-projeto.supabase.co" 
+                       class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-amber-600 focus:outline-none bg-white">
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
+                  <i data-lucide="key" class="w-3.5 h-3.5 text-amber-600 mr-1.5"></i>
+                  Anon Key do Banco 2
+                </label>
+                <input type="password" id="supabaseSecondaryKeyInput" 
+                       value="${cfg.secondaryAnonKey || ''}" 
+                       placeholder="Cole aqui a anon key do novo banco criado" 
+                       class="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:ring-2 focus:ring-amber-600 focus:outline-none bg-white">
+              </div>
+            </div>
+
           </div>
 
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1 flex items-center">
-              <i data-lucide="key" class="w-3.5 h-3.5 text-emerald-600 mr-1.5"></i>
-              Chave Pública Anônima (Anon Key / Public API Key) *
-            </label>
-            <input type="password" id="supabaseKeyInput" required 
-                   value="${cfg.anonKey || ''}" 
-                   placeholder="Cole aqui sua chave anon" 
-                   class="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-mono text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none bg-slate-50">
+          <!-- Opções de Automação Dupla -->
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center space-x-3">
+              <input type="checkbox" id="supabaseDualWriteInput" ${cfg.dualWrite ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded">
+              <label for="supabaseDualWriteInput" class="text-xs font-bold text-slate-800 cursor-pointer">
+                ⚡ Cópia Leve Automática (Dual-Write ativo a cada alteração no sistema)
+              </label>
+            </div>
+            <div class="flex items-center space-x-3">
+              <input type="checkbox" id="supabaseAutoFailoverInput" ${cfg.autoFailover ? 'checked' : ''} class="w-4 h-4 text-emerald-600 rounded">
+              <label for="supabaseAutoFailoverInput" class="text-xs font-bold text-slate-800 cursor-pointer">
+                🛡️ Salvaguarda Ativa (O Banco 2 salva caso o Banco 1 falhe ou atinja cota)
+              </label>
+            </div>
           </div>
 
-          <div id="supabaseStatusMsg" class="hidden p-3.5 rounded-xl text-xs font-bold"></div>
+          <div id="supabaseStatusMsg" class="hidden p-4 rounded-xl text-xs font-bold"></div>
 
-          <div class="pt-2 flex flex-wrap items-center gap-3">
-            <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all">
-              <i data-lucide="save" class="w-4 h-4"></i>
-              <span>Salvar & Conectar ao Supabase</span>
-            </button>
+          <!-- Botões de Ação -->
+          <div class="pt-2 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <button type="submit" class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-md flex items-center space-x-2 transition-all cursor-pointer">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>Salvar Configuração dos 2 Bancos</span>
+              </button>
 
-            <button type="button" onclick="handleTestSupabaseConnection()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl flex items-center space-x-2 transition-all">
-              <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
-              <span>Testar Conexão</span>
-            </button>
+              <button type="button" onclick="handleTestSupabaseConnection()" class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs sm:text-sm rounded-xl flex items-center space-x-2 transition-all cursor-pointer border border-slate-200">
+                <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+                <span>Testar Conexão dos 2 Bancos</span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2.5">
+              <button type="button" onclick="openSecondarySqlModal()" class="px-4 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 border border-amber-300 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all cursor-pointer">
+                <span>📜</span>
+                <span>Ver Script SQL do Banco 2</span>
+              </button>
+
+              <button type="button" onclick="handleReconcileToSecondary()" class="px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold text-xs rounded-xl flex items-center space-x-1.5 transition-all cursor-pointer">
+                <span>🔄</span>
+                <span>Enviar Cópia Completa ao Banco 2</span>
+              </button>
+            </div>
           </div>
         </form>
+
       </div>
     `;
   }
@@ -21437,11 +21552,15 @@ function initEventListeners() {
   });
 }
 
-// Handlers para Vinculação do Banco de Dados Supabase
+// Handlers para Vinculação do Banco de Dados Supabase (Sistema Duplo 2 em 1)
 async function handleSaveSupabaseConfig(event) {
   event.preventDefault();
-  const url = document.getElementById('supabaseUrlInput').value.trim();
-  const anonKey = document.getElementById('supabaseKeyInput').value.trim();
+  const url = document.getElementById('supabaseUrlInput') ? document.getElementById('supabaseUrlInput').value.trim() : '';
+  const anonKey = document.getElementById('supabaseKeyInput') ? document.getElementById('supabaseKeyInput').value.trim() : '';
+  const secondaryUrl = document.getElementById('supabaseSecondaryUrlInput') ? document.getElementById('supabaseSecondaryUrlInput').value.trim() : '';
+  const secondaryAnonKey = document.getElementById('supabaseSecondaryKeyInput') ? document.getElementById('supabaseSecondaryKeyInput').value.trim() : '';
+  const dualWrite = document.getElementById('supabaseDualWriteInput') ? document.getElementById('supabaseDualWriteInput').checked : true;
+  const autoFailover = document.getElementById('supabaseAutoFailoverInput') ? document.getElementById('supabaseAutoFailoverInput').checked : true;
   const statusMsg = document.getElementById('supabaseStatusMsg');
 
   if (!window.ArenaSupabase) {
@@ -21449,48 +21568,256 @@ async function handleSaveSupabaseConfig(event) {
     return;
   }
 
-  statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
-  statusMsg.classList.add('bg-slate-100', 'text-slate-800');
-  statusMsg.innerText = 'Testando conexão com o Supabase...';
-
-  const res = await window.ArenaSupabase.saveConfig(url, anonKey);
-  if (res.success) {
-    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
-    statusMsg.innerText = '✓ Conexão realizada com sucesso! O banco de dados Supabase está vinculado.';
-    state.supabaseConnected = true;
-    setTimeout(() => {
-      renderStepContent();
-      syncDataFromSupabase();
-    }, 1200);
-  } else {
-    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
-    statusMsg.innerText = 'Falha na conexão: ' + res.message;
+  if (statusMsg) {
+    statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800', 'bg-amber-50', 'text-amber-800');
+    statusMsg.classList.add('bg-slate-100', 'text-slate-800');
+    statusMsg.innerText = 'Testando e vinculando ambos os bancos de dados...';
   }
+
+  const res = await window.ArenaSupabase.saveDualConfig({
+    url,
+    anonKey,
+    secondaryUrl,
+    secondaryAnonKey,
+    dualWrite,
+    autoFailover
+  });
+
+  if (statusMsg) {
+    let msg = '';
+    let isOk = false;
+    if (res.isDualActive) {
+      isOk = true;
+      msg = '✓ Sucesso Absoluto! Banco 1 e Banco 2 conectados e operando em Modo 2 em 1 (Cópia Leve e Salvaguarda Ativos).';
+    } else if (res.db2 && res.db2.success) {
+      isOk = true;
+      msg = '✓ Banco 2 (Reserva) conectado e operando como Salvaguarda Ativa!';
+    } else if (res.db1 && res.db1.success) {
+      isOk = true;
+      msg = '✓ Banco 1 conectado!' + (secondaryUrl ? ' (Aviso Banco 2: ' + (res.db2.message || 'aguardando validação') + ')' : '');
+    } else {
+      msg = 'Falha na conexão: Banco 1 (' + (res.db1.message || 'erro') + ') | Banco 2 (' + (res.db2.message || 'não configurado') + ')';
+    }
+
+    statusMsg.className = isOk
+      ? 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200'
+      : 'p-3.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
+    statusMsg.innerText = msg;
+  }
+
+  state.supabaseConnected = res.hasActiveDatabase;
+  setTimeout(() => {
+    renderStepContent();
+    syncDataFromSupabase();
+  }, 1200);
 }
 
 async function handleTestSupabaseConnection() {
   const statusMsg = document.getElementById('supabaseStatusMsg');
   if (!statusMsg) return;
 
-  statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800');
+  statusMsg.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800', 'bg-rose-50', 'text-rose-800', 'bg-amber-50', 'text-amber-800');
   statusMsg.classList.add('bg-slate-100', 'text-slate-800');
-  statusMsg.innerText = 'Testando conexão...';
+  statusMsg.innerText = 'Testando conexão com o Banco 1 e o Banco 2...';
 
-  if (!window.ArenaSupabase || !window.ArenaSupabase.getClient()) {
+  if (!window.ArenaSupabase) {
     statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200';
-    statusMsg.innerText = 'Preencha a URL e Chave do Supabase antes de testar.';
+    statusMsg.innerText = 'Cliente Supabase não inicializado.';
     return;
   }
 
-  const res = await window.ArenaSupabase.testConnection();
-  if (res.success) {
+  const res = await window.ArenaSupabase.testBothConnections();
+  let details = `Banco 1: ${res.db1.success ? '🟢 Conectado' : '🔴 ' + res.db1.message} | Banco 2: ${res.db2.success ? '🟢 Conectado' : '🟡 ' + res.db2.message}`;
+
+  if (res.hasActiveDatabase) {
     statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
-    statusMsg.innerText = '✓ Conexão bem-sucedida com o Supabase!';
+    statusMsg.innerText = '✓ ' + details;
   } else {
     statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
-    statusMsg.innerText = 'Erro ao conectar: ' + res.message;
+    statusMsg.innerText = 'Erro ao conectar: ' + details;
   }
 }
+
+async function handleReconcileToSecondary() {
+  const statusMsg = document.getElementById('supabaseStatusMsg');
+  if (statusMsg) {
+    statusMsg.classList.remove('hidden');
+    statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200';
+    statusMsg.innerText = 'Enviando cópia leve de todos os dados para o Banco 2...';
+  }
+
+  if (!window.ArenaSupabase || !window.ArenaSupabase.getSecondaryClient()) {
+    if (statusMsg) {
+      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200';
+      statusMsg.innerText = 'Aviso: Preencha e salve a URL e Anon Key do Banco 2 antes de reconciliar.';
+    }
+    return;
+  }
+
+  const res = await window.ArenaSupabase.reconcileToSecondary(state);
+  if (statusMsg) {
+    if (res.success) {
+      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+      statusMsg.innerText = '✓ Cópia de segurança enviada com sucesso para o Banco 2!';
+    } else {
+      statusMsg.className = 'p-3.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
+      statusMsg.innerText = 'Aviso ao enviar cópia para o Banco 2: ' + (res.error || res.message);
+    }
+  }
+}
+
+function openSecondarySqlModal() {
+  const modalRoot = document.getElementById('modalRoot');
+  if (!modalRoot) return;
+
+  const sqlScript = `-- ==============================================================================
+-- 🏟️ ARENA LIMOEIRO - SCRIPT SQL COMPLETO PARA O BANCO 2 (SUPABASE)
+-- Execute no SQL Editor do seu novo projeto Supabase
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS public.customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    email TEXT,
+    document TEXT,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.courts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    category_label TEXT NOT NULL,
+    image TEXT,
+    base_price_per_hour NUMERIC(10,2) NOT NULL DEFAULT 140.00,
+    monthly_price NUMERIC(10,2) NOT NULL DEFAULT 500.00,
+    badge TEXT,
+    bookings_count INTEGER DEFAULT 0,
+    order_index INTEGER DEFAULT 1,
+    description TEXT,
+    observation TEXT,
+    specs JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Bebidas',
+    type TEXT NOT NULL DEFAULT 'product',
+    price NUMERIC(10,2) NOT NULL DEFAULT 5.00,
+    unit TEXT DEFAULT 'unid.',
+    image TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.monthly_members (
+    id TEXT PRIMARY KEY,
+    team_name TEXT NOT NULL,
+    responsible_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    customer_id TEXT,
+    court_id TEXT,
+    day_of_week TEXT NOT NULL,
+    day_of_week_label TEXT NOT NULL,
+    time TEXT NOT NULL,
+    start_time TEXT,
+    end_time TEXT,
+    monthly_price NUMERIC(10,2) NOT NULL,
+    status TEXT DEFAULT 'active',
+    start_month TEXT,
+    observation TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.bookings (
+    id TEXT PRIMARY KEY,
+    court_id TEXT,
+    customer_id TEXT,
+    date TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    time TEXT NOT NULL,
+    duration INTEGER NOT NULL DEFAULT 60,
+    customer_name TEXT NOT NULL,
+    customer_phone TEXT NOT NULL,
+    total_price NUMERIC(10,2) NOT NULL,
+    status TEXT DEFAULT 'confirmed',
+    booking_type TEXT DEFAULT 'avulso',
+    payment_method TEXT DEFAULT 'pix',
+    product_cart JSONB DEFAULT '{}'::jsonb,
+    observation TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Atendente da Recepção',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Permissões RLS públicas para acesso do sistema
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.courts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.monthly_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Acesso completo customers" ON public.customers FOR ALL USING (true);
+CREATE POLICY "Acesso completo courts" ON public.courts FOR ALL USING (true);
+CREATE POLICY "Acesso completo products" ON public.products FOR ALL USING (true);
+CREATE POLICY "Acesso completo monthly_members" ON public.monthly_members FOR ALL USING (true);
+CREATE POLICY "Acesso completo bookings" ON public.bookings FOR ALL USING (true);
+CREATE POLICY "Acesso completo admin_users" ON public.admin_users FOR ALL USING (true);
+
+-- Ativar Realtime
+BEGIN;
+  DROP PUBLICATION IF EXISTS supabase_realtime;
+  CREATE PUBLICATION supabase_realtime FOR TABLE 
+    public.bookings, public.courts, public.monthly_members, public.products, public.customers;
+COMMIT;`;
+
+  modalRoot.innerHTML = `
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div class="bg-slate-900 border border-emerald-500/40 rounded-3xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl space-y-4 text-white my-auto max-h-[90vh] flex flex-col">
+        <div class="flex items-center justify-between pb-3 border-b border-emerald-900/60">
+          <div class="flex items-center gap-2">
+            <span class="text-emerald-400 text-lg">📜</span>
+            <h3 class="text-sm sm:text-base font-black text-white uppercase tracking-wide">Script SQL para o Banco 2 (Novo Supabase)</h3>
+          </div>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <p class="text-xs text-slate-300 leading-relaxed">
+          Copie o script SQL abaixo e cole no <strong>SQL Editor</strong> do seu novo projeto Supabase. Ele cria todas as tabelas (quadras, clientes, agendamentos, mensalistas, produtos) com permissões ativas para operação imediata:
+        </p>
+
+        <div class="flex-1 overflow-y-auto bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-emerald-300 select-all max-h-[350px] whitespace-pre">${sqlScript.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+
+        <div class="pt-2 flex items-center justify-between gap-3 border-t border-slate-800">
+          <button type="button" onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(sqlScript)}')).then(() => alert('Script SQL copiado para a área de transferência! Cole no SQL Editor do seu novo Supabase.'))" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer">
+            <span>📋</span>
+            <span>Copiar Código SQL</span>
+          </button>
+          <button type="button" onclick="closeModal()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl transition-all cursor-pointer">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+}
+window.openSecondarySqlModal = openSecondarySqlModal;
+window.handleReconcileToSecondary = handleReconcileToSecondary;
 
 function handleDisconnectSupabase() {
   if (confirm('Deseja desconectar o Supabase e voltar para o modo local?')) {

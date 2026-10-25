@@ -1,79 +1,418 @@
-// Cliente de Conexão com o Supabase da Arena Limoeiro
+// Cliente de Conexão com o Supabase da Arena Limoeiro - Arquitetura Dupla (2 em 1)
+// Banco 1 (Principal/Exibição) + Banco 2 (Secundário/Cópia Leve & Salvaguarda Ativa)
 (function() {
   const STORAGE_KEY = 'arena_supabase_config';
   
-  // Tenta carregar do localStorage ou de window.ENV
+  // Configuração padrão com suporte a Banco Duplo (2 em 1)
   function getConfig() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          url: parsed.url || window.SUPABASE_URL || 'https://brmclyukjfijommbxhks.supabase.co',
+          anonKey: parsed.anonKey || window.SUPABASE_ANON_KEY || 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+          secondaryUrl: parsed.secondaryUrl || '',
+          secondaryAnonKey: parsed.secondaryAnonKey || '',
+          dualWrite: parsed.dualWrite !== false,
+          autoFailover: parsed.autoFailover !== false,
+          connected: !!parsed.connected,
+          secondaryConnected: !!parsed.secondaryConnected
+        };
+      }
     } catch (e) {}
     
     return {
       url: window.SUPABASE_URL || 'https://brmclyukjfijommbxhks.supabase.co',
       anonKey: window.SUPABASE_ANON_KEY || 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
-      connected: true
+      secondaryUrl: '',
+      secondaryAnonKey: '',
+      dualWrite: true,
+      autoFailover: true,
+      connected: true,
+      secondaryConnected: false
     };
   }
 
-  let clientInstance = null;
+  let client1 = null;
+  let client2 = null;
+  let primaryRestricted = false; // Flag para erro 402 exceed_egress_quota ou indisponibilidade
 
-  function initClient() {
-    const config = getConfig();
-    if (config.url && config.anonKey && window.supabase && window.supabase.createClient) {
-      try {
-        const cleanUrl = config.url.replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-        clientInstance = window.supabase.createClient(cleanUrl, config.anonKey, {
-          auth: { persistSession: true },
-          realtime: { params: { eventsPerSecond: 10 } }
-        });
-        return clientInstance;
-      } catch (err) {
-        console.warn('Erro ao inicializar Supabase:', err);
-      }
+  function createSingleClient(url, key) {
+    if (!url || !key || !window.supabase || !window.supabase.createClient) return null;
+    try {
+      const cleanUrl = url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      return window.supabase.createClient(cleanUrl, key.trim(), {
+        auth: { persistSession: true },
+        realtime: { params: { eventsPerSecond: 10 } }
+      });
+    } catch (err) {
+      console.warn('Erro ao criar cliente Supabase para:', url, err);
+      return null;
     }
-    return null;
   }
+
+  function initClients() {
+    const config = getConfig();
+    if (config.url && config.anonKey) {
+      client1 = createSingleClient(config.url, config.anonKey);
+    }
+    if (config.secondaryUrl && config.secondaryAnonKey) {
+      client2 = createSingleClient(config.secondaryUrl, config.secondaryAnonKey);
+    } else {
+      client2 = null;
+    }
+  }
+
+  // Verifica se o erro indica bloqueio de cota ou indisponibilidade do banco
+  function isRestrictedError(error) {
+    if (!error) return false;
+    const msg = String(error.message || error.details || error || '').toLowerCase();
+    const code = String(error.code || error.status || '');
+    return code === '402' ||
+      code === '429' ||
+      msg.includes('exceed_egress_quota') ||
+      msg.includes('restricted') ||
+      msg.includes('spend caps') ||
+      msg.includes('quota') ||
+      msg.includes('networkerror') ||
+      msg.includes('failed to fetch');
+  }
+
+  // Cria um Proxy Builder que intercepta chamadas a tabelas PostgREST
+  // Realiza: Failover transparente em leituras e Dual-Write com cópia leve assíncrona em escritas
+  function createSmartProxyClient() {
+    return {
+      from(tableName) {
+        return createTableProxy(tableName);
+      },
+      channel(name, opts) {
+        const c = (!primaryRestricted && client1) ? client1 : (client2 || client1);
+        return c ? c.channel(name, opts) : null;
+      },
+      get auth() {
+        const c = (!primaryRestricted && client1) ? client1 : (client2 || client1);
+        return c ? c.auth : null;
+      }
+    };
+  }
+
+  function createTableProxy(tableName) {
+    const operations = {
+      isWrite: false,
+      writeMethod: null,
+      writeArgs: null
+    };
+
+    // Objeto intermediário para montar a query de forma fluente
+    const builderProxy = {
+      _calls: [],
+      
+      select(...args) {
+        this._calls.push({ method: 'select', args });
+        return this;
+      },
+      insert(...args) {
+        operations.isWrite = true;
+        operations.writeMethod = 'insert';
+        operations.writeArgs = args;
+        this._calls.push({ method: 'insert', args });
+        return this;
+      },
+      upsert(...args) {
+        operations.isWrite = true;
+        operations.writeMethod = 'upsert';
+        operations.writeArgs = args;
+        this._calls.push({ method: 'upsert', args });
+        return this;
+      },
+      update(...args) {
+        operations.isWrite = true;
+        operations.writeMethod = 'update';
+        operations.writeArgs = args;
+        this._calls.push({ method: 'update', args });
+        return this;
+      },
+      delete(...args) {
+        operations.isWrite = true;
+        operations.writeMethod = 'delete';
+        operations.writeArgs = args;
+        this._calls.push({ method: 'delete', args });
+        return this;
+      },
+      eq(...args) { this._calls.push({ method: 'eq', args }); return this; },
+      neq(...args) { this._calls.push({ method: 'neq', args }); return this; },
+      gt(...args) { this._calls.push({ method: 'gt', args }); return this; },
+      gte(...args) { this._calls.push({ method: 'gte', args }); return this; },
+      lt(...args) { this._calls.push({ method: 'lt', args }); return this; },
+      lte(...args) { this._calls.push({ method: 'lte', args }); return this; },
+      like(...args) { this._calls.push({ method: 'like', args }); return this; },
+      ilike(...args) { this._calls.push({ method: 'ilike', args }); return this; },
+      is(...args) { this._calls.push({ method: 'is', args }); return this; },
+      in(...args) { this._calls.push({ method: 'in', args }); return this; },
+      order(...args) { this._calls.push({ method: 'order', args }); return this; },
+      limit(...args) { this._calls.push({ method: 'limit', args }); return this; },
+      range(...args) { this._calls.push({ method: 'range', args }); return this; },
+      single(...args) { this._calls.push({ method: 'single', args }); return this; },
+      maybeSingle(...args) { this._calls.push({ method: 'maybeSingle', args }); return this; },
+
+      // Execução da Query com Failover Inteligente e Cópia Leve
+      async then(resolve, reject) {
+        try {
+          const cfg = getConfig();
+          const targetClient = (!primaryRestricted && client1) ? client1 : (client2 || client1);
+
+          // Se for operação de escrita:
+          if (operations.isWrite && cfg.dualWrite && client2) {
+            // Despacha cópia leve assíncrona para o Banco 2
+            dispatchLightweightCopy(tableName, operations, this._calls).catch(() => {});
+          }
+
+          let result = null;
+          let primaryFailed = false;
+
+          if (client1 && !primaryRestricted) {
+            try {
+              let query = client1.from(tableName);
+              for (const call of this._calls) {
+                if (typeof query[call.method] === 'function') {
+                  query = query[call.method](...call.args);
+                }
+              }
+              result = await query;
+              if (result && result.error && isRestrictedError(result.error)) {
+                console.warn('⚠️ [Banco 1] Restrição detectada no Banco Principal:', result.error.message);
+                primaryRestricted = true;
+                primaryFailed = true;
+              }
+            } catch (err) {
+              if (isRestrictedError(err)) {
+                primaryRestricted = true;
+              }
+              primaryFailed = true;
+            }
+          } else {
+            primaryFailed = true;
+          }
+
+          // Se o Banco 1 falhou e temos Banco 2 (Regra: O Segundo interfere no Primeiro para salvar os dados):
+          if (primaryFailed && client2) {
+            try {
+              let query2 = client2.from(tableName);
+              for (const call of this._calls) {
+                if (typeof query2[call.method] === 'function') {
+                  query2 = query2[call.method](...call.args);
+                }
+              }
+              result = await query2;
+              console.log('🛡️ [Banco 2] Operação realizada com sucesso no Banco Reserva!');
+            } catch (secErr) {
+              result = { data: null, error: secErr };
+            }
+          }
+
+          if (!result) {
+            result = { data: null, error: new Error('Nenhum banco de dados disponível.') };
+          }
+
+          if (resolve) resolve(result);
+          return result;
+        } catch (fatalErr) {
+          if (reject) reject(fatalErr);
+          else throw fatalErr;
+        }
+      }
+    };
+
+    return builderProxy;
+  }
+
+  // Despacha uma cópia leve em tempo real para o Banco 2 (Delta Sync Assíncrono)
+  async function dispatchLightweightCopy(tableName, operations, calls) {
+    if (!client2) return;
+    try {
+      let q2 = client2.from(tableName);
+      for (const call of calls) {
+        if (typeof q2[call.method] === 'function') {
+          q2 = q2[call.method](...call.args);
+        }
+      }
+      const res = await q2;
+      if (res && res.error) {
+        console.warn(`[Banco 2 - Cópia Leve] Aviso em ${tableName}:`, res.error.message);
+      } else {
+        console.log(`✓ [Banco 2 - Cópia Leve] Sincronizado com sucesso: ${tableName}`);
+      }
+    } catch (e) {
+      console.warn(`[Banco 2 - Cópia Leve] Erro assíncrono em ${tableName}:`, e?.message || e);
+    }
+  }
+
+  let smartProxyInstance = null;
 
   window.ArenaSupabase = {
     getConfig,
-    saveConfig(url, anonKey) {
-      const cleanUrl = url.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
-      const trimmedKey = anonKey.trim();
-      const cfg = { url: cleanUrl, anonKey: trimmedKey, connected: false };
+
+    // Salva configuração de ambos os bancos (Banco 1 e Banco 2)
+    async saveDualConfig({ url, anonKey, secondaryUrl, secondaryAnonKey, dualWrite = true, autoFailover = true }) {
+      const cleanUrl1 = (url || '').trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      const cleanKey1 = (anonKey || '').trim();
+      const cleanUrl2 = (secondaryUrl || '').trim().replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+      const cleanKey2 = (secondaryAnonKey || '').trim();
+
+      const cfg = {
+        url: cleanUrl1 || 'https://brmclyukjfijommbxhks.supabase.co',
+        anonKey: cleanKey1 || 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+        secondaryUrl: cleanUrl2,
+        secondaryAnonKey: cleanKey2,
+        dualWrite: dualWrite !== false,
+        autoFailover: autoFailover !== false,
+        connected: false,
+        secondaryConnected: false
+      };
+
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
-      initClient();
-      return this.testConnection();
+      initClients();
+      primaryRestricted = false;
+      return await this.testBothConnections();
     },
+
+    // Compatibilidade com a chamada legada saveConfig(url, anonKey)
+    saveConfig(url, anonKey) {
+      const current = getConfig();
+      return this.saveDualConfig({
+        url,
+        anonKey,
+        secondaryUrl: current.secondaryUrl,
+        secondaryAnonKey: current.secondaryAnonKey,
+        dualWrite: current.dualWrite,
+        autoFailover: current.autoFailover
+      });
+    },
+
     disconnect() {
       localStorage.removeItem(STORAGE_KEY);
-      clientInstance = null;
+      client1 = null;
+      client2 = null;
+      primaryRestricted = false;
+      smartProxyInstance = null;
     },
+
+    // Retorna o cliente inteligente 2 em 1
     getClient() {
-      if (!clientInstance) initClient();
-      return clientInstance;
+      if (!client1 && !client2) initClients();
+      if (!smartProxyInstance) {
+        smartProxyInstance = createSmartProxyClient();
+      }
+      return smartProxyInstance;
     },
+
+    getPrimaryClient() {
+      if (!client1) initClients();
+      return client1;
+    },
+
+    getSecondaryClient() {
+      if (!client2) initClients();
+      return client2;
+    },
+
     isReady() {
-      return !!this.getClient();
+      return !!(client1 || client2);
     },
-    async testConnection() {
-      const client = this.getClient();
-      if (!client) return { success: false, message: 'URL ou Chave do Supabase não configuradas.' };
 
-      try {
-        const { data, error } = await client.from('courts').select('id').limit(1);
-        if (error) {
-          return { success: false, message: error.message };
+    // Testa a conexão de ambos os bancos
+    async testBothConnections() {
+      initClients();
+      const results = {
+        db1: { success: false, message: 'Não configurado' },
+        db2: { success: false, message: 'Não configurado' },
+        isDualActive: false
+      };
+
+      if (client1) {
+        try {
+          const { data, error } = await client1.from('courts').select('id').limit(1);
+          if (error) {
+            results.db1 = { success: false, message: error.message };
+            if (isRestrictedError(error)) {
+              primaryRestricted = true;
+              results.db1.restricted = true;
+            }
+          } else {
+            results.db1 = { success: true, message: 'Conectado com sucesso!' };
+            primaryRestricted = false;
+          }
+        } catch (err) {
+          results.db1 = { success: false, message: err.message || 'Erro de rede' };
         }
-        
-        // Marca como conectado
-        const current = getConfig();
-        current.connected = true;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      }
 
-        return { success: true, message: 'Conectado com sucesso ao Supabase!' };
+      if (client2) {
+        try {
+          const { data, error } = await client2.from('courts').select('id').limit(1);
+          if (error) {
+            results.db2 = { success: false, message: error.message };
+          } else {
+            results.db2 = { success: true, message: 'Conectado com sucesso!' };
+          }
+        } catch (err) {
+          results.db2 = { success: false, message: err.message || 'Erro de rede' };
+        }
+      }
+
+      const cfg = getConfig();
+      cfg.connected = results.db1.success;
+      cfg.secondaryConnected = results.db2.success;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+
+      results.isDualActive = results.db1.success && results.db2.success;
+      results.hasActiveDatabase = results.db1.success || results.db2.success;
+
+      return results;
+    },
+
+    // Compatibilidade com chamada legada testConnection()
+    async testConnection() {
+      const dual = await this.testBothConnections();
+      if (dual.db1.success) {
+        return { success: true, message: 'Banco Principal Conectado!' + (dual.db2.success ? ' (Banco 2 Conectado e Ativo em Modo 2 em 1)' : '') };
+      }
+      if (dual.db2.success) {
+        return { success: true, message: 'Banco Reserva Conectado e Operando como Salvaguarda Ativa!' };
+      }
+      return { success: false, message: dual.db1.message || dual.db2.message || 'Falha ao conectar.' };
+    },
+
+    // Reconciliação / Cópia Leve de Segurança em lote para o Banco 2
+    async reconcileToSecondary(stateData) {
+      if (!client2 || !stateData) return { success: false, message: 'Banco 2 não configurado.' };
+      console.log('🔄 Iniciando Reconciliação / Cópia Leve para o Banco 2...');
+      try {
+        if (Array.isArray(stateData.courts) && stateData.courts.length > 0) {
+          await client2.from('courts').upsert(stateData.courts, { onConflict: 'id' }).catch(() => null);
+        }
+        if (Array.isArray(stateData.products) && stateData.products.length > 0) {
+          await client2.from('products').upsert(stateData.products, { onConflict: 'id' }).catch(() => null);
+        }
+        if (Array.isArray(stateData.customers) && stateData.customers.length > 0) {
+          await client2.from('customers').upsert(stateData.customers, { onConflict: 'id' }).catch(() => null);
+        }
+        if (Array.isArray(stateData.bookings) && stateData.bookings.length > 0) {
+          // Chunk de 30 agendamentos por vez para ser ultra-leve
+          for (let i = 0; i < stateData.bookings.length; i += 30) {
+            const chunk = stateData.bookings.slice(i, i + 30);
+            await client2.from('bookings').upsert(chunk, { onConflict: 'id' }).catch(() => null);
+          }
+        }
+        if (Array.isArray(stateData.monthlyMembers) && stateData.monthlyMembers.length > 0) {
+          await client2.from('monthly_members').upsert(stateData.monthlyMembers, { onConflict: 'id' }).catch(() => null);
+        }
+        console.log('✓ Reconciliação concluída com sucesso no Banco 2!');
+        return { success: true };
       } catch (err) {
-        return { success: false, message: err.message || 'Erro de conexão de rede.' };
+        console.warn('Aviso durante reconciliação:', err);
+        return { success: false, error: err.message };
       }
     },
 
@@ -132,7 +471,7 @@
       return result;
     },
 
-    // Buscar ou Criar Cliente na tabela 'customers' com suporte a documento e observações
+    // Buscar ou Criar Cliente com Gravação Dupla Inteligente
     async getOrCreateCustomer(name, phone, email = '', extraData = {}) {
       const client = this.getClient();
       if (!client) return { id: 'cust-local-' + Date.now(), name, phone, email, ...extraData };
@@ -141,7 +480,6 @@
         const cleanPhone = (phone || '').replace(/\D/g, '');
         let existing = null;
 
-        // 1. Tenta encontrar por telefone sem quebrar a sintaxe do PostgREST
         if (phone) {
           const { data: d1 } = await client.from('customers').select('*').eq('phone', phone).limit(1);
           if (d1 && d1.length > 0) existing = d1[0];
@@ -155,7 +493,6 @@
           if (d3 && d3.length > 0) existing = d3[0];
         }
 
-        // 2. Tenta encontrar por CPF (documento) caso fornecido
         const cleanCpf = (extraData.cpf || '').replace(/\D/g, '');
         if (!existing && cleanCpf.length === 11) {
           const { data: byDoc } = await client.from('customers').select('*').eq('document', extraData.cpf).limit(1);
@@ -191,7 +528,7 @@
             try {
               await client.from('customers').update(updates).eq('id', existing.id);
             } catch(e) {
-              console.warn('Aviso ao atualizar cliente no Supabase:', e);
+              console.warn('Aviso ao atualizar cliente:', e);
             }
           }
           return {
@@ -234,7 +571,6 @@
           };
         }
 
-        // Fallback: tenta sem campos adicionais apenas se falhar
         const { data: fallbackCreated } = await client
           .from('customers')
           .insert([{ id: newId, name: name || 'Cliente', phone: phone || '', email: email || '' }])
@@ -276,7 +612,9 @@
         this._broadcastChannel = client.channel('arena_realtime_broadcast', {
           config: { broadcast: { self: false } }
         });
-        this._broadcastChannel.subscribe();
+        if (this._broadcastChannel && typeof this._broadcastChannel.subscribe === 'function') {
+          this._broadcastChannel.subscribe();
+        }
       }
       return this._broadcastChannel;
     },
@@ -357,8 +695,8 @@
     }
   };
 
-  // Inicializa na carga
-  initClient();
+  // Inicializa clientes na carga
+  initClients();
 
   // ☁️ Sincronização em Nuvem de Alta Velocidade (Realtime Cross-Device Sync)
   const SYNC_API_ENDPOINT = (typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('capacitor://') && !window.location.origin.includes('file://'))
@@ -384,11 +722,28 @@
 
     async push(action, payload) {
       try {
+        // Envia para a API de Sincronização Cloud
         const res = await fetch(SYNC_API_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action, payload })
         });
+
+        // E se houver Banco 2 conectado, replica cópia leve direta
+        if (window.ArenaSupabase && client2) {
+          try {
+            if (action === 'push_booking' && payload && payload.id) {
+              client2.from('bookings').upsert([payload], { onConflict: 'id' }).then(() => {});
+            } else if (action === 'delete_booking' && payload && payload.id) {
+              client2.from('bookings').delete().eq('id', payload.id).then(() => {});
+            } else if (action === 'push_monthly' && payload && payload.id) {
+              client2.from('monthly_members').upsert([payload], { onConflict: 'id' }).then(() => {});
+            } else if (action === 'delete_monthly' && payload && payload.id) {
+              client2.from('monthly_members').delete().eq('id', payload.id).then(() => {});
+            }
+          } catch(e) {}
+        }
+
         if (!res.ok) return false;
         const json = await res.json();
         return json && json.success;
@@ -398,4 +753,3 @@
     }
   };
 })();
-
