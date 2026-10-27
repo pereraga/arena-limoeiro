@@ -17278,6 +17278,18 @@ async function handleSaveEditMatch(event, matchId) {
       localStorage.setItem('arena_local_bookings', JSON.stringify(state.bookings));
     } catch(e) {}
 
+    // Sincroniza partida editada em tempo real com todos os outros celulares, APK e site
+    if (window.ArenaCloudSync && bIdx >= 0 && state.bookings[bIdx]) {
+      try {
+        window.ArenaCloudSync.push('push_booking', state.bookings[bIdx]);
+      } catch(e) {}
+    }
+    if (window.ArenaSupabase && typeof window.ArenaSupabase.broadcastBooking === 'function' && bIdx >= 0 && state.bookings[bIdx]) {
+      try {
+        window.ArenaSupabase.broadcastBooking(state.bookings[bIdx]);
+      } catch(e) {}
+    }
+
     // Fecha a janela modal
     closeModal();
 
@@ -17494,6 +17506,13 @@ async function handleMonthlySubmit(event, editId) {
     } catch (e) {
       console.warn('Erro ao salvar no Supabase monthly_members:', e);
     }
+  }
+
+  // Sincroniza contrato editado em tempo real com outros celulares e APK
+  if (window.ArenaCloudSync) {
+    try {
+      window.ArenaCloudSync.push('push_monthly_member', memberRecord);
+    } catch (e) {}
   }
 
   // Se estiver editando, sincroniza os agendamentos já gerados deste mensalista com os dados atualizados
@@ -20470,6 +20489,13 @@ async function saveCustomerFromAdminModal(event, existingId) {
     } else {
       state.supabaseCustomers.unshift(finalCustomer);
     }
+  }
+
+  // Sincroniza atleta editado em tempo real entre celulares e APK
+  if (window.ArenaCloudSync) {
+    try {
+      window.ArenaCloudSync.push('sync_all', { customers: [finalCustomer] });
+    } catch(e) {}
   }
 
   closeModal();
