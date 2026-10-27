@@ -2139,12 +2139,20 @@ function initCloudSync() {
     syncDataFromSupabase();
     loadAdminUsers();
     // loadWaterSupplyFromDatabase(); // Desativado do banco por enquanto
+    if (typeof window.ArenaSupabase.cleanupTemporaryFinishedGamesDB2 === 'function') {
+      window.ArenaSupabase.cleanupTemporaryFinishedGamesDB2(true).catch(() => {});
+    }
   }
 }
 
 
 // ROTINA AUTOMÁTICA: Avanço de Partidas e Liberação de Quadra ao Encerrar o Horário
 async function autoAdvanceFinishedMatches() {
+  // Limpeza automática no Banco 2: remove jogos temporários finalizados há mais de meia hora
+  if (window.ArenaSupabase && typeof window.ArenaSupabase.cleanupTemporaryFinishedGamesDB2 === 'function') {
+    window.ArenaSupabase.cleanupTemporaryFinishedGamesDB2().catch(() => {});
+  }
+
   const now = new Date();
   const todayStr = getFormattedDate(now);
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
@@ -11295,7 +11303,7 @@ function renderAdminSubTabContent(tab) {
           <ul class="text-[11px] sm:text-xs text-slate-200 space-y-1.5 list-disc list-inside leading-relaxed">
             <li><strong>Banco 1 (Armazenamento Compacto & Otimizado):</strong> Focado em armazenar jogos, mensalistas e clientes de forma compactada. Água, lanches e bar foram desativados do banco para economizar 95% de dados e garantir folga total para pesquisas e modificações todos os meses sem falhas.</li>
             <li><strong>Renderização Perfeita no Site:</strong> Quando o site abre, o sistema reconfigura automaticamente os arquivos compactados para renderizar todos os jogos, horários e mensalistas perfeitamente.</li>
-            <li><strong>Banco 2 (Salvaguarda & Cópia Fiel 2 em 1):</strong> Recebe uma cópia integral de toda requisição/modificação no sistema em tempo real, mantendo os dados protegidos contra qualquer perda ou indisponibilidade.</li>
+            <li><strong>Banco 2 (Salvaguarda & Jogos Temporários 2 em 1):</strong> Recebe a cópia de qualquer jogo em andamento e agendado. Cada jogo permanece temporariamente salvo no Banco 2 durante seu horário e por mais 30 minutos após o término. Passada essa meia hora, o sistema apaga automaticamente o jogo do Banco 2 para mantê-lo sempre leve, rápido e sem perdas, permanecendo salvo de forma permanente no Banco 1.</li>
           </ul>
         </div>
 
@@ -11342,7 +11350,7 @@ function renderAdminSubTabContent(tab) {
               <div class="flex items-center justify-between pb-2 border-b border-slate-200/80">
                 <div class="flex items-center gap-2">
                   <span class="text-base">🛡️</span>
-                  <strong class="text-xs font-black uppercase text-slate-900">Banco 2: Secundário (Cópia Leve & Salvaguarda)</strong>
+                  <strong class="text-xs font-black uppercase text-slate-900">Banco 2: Secundário (Salvaguarda & Jogos Temporários)</strong>
                 </div>
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded ${cfg.secondaryConnected ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
                   ${cfg.secondaryConnected ? '🟢 Conectado' : '🟡 Aguardando Chave'}

@@ -363,12 +363,94 @@
     }
   }
 
+  // ── CONTROLE TEMPORÁRIO DE JOGOS NO BANCO 2 ──
+  // Identifica se o jogo terminou e se já se passaram 30 minutos após o horário agendado de encerramento
+  function isGameExpiredForDB2(booking, now = new Date()) {
+    if (!booking || !booking.date) return false;
+    const dateStr = String(booking.date).trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+
+    let endTimeStr = booking.end_time || booking.endTime;
+    if (!endTimeStr && (booking.start_time || booking.startTime)) {
+      const s = booking.start_time || booking.startTime;
+      const dur = Number(booking.duration) || 60;
+      const [sh, sm] = String(s).split(':').map(Number);
+      if (!isNaN(sh)) {
+        const totalMin = sh * 60 + (sm || 0) + dur;
+        const eh = Math.floor(totalMin / 60) % 24;
+        const em = totalMin % 60;
+        endTimeStr = String(eh).padStart(2, '0') + ':' + String(em).padStart(2, '0');
+      }
+    }
+    if (!endTimeStr && booking.time && booking.time.includes(' às ')) {
+      endTimeStr = booking.time.split(' às ')[1];
+    }
+    if (!endTimeStr) endTimeStr = '23:59';
+
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const [hours, minutes] = endTimeStr.split(':').map(Number);
+    const gameEndDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0);
+
+    // Adiciona 30 minutos (meia hora) de carência após o término do jogo
+    const deleteThreshold = new Date(gameEndDate.getTime() + 30 * 60 * 1000);
+    return now.getTime() >= deleteThreshold.getTime();
+  }
+
+  let _lastDB2CleanupTime = 0;
+  async function cleanupTemporaryFinishedGamesDB2(force = false) {
+    const now = Date.now();
+    if (!force && (now - _lastDB2CleanupTime < 60000)) return { skipped: true };
+    _lastDB2CleanupTime = now;
+
+    if (!client2) return { skipped: true, reason: 'Banco 2 não conectado' };
+
+    try {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+
+      // Busca jogos do Banco 2 com data menor ou igual a hoje
+      const { data: candidates, error } = await client2
+        .from('bookings')
+        .select('id,date,start_time,end_time,time,duration')
+        .lte('date', todayStr)
+        .limit(200);
+
+      if (error || !Array.isArray(candidates) || candidates.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      const expiredIds = candidates
+        .filter(b => isGameExpiredForDB2(b, today))
+        .map(b => b.id)
+        .filter(Boolean);
+
+      if (expiredIds.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      console.log(`🧹 [Banco 2] Limpando ${expiredIds.length} jogos temporários encerrados há mais de 30 minutos...`);
+
+      for (let i = 0; i < expiredIds.length; i += 25) {
+        const chunk = expiredIds.slice(i, i + 25);
+        await client2.from('bookings').delete().in('id', chunk);
+      }
+
+      console.log(`✓ [Banco 2] ${expiredIds.length} jogos temporários removidos após 30 min do encerramento.`);
+      return { success: true, count: expiredIds.length };
+    } catch (err) {
+      console.warn('Aviso ao limpar jogos temporários do Banco 2:', err);
+      return { success: false, error: err?.message || err };
+    }
+  }
+
   let smartProxyInstance = null;
 
   window.ArenaSupabase = {
     getConfig,
     compactBooking,
     expandBooking,
+    isGameExpiredForDB2,
+    cleanupTemporaryFinishedGamesDB2,
 
     // Salva configuração de ambos os bancos (Banco 1 e Banco 2)
     async saveDualConfig({ url, anonKey, secondaryUrl, secondaryAnonKey, dualWrite = true, autoFailover = true }) {

@@ -82,9 +82,78 @@ async function mirrorToSupabaseDB2(action, payload) {
         }
       });
     }
+    // Dispara limpeza de jogos temporários encerrados há mais de 30 minutos no Banco 2
+    cleanupDB2TemporaryExpiredGames().catch(() => null);
   } catch(e) {
     console.warn('[Sync Mirror DB2] Aviso:', e.message);
   }
+}
+
+function isGameExpiredForDB2(booking, now = new Date()) {
+  if (!booking || !booking.date) return false;
+  const dateStr = String(booking.date).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+
+  let endTimeStr = booking.end_time || booking.endTime;
+  if (!endTimeStr && (booking.start_time || booking.startTime)) {
+    const s = booking.start_time || booking.startTime;
+    const dur = Number(booking.duration) || 60;
+    const [sh, sm] = String(s).split(':').map(Number);
+    if (!isNaN(sh)) {
+      const totalMin = sh * 60 + (sm || 0) + dur;
+      const eh = Math.floor(totalMin / 60) % 24;
+      const em = totalMin % 60;
+      endTimeStr = String(eh).padStart(2, '0') + ':' + String(em).padStart(2, '0');
+    }
+  }
+  if (!endTimeStr && booking.time && booking.time.includes(' às ')) {
+    endTimeStr = booking.time.split(' às ')[1];
+  }
+  if (!endTimeStr) endTimeStr = '23:59';
+
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hours, minutes] = endTimeStr.split(':').map(Number);
+  const gameEndDate = new Date(year, month - 1, day, hours || 0, minutes || 0, 0);
+
+  // 30 minutos após o término agendado
+  const deleteThreshold = new Date(gameEndDate.getTime() + 30 * 60 * 1000);
+  return now.getTime() >= deleteThreshold.getTime();
+}
+
+let _lastSyncDB2Cleanup = 0;
+async function cleanupDB2TemporaryExpiredGames() {
+  const now = Date.now();
+  if (now - _lastSyncDB2Cleanup < 60000) return;
+  _lastSyncDB2Cleanup = now;
+
+  try {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const res = await fetch(`${SUPABASE_DB2_URL}/rest/v1/bookings?date=lte.${todayStr}&select=id,date,start_time,end_time,time,duration&limit=100`, {
+      headers: {
+        apikey: SUPABASE_DB2_KEY,
+        Authorization: `Bearer ${SUPABASE_DB2_KEY}`
+      }
+    });
+    if (!res.ok) return;
+    const list = await res.json();
+    if (!Array.isArray(list) || list.length === 0) return;
+
+    const expiredIds = list.filter(b => isGameExpiredForDB2(b, today)).map(b => b.id).filter(Boolean);
+    if (expiredIds.length > 0) {
+      for (let i = 0; i < expiredIds.length; i += 20) {
+        const chunk = expiredIds.slice(i, i + 20);
+        const idParam = chunk.map(id => `"${id}"`).join(',');
+        await fetch(`${SUPABASE_DB2_URL}/rest/v1/bookings?id=in.(${idParam})`, {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_DB2_KEY,
+            Authorization: `Bearer ${SUPABASE_DB2_KEY}`
+          }
+        });
+      }
+    }
+  } catch(e) {}
 }
 
 
