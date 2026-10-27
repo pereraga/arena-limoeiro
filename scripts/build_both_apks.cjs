@@ -31,11 +31,11 @@ function setConfig({ appId, appName, url }) {
   console.log(`🌐 URL de Inicialização: ${url}`);
   console.log(`========================================`);
 
-  // 1. Atualiza build.gradle com appId e versão 5.6.2
+  // 1. Atualiza build.gradle com appId e versão 5.7.0
   let bg = fs.readFileSync(buildGradlePath, 'utf8');
   bg = bg.replace(/applicationId\s+["'][^"']+["']/, `applicationId "${appId}"`);
-  bg = bg.replace(/versionCode\s+\d+/, `versionCode 562`);
-  bg = bg.replace(/versionName\s+["'][^"']+["']/, `versionName "5.6.2"`);
+  bg = bg.replace(/versionCode\s+\d+/, `versionCode 570`);
+  bg = bg.replace(/versionName\s+["'][^"']+["']/, `versionName "5.7.0"`);
   fs.writeFileSync(buildGradlePath, bg, 'utf8');
 
   // 2. Atualiza strings.xml
