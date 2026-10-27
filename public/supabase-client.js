@@ -12,7 +12,7 @@
         return {
           url: parsed.url || window.SUPABASE_URL || 'https://brmclyukjfijommbxhks.supabase.co',
           anonKey: parsed.anonKey || window.SUPABASE_ANON_KEY || 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
-          secondaryUrl: parsed.secondaryUrl || '',
+          secondaryUrl: parsed.secondaryUrl || window.SUPABASE_SECONDARY_URL || 'https://aukrcnhuyultkjqsgvea.supabase.co',
           secondaryAnonKey: parsed.secondaryAnonKey || window.SUPABASE_SECONDARY_ANON_KEY || 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
           dualWrite: parsed.dualWrite !== false,
           autoFailover: parsed.autoFailover !== false,
@@ -25,7 +25,7 @@
     return {
       url: window.SUPABASE_URL || 'https://brmclyukjfijommbxhks.supabase.co',
       anonKey: window.SUPABASE_ANON_KEY || 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
-      secondaryUrl: '',
+      secondaryUrl: window.SUPABASE_SECONDARY_URL || 'https://aukrcnhuyultkjqsgvea.supabase.co',
       secondaryAnonKey: 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
       dualWrite: true,
       autoFailover: true,

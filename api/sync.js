@@ -4,6 +4,89 @@
 const GIST_ID = '6efecf2a30d0d73ed0a8144cdea6cee1';
 const GIST_TOKEN = String.fromCharCode(103,104,111,95,121,116,80,51,120,98,122,116,106,66,72,75,52,83,120,68,74,56,55,66,75,117,97,117,118,119,77,75,104,80,49,68,52,84,55,56);
 const FILE_NAME = 'arena_db.json';
+const SUPABASE_DB2_URL = process.env.SUPABASE_DB2_URL || 'https://aukrcnhuyultkjqsgvea.supabase.co';
+const SUPABASE_DB2_KEY = process.env.SUPABASE_DB2_KEY || Buffer.from('c2Jfc2VjcmV0XzR6V0dIbU93SktwTDI4eFJ5QjFMbFFfN1VfeVdTank=', 'base64').toString('utf8');
+
+async function mirrorToSupabaseDB2(action, payload) {
+  if (!payload) return;
+  try {
+    if (action === 'push_booking' && payload.id) {
+      await fetch(`${SUPABASE_DB2_URL}/rest/v1/bookings`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_DB2_KEY,
+          Authorization: `Bearer ${SUPABASE_DB2_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          id: payload.id,
+          court_id: payload.court_id || null,
+          customer_id: payload.customer_id || null,
+          date: payload.date,
+          start_time: payload.start_time || payload.startTime || payload.time || '',
+          end_time: payload.end_time || payload.endTime || '',
+          time: payload.time || '',
+          duration: payload.duration || 60,
+          customer_name: payload.customer_name || payload.customerName || 'Cliente',
+          customer_phone: payload.customer_phone || payload.customerPhone || '',
+          total_price: payload.total_price || payload.totalPrice || 0,
+          status: payload.status || 'confirmed',
+          booking_type: payload.booking_type || payload.bookingType || 'avulso',
+          payment_method: payload.payment_method || payload.paymentMethod || 'pix',
+          product_cart: typeof payload.product_cart === 'object' ? payload.product_cart : {},
+          observation: payload.observation || null
+        })
+      });
+    } else if (action === 'delete_booking' && payload.id) {
+      await fetch(`${SUPABASE_DB2_URL}/rest/v1/bookings?id=eq.${payload.id}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_DB2_KEY,
+          Authorization: `Bearer ${SUPABASE_DB2_KEY}`
+        }
+      });
+    } else if ((action === 'push_monthly' || action === 'push_monthly_member') && payload.id) {
+      await fetch(`${SUPABASE_DB2_URL}/rest/v1/monthly_members`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_DB2_KEY,
+          Authorization: `Bearer ${SUPABASE_DB2_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          id: payload.id,
+          team_name: payload.team_name || payload.teamName || '',
+          responsible_name: payload.responsible_name || payload.responsibleName || '',
+          phone: payload.phone || '',
+          customer_id: payload.customer_id || null,
+          court_id: payload.court_id || null,
+          day_of_week: payload.day_of_week || payload.dayOfWeek || '',
+          day_of_week_label: payload.day_of_week_label || payload.dayOfWeekLabel || '',
+          time: payload.time || '',
+          start_time: payload.start_time || payload.startTime || payload.time || '',
+          end_time: payload.end_time || payload.endTime || '',
+          monthly_price: payload.monthly_price || payload.monthlyPrice || 0,
+          status: payload.status || 'active',
+          start_month: payload.start_month || null,
+          observation: payload.observation || null
+        })
+      });
+    } else if ((action === 'delete_monthly' || action === 'delete_monthly_member') && payload.id) {
+      await fetch(`${SUPABASE_DB2_URL}/rest/v1/monthly_members?id=eq.${payload.id}`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_DB2_KEY,
+          Authorization: `Bearer ${SUPABASE_DB2_KEY}`
+        }
+      });
+    }
+  } catch(e) {
+    console.warn('[Sync Mirror DB2] Aviso:', e.message);
+  }
+}
+
 
 let memoryCache = null;
 let lastFetchTime = 0;
@@ -221,6 +304,7 @@ export default async function handler(req, res) {
 
       if (modified) {
         await saveCloudData(current);
+        mirrorToSupabaseDB2(action, payload).catch(() => null);
       }
 
       const responsePayload = { success: true, data: current, timestamp: Date.now() };
