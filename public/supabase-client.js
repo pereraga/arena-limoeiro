@@ -97,29 +97,115 @@
     };
   }
 
-  // ── COMPACTAÇÃO DE DADOS PARA ARMAZENAMENTO LEVE (BANCO 1) ──
-  // Remove redundâncias, propriedades vazias e derivados para economizar cota mensal e largura de banda
-  function compactBooking(b) {
-    if (!b || typeof b !== 'object') return b;
-    const compact = {
-      id: b.id,
-      court_id: b.court_id || b.courtId || null,
-      customer_name: b.customer_name || b.customerName || 'Cliente',
-      customer_phone: (b.customer_phone || b.customerPhone || '').replace(/\D/g, ''),
-      date: b.date,
-      start_time: b.start_time || b.startTime || (b.time ? String(b.time).split(' ')[0] : '') || '',
-      end_time: b.end_time || b.endTime || (b.time ? String(b.time).split(' ')[2] : '') || '',
-      total_price: Number(b.total_price !== undefined ? b.total_price : (b.totalPrice !== undefined ? b.totalPrice : 0)),
-      status: b.status || 'confirmed',
-      booking_type: b.booking_type || b.bookingType || 'avulso',
-      payment_method: b.payment_method || b.paymentMethod || 'pix'
-    };
-    if (b.customer_id || b.customerId) compact.customer_id = b.customer_id || b.customerId;
-    if (b.observation) compact.observation = String(b.observation).trim();
-    if (b.product_cart && typeof b.product_cart === 'object' && Object.keys(b.product_cart).length > 0) {
-      compact.product_cart = b.product_cart;
+  // ── SANITIZAÇÃO E NORMALIZAÇÃO DE JOGOS PARA BANCO 1 E BANCO 2 ──
+  // Para UPDATE: reescreve APENAS os campos modificados, sem alterar os outros campos no banco
+  // Para INSERT/UPSERT: compacta e normaliza com valores padrão essenciais
+  function sanitizeBookingPayload(payload, isInsert = false) {
+    if (!payload || typeof payload !== 'object') return payload;
+
+    const sanitized = {};
+
+    if (payload.id !== undefined) sanitized.id = payload.id;
+    if (payload.court_id !== undefined || payload.courtId !== undefined) {
+      sanitized.court_id = payload.court_id !== undefined ? payload.court_id : payload.courtId;
     }
-    return compact;
+    if (payload.customer_id !== undefined || payload.customerId !== undefined) {
+      sanitized.customer_id = payload.customer_id !== undefined ? payload.customer_id : payload.customerId;
+    }
+    if (payload.customer_name !== undefined || payload.customerName !== undefined) {
+      sanitized.customer_name = payload.customer_name !== undefined ? payload.customer_name : payload.customerName;
+    }
+    if (payload.customer_phone !== undefined || payload.customerPhone !== undefined) {
+      const rawP = payload.customer_phone !== undefined ? payload.customer_phone : payload.customerPhone;
+      sanitized.customer_phone = rawP ? String(rawP).trim() : '';
+    }
+    if (payload.date !== undefined) sanitized.date = payload.date;
+
+    if (payload.start_time !== undefined || payload.startTime !== undefined) {
+      sanitized.start_time = payload.start_time !== undefined ? payload.start_time : payload.startTime;
+    }
+    if (payload.end_time !== undefined || payload.endTime !== undefined) {
+      sanitized.end_time = payload.end_time !== undefined ? payload.end_time : payload.endTime;
+    }
+    if (payload.time !== undefined) sanitized.time = payload.time;
+    if (payload.duration !== undefined) sanitized.duration = Number(payload.duration) || 60;
+
+    if (payload.total_price !== undefined || payload.totalPrice !== undefined || payload.price !== undefined) {
+      const p = payload.total_price !== undefined ? payload.total_price : (payload.totalPrice !== undefined ? payload.totalPrice : payload.price);
+      sanitized.total_price = Number(p || 0);
+    }
+
+    if (payload.status !== undefined) sanitized.status = payload.status;
+    if (payload.booking_type !== undefined || payload.bookingType !== undefined) {
+      sanitized.booking_type = payload.booking_type !== undefined ? payload.booking_type : payload.bookingType;
+    }
+    if (payload.payment_method !== undefined || payload.paymentMethod !== undefined) {
+      sanitized.payment_method = payload.payment_method !== undefined ? payload.payment_method : payload.paymentMethod;
+    }
+    if (payload.product_cart !== undefined) {
+      sanitized.product_cart = typeof payload.product_cart === 'object' && payload.product_cart !== null ? payload.product_cart : {};
+    }
+    if (payload.observation !== undefined) {
+      sanitized.observation = payload.observation ? String(payload.observation).trim() : null;
+    }
+
+    if (isInsert) {
+      if (!sanitized.customer_name) sanitized.customer_name = 'Cliente';
+      if (!sanitized.status) sanitized.status = 'confirmed';
+      if (!sanitized.booking_type) sanitized.booking_type = 'avulso';
+      if (!sanitized.payment_method) sanitized.payment_method = 'pix';
+      if (sanitized.total_price === undefined) sanitized.total_price = 0;
+    }
+
+    return sanitized;
+  }
+
+  // Sanitização de mensalistas / contratos (remove colunas inexistentes como contract_type)
+  function sanitizeMonthlyPayload(payload, isInsert = false) {
+    if (!payload || typeof payload !== 'object') return payload;
+
+    const sanitized = {};
+    if (payload.id !== undefined) sanitized.id = payload.id;
+    if (payload.team_name !== undefined || payload.teamName !== undefined) {
+      sanitized.team_name = payload.team_name !== undefined ? payload.team_name : payload.teamName;
+    }
+    if (payload.responsible_name !== undefined || payload.responsibleName !== undefined) {
+      sanitized.responsible_name = payload.responsible_name !== undefined ? payload.responsible_name : payload.responsibleName;
+    }
+    if (payload.phone !== undefined) sanitized.phone = String(payload.phone).trim();
+    if (payload.customer_id !== undefined || payload.customerId !== undefined) {
+      sanitized.customer_id = payload.customer_id !== undefined ? payload.customer_id : payload.customerId;
+    }
+    if (payload.court_id !== undefined || payload.courtId !== undefined) {
+      sanitized.court_id = payload.court_id !== undefined ? payload.court_id : payload.courtId;
+    }
+    if (payload.day_of_week !== undefined || payload.dayOfWeek !== undefined) {
+      sanitized.day_of_week = payload.day_of_week !== undefined ? payload.day_of_week : payload.dayOfWeek;
+    }
+    if (payload.day_of_week_label !== undefined || payload.dayOfWeekLabel !== undefined) {
+      sanitized.day_of_week_label = payload.day_of_week_label !== undefined ? payload.day_of_week_label : payload.dayOfWeekLabel;
+    }
+    if (payload.time !== undefined) sanitized.time = payload.time;
+    if (payload.start_time !== undefined || payload.startTime !== undefined) {
+      sanitized.start_time = payload.start_time !== undefined ? payload.start_time : payload.startTime;
+    }
+    if (payload.end_time !== undefined || payload.endTime !== undefined) {
+      sanitized.end_time = payload.end_time !== undefined ? payload.end_time : payload.endTime;
+    }
+    if (payload.monthly_price !== undefined || payload.monthlyPrice !== undefined) {
+      sanitized.monthly_price = Number(payload.monthly_price !== undefined ? payload.monthly_price : payload.monthlyPrice) || 0;
+    }
+    if (payload.status !== undefined) sanitized.status = payload.status;
+    if (payload.start_month !== undefined) sanitized.start_month = payload.start_month;
+    if (payload.observation !== undefined) {
+      sanitized.observation = payload.observation ? String(payload.observation).trim() : null;
+    }
+
+    return sanitized;
+  }
+
+  function compactBooking(b) {
+    return sanitizeBookingPayload(b, true);
   }
 
   // ── EXPANSÃO / RECONFIGURAÇÃO PARA RENDERIZAR OS JOGOS NO SITE ──
@@ -252,21 +338,22 @@
           }
 
           const cfg = getConfig();
+          const isInsertOp = operations.writeMethod === 'insert' || operations.writeMethod === 'upsert';
 
-          // Se for operação de escrita:
-          if (operations.isWrite && cfg.dualWrite && client2) {
-            // Despacha cópia integral de salvaguarda assíncrona para o Banco 2 (2 em 1)
-            dispatchLightweightCopy(tableName, operations, this._calls).catch(() => {});
-          }
-
-          // Monta chamadas compactadas para o Banco 1 (Armazenamento leve)
-          const callsForDB1 = this._calls.map(call => {
-            if (tableName === 'bookings' && ['insert', 'upsert', 'update'].includes(call.method)) {
+          // Monta chamadas sanitizadas precisas para ambos os bancos
+          // Para UPDATE: reescreve APENAS os campos modificados, sem alterar os outros campos no banco
+          const sanitizedCalls = this._calls.map(call => {
+            if (['insert', 'upsert', 'update'].includes(call.method)) {
               return {
                 method: call.method,
                 args: call.args.map(arg => {
-                  if (Array.isArray(arg)) return arg.map(compactBooking);
-                  if (typeof arg === 'object' && arg !== null) return compactBooking(arg);
+                  if (tableName === 'bookings') {
+                    if (Array.isArray(arg)) return arg.map(b => sanitizeBookingPayload(b, isInsertOp));
+                    if (typeof arg === 'object' && arg !== null) return sanitizeBookingPayload(arg, isInsertOp);
+                  } else if (tableName === 'monthly_members') {
+                    if (Array.isArray(arg)) return arg.map(m => sanitizeMonthlyPayload(m, isInsertOp));
+                    if (typeof arg === 'object' && arg !== null) return sanitizeMonthlyPayload(arg, isInsertOp);
+                  }
                   return arg;
                 })
               };
@@ -274,13 +361,19 @@
             return call;
           });
 
+          // Se for operação de escrita:
+          if (operations.isWrite && cfg.dualWrite && client2) {
+            // Despacha cópia integral de salvaguarda assíncrona para o Banco 2 (2 em 1) com payload sanitizado
+            dispatchLightweightCopy(tableName, operations, sanitizedCalls).catch(() => {});
+          }
+
           let result = null;
           let primaryFailed = false;
 
           if (client1 && !primaryRestricted) {
             try {
               let query = client1.from(tableName);
-              for (const call of callsForDB1) {
+              for (const call of sanitizedCalls) {
                 if (typeof query[call.method] === 'function') {
                   query = query[call.method](...call.args);
                 }
@@ -305,7 +398,7 @@
           if (primaryFailed && client2) {
             try {
               let query2 = client2.from(tableName);
-              for (const call of this._calls) {
+              for (const call of sanitizedCalls) {
                 if (typeof query2[call.method] === 'function') {
                   query2 = query2[call.method](...call.args);
                 }

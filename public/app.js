@@ -17157,16 +17157,11 @@ async function handleSaveEditMatch(event, matchId) {
             observation: fullObs
           };
 
-          const extendedPayload = {
-            ...updatePayload,
-            customer_cpf: custCpf ? formatCPF(custCpf) : null,
-            emergency_contact: emerg || null
-          };
-
-          const { error: updErr } = await client.from('bookings').update(extendedPayload).eq('id', matchId);
+          const { error: updErr } = await client.from('bookings').update(updatePayload).eq('id', matchId);
           if (updErr) {
-            console.warn('Tentativa com payload simplificado no Supabase:', updErr);
-            await client.from('bookings').update(updatePayload).eq('id', matchId);
+            console.warn('Erro ao atualizar partida no Supabase:', updErr);
+          } else {
+            console.log('✓ Partida atualizada com sucesso no banco de dados!');
           }
         }
       } catch (dbErr) {
@@ -17492,7 +17487,6 @@ async function handleMonthlySubmit(event, editId) {
         responsible_name: responsibleName,
         phone: phone,
         court_id: courtId,
-        contract_type: contractType,
         day_of_week: dayOfWeek,
         day_of_week_label: dayLabels[dayOfWeek] || 'Semanal',
         time: startTime,
