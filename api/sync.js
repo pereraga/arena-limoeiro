@@ -235,11 +235,8 @@ export default async function handler(req, res) {
           modified = true;
         }
 
-        // Atualizar Estoque de Água se fornecido
-        if (payload.water_supply) {
-          current.water_supply = { ...current.water_supply, ...payload.water_supply };
-          modified = true;
-        }
+        // Atualizar Estoque de Água (Desativado temporariamente para economia e desempenho)
+        // if (payload.water_supply) { ... }
 
         // Atualizar Quadras se fornecido
         if (Array.isArray(payload.courts) && payload.courts.length > 0) {
@@ -248,13 +245,28 @@ export default async function handler(req, res) {
         }
       }
 
-      // ── Ação: Criar / Atualizar Agendamento ──
+      // ── Ação: Criar / Atualizar Agendamento (Compactado para Armazenamento Leve) ──
       else if (action === 'push_booking' && payload && payload.id) {
+        const compactItem = {
+          id: payload.id,
+          court_id: payload.court_id || payload.courtId || null,
+          customer_id: payload.customer_id || payload.customerId || null,
+          customer_name: payload.customer_name || payload.customerName || 'Cliente',
+          customer_phone: (payload.customer_phone || payload.customerPhone || '').replace(/\D/g, ''),
+          date: payload.date,
+          start_time: payload.start_time || payload.startTime || (payload.time ? String(payload.time).split(' ')[0] : '') || '',
+          end_time: payload.end_time || payload.endTime || (payload.time ? String(payload.time).split(' ')[2] : '') || '',
+          total_price: Number(payload.total_price !== undefined ? payload.total_price : (payload.totalPrice !== undefined ? payload.totalPrice : 0)),
+          status: payload.status || 'confirmed',
+          booking_type: payload.booking_type || payload.bookingType || 'avulso',
+          payment_method: payload.payment_method || payload.paymentMethod || 'pix',
+          observation: payload.observation ? String(payload.observation).trim() : ''
+        };
         const idx = current.bookings.findIndex(b => b.id === payload.id);
         if (idx !== -1) {
-          current.bookings[idx] = { ...current.bookings[idx], ...payload };
+          current.bookings[idx] = { ...current.bookings[idx], ...compactItem };
         } else {
-          current.bookings.push(payload);
+          current.bookings.push(compactItem);
         }
         modified = true;
       }
@@ -294,10 +306,10 @@ export default async function handler(req, res) {
         modified = true;
       }
 
-      // ── Ação: Atualizar Água / Galão ──
+      // ── Ação: Atualizar Água / Galão (Desativado temporariamente do banco) ──
       else if (action === 'update_water' && payload) {
-        current.water_supply = { ...current.water_supply, ...payload };
-        modified = true;
+        // Ignora atualização de água na nuvem por enquanto
+        modified = false;
       }
 
 

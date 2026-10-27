@@ -97,6 +97,86 @@
     };
   }
 
+  // ── COMPACTAÇÃO DE DADOS PARA ARMAZENAMENTO LEVE (BANCO 1) ──
+  // Remove redundâncias, propriedades vazias e derivados para economizar cota mensal e largura de banda
+  function compactBooking(b) {
+    if (!b || typeof b !== 'object') return b;
+    const compact = {
+      id: b.id,
+      court_id: b.court_id || b.courtId || null,
+      customer_name: b.customer_name || b.customerName || 'Cliente',
+      customer_phone: (b.customer_phone || b.customerPhone || '').replace(/\D/g, ''),
+      date: b.date,
+      start_time: b.start_time || b.startTime || (b.time ? String(b.time).split(' ')[0] : '') || '',
+      end_time: b.end_time || b.endTime || (b.time ? String(b.time).split(' ')[2] : '') || '',
+      total_price: Number(b.total_price !== undefined ? b.total_price : (b.totalPrice !== undefined ? b.totalPrice : 0)),
+      status: b.status || 'confirmed',
+      booking_type: b.booking_type || b.bookingType || 'avulso',
+      payment_method: b.payment_method || b.paymentMethod || 'pix'
+    };
+    if (b.customer_id || b.customerId) compact.customer_id = b.customer_id || b.customerId;
+    if (b.observation) compact.observation = String(b.observation).trim();
+    if (b.product_cart && typeof b.product_cart === 'object' && Object.keys(b.product_cart).length > 0) {
+      compact.product_cart = b.product_cart;
+    }
+    return compact;
+  }
+
+  // ── EXPANSÃO / RECONFIGURAÇÃO PARA RENDERIZAR OS JOGOS NO SITE ──
+  // Reconstitui time, duration, nomes alternativos (courtId, customerName) para renderizar os jogos perfeitamente
+  function expandBooking(b) {
+    if (!b || typeof b !== 'object') return b;
+    const startTime = b.start_time || b.startTime || (b.time ? String(b.time).split(' ')[0] : '') || '00:00';
+    const endTime = b.end_time || b.endTime || (b.time ? String(b.time).split(' ')[2] : '') || '';
+
+    let duration = Number(b.duration);
+    if (!duration && startTime && endTime) {
+      const [sh, sm] = startTime.split(':').map(Number);
+      const [eh, em] = endTime.split(':').map(Number);
+      if (!isNaN(sh) && !isNaN(eh)) {
+        duration = (eh * 60 + (em || 0)) - (sh * 60 + (sm || 0));
+      }
+    }
+    if (!duration || duration <= 0) duration = 60;
+
+    const timeStr = b.time || (startTime && endTime ? (startTime + ' às ' + endTime) : startTime);
+    const totalPrice = Number(b.total_price !== undefined ? b.total_price : (b.totalPrice !== undefined ? b.totalPrice : 0));
+    const custName = b.customer_name || b.customerName || 'Cliente';
+    const custPhone = b.customer_phone || b.customerPhone || '';
+    const courtId = b.court_id || b.courtId || '';
+    const bType = b.booking_type || b.bookingType || 'avulso';
+    const payMethod = b.payment_method || b.paymentMethod || 'pix';
+
+    return {
+      ...b,
+      id: b.id,
+      court_id: courtId,
+      courtId: courtId,
+      customer_id: b.customer_id || b.customerId || null,
+      customerId: b.customer_id || b.customerId || null,
+      customer_name: custName,
+      customerName: custName,
+      customer_phone: custPhone,
+      customerPhone: custPhone,
+      date: b.date,
+      start_time: startTime,
+      startTime: startTime,
+      end_time: endTime,
+      endTime: endTime,
+      time: timeStr,
+      duration: duration,
+      total_price: totalPrice,
+      totalPrice: totalPrice,
+      status: b.status || 'confirmed',
+      booking_type: bType,
+      bookingType: bType,
+      payment_method: payMethod,
+      paymentMethod: payMethod,
+      product_cart: b.product_cart || {},
+      observation: b.observation || ''
+    };
+  }
+
   function createTableProxy(tableName) {
     const operations = {
       isWrite: false,
@@ -109,6 +189,10 @@
       _calls: [],
       
       select(...args) {
+        // Otimização: Se for bookings e select('*'), seleciona apenas as colunas necessárias para economizar cota
+        if (tableName === 'bookings' && (args.length === 0 || args[0] === '*')) {
+          args = ['id,court_id,customer_name,customer_phone,date,start_time,end_time,total_price,status,booking_type,payment_method,observation'];
+        }
         this._calls.push({ method: 'select', args });
         return this;
       },
@@ -156,17 +240,39 @@
       single(...args) { this._calls.push({ method: 'single', args }); return this; },
       maybeSingle(...args) { this._calls.push({ method: 'maybeSingle', args }); return this; },
 
-      // Execução da Query com Failover Inteligente e Cópia Leve
+      // Execução da Query com Compactação, Failover Inteligente e Cópia de Salvaguarda
       async then(resolve, reject) {
         try {
+          // REGRA DE USUÁRIO: Água, lanches e produtos desativados do banco por enquanto
+          if (tableName === 'products') {
+            const localProducts = JSON.parse(localStorage.getItem('arena_local_products') || '[]');
+            const mockResult = { data: operations.isWrite ? null : localProducts, error: null };
+            if (resolve) resolve(mockResult);
+            return mockResult;
+          }
+
           const cfg = getConfig();
-          const targetClient = (!primaryRestricted && client1) ? client1 : (client2 || client1);
 
           // Se for operação de escrita:
           if (operations.isWrite && cfg.dualWrite && client2) {
-            // Despacha cópia leve assíncrona para o Banco 2
+            // Despacha cópia integral de salvaguarda assíncrona para o Banco 2 (2 em 1)
             dispatchLightweightCopy(tableName, operations, this._calls).catch(() => {});
           }
+
+          // Monta chamadas compactadas para o Banco 1 (Armazenamento leve)
+          const callsForDB1 = this._calls.map(call => {
+            if (tableName === 'bookings' && ['insert', 'upsert', 'update'].includes(call.method)) {
+              return {
+                method: call.method,
+                args: call.args.map(arg => {
+                  if (Array.isArray(arg)) return arg.map(compactBooking);
+                  if (typeof arg === 'object' && arg !== null) return compactBooking(arg);
+                  return arg;
+                })
+              };
+            }
+            return call;
+          });
 
           let result = null;
           let primaryFailed = false;
@@ -174,7 +280,7 @@
           if (client1 && !primaryRestricted) {
             try {
               let query = client1.from(tableName);
-              for (const call of this._calls) {
+              for (const call of callsForDB1) {
                 if (typeof query[call.method] === 'function') {
                   query = query[call.method](...call.args);
                 }
@@ -195,7 +301,7 @@
             primaryFailed = true;
           }
 
-          // Se o Banco 1 falhou e temos Banco 2 (Regra: O Segundo interfere no Primeiro para salvar os dados):
+          // Se o Banco 1 falhou ou está restrito (Regra: O Segundo interfere no Primeiro para salvar os dados):
           if (primaryFailed && client2) {
             try {
               let query2 = client2.from(tableName);
@@ -205,7 +311,7 @@
                 }
               }
               result = await query2;
-              console.log('🛡️ [Banco 2] Operação realizada com sucesso no Banco Reserva!');
+              console.log('🛡️ [Banco 2] Operação realizada com sucesso no Banco Salvaguarda!');
             } catch (secErr) {
               result = { data: null, error: secErr };
             }
@@ -213,6 +319,15 @@
 
           if (!result) {
             result = { data: null, error: new Error('Nenhum banco de dados disponível.') };
+          }
+
+          // RECONFIGURAÇÃO / EXPANSÃO: Ao abrir no site, expande o arquivo compactado para renderizar os jogos perfeitamente
+          if (result && result.data && tableName === 'bookings') {
+            if (Array.isArray(result.data)) {
+              result.data = result.data.map(expandBooking);
+            } else if (typeof result.data === 'object') {
+              result.data = expandBooking(result.data);
+            }
           }
 
           if (resolve) resolve(result);
@@ -252,6 +367,8 @@
 
   window.ArenaSupabase = {
     getConfig,
+    compactBooking,
+    expandBooking,
 
     // Salva configuração de ambos os bancos (Banco 1 e Banco 2)
     async saveDualConfig({ url, anonKey, secondaryUrl, secondaryAnonKey, dualWrite = true, autoFailover = true }) {
@@ -722,6 +839,14 @@
 
     async push(action, payload) {
       try {
+        // Água e lanches desativados da sincronização externa temporariamente
+        if (action === 'update_water') return true;
+        if (action === 'sync_all' && payload && payload.water_supply) {
+          const { water_supply, ...rest } = payload;
+          payload = rest;
+          if (Object.keys(payload).length === 0) return true;
+        }
+
         // Envia para a API de Sincronização Cloud
         const res = await fetch(SYNC_API_ENDPOINT, {
           method: 'POST',

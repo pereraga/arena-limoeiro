@@ -2138,7 +2138,7 @@ function initCloudSync() {
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     syncDataFromSupabase();
     loadAdminUsers();
-    loadWaterSupplyFromDatabase();
+    // loadWaterSupplyFromDatabase(); // Desativado do banco por enquanto
   }
 }
 
@@ -8269,71 +8269,25 @@ function getWaterSupplyAnalytics() {
 window.getWaterSupplyAnalytics = getWaterSupplyAnalytics;
 
 async function loadWaterSupplyFromDatabase() {
-  if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
+  // Água desativada do banco temporariamente (Regra do Usuário):
+  // Fica 100% em cache local ultra-rápido sem consumir cota de rede.
   try {
-    const client = window.ArenaSupabase.getClient();
-    const { data, error } = await client
-      .from('products')
-      .select('*')
-      .eq('id', 'arena-water-supply')
-      .maybeSingle();
-
-    if (data && data.image) {
-      const parsed = JSON.parse(data.image);
-      if (parsed && (typeof parsed.full === 'number' || typeof parsed.empty === 'number')) {
-        state.waterSupply = {
-          ...state.waterSupply,
-          ...parsed,
-          full: typeof parsed.full === 'number' ? parsed.full : (state.waterSupply?.full || 0),
-          empty: typeof parsed.empty === 'number' ? parsed.empty : 0,
-          min_alert: typeof parsed.min_alert === 'number' ? parsed.min_alert : 5,
-          unit_price: typeof parsed.unit_price === 'number' ? parsed.unit_price : 0.75,
-          fixed_allocations: Array.isArray(parsed.fixed_allocations) ? parsed.fixed_allocations : (state.waterSupply?.fixed_allocations || []),
-          courts: (parsed.courts && typeof parsed.courts === 'object') ? parsed.courts : (state.waterSupply?.courts || {}),
-          orders: Array.isArray(parsed.orders) ? parsed.orders : [],
-          history: Array.isArray(parsed.history) ? parsed.history : []
-        };
-        localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
-        if (state.currentMode === 'admin' && (state.adminTab === 'bar_control' || state.adminTab === 'live_dashboard')) {
-          renderStepContent();
-        }
+    const localWater = JSON.parse(localStorage.getItem('arena_water_supply') || 'null');
+    if (localWater && typeof localWater.full === 'number') {
+      state.waterSupply = { ...state.waterSupply, ...localWater };
+      if (state.currentMode === 'admin' && (state.adminTab === 'bar_control' || state.adminTab === 'live_dashboard')) {
+        renderStepContent();
       }
     }
   } catch(err) {
-    console.warn('Erro ao carregar água do Supabase:', err);
+    console.warn('Aviso ao carregar água local:', err);
   }
 }
 window.loadWaterSupplyFromDatabase = loadWaterSupplyFromDatabase;
 
 async function saveWaterSupplyToDatabase() {
+  // Água desativada do banco temporariamente - salva apenas localmente para evitar tráfego de banco
   localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
-  if (window.ArenaCloudSync) {
-    try {
-      window.ArenaCloudSync.push('sync_all', { water_supply: state.waterSupply });
-    } catch(e) {}
-  }
-  if (!window.ArenaSupabase || !window.ArenaSupabase.isReady()) return;
-  try {
-    const client = window.ArenaSupabase.getClient();
-    const payload = {
-      id: 'arena-water-supply',
-      name: '💧 Controle Interno de Água Arena',
-      category: 'Estoque',
-      type: 'water_supply',
-      price: 0,
-      unit: 'unid.',
-      image: JSON.stringify(state.waterSupply)
-    };
-    const { error: upsertErr } = await client.from('products').upsert(payload, { onConflict: 'id' });
-    if (upsertErr) {
-      const { error: updateErr } = await client.from('products').update(payload).eq('id', 'arena-water-supply');
-      if (updateErr) {
-        console.warn('Erro ao atualizar água no Supabase:', updateErr);
-      }
-    }
-  } catch(err) {
-    console.warn('Erro ao salvar água no Supabase:', err);
-  }
 }
 window.saveWaterSupplyToDatabase = saveWaterSupplyToDatabase;
 
@@ -11338,10 +11292,10 @@ function renderAdminSubTabContent(tab) {
             <span class="text-emerald-400 text-base">🛡️</span>
             <strong class="text-xs sm:text-sm font-black text-emerald-300 uppercase tracking-wide">Como Funciona a Integração dos 2 Bancos (2 em 1):</strong>
           </div>
-          <ul class="text-[11px] sm:text-xs text-slate-200 space-y-1 list-disc list-inside leading-relaxed">
-            <li><strong>O Banco 1 não interfere no Banco 2:</strong> Se o Banco 1 sofrer bloqueio de cota (exceder limite) ou falha, o Banco 2 permanece 100% protegido.</li>
-            <li><strong>O Banco 2 interfere no Banco 1 para salvar:</strong> Se o Banco 1 falhar ou rejeitar gravações, o Banco 2 assume imediatamente sem perder nenhum agendamento.</li>
-            <li><strong>Cópia Leve Contínua:</strong> Qualquer modificação (novo jogo, alteração, cancelamento, mensalista ou bar) envia automaticamente uma cópia leve para o Banco 2 em segundo plano.</li>
+          <ul class="text-[11px] sm:text-xs text-slate-200 space-y-1.5 list-disc list-inside leading-relaxed">
+            <li><strong>Banco 1 (Armazenamento Compacto & Otimizado):</strong> Focado em armazenar jogos, mensalistas e clientes de forma compactada. Água, lanches e bar foram desativados do banco para economizar 95% de dados e garantir folga total para pesquisas e modificações todos os meses sem falhas.</li>
+            <li><strong>Renderização Perfeita no Site:</strong> Quando o site abre, o sistema reconfigura automaticamente os arquivos compactados para renderizar todos os jogos, horários e mensalistas perfeitamente.</li>
+            <li><strong>Banco 2 (Salvaguarda & Cópia Fiel 2 em 1):</strong> Recebe uma cópia integral de toda requisição/modificação no sistema em tempo real, mantendo os dados protegidos contra qualquer perda ou indisponibilidade.</li>
           </ul>
         </div>
 
@@ -22210,16 +22164,14 @@ async function syncDataFromSupabase(skipRender = false) {
   try {
     const [
       { data: dbCourts },
-      { data: dbProducts },
       { data: dbMembers },
       { data: dbBookings },
       { data: dbCustomers, error: errCust },
       { data: dbAdmins }
     ] = await Promise.all([
       client.from('courts').select('*').order('order_index', { ascending: true }),
-      client.from('products').select('*'),
       client.from('monthly_members').select('*'),
-      client.from('bookings').select('*'),
+      client.from('bookings').select('*'), // Interceptado e expandido automaticamente pelo cliente inteligente
       client.from('customers').select('*').order('created_at', { ascending: false }),
       client.from('admin_users').select('*').order('created_at', { ascending: true })
     ]);
@@ -22240,32 +22192,8 @@ async function syncDataFromSupabase(skipRender = false) {
       }
     }
 
-    if (dbProducts && dbProducts.length > 0) {
-      const waterRow = dbProducts.find(p => p.id === 'arena-water-supply' || p.type === 'water_supply');
-      if (waterRow) {
-        try {
-          const parsed = JSON.parse(waterRow.image || '{}');
-          if (parsed && (typeof parsed.full === 'number' || typeof parsed.empty === 'number')) {
-            state.waterSupply = {
-              ...state.waterSupply,
-              ...parsed,
-              full: typeof parsed.full === 'number' ? parsed.full : (state.waterSupply?.full || 0),
-              empty: typeof parsed.empty === 'number' ? parsed.empty : 0,
-              min_alert: typeof parsed.min_alert === 'number' ? parsed.min_alert : 5,
-              unit_price: typeof parsed.unit_price === 'number' ? parsed.unit_price : 0.75,
-              fixed_allocations: Array.isArray(parsed.fixed_allocations) ? parsed.fixed_allocations : (state.waterSupply?.fixed_allocations || []),
-              courts: (parsed.courts && typeof parsed.courts === 'object') ? parsed.courts : (state.waterSupply?.courts || {}),
-              orders: Array.isArray(parsed.orders) ? parsed.orders : [],
-              history: Array.isArray(parsed.history) ? parsed.history : []
-            };
-            localStorage.setItem('arena_water_supply', JSON.stringify(state.waterSupply));
-          }
-        } catch(e) {}
-      }
-      const filteredProducts = dbProducts.filter(p => p.id !== 'arena-water-supply' && p.type !== 'water_supply');
-      state.products = filteredProducts;
-      localStorage.setItem('arena_local_products', JSON.stringify(filteredProducts));
-    }
+    // Produtos e Água desativados de sincronização do banco temporariamente (Regra do Usuário)
+    // Mantém o estoque local em cache para máxima economia de banda e integridade offline
 
     if (Array.isArray(dbMembers) && dbMembers.length > 0) {
       const validDbMembers = dbMembers.filter(m => {
@@ -22542,11 +22470,11 @@ async function syncDataFromSupabase(skipRender = false) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, async () => {
           await loadSupabaseCustomers();
         })
-        // ──── Estoque de Água e Produtos em Tempo Real ────
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
-          await loadWaterSupplyFromDatabase();
-          _refreshAllUI();
-        })
+        // ──── Estoque de Água e Produtos (Desativados temporariamente do banco) ────
+        // .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+        //   await loadWaterSupplyFromDatabase();
+        //   _refreshAllUI();
+        // })
         // ──── Gestores & Acessos Administrativos em Tempo Real ────
         .on('postgres_changes', { event: '*', schema: 'public', table: 'admin_users' }, async () => {
           await loadAdminUsers();
