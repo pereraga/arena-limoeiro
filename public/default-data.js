@@ -69,7 +69,7 @@ const initialCourts = [
     name: "FUT 5 - SOCCER 5",
     category: "poliesportiva",
     categoryLabel: "Quadra Poliesportiva",
-    image: "https://drive.google.com/thumbnail?id=1KA-WEG8J4q6UtUXKyVzSyRha_PgwtHCD&sz=w1200",
+    image: "https://lh3.googleusercontent.com/d/1KA-WEG8J4q6UtUXKyVzSyRha_PgwtHCD=w1200",
     basePricePerHour: 90.00,
     monthlyPrice: 500.00,
     badge: "🔥 Mais Agendada da Semana",

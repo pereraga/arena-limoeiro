@@ -1065,7 +1065,7 @@ function convertDriveLink(url) {
   }
 
   if (fileId) {
-    return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1200';
+    return 'https://lh3.googleusercontent.com/d/' + fileId + '=w1200';
   }
   return u;
 }
@@ -3102,7 +3102,7 @@ function renderStep1(container) {
                    ontouchstart="handleCourtTouchStart(event, '${court.id}')"
                    ontouchend="handleCourtTouchEnd(event, '${court.id}')">
                 
-                <img id="court-img-${court.id}" src="${currentActiveImage}" alt="${court.name}" 
+                <img id="court-img-${court.id}" referrerpolicy="no-referrer" src="${currentActiveImage}" alt="${court.name}" 
                      onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}"
                      class="w-full h-full object-cover transition-opacity duration-300">
                 
@@ -18944,7 +18944,7 @@ function renderCourtModalGallery() {
 
   container.innerHTML = gallery.map((imgUrl, idx) => `
     <div class="relative group rounded-xl overflow-hidden border ${idx === 0 ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-200'} bg-slate-100 aspect-video flex flex-col justify-between shadow-sm">
-      <img src="${imgUrl}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-full h-full object-cover">
+      <img src="${imgUrl}" referrerpolicy="no-referrer" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-full h-full object-cover">
       
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40">
         <!-- Top bar: Capa e Excluir -->
