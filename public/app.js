@@ -1039,8 +1039,43 @@ if (typeof window !== 'undefined') window.state = state;
 // ==============================================================================
 // 🏟️ NORMALIZADOR DE QUADRAS / ESPAÇOS (COMPATIBILIDADE SUPABASE & LOCAL)
 // ==============================================================================
+// Converte link do Google Drive para link direto de imagem funcional
+function convertDriveLink(url) {
+  if (!url || typeof url !== 'string') return url;
+  const u = url.trim();
+
+  let fileId = null;
+  const matchFile = u.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (matchFile) fileId = matchFile[1];
+  if (!fileId) {
+    const matchOpen = u.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+    if (matchOpen) fileId = matchOpen[1];
+  }
+  if (!fileId) {
+    const matchUc = u.match(/drive\.google\.com\/uc\?.*id=([a-zA-Z0-9_-]+)/);
+    if (matchUc) fileId = matchUc[1];
+  }
+  if (!fileId) {
+    const matchThumb = u.match(/drive\.google\.com\/thumbnail\?.*id=([a-zA-Z0-9_-]+)/);
+    if (matchThumb) fileId = matchThumb[1];
+  }
+  if (!fileId) {
+    const matchLh3 = u.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchLh3) fileId = matchLh3[1];
+  }
+
+  if (fileId) {
+    return 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1200';
+  }
+  return u;
+}
+window.convertDriveLink = convertDriveLink;
+
 function sanitizeCourtUrl(url) {
   if (!url || typeof url !== 'string') return 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80';
+  if (url.includes('drive.google.com') || url.includes('googleusercontent.com')) {
+    return convertDriveLink(url);
+  }
   if (url.includes('photo-1529900245534-47fbf8204bca') || url.includes('photo-1508098682722-e99c43a406b2')) {
     return 'https://images.unsplash.com/photo-1529900748604-07564a03e7a6?w=800&auto=format&fit=crop&q=80';
   }
@@ -1961,7 +1996,18 @@ function loadInitialData() {
     const hasOldMockCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && (c.name.includes('Campo Society 01') || c.name.includes('Quadra de Areia A') || c.name.includes('Ginásio Poliesportivo 01') || c.name.includes('Quadra de Padel')));
     const hasFutCourts = Array.isArray(localCourts) && localCourts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
     if (localCourts !== null && Array.isArray(localCourts) && localCourts.length > 0 && !hasOldMockCourts && hasFutCourts) {
-      state.courts = localCourts.map(normalizeCourt);
+      const initCustomPhotos = JSON.parse(localStorage.getItem('arena_custom_court_photos') || '{}');
+      state.courts = localCourts.map(c => {
+        const norm = normalizeCourt(c);
+        if (initCustomPhotos[norm.id] && initCustomPhotos[norm.id].image) {
+          norm.image = initCustomPhotos[norm.id].image;
+          if (Array.isArray(initCustomPhotos[norm.id].gallery)) {
+            norm.gallery = initCustomPhotos[norm.id].gallery;
+            if (norm.specs) norm.specs.gallery = initCustomPhotos[norm.id].gallery;
+          }
+        }
+        return norm;
+      });
       try { localStorage.setItem('arena_local_courts', JSON.stringify(state.courts)); } catch(e) {}
     } else {
       state.courts = (d.initialCourts || []).map(normalizeCourt);
@@ -3057,7 +3103,7 @@ function renderStep1(container) {
                    ontouchend="handleCourtTouchEnd(event, '${court.id}')">
                 
                 <img id="court-img-${court.id}" src="${currentActiveImage}" alt="${court.name}" 
-                     onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'"
+                     onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}"
                      class="w-full h-full object-cover transition-opacity duration-300">
                 
                 <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
@@ -3370,7 +3416,7 @@ function renderStep2(container) {
       <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 rounded-3xl p-4 sm:p-6 text-white mb-6 shadow-xl border border-emerald-800/50">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-3.5 sm:space-x-4">
-            <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
+            <img src="${court.image}" alt="${court.name}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-emerald-400/40 shadow">
             <div>
               <span class="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase">
                 Campo Selecionado
@@ -4630,7 +4676,7 @@ function renderStep4(container) {
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-3.5">
-          <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-12 h-12 rounded-xl object-cover flex-shrink-0">
+          <img src="${court.image}" alt="${court.name}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-12 h-12 rounded-xl object-cover flex-shrink-0">
           <div class="overflow-hidden">
             <span class="text-[11px] font-bold text-slate-400 block uppercase">Espaço Esportivo</span>
             <p class="text-sm font-extrabold text-slate-800 truncate">${court.name.split(' - ')[0]}</p>
@@ -6833,7 +6879,7 @@ function renderFreeCourtCard(court, selectedDate, isPartialDay = false) {
         <div class="relative h-40 sm:h-44 w-full overflow-hidden bg-slate-900">
           <img src="${courtImg}" 
                alt="${court.name}" 
-               onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+               onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" 
                class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
           <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent"></div>
 
@@ -7377,7 +7423,7 @@ function renderLiveDashboardTab() {
 
                       <img src="${court.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
                            alt="${court.name}" 
-                           onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+                           onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" 
                            class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
 
                       <div class="space-y-1">
@@ -7796,7 +7842,7 @@ function renderCourtsControlTab() {
               
               <div>
                 <div class="relative h-44 w-full overflow-hidden bg-slate-900">
-                  <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-full h-full object-cover">
+                  <img src="${court.image}" alt="${court.name}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-full h-full object-cover">
                   <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
 
                   <!-- Badges de Categoria e Status -->
@@ -11668,7 +11714,7 @@ function renderAdminSubTabContent(tab) {
           ${(state.adminCategoryFilter && state.adminCategoryFilter !== 'all' ? state.courts.filter(c => c.category === state.adminCategoryFilter) : state.courts).map(court => `
             <div class="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col justify-between">
               <div>
-                <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="h-40 w-full object-cover">
+                <img src="${court.image}" alt="${court.name}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="h-40 w-full object-cover">
                 <div class="p-4">
                   <span class="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded uppercase">${court.categoryLabel || 'Esporte'}</span>
                   <h4 class="text-base font-black text-slate-900 mt-1">${court.name}</h4>
@@ -11712,7 +11758,7 @@ function renderAdminSubTabContent(tab) {
             <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
               <div class="flex items-center space-x-3 min-w-0">
                 <span class="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center shrink-0 shadow-xs">${idx + 1}</span>
-                <img src="${court.image}" alt="${court.name}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs">
+                <img src="${court.image}" alt="${court.name}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-12 h-12 rounded-xl object-cover shrink-0 border border-slate-200 shadow-xs">
                 <div class="min-w-0">
                   <span class="text-xs font-black text-slate-900 block truncate">${court.name}</span>
                   <span class="text-[10px] text-emerald-700 font-bold block">${court.categoryLabel || 'Esporte'}</span>
@@ -11775,7 +11821,7 @@ function renderAdminSubTabContent(tab) {
                     <div class="flex items-start space-x-3.5 min-w-0">
                       <img src="${court ? court.image : 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
                            alt="${courtName}" 
-                           onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+                           onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" 
                            class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
 
                       <div class="space-y-1 min-w-0">
@@ -13365,7 +13411,7 @@ function renderSubtabBookingsItems(bookings) {
         <div class="flex items-start sm:items-center space-x-3.5 flex-1 min-w-0">
           <img src="${court.image || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'}" 
                alt="${court.name}" 
-               onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" 
+               onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" 
                class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
 
           <!-- Bloco de Informações do Jogo -->
@@ -18898,7 +18944,7 @@ function renderCourtModalGallery() {
 
   container.innerHTML = gallery.map((imgUrl, idx) => `
     <div class="relative group rounded-xl overflow-hidden border ${idx === 0 ? 'border-emerald-500 ring-2 ring-emerald-500/30' : 'border-slate-200'} bg-slate-100 aspect-video flex flex-col justify-between shadow-sm">
-      <img src="${imgUrl}" onerror="this.src='https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800&auto=format&fit=crop&q=80'" class="w-full h-full object-cover">
+      <img src="${imgUrl}" onerror="if(!this.dataset.errored){this.dataset.errored='1';console.warn('Falha imagem:',this.src);}" class="w-full h-full object-cover">
       
       <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40">
         <!-- Top bar: Capa e Excluir -->
@@ -18934,7 +18980,8 @@ function renderCourtModalGallery() {
 }
 
 function addCourtModalGalleryImage(url) {
-  const clean = (url || '').trim();
+  const raw = (url || '').trim();
+  const clean = convertDriveLink(raw);
   if (!clean) return;
   window._courtModalGallery = window._courtModalGallery || [];
   if (!window._courtModalGallery.includes(clean)) {
@@ -19375,6 +19422,9 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
   // Persistir em localStorage
   try {
     localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
+    const customPhotos = JSON.parse(localStorage.getItem('arena_custom_court_photos') || '{}');
+    customPhotos[id] = { image: savedCourt.image, gallery: savedCourt.gallery };
+    localStorage.setItem('arena_custom_court_photos', JSON.stringify(customPhotos));
   } catch(e) {
     console.warn('Erro ao salvar no localStorage:', e);
   }
@@ -22211,7 +22261,18 @@ async function syncDataFromSupabase(skipRender = false) {
       const hasMock = dbCourts.some(c => c && c.name && (c.name.includes('Campo Society 01') || c.name.includes('Quadra de Areia A') || c.name.includes('Ginásio Poliesportivo 01') || c.name.includes('Quadra de Padel')));
       const hasFutCourts = dbCourts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
       if (!hasMock && hasFutCourts) {
-        state.courts = dbCourts.map(normalizeCourt);
+        const savedCustomPhotos = JSON.parse(localStorage.getItem('arena_custom_court_photos') || '{}');
+        state.courts = dbCourts.map(c => {
+          const norm = normalizeCourt(c);
+          if (savedCustomPhotos[norm.id] && savedCustomPhotos[norm.id].image) {
+            norm.image = savedCustomPhotos[norm.id].image;
+            if (Array.isArray(savedCustomPhotos[norm.id].gallery)) {
+              norm.gallery = savedCustomPhotos[norm.id].gallery;
+              if (norm.specs) norm.specs.gallery = savedCustomPhotos[norm.id].gallery;
+            }
+          }
+          return norm;
+        });
         if (state.selectedCourt) {
           const matching = state.courts.find(c => c.id === state.selectedCourt.id);
           if (matching) state.selectedCourt = matching;
