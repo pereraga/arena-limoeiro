@@ -3640,9 +3640,9 @@ function renderCalendarHTML() {
                        'bg-slate-50 text-slate-800 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200/80 font-bold' :
                        'bg-white text-slate-700 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-100 font-bold'}">
         <span>${day}</span>
-        ${isSelected ? '<span class="text-[9px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓' + (fixosThisDay.length > 0 ? ' 👑' : '') + '</span>' : 
+        ${isSelected ? '<span class="text-[9px] font-black uppercase tracking-wider text-emerald-100 leading-none mt-0.5">✓</span>' : 
           isToday ? '<span class="text-[9px] font-extrabold text-emerald-700 leading-none mt-0.5">Hoje</span>' : 
-          fixosThisDay.length > 0 ? '<span class="text-[8px] font-black text-amber-700 leading-none mt-0.5 flex items-center">👑 Fixo</span>' :
+          fixosThisDay.length > 0 ? '<span class="text-[8px] font-black text-amber-700 leading-none mt-0.5 flex items-center">Fixo</span>' :
           isWeekend ? '<span class="w-1 h-1 rounded-full bg-emerald-500 mt-0.5"></span>' : ''}
       </button>
     `;
@@ -3960,7 +3960,7 @@ function renderStep3Content() {
             <span class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse inline-block"></span> Em Jogo Agora
           </span>
           <span class="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2.5 py-1 rounded-full">
-            <span class="text-xs">👑</span> Horário Fixo (Mensalista)
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Horário Fixo (Mensalista)
           </span>
           <span class="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full">
             <span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Reservado
@@ -4067,8 +4067,8 @@ function renderStep3Content() {
               } else if (isBooked) {
                 if (slot.isMensalista) {
                   cardClass = 'bg-amber-50/90 border-2 border-amber-300 text-amber-950 cursor-not-allowed shadow-2xs';
-                  badge = '<span class="text-[8px] xs:text-[8.5px] font-black bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-300 inline-flex items-center justify-center gap-1 whitespace-nowrap truncate max-w-full">👑 Horário Fixo</span>';
-                  icon = '👑';
+                  badge = '<span class="text-[8px] xs:text-[8.5px] font-black bg-amber-200 text-amber-950 px-1.5 py-0.5 rounded-md border border-amber-300 inline-flex items-center justify-center gap-1 whitespace-nowrap truncate max-w-full">Horário Fixo</span>';
+                  icon = '🔒';
                   nameLabel = slot.customerName ? `<span class="text-[8.5px] text-amber-900 font-extrabold truncate block mt-0.5 text-center">Time: ${slot.customerName}</span>` : '';
                 } else {
                   cardClass = 'bg-slate-100 border-2 border-slate-300 text-slate-500 cursor-not-allowed';
