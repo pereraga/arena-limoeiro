@@ -7106,7 +7106,7 @@ function renderLiveDashboardTab() {
             <i data-lucide="dollar-sign" class="w-6 h-6 text-emerald-700"></i>
           </div>
           <div>
-            <span class="text-[11px] font-bold text-slate-500 uppercase block">Faturamento Previsto</span>
+            <span class="text-[11px] font-bold text-slate-500 uppercase block">Faturamento Previsto ${isSelectedDateToday ? '(Hoje)' : '(' + formatDisplayDate(selectedDate) + ')'}</span>
             <div class="text-lg sm:text-xl font-black text-slate-900">R$ ${totalRevenue.toFixed(2).replace('.', ',')}</div>
           </div>
         </div>
