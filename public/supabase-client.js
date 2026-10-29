@@ -362,13 +362,30 @@
           });
 
           // Se for operação de escrita:
-          if (operations.isWrite && cfg.dualWrite && client2) {
+          if (operations.isWrite && cfg.dualWrite && client2 && tableName !== 'courts') {
             // Despacha cópia integral de salvaguarda assíncrona para o Banco 2 (2 em 1) com payload sanitizado
             dispatchLightweightCopy(tableName, operations, sanitizedCalls).catch(() => {});
           }
 
           let result = null;
           let primaryFailed = false;
+
+          // Para courts: exclusividade total no Banco 2 (sem tocar no Banco 1)
+          if (tableName === 'courts' && client2) {
+            try {
+              let queryCourt = client2.from('courts');
+              for (const call of sanitizedCalls) {
+                if (typeof queryCourt[call.method] === 'function') {
+                  queryCourt = queryCourt[call.method](...call.args);
+                }
+              }
+              result = await queryCourt;
+              if (resolve) resolve(result);
+              return result;
+            } catch(eCourt) {
+              console.warn('[DB2 Courts] Erro na consulta:', eCourt);
+            }
+          }
 
           if (client1 && !primaryRestricted) {
             try {

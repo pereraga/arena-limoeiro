@@ -19450,43 +19450,39 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
     showNotification(isEditing ? `Quadra "${name}" atualizada com sucesso!` : `Quadra "${name}" criada com sucesso!`, 'success');
   }
 
+  // 🛡️ SALVAMENTO EXCLUSIVO E DEFINITIVO NO BANCO 2 (Sem tocar no Banco 1)
   if (window.ArenaSupabase && window.ArenaSupabase.isReady()) {
     try {
-      const client = window.ArenaSupabase.getClient();
+      const db2 = window.ArenaSupabase.getSecondaryClient ? window.ArenaSupabase.getSecondaryClient() : window.ArenaSupabase.getClient();
+      const courtPayload = {
+        name,
+        category,
+        category_label: savedCourt.categoryLabel,
+        base_price_per_hour: price,
+        monthly_price: monthlyPrice,
+        description,
+        observation,
+        image: savedCourt.image,
+        specs: savedCourt.specs,
+        badge: savedCourt.badge
+      };
+
       if (isEditing) {
-        await client.from('courts').update({
-          name, 
-          category, 
-          category_label: savedCourt.categoryLabel,
-          base_price_per_hour: price, 
-          monthly_price: monthlyPrice,
-          description, 
-          observation, 
-          image: savedCourt.image, 
-          specs: savedCourt.specs,
-          badge: savedCourt.badge
-        }).eq('id', courtIdToEdit);
+        await db2.from('courts').update(courtPayload).eq('id', courtIdToEdit);
       } else {
-        await client.from('courts').insert([{
-          id, 
-          name, 
-          category, 
-          category_label: savedCourt.categoryLabel,
-          base_price_per_hour: price, 
-          monthly_price: monthlyPrice,
-          description, 
-          observation, 
-          image: savedCourt.image, 
-          specs: savedCourt.specs,
-          badge: savedCourt.badge,
+        await db2.from('courts').upsert([{
+          id,
+          ...courtPayload,
           order_index: state.courts.length
-        }]);
+        }], { onConflict: 'id' });
       }
+
+      console.log('✅ Foto e quadra congeladas com sucesso exclusivamente no Banco 2!');
       if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
         window.ArenaSupabase.broadcastCourtUpdate(savedCourt);
       }
     } catch(e) {
-      console.warn('Erro ao salvar quadra no Supabase:', e);
+      console.warn('Erro ao salvar quadra no Banco 2:', e);
     }
   }
 }
