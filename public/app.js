@@ -18984,7 +18984,10 @@ function addCourtModalGalleryImage(url) {
   const clean = convertDriveLink(raw);
   if (!clean) return;
   window._courtModalGallery = window._courtModalGallery || [];
-  if (!window._courtModalGallery.includes(clean)) {
+  const isDefaultUnsplash = (img) => typeof img === 'string' && img.includes('images.unsplash.com');
+  if (window._courtModalGallery.length === 1 && isDefaultUnsplash(window._courtModalGallery[0])) {
+    window._courtModalGallery = [clean];
+  } else if (!window._courtModalGallery.includes(clean)) {
     window._courtModalGallery.push(clean);
   }
   renderCourtModalGallery();
@@ -22173,7 +22176,18 @@ async function syncDataFromSupabase(skipRender = false) {
       if (cloudData) {
         // Quadras oficiais
         if (Array.isArray(cloudData.courts) && cloudData.courts.length > 0) {
-          state.courts = cloudData.courts.map(normalizeCourt);
+          const savedCustomPhotos = JSON.parse(localStorage.getItem('arena_custom_court_photos') || '{}');
+          state.courts = cloudData.courts.map(c => {
+            const norm = normalizeCourt(c);
+            if (savedCustomPhotos[norm.id] && savedCustomPhotos[norm.id].image) {
+              norm.image = savedCustomPhotos[norm.id].image;
+              if (Array.isArray(savedCustomPhotos[norm.id].gallery)) {
+                norm.gallery = savedCustomPhotos[norm.id].gallery;
+                if (norm.specs) norm.specs.gallery = savedCustomPhotos[norm.id].gallery;
+              }
+            }
+            return norm;
+          });
           localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
         }
 
@@ -22625,7 +22639,18 @@ async function checkAndSyncBookingsBackground() {
             const hasMock = cloudData.courts.some(c => c && c.name && (c.name.includes('Campo Society 01') || c.name.includes('Quadra de Areia A') || c.name.includes('Ginásio Poliesportivo 01') || c.name.includes('Quadra de Padel')));
             const hasFutCourts = cloudData.courts.some(c => c && c.name && (c.name.includes('FUT 5') || c.name.includes('FUTMESA') || c.name.includes('SOCCER 5')));
             if (!hasMock && hasFutCourts) {
-              const normCourts = cloudData.courts.map(normalizeCourt);
+              const savedCustomPhotos = JSON.parse(localStorage.getItem('arena_custom_court_photos') || '{}');
+              const normCourts = cloudData.courts.map(c => {
+                const norm = normalizeCourt(c);
+                if (savedCustomPhotos[norm.id] && savedCustomPhotos[norm.id].image) {
+                  norm.image = savedCustomPhotos[norm.id].image;
+                  if (Array.isArray(savedCustomPhotos[norm.id].gallery)) {
+                    norm.gallery = savedCustomPhotos[norm.id].gallery;
+                    if (norm.specs) norm.specs.gallery = savedCustomPhotos[norm.id].gallery;
+                  }
+                }
+                return norm;
+              });
               if (JSON.stringify(normCourts) !== JSON.stringify(state.courts)) {
                 state.courts = normCourts;
                 localStorage.setItem('arena_local_courts', JSON.stringify(normCourts));
