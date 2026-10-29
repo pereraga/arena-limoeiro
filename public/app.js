@@ -19012,6 +19012,9 @@ function setCourtModalCoverImage(index) {
 function handleCourtImageUpload(inputEl) {
   if (!inputEl || !inputEl.files || !inputEl.files[0]) return;
   const file = inputEl.files[0];
+  if (typeof showNotification === 'function') {
+    showNotification('Carregando foto...', 'info');
+  }
   const reader = new FileReader();
   reader.onload = function(e) {
     const rawDataUrl = e.target.result;
@@ -19027,16 +19030,26 @@ function handleCourtImageUpload(inputEl) {
       }
       if (height > maxHeight) {
         width = Math.round((width * maxHeight) / height);
-        height = maxHeight;
+        width = maxHeight;
       }
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, width, height);
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.80);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
       addCourtModalGalleryImage(compressedDataUrl);
       inputEl.value = '';
+      if (typeof showNotification === 'function') {
+        showNotification('Foto adicionada! Clique em "Salvar Alterações" abaixo para publicar.', 'success');
+      }
+    };
+    img.onerror = function() {
+      addCourtModalGalleryImage(rawDataUrl);
+      inputEl.value = '';
+      if (typeof showNotification === 'function') {
+        showNotification('Foto adicionada! Clique em "Salvar Alterações" para publicar.', 'success');
+      }
     };
     img.src = rawDataUrl;
   };
