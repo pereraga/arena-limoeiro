@@ -6232,6 +6232,10 @@ function renderAdminView(container) {
             <i data-lucide="info" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
             <span class="whitespace-nowrap">Info Sistema</span>
           </button>
+          <button onclick="setAdminTab('reports')" class="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-slate-800" title="Acessar Relatórios e Planilhas">
+            <i data-lucide="file-text" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+            <span class="whitespace-nowrap">📄 Relatórios</span>
+          </button>
           ${canDirectBooking() ? `
             <button onclick="openDirectBookingModal()" class="flex-1 md:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
@@ -6304,6 +6308,15 @@ function renderAdminView(container) {
             <span class="truncate">Cadastros & Ajustes</span>
           </button>
         ` : ''}
+
+        <button onclick="setAdminTab('reports')" 
+                class="col-span-2 sm:col-span-1 lg:col-auto w-full lg:w-auto justify-center text-center px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center space-x-2 transition-all cursor-pointer
+                       ${currentTab === 'reports' ? 
+                         'bg-emerald-600 text-white font-black border border-emerald-600 shadow-md shadow-emerald-600/25' : 
+                         'bg-white text-slate-700 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+          <i data-lucide="file-text" class="w-4 h-4 shrink-0 ${currentTab === 'reports' ? 'text-white' : 'text-emerald-600'}"></i>
+          <span class="truncate">Relatórios & Backup</span>
+        </button>
       </div>
 
       <div id="adminTabContent">
@@ -10957,6 +10970,10 @@ function renderAdminTabContent() {
 
   if (currentTab === 'bar_control') {
     return renderBarControlTab();
+  }
+
+  if (currentTab === 'reports') {
+    return renderAdminBackupTab();
   }
 
   const userRole = state.currentUser?.role || 'Administrador Geral';
