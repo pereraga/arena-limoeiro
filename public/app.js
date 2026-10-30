@@ -20429,6 +20429,18 @@ async function handleCourtFormSubmit(event, courtIdToEdit) {
       if (window.ArenaSupabase && window.ArenaSupabase.broadcastCourtUpdate) {
         window.ArenaSupabase.broadcastCourtUpdate(savedCourt);
       }
+
+      // ☁️ Sincronização em Nuvem Imediata (Celulares, Outros Aparelhos e Visitantes)
+      if (window.ArenaCloudSync) {
+        window.ArenaCloudSync.push('update_court', {
+          id: savedCourt.id,
+          name: savedCourt.name,
+          image: savedCourt.image,
+          gallery: savedCourt.gallery,
+          specs: savedCourt.specs
+        });
+        window.ArenaCloudSync.push('sync_all', { courts: state.courts });
+      }
     } catch(e) {
       console.warn('Erro ao salvar quadra no Banco 2:', e);
     }
@@ -23130,9 +23142,13 @@ async function syncDataFromSupabase(skipRender = false) {
                 norm.gallery = savedCustomPhotos[norm.id].gallery;
                 if (norm.specs) norm.specs.gallery = savedCustomPhotos[norm.id].gallery;
               }
+            } else if (norm.image) {
+              // Se a nuvem trouxe uma foto oficial da quadra, sincroniza para a máquina de todos os usuários
+              savedCustomPhotos[norm.id] = { image: norm.image, gallery: norm.gallery || [norm.image] };
             }
             return norm;
           });
+          localStorage.setItem('arena_custom_court_photos', JSON.stringify(savedCustomPhotos));
           localStorage.setItem('arena_local_courts', JSON.stringify(state.courts));
         }
 
@@ -23593,9 +23609,12 @@ async function checkAndSyncBookingsBackground() {
                     norm.gallery = savedCustomPhotos[norm.id].gallery;
                     if (norm.specs) norm.specs.gallery = savedCustomPhotos[norm.id].gallery;
                   }
+                } else if (norm.image) {
+                  savedCustomPhotos[norm.id] = { image: norm.image, gallery: norm.gallery || [norm.image] };
                 }
                 return norm;
               });
+              localStorage.setItem('arena_custom_court_photos', JSON.stringify(savedCustomPhotos));
               if (JSON.stringify(normCourts) !== JSON.stringify(state.courts)) {
                 state.courts = normCourts;
                 localStorage.setItem('arena_local_courts', JSON.stringify(normCourts));

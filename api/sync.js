@@ -307,9 +307,21 @@ export default async function handler(req, res) {
         // Atualizar Estoque de Água (Desativado temporariamente para economia e desempenho)
         // if (payload.water_supply) { ... }
 
-        // Atualizar Quadras se fornecido
+        // Atualizar Quadras se fornecido (com mesclagem inteligente e sincronização de fotos)
         if (Array.isArray(payload.courts) && payload.courts.length > 0) {
-          current.courts = payload.courts;
+          if (!Array.isArray(current.courts) || current.courts.length === 0) {
+            current.courts = payload.courts;
+          } else {
+            const courtMap = new Map(current.courts.map(c => [c.id, c]));
+            for (const c of payload.courts) {
+              if (c && c.id) {
+                const existing = courtMap.get(c.id);
+                // Se o payload tiver imagem válida atualizada, sobrepõe a imagem existente
+                courtMap.set(c.id, existing ? { ...existing, ...c } : c);
+              }
+            }
+            current.courts = Array.from(courtMap.values());
+          }
           modified = true;
         }
       }
