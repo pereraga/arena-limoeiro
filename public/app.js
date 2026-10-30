@@ -6224,18 +6224,7 @@ function renderAdminView(container) {
         </div>
 
         <div class="flex items-center gap-2 w-full md:w-auto mt-3 md:mt-0 flex-wrap">
-          <button onclick="openDownloadApkModal()" class="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-amber-600" title="Baixar APK Controle e Cliente">
-            <i data-lucide="download" class="w-4 h-4 text-white flex-shrink-0"></i>
-            <span class="whitespace-nowrap">Baixar APK</span>
-          </button>
-          <button onclick="openSystemInfoModal()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-slate-200" title="Ver Informações do Sistema">
-            <i data-lucide="info" class="w-4 h-4 text-emerald-600 flex-shrink-0"></i>
-            <span class="whitespace-nowrap">Info Sistema</span>
-          </button>
-          <button onclick="setAdminTab('reports')" class="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer border border-slate-800" title="Acessar Relatórios e Planilhas">
-            <i data-lucide="file-text" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-            <span class="whitespace-nowrap">📄 Relatórios</span>
-          </button>
+
           ${canDirectBooking() ? `
             <button onclick="openDirectBookingModal()" class="flex-1 md:flex-initial justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-sm font-black shadow-md flex items-center space-x-1.5 transition-all cursor-pointer">
               <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
