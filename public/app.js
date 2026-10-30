@@ -13562,8 +13562,8 @@ function initFinanceCharts() {
     }
 
     const grad = ctx.createLinearGradient(0, 0, 0, 260);
-    grad.addColorStop(0, 'rgba(16, 185, 129, 0.45)');
-    grad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+    grad.addColorStop(0, 'rgba(5, 150, 105, 0.28)');
+    grad.addColorStop(1, 'rgba(5, 150, 105, 0.0)');
 
     _financeEvolutionChart = new Chart(ctx, {
       type: 'line',
@@ -13573,21 +13573,22 @@ function initFinanceCharts() {
           {
             label: 'Receita Realizada (R$)',
             data: dataReal,
-            borderColor: '#10b981',
+            borderColor: '#059669',
             backgroundColor: grad,
-            borderWidth: 2.5,
+            borderWidth: 3,
             tension: 0.35,
             fill: true,
-            pointBackgroundColor: '#00e676',
-            pointBorderColor: '#0f172a',
+            pointBackgroundColor: '#047857',
+            pointBorderColor: '#ffffff',
             pointBorderWidth: 2,
-            pointRadius: 4
+            pointRadius: 4.5,
+            pointHoverRadius: 6.5
           },
           {
             label: 'Meta Projetada (R$)',
             data: dataMeta,
-            borderColor: 'rgba(94, 234, 212, 0.4)',
-            borderWidth: 1.8,
+            borderColor: '#0284c7',
+            borderWidth: 2,
             borderDash: [5, 5],
             tension: 0.3,
             fill: false,
@@ -13602,8 +13603,8 @@ function initFinanceCharts() {
           legend: { display: false }
         },
         scales: {
-          x: { grid: { color: 'rgba(255, 255, 255, 0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-          y: { grid: { color: 'rgba(255, 255, 255, 0.04)' }, ticks: { color: '#64748b', font: { size: 10 }, callback: v => 'R$ ' + v } }
+          x: { grid: { color: 'rgba(226, 232, 240, 0.9)' }, ticks: { color: '#475569', font: { size: 11, weight: '600' } } },
+          y: { grid: { color: 'rgba(226, 232, 240, 0.9)' }, ticks: { color: '#475569', font: { size: 11, weight: '600' }, callback: v => 'R$ ' + v } }
         }
       }
     });
@@ -13627,8 +13628,8 @@ function initFinanceCharts() {
         labels: ['Mensalistas Fixos', 'Horários Avulsos', 'Bar & Cantina'],
         datasets: [{
           data: [fixosVal, avulsosVal, barVal],
-          backgroundColor: ['#10b981', '#06b6d4', '#f59e0b'],
-          borderColor: '#0f172a',
+          backgroundColor: ['#059669', '#0284c7', '#f59e0b'],
+          borderColor: '#ffffff',
           borderWidth: 3,
           hoverOffset: 6
         }]
@@ -13636,7 +13637,7 @@ function initFinanceCharts() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '72%',
+        cutout: '70%',
         plugins: {
           legend: { display: false }
         }
@@ -13666,9 +13667,9 @@ function initFinanceCharts() {
         datasets: [{
           label: 'Horas Reservadas',
           data: occData,
-          backgroundColor: 'rgba(16, 185, 129, 0.65)',
-          hoverBackgroundColor: '#10b981',
-          borderRadius: 6
+          backgroundColor: '#10b981',
+          hoverBackgroundColor: '#059669',
+          borderRadius: 8
         }]
       },
       options: {
@@ -13678,8 +13679,8 @@ function initFinanceCharts() {
           legend: { display: false }
         },
         scales: {
-          x: { grid: { display: false }, ticks: { color: '#64748b', font: { size: 10 } } },
-          y: { grid: { color: 'rgba(255, 255, 255, 0.04)' }, ticks: { color: '#64748b', font: { size: 10 } } }
+          x: { grid: { display: false }, ticks: { color: '#475569', font: { size: 11, weight: '600' } } },
+          y: { grid: { color: 'rgba(226, 232, 240, 0.9)' }, ticks: { color: '#475569', font: { size: 11, weight: '600' } } }
         }
       }
     });
@@ -13699,33 +13700,33 @@ function renderAdminReportsTab() {
     <div class="space-y-6">
       
       <!-- Topo: Seletor de Período e Botões Oficiais de Exportação -->
-      <div class="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 border border-emerald-950/60 rounded-3xl p-5 sm:p-6 shadow-md text-white">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div class="bg-white border border-slate-200 rounded-3xl p-5 sm:p-7 shadow-xs">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
           <div>
             <div class="flex items-center space-x-2">
-              <span class="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              <span class="p-2 rounded-xl bg-emerald-100 text-emerald-800">
                 <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
               </span>
-              <span class="text-xs font-black uppercase tracking-wider text-emerald-400">Painel Financeiro & Relatórios Inteligentes</span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+              <span class="text-xs font-black uppercase tracking-wider text-emerald-800">Painel Financeiro & Relatórios Inteligentes</span>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
                 100% Leitura Segura
               </span>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-white mt-1">Fluxo de Caixa, Rentabilidade & Desempenho</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Métricas de ocupação, evolução de receita, rankings de fidelidade e relatórios em tempo real.</p>
+            <h3 class="text-xl sm:text-2xl font-black text-slate-900 mt-1.5">Fluxo de Caixa, Rentabilidade & Desempenho</h3>
+            <p class="text-xs text-slate-500 mt-0.5">Métricas de ocupação, evolução de receita, rankings de fidelidade e relatórios em tempo real.</p>
           </div>
 
           <!-- Botões de Troca de Período (Diário / Mensal / Anual) -->
-          <div class="flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 self-start md:self-center shadow-inner">
-            <button onclick="setFinancePeriod('daily')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${an.period === 'daily' ? 'bg-emerald-600 text-white shadow-md font-black' : 'text-slate-300 hover:text-white'}">
+          <div class="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200 self-start md:self-center shadow-inner">
+            <button onclick="setFinancePeriod('daily')" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${an.period === 'daily' ? 'bg-emerald-600 text-white shadow font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'}">
               <i data-lucide="clock" class="w-3.5 h-3.5"></i>
               <span>Diário</span>
             </button>
-            <button onclick="setFinancePeriod('monthly')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${an.period === 'monthly' ? 'bg-emerald-600 text-white font-black shadow-md' : 'text-slate-300 hover:text-white'}">
+            <button onclick="setFinancePeriod('monthly')" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${an.period === 'monthly' ? 'bg-emerald-600 text-white shadow font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'}">
               <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
               <span>Mensal</span>
             </button>
-            <button onclick="setFinancePeriod('yearly')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 ${an.period === 'yearly' ? 'bg-emerald-600 text-white font-black shadow-md' : 'text-slate-300 hover:text-white'}">
+            <button onclick="setFinancePeriod('yearly')" class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer ${an.period === 'yearly' ? 'bg-emerald-600 text-white shadow font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'}">
               <i data-lucide="calendar-range" class="w-3.5 h-3.5"></i>
               <span>Anual</span>
             </button>
@@ -13734,9 +13735,9 @@ function renderAdminReportsTab() {
 
         <!-- Barra de Ações Rápidas de Exportação -->
         <div class="flex flex-wrap items-center justify-between gap-3 pt-4">
-          <div class="flex items-center space-x-2 text-xs text-slate-300">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Período Ativo: <strong>${an.period === 'daily' ? ('Dia ' + formatDisplayDate(selectedDate)) : (an.period === 'yearly' ? 'Ano Fiscal Vigente' : 'Mês Vigente')}</strong></span>
+          <div class="flex items-center space-x-2 text-xs text-slate-600 font-medium">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 animate-pulse"></span>
+            <span>Período Ativo: <strong class="text-slate-900 font-bold">${an.period === 'daily' ? ('Dia ' + formatDisplayDate(selectedDate)) : (an.period === 'yearly' ? 'Ano Fiscal Vigente' : 'Mês Vigente')}</strong></span>
           </div>
 
           <div class="flex items-center gap-2 flex-wrap">
@@ -13744,38 +13745,38 @@ function renderAdminReportsTab() {
               <i data-lucide="printer" class="w-4 h-4"></i>
               <span>📄 PDF do Dia</span>
             </button>
-            <button onclick="exportDailyExcel()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer" title="Exportar jogos do dia detalhado para Excel / CSV">
+            <button onclick="exportDailyExcel()" class="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-100 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer" title="Exportar jogos do dia detalhado para Excel / CSV">
               <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400"></i>
               <span>📊 Excel (Dia)</span>
             </button>
-            <button onclick="exportUnifiedPDF()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer" title="Baixar Relatório Geral Unificado em PDF">
-              <i data-lucide="file-text" class="w-4 h-4 text-emerald-400"></i>
+            <button onclick="exportUnifiedPDF()" class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer" title="Baixar Relatório Geral Unificado em PDF">
+              <i data-lucide="file-text" class="w-4 h-4 text-emerald-600"></i>
               <span>PDF Geral</span>
             </button>
-            <button onclick="exportUnifiedExcel()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer" title="Baixar Planilha Completa Unificada">
-              <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+            <button onclick="exportUnifiedExcel()" class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer" title="Baixar Planilha Completa Unificada">
+              <i data-lucide="download" class="w-4 h-4 text-emerald-600"></i>
               <span>Excel Geral</span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Grid de Indicadores Cards (KPIs) -->
+      <!-- Grid de Indicadores Cards (KPIs) com Fundo Claro e Alta Nitidez -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         <!-- Faturamento Total -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/80 p-5 rounded-3xl relative overflow-hidden shadow-sm">
+        <div class="bg-white border border-slate-200 p-5 rounded-3xl relative overflow-hidden shadow-xs hover:border-emerald-300 transition-all">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Faturamento Projetado</span>
-            <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Faturamento Projetado</span>
+            <span class="p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 text-xs">
               <i data-lucide="dollar-sign" class="w-4 h-4"></i>
             </span>
           </div>
           <div class="mt-3">
-            <div class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <div class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               R$ ${an.grandTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div class="mt-2 flex items-center gap-1.5 text-xs text-emerald-400 font-bold">
+            <div class="mt-2 flex items-center gap-1.5 text-xs text-emerald-700 font-bold">
               <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
               <span>Calculado sobre os jogos ativos</span>
             </div>
@@ -13783,58 +13784,58 @@ function renderAdminReportsTab() {
         </div>
 
         <!-- Partidas & Horas -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/80 p-5 rounded-3xl relative overflow-hidden shadow-sm">
+        <div class="bg-white border border-slate-200 p-5 rounded-3xl relative overflow-hidden shadow-xs hover:border-teal-300 transition-all">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Partidas & Horas</span>
-            <span class="p-2 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-500/20 text-xs">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Partidas & Horas</span>
+            <span class="p-2.5 rounded-2xl bg-teal-100 text-teal-800 text-xs">
               <i data-lucide="activity" class="w-4 h-4"></i>
             </span>
           </div>
           <div class="mt-3">
-            <div class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <div class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               ${an.totalMatchesCount} jogos
             </div>
-            <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+            <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
               <span>${an.totalHours}h estimadas</span>
-              <span class="text-emerald-400 font-bold">Ocupação: ${an.taxaOcupacao}</span>
+              <span class="text-teal-700 font-bold">Ocupação: ${an.taxaOcupacao}</span>
             </div>
           </div>
         </div>
 
         <!-- Ticket Médio -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/80 p-5 rounded-3xl relative overflow-hidden shadow-sm">
+        <div class="bg-white border border-slate-200 p-5 rounded-3xl relative overflow-hidden shadow-xs hover:border-amber-300 transition-all">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Ticket Médio / Hora</span>
-            <span class="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Ticket Médio / Hora</span>
+            <span class="p-2.5 rounded-2xl bg-amber-100 text-amber-800 text-xs">
               <i data-lucide="tag" class="w-4 h-4"></i>
             </span>
           </div>
           <div class="mt-3">
-            <div class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+            <div class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
               R$ ${an.ticketMedio.toFixed(2).replace('.', ',')}
             </div>
-            <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
-              <span class="text-amber-400 font-semibold">${(state.monthlyMembers || []).length} Mensalistas Fixos</span>
-              <span class="text-slate-300 font-medium">Equilíbrio Estável</span>
+            <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <span class="text-amber-800 font-bold">${(state.monthlyMembers || []).length} Mensalistas Fixos</span>
+              <span class="text-slate-600 font-medium">Equilíbrio Estável</span>
             </div>
           </div>
         </div>
 
         <!-- Taxa de Recebimento -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800/80 p-5 rounded-3xl relative overflow-hidden shadow-sm">
+        <div class="bg-white border border-slate-200 p-5 rounded-3xl relative overflow-hidden shadow-xs hover:border-blue-300 transition-all">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Taxa de Recebimento</span>
-            <span class="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Taxa de Recebimento</span>
+            <span class="p-2.5 rounded-2xl bg-blue-100 text-blue-800 text-xs">
               <i data-lucide="shield-check" class="w-4 h-4"></i>
             </span>
           </div>
           <div class="mt-3">
-            <div class="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight">
+            <div class="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
               ${an.taxaRecebimento}
             </div>
-            <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
-              <span class="text-slate-300">Fluxo em Dia</span>
-              <span class="text-slate-400 font-mono">PIX / Dinheiro / Balcão</span>
+            <div class="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <span class="text-slate-700 font-medium">Fluxo em Dia</span>
+              <span class="text-slate-500 font-mono">PIX / Dinheiro / Balcão</span>
             </div>
           </div>
         </div>
@@ -13845,21 +13846,21 @@ function renderAdminReportsTab() {
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         <!-- Gráfico de Evolução -->
-        <div class="lg:col-span-2 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between shadow-sm">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-2">
+        <div class="lg:col-span-2 bg-white border border-slate-200 p-6 rounded-3xl flex flex-col justify-between shadow-xs">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
             <div>
-              <h4 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+              <h4 class="text-base font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
                 <span>Evolução de Receita & Tendência de Faturamento</span>
               </h4>
-              <p class="text-xs text-slate-400 mt-0.5">Curva de entradas e projeções por período</p>
+              <p class="text-xs text-slate-500 mt-0.5">Curva de entradas e projeções por período</p>
             </div>
             <div class="flex items-center gap-2 text-xs">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Realizado
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-600"></span> Realizado
               </span>
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/10 border border-teal-500/30 text-teal-300 font-semibold">
-                <span class="w-2 h-2 rounded-full bg-teal-300"></span> Meta
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 font-bold">
+                <span class="w-2 h-2 rounded-full bg-sky-600"></span> Meta
               </span>
             </div>
           </div>
@@ -13869,29 +13870,29 @@ function renderAdminReportsTab() {
         </div>
 
         <!-- Gráfico de Pizza / Distribuição -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between shadow-sm">
-          <div class="pb-3 border-b border-slate-800">
-            <h4 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-400"></i>
+        <div class="bg-white border border-slate-200 p-6 rounded-3xl flex flex-col justify-between shadow-xs">
+          <div class="pb-3 border-b border-slate-100">
+            <h4 class="text-base font-black text-slate-900 flex items-center gap-2">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
               <span>Origem das Receitas</span>
             </h4>
-            <p class="text-xs text-slate-400 mt-0.5">Mensalistas Fixos vs. Avulsos vs. Bar</p>
+            <p class="text-xs text-slate-500 mt-0.5">Mensalistas Fixos vs. Avulsos vs. Bar</p>
           </div>
           <div class="mt-3 w-full h-[200px] relative flex items-center justify-center">
             <canvas id="financeCategoryChart"></canvas>
           </div>
-          <div class="mt-3 grid grid-cols-2 gap-2 text-[11px] pt-3 border-t border-slate-800/80">
-            <div class="flex items-center gap-1.5 text-slate-300">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
-              <span>Fixos: <strong class="text-white">R$ ${Math.round(an.totalMensalistaRevenue).toLocaleString('pt-BR')}</strong></span>
+          <div class="mt-3 grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-100">
+            <div class="flex items-center gap-1.5 text-slate-700">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0"></span>
+              <span>Fixos: <strong class="text-slate-900">R$ ${Math.round(an.totalMensalistaRevenue).toLocaleString('pt-BR')}</strong></span>
             </div>
-            <div class="flex items-center gap-1.5 text-slate-300">
-              <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 shrink-0"></span>
-              <span>Avulsos: <strong class="text-white">R$ ${Math.round(an.totalAvulsoRevenue).toLocaleString('pt-BR')}</strong></span>
+            <div class="flex items-center gap-1.5 text-slate-700">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-600 shrink-0"></span>
+              <span>Avulsos: <strong class="text-slate-900">R$ ${Math.round(an.totalAvulsoRevenue).toLocaleString('pt-BR')}</strong></span>
             </div>
-            <div class="flex items-center gap-1.5 text-slate-300 col-span-2">
+            <div class="flex items-center gap-1.5 text-slate-700 col-span-2">
               <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
-              <span>Bar & Cantina: <strong class="text-white">R$ ${Math.round(an.totalBarRevenue).toLocaleString('pt-BR')}</strong></span>
+              <span>Bar & Cantina: <strong class="text-slate-900">R$ ${Math.round(an.totalBarRevenue).toLocaleString('pt-BR')}</strong></span>
             </div>
           </div>
         </div>
@@ -13901,16 +13902,16 @@ function renderAdminReportsTab() {
       <!-- Ocupação por Horários & Meios de Pagamento -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        <div class="lg:col-span-2 bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl shadow-sm">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="lg:col-span-2 bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
-              <h4 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="layers" class="w-4 h-4 text-emerald-400"></i>
+              <h4 class="text-base font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4 text-emerald-600"></i>
                 <span>Fluxo por Faixa de Horário & Demanda dos Espaços</span>
               </h4>
-              <p class="text-xs text-slate-400 mt-0.5">Concentração de jogos nas quadras da Arena Limoeiro</p>
+              <p class="text-xs text-slate-500 mt-0.5">Concentração de jogos nas quadras da Arena Limoeiro</p>
             </div>
-            <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
               Quadras 1, 2, 3 e Areia
             </span>
           </div>
@@ -13920,50 +13921,50 @@ function renderAdminReportsTab() {
         </div>
 
         <!-- Meios de Pagamento -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl flex flex-col justify-between shadow-sm">
-          <div class="pb-3 border-b border-slate-800">
-            <h4 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="credit-card" class="w-4 h-4 text-emerald-400"></i>
+        <div class="bg-white border border-slate-200 p-6 rounded-3xl flex flex-col justify-between shadow-xs">
+          <div class="pb-3 border-b border-slate-100">
+            <h4 class="text-base font-black text-slate-900 flex items-center gap-2">
+              <i data-lucide="credit-card" class="w-4 h-4 text-emerald-600"></i>
               <span>Meios de Pagamento</span>
             </h4>
-            <p class="text-xs text-slate-400 mt-0.5">Distribuição das formas de recebimento</p>
+            <p class="text-xs text-slate-500 mt-0.5">Distribuição das formas de recebimento</p>
           </div>
 
           <div class="space-y-3.5 my-auto py-2 text-xs">
             <div>
               <div class="flex justify-between font-bold mb-1">
-                <span class="text-slate-200">PIX Instantâneo</span>
-                <span class="text-emerald-400 font-mono">75%</span>
+                <span class="text-slate-700">PIX Instantâneo</span>
+                <span class="text-emerald-700 font-mono font-black">75%</span>
               </div>
-              <div class="w-full bg-slate-800 rounded-full h-2">
-                <div class="bg-emerald-500 h-2 rounded-full" style="width: 75%"></div>
-              </div>
-            </div>
-
-            <div>
-              <div class="flex justify-between font-bold mb-1">
-                <span class="text-slate-200">Cartão de Crédito / Débito</span>
-                <span class="text-teal-400 font-mono">18%</span>
-              </div>
-              <div class="w-full bg-slate-800 rounded-full h-2">
-                <div class="bg-teal-500 h-2 rounded-full" style="width: 18%"></div>
+              <div class="w-full bg-slate-100 rounded-full h-2">
+                <div class="bg-emerald-600 h-2 rounded-full" style="width: 75%"></div>
               </div>
             </div>
 
             <div>
               <div class="flex justify-between font-bold mb-1">
-                <span class="text-slate-200">Dinheiro / Presencial</span>
-                <span class="text-amber-400 font-mono">7%</span>
+                <span class="text-slate-700">Cartão de Crédito / Débito</span>
+                <span class="text-teal-700 font-mono font-black">18%</span>
               </div>
-              <div class="w-full bg-slate-800 rounded-full h-2">
+              <div class="w-full bg-slate-100 rounded-full h-2">
+                <div class="bg-teal-600 h-2 rounded-full" style="width: 18%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between font-bold mb-1">
+                <span class="text-slate-700">Dinheiro / Presencial</span>
+                <span class="text-amber-700 font-mono font-black">7%</span>
+              </div>
+              <div class="w-full bg-slate-100 rounded-full h-2">
                 <div class="bg-amber-500 h-2 rounded-full" style="width: 7%"></div>
               </div>
             </div>
           </div>
 
-          <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between text-xs">
-            <span class="text-emerald-300 font-medium">Adimplência Total:</span>
-            <span class="text-white font-black">98.2% em dia</span>
+          <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs">
+            <span class="text-emerald-800 font-semibold">Adimplência Total:</span>
+            <span class="text-emerald-950 font-black">98.2% em dia</span>
           </div>
         </div>
 
@@ -13973,33 +13974,33 @@ function renderAdminReportsTab() {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         <!-- Ranking 1: Fidelidade (Quem Joga Mais) -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl shadow-sm">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
             <div>
-              <h4 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="trophy" class="w-4 h-4 text-amber-400"></i>
+              <h4 class="text-base font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="trophy" class="w-4 h-4 text-amber-500"></i>
                 <span>Ranking de Fidelidade: Quem Joga Mais</span>
               </h4>
-              <p class="text-xs text-slate-400 mt-0.5">Atletas e equipes com maior presença no período</p>
+              <p class="text-xs text-slate-500 mt-0.5">Atletas e equipes com maior presença no período</p>
             </div>
-            <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/20">Top 5</span>
+            <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">Top 5</span>
           </div>
 
           <div class="space-y-2.5">
             ${an.topPlayers.map((p, idx) => `
-              <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-800/50 border border-slate-700/60 hover:border-emerald-500/30 transition">
+              <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-emerald-300 transition">
                 <div class="flex items-center space-x-3 min-w-0">
-                  <div class="w-8 h-8 rounded-xl bg-slate-700 text-emerald-400 font-black text-xs flex items-center justify-center shrink-0 border border-slate-600">
+                  <div class="w-8 h-8 rounded-xl bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center shrink-0 border border-slate-300">
                     #${idx + 1}
                   </div>
                   <div class="min-w-0">
-                    <span class="text-xs font-bold text-white block truncate">${p.name}</span>
-                    <span class="text-[10px] text-slate-400 block">${p.phone || 'Cliente Fiel'} • <strong class="text-emerald-400">${p.type}</strong></span>
+                    <span class="text-xs font-black text-slate-900 block truncate">${p.name}</span>
+                    <span class="text-[10px] text-slate-500 block">${p.phone || 'Cliente Fiel'} • <strong class="text-emerald-700">${p.type}</strong></span>
                   </div>
                 </div>
                 <div class="text-right shrink-0">
-                  <span class="text-sm font-black text-emerald-400 font-mono">${p.games}</span>
-                  <span class="text-[10px] text-slate-400 block font-medium">partidas</span>
+                  <span class="text-sm font-black text-emerald-700 font-mono">${p.games}</span>
+                  <span class="text-[10px] text-slate-500 block font-medium">partidas</span>
                 </div>
               </div>
             `).join('')}
@@ -14007,33 +14008,33 @@ function renderAdminReportsTab() {
         </div>
 
         <!-- Ranking 2: Maiores Pagadores -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-6 rounded-3xl shadow-sm">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+        <div class="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
             <div>
-              <h4 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="crown" class="w-4 h-4 text-amber-400"></i>
+              <h4 class="text-base font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="crown" class="w-4 h-4 text-amber-500"></i>
                 <span>Maiores Clientes: Maior Contribuição</span>
               </h4>
-              <p class="text-xs text-slate-400 mt-0.5">Equipes e mensalistas com maior movimentação financeira</p>
+              <p class="text-xs text-slate-500 mt-0.5">Equipes e mensalistas com maior movimentação financeira</p>
             </div>
-            <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Receita</span>
+            <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300">Receita</span>
           </div>
 
           <div class="space-y-2.5">
             ${an.topSpenders.map((s, idx) => `
-              <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-800/50 border border-slate-700/60 hover:border-amber-500/30 transition">
+              <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-amber-300 transition">
                 <div class="flex items-center space-x-3 min-w-0">
-                  <div class="w-8 h-8 rounded-xl bg-slate-700 text-amber-400 font-black text-xs flex items-center justify-center shrink-0 border border-slate-600">
+                  <div class="w-8 h-8 rounded-xl bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center shrink-0 border border-slate-300">
                     #${idx + 1}
                   </div>
                   <div class="min-w-0">
-                    <span class="text-xs font-bold text-white block truncate">${s.name}</span>
-                    <span class="text-[10px] text-slate-400 block">${s.games} partidas no sistema</span>
+                    <span class="text-xs font-black text-slate-900 block truncate">${s.name}</span>
+                    <span class="text-[10px] text-slate-500 block">${s.games} partidas no sistema</span>
                   </div>
                 </div>
                 <div class="text-right shrink-0">
-                  <span class="text-sm font-black text-amber-400 font-mono">R$ ${s.totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  <span class="text-[10px] text-emerald-400 block font-medium">Em dia</span>
+                  <span class="text-sm font-black text-amber-800 font-mono">R$ ${s.totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span class="text-[10px] text-emerald-700 block font-bold">Em dia</span>
                 </div>
               </div>
             `).join('')}
