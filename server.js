@@ -17,14 +17,19 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
-// Rota Principal para o Sistema 2 (index (1).html com Banco de Dados vinculado)
+// Rota Principal para o Sistema 2 (index.html com Banco de Dados e WhatsApp)
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index-sistema2.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Acesso opcional ao Sistema 1 no servidor local
+// Acesso opcional ao Sistema 1
 app.get('/sistema1', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'index-sistema1.html'));
+});
+
+// Acesso explícito ao Sistema 2
+app.get('/sistema2', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index-sistema2.html'));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -373,6 +378,75 @@ io.on('connection', (socket) => {
     else blockedByAdmin.set(key, { reason: "Manutenção" });
     io.emit('schedule_updated', { courtId, date });
   });
+});
+
+// ==============================================================================
+// 📲 INTEGRAÇÃO EVOLUTION API (WHATSAPP AUTOMATIZADO)
+// ==============================================================================
+const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'https://evolution-api-latest-4n78.onrender.com';
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'ArenaLimoeiro2026Sec';
+const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE || 'arena-limoeiro';
+
+// Tela para escanear o QR Code em tempo real
+app.get('/conectar-whatsapp', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'conectar-whatsapp.html'));
+});
+
+// Checa estado da conexão (open, close, connecting)
+app.get('/api/whatsapp/status', async (req, res) => {
+  try {
+    const response = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${EVOLUTION_INSTANCE}`, {
+      headers: { 'apikey': EVOLUTION_API_KEY }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Busca QR Code novo ao vivo
+app.get('/api/whatsapp/qrcode', async (req, res) => {
+  try {
+    const response = await fetch(`${EVOLUTION_API_URL}/instance/connect/${EVOLUTION_INSTANCE}`, {
+      headers: { 'apikey': EVOLUTION_API_KEY }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Disparo de mensagem de WhatsApp direta
+app.post('/api/whatsapp/send', async (req, res) => {
+  try {
+    const { number, text } = req.body;
+    if (!number || !text) {
+      return res.status(400).json({ success: false, message: 'Número e mensagem são obrigatórios' });
+    }
+
+    const cleanPhone = String(number).replace(/\D/g, '');
+    const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : ('55' + cleanPhone);
+
+    const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
+      method: 'POST',
+      headers: {
+        'apikey': EVOLUTION_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        number: formattedPhone,
+        text: text
+      })
+    });
+
+    const data = await response.json();
+    res.json({ success: true, result: data });
+  } catch (error) {
+    console.error('Erro envio WhatsApp:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 const PORT = process.env.PORT || 3000;

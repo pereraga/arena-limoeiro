@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conectar WhatsApp - Arena Limoeiro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #030908;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #0d1a16;
+      border: 1px solid #1e3a32;
+      border-radius: 24px;
+      padding: 36px 32px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      position: relative;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid #22c55e;
+      color: #4ade80;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .qr-container {
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 18px;
+      display: inline-block;
+      margin-bottom: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      min-width: 250px;
+      min-height: 250px;
+      position: relative;
+    }
+    .qr-image {
+      width: 250px;
+      height: 250px;
+      display: block;
+      border-radius: 8px;
+    }
+    .loading-spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #0f172a;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .status-box {
+      background: #112620;
+      border: 1px solid #1b4d3e;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #eab308;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px 20px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 15px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: none;
+    }
+    .btn-primary {
+      background: #25d366;
+      color: #000000;
+      margin-bottom: 12px;
+    }
+    .btn-primary:hover {
+      background: #22c55e;
+      transform: translateY(-2px);
+    }
+    .btn-secondary {
+      background: #1e293b;
+      color: #e2e8f0;
+    }
+    .btn-secondary:hover {
+      background: #334155;
+    }
+    .instructions {
+      text-align: left;
+      background: rgba(255,255,255,0.03);
+      border-radius: 14px;
+      padding: 16px;
+      margin-top: 20px;
+      font-size: 13px;
+      color: #cbd5e1;
+    }
+    .instructions ol {
+      padding-left: 20px;
+      margin-top: 8px;
+      line-height: 1.8;
+    }
+    .success-panel {
+      display: none;
+      background: rgba(34, 197, 94, 0.1);
+      border: 2px solid #22c55e;
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .test-box {
+      margin-top: 16px;
+      display: flex;
+      gap: 8px;
+    }
+    .test-input {
+      flex: 1;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #1e3a32;
+      background: #030908;
+      color: #ffffff;
+      outline: none;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <div class="badge">
+      <span>⚡</span>
+      <span>Evolution API + Arena Limoeiro</span>
+    </div>
+
+    <h1>Vincular WhatsApp Oficial</h1>
+    <p>Escaneie o QR Code abaixo com o celular da Arena para ativar o envio automático de códigos e comprovantes.</p>
+
+    <!-- Painel de Conectado com Sucesso -->
+    <div id="successPanel" class="success-panel">
+      <div style="font-size: 48px; margin-bottom: 8px;">✅</div>
+      <h2 style="font-size: 20px; color: #4ade80; font-weight: 900; margin-bottom: 6px;">WhatsApp Conectado!</h2>
+      <p style="margin-bottom: 12px; color: #d1fae5;">A instância <strong>arena-limoeiro</strong> está ativa e pronta para enviar mensagens automáticas.</p>
+      
+      <div class="test-box">
+        <input type="text" id="testPhone" class="test-input" placeholder="Seu WhatsApp (ex: 8199895484)" />
+        <button type="button" class="btn btn-primary" style="width: auto; margin-bottom: 0;" onclick="sendTestMessage()">Enviar Teste</button>
+      </div>
+      <div id="testResult" style="margin-top: 10px; font-size: 13px; font-weight: 700;"></div>
+    </div>
+
+    <!-- Container do QR Code -->
+    <div id="qrArea">
+      <div class="qr-container">
+        <div id="loading" class="loading-spinner">Gerando QR Code...</div>
+        <img id="qrImage" class="qr-image" style="display: none;" alt="QR Code WhatsApp" />
+      </div>
+
+      <div class="status-box">
+        <div id="statusDot" class="status-dot"></div>
+        <span id="statusText">Aguardando leitura do celular...</span>
+      </div>
+
+      <button type="button" class="btn btn-primary" onclick="loadQrCode()">
+        <span>🔄</span>
+        <span>Atualizar QR Code</span>
+      </button>
+
+      <div class="instructions">
+        <strong>Como ler no celular:</strong>
+        <ol>
+          <li>Abra o <strong>WhatsApp</strong> no celular da Arena.</li>
+          <li>Toque nos <strong>3 pontinhos</strong> (ou <strong>Configurações</strong> no iPhone).</li>
+          <li>Toque em <strong>Aparelhos conectados</strong>.</li>
+          <li>Toque em <strong>Conectar um aparelho</strong>.</li>
+          <li>Aponte a câmera para o QR Code acima.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div style="margin-top: 24px;">
+      <a href="/" class="btn btn-secondary">
+        <span>⬅️</span>
+        <span>Voltar para o Sistema 2 de Agendamentos</span>
+      </a>
+    </div>
+  </div>
+
+  <script>
+    let checkInterval = null;
+
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/whatsapp/status');
+        const data = await res.json();
+        const state = data?.instance?.state;
+
+        if (state === 'open') {
+          document.getElementById('qrArea').style.display = 'none';
+          document.getElementById('successPanel').style.display = 'block';
+          if (checkInterval) clearInterval(checkInterval);
+        } else {
+          document.getElementById('statusText').textContent = 'Aguardando leitura do celular (' + (state || 'connecting') + ')...';
+        }
+      } catch (err) {
+        console.warn('Status error:', err);
+      }
+    }
+
+    async function loadQrCode() {
+      const loading = document.getElementById('loading');
+      const qrImage = document.getElementById('qrImage');
+      loading.style.display = 'block';
+      loading.textContent = 'Gerando QR Code atualizado...';
+      qrImage.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/whatsapp/qrcode');
+        const data = await res.json();
+
+        if (data.base64) {
+          qrImage.src = data.base64;
+          qrImage.style.display = 'block';
+          loading.style.display = 'none';
+          document.getElementById('statusText').textContent = 'QR Code gerado! Aponte o celular agora.';
+        } else if (data?.instance?.state === 'open') {
+          checkStatus();
+        } else {
+          loading.textContent = 'Aguardando Evolution API...';
+        }
+      } catch (err) {
+        loading.textContent = 'Erro ao buscar QR Code. Tente novamente.';
+        console.error(err);
+      }
+    }
+
+    async function sendTestMessage() {
+      const phoneInput = document.getElementById('testPhone');
+      const resultDiv = document.getElementById('testResult');
+      const phone = phoneInput.value.trim().replace(/\D/g, '');
+
+      if (!phone || phone.length < 10) {
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = 'Por favor, digite um número com DDD (ex: 8199895484).';
+        return;
+      }
+
+      resultDiv.style.color = '#eab308';
+      resultDiv.textContent = 'Enviando mensagem de teste via Evolution API...';
+
+      try {
+        const res = await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            number: phone,
+            text: '⚽ *TESTE OFICIAL - ARENA LIMOEIRO*\n\nParabéns! Sua Evolution API está conectada e enviando mensagens com sucesso direto do Sistema 2! 🚀'
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          resultDiv.style.color = '#22c55e';
+          resultDiv.textContent = '✅ Mensagem enviada com sucesso! Verifique seu WhatsApp.';
+        } else {
+          resultDiv.style.color = '#ef4444';
+          resultDiv.textContent = 'Erro no envio: ' + (data.error || 'Verifique o número.');
+        }
+      } catch (err) {
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = 'Erro ao conectar: ' + err.message;
+      }
+    }
+
+    // Início
+    loadQrCode();
+    checkStatus();
+    checkInterval = setInterval(checkStatus, 3500);
+  </script>
+</body>
+</html>

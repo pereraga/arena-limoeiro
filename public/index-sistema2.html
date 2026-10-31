@@ -306,6 +306,7 @@
     <span style="font-weight: 600;">Banco de Dados Vinculado (Supabase Nuvem + Local)</span>
   </div>
   <div style="display: flex; align-items: center; gap: 16px;">
+    <a href="/conectar-whatsapp" target="_blank" style="color: #22c55e; text-decoration: none; font-weight: 800; background: rgba(34,197,94,0.18); padding: 5px 14px; border-radius: 6px; border: 1px solid #22c55e; display: inline-flex; align-items: center; gap: 6px;">📲 Conectar WhatsApp</a>
     <a href="/sistema1" style="color: #6ee7b7; text-decoration: none; font-weight: 700; background: rgba(16,185,129,0.15); padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.3);">⚙️ Painel Admin Local</a>
     <a href="https://arenalimoeiro.vercel.app" target="_blank" style="color: #94a3b8; text-decoration: none; font-weight: 600;">🌐 Sistema 1 (Vercel)</a>
   </div>
@@ -373,11 +374,12 @@
                   <div class="field-label"><span>WhatsApp do Titular</span><small style="color: #059669; font-weight: 700;">Receberá o código</small></div>
                   <div style="display: flex; gap: 8px;">
                     <input class="control" id="customerPhone" type="tel" placeholder="(00) 00000-0000" autocomplete="tel" required maxlength="15" style="flex: 1;" />
-                    <button type="button" id="btnSendCode" style="background: #0f172a; color: #ffffff; border: 1.5px solid #059669; border-radius: 12px; padding: 0 14px; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 6px;">
+                    <button type="button" id="btnSendCode" onclick="requestOtpCode()" style="background: #0f172a; color: #ffffff; border: 1.5px solid #059669; border-radius: 12px; padding: 0 14px; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 6px;">
                       <span>📲</span>
                       <span id="btnSendCodeText">VERIFICAR</span>
                     </button>
                   </div>
+                  <div id="phoneError" style="display: none; color: #ef4444; font-size: 12px; font-weight: 700; margin-top: 6px;"></div>
                 </div>
               </div>
 
@@ -389,11 +391,12 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
                   <input type="text" id="otpInput" maxlength="4" placeholder="0000" style="width: 130px; text-align: center; font-size: 22px; font-weight: 900; letter-spacing: 6px; padding: 10px; border: 2px solid #059669; border-radius: 10px; outline: none; background: #ffffff; color: #0f172a;" />
-                  <button type="button" id="btnValidateOtp" style="background: #059669; color: #ffffff; border: none; border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 800; cursor: pointer;">
+                  <button type="button" id="btnValidateOtp" onclick="validateOtpCode()" style="background: #059669; color: #ffffff; border: none; border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 800; cursor: pointer;">
                     CONFIRMAR CÓDIGO
                   </button>
                   <span id="otpStatus" style="font-size: 13px; font-weight: 700;"></span>
                 </div>
+                <div id="zapDeliveryInfo" style="margin-top: 8px; font-size: 12px;"></div>
               </div>
             </div>
           </div>
@@ -714,23 +717,32 @@
   let _isPhoneVerified = false;
   let _verifiedPhone = '';
 
-  async function requestOtpCode() {
+  window.requestOtpCode = async function() {
     const phoneEl = document.getElementById('customerPhone');
     const nameEl = document.getElementById('customerName');
+    const phoneErr = document.getElementById('phoneError');
     const phone = phoneEl ? phoneEl.value.trim() : '';
-    const name = nameEl ? nameEl.value.trim() : '';
+    let name = nameEl ? nameEl.value.trim() : '';
     const cleanPhone = phone.replace(/\D/g, '');
 
-    if (!name) {
-      alert('Por favor, informe seu nome antes de solicitar o código de verificação.');
-      if (nameEl) nameEl.focus();
+    if (phoneErr) phoneErr.style.display = 'none';
+
+    // Se o cliente não digitou o número com DDD completo
+    if (cleanPhone.length < 10) {
+      if (phoneErr) {
+        phoneErr.innerHTML = '⚠️ Digite o número completo com DDD (ex: 81 99895-4840). Você digitou apenas ' + cleanPhone.length + ' números.';
+        phoneErr.style.display = 'block';
+      }
+      if (phoneEl) {
+        phoneEl.focus();
+        phoneEl.style.borderColor = '#ef4444';
+        setTimeout(() => { if (phoneEl) phoneEl.style.borderColor = ''; }, 3500);
+      }
       return;
     }
 
-    if (cleanPhone.length < 10) {
-      alert('Por favor, digite um número de WhatsApp válido com DDD (ex: 81 99999-9999).');
-      if (phoneEl) phoneEl.focus();
-      return;
+    if (!name) {
+      name = 'Cliente Arena';
     }
 
     const btn = document.getElementById('btnSendCode');
@@ -751,7 +763,7 @@
 
     // 1. Envia para a Supabase Edge Function API-MENSAGEM
     try {
-      await fetch('https://aukrcnhuyultkjqsgvea.supabase.co/functions/v1/API-MENSAGEM', {
+      fetch('https://aukrcnhuyultkjqsgvea.supabase.co/functions/v1/API-MENSAGEM', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -764,23 +776,10 @@
           message: zapMessage,
           otp_code: _generatedOtp
         })
-      });
-    } catch(e) {
-      console.warn('Erro chamada Edge Function:', e);
-    }
+      }).catch(e => console.warn('Edge Function aviso:', e));
+    } catch(e) {}
 
-    // 2. Link direto para o WhatsApp Oficial da Arena Limoeiro
-    const arenaPhone = '558199895484';
-    const zapMessageToArena = 
-      `⚽ *VALIDAÇÃO DE NÚMERO - ARENA LIMOEIRO*\n\n` +
-      `Olá! Sou *${name}* e estou agendando uma partida na Arena.\n` +
-      `Meu WhatsApp: *${phone}*\n\n` +
-      `👉 *CÓDIGO DE SEGURANÇA:* *${_generatedOtp}*\n\n` +
-      `Envio esta mensagem para validar meu número e liberar meu agendamento!`;
-
-    const zapUrl = `https://api.whatsapp.com/send?phone=${arenaPhone}&text=${encodeURIComponent(zapMessageToArena)}`;
-
-    // Exibe o painel de digitação do OTP
+    // Exibe o painel de digitação do OTP imediatamente
     const otpBox = document.getElementById('otpBox');
     if (otpBox) {
       otpBox.style.display = 'block';
@@ -793,28 +792,51 @@
       setTimeout(() => otpInput.focus(), 150);
     }
 
+    const zapDeliveryInfo = document.getElementById('zapDeliveryInfo');
+    if (zapDeliveryInfo) {
+      zapDeliveryInfo.innerHTML = '<span style="color:#0284c7; font-weight:700;">⏳ Enviando código para o WhatsApp ' + phone + '...</span>';
+    }
+
+    // 2. Disparo AUTOMÁTICO via Evolution API conectada
+    try {
+      fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          number: cleanPhone,
+          text: zapMessage
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (zapDeliveryInfo) {
+          if (res.success) {
+            zapDeliveryInfo.innerHTML = '<span style="color:#16a34a; font-weight:800;">✅ Mensagem enviada automaticamente para seu WhatsApp!</span>';
+          } else {
+            zapDeliveryInfo.innerHTML = '<span style="color:#eab308; font-weight:700;">⚠️ WhatsApp: ' + (res.error || 'Aguarde o envio') + '</span>';
+          }
+        }
+      })
+      .catch(e => {
+        if (zapDeliveryInfo) zapDeliveryInfo.innerHTML = '';
+      });
+    } catch(e) {}
+
     const otpStatus = document.getElementById('otpStatus');
     if (otpStatus) {
       otpStatus.innerHTML = `
-        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <a href="${zapUrl}" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; background: #25d366; color: #ffffff; padding: 10px 16px; border-radius: 10px; font-weight: 800; text-decoration: none; font-size: 13.5px; box-shadow: 0 4px 12px rgba(37,211,102,0.35); transition: transform 0.15s ease;">
-              <span>📲</span>
-              <span>1. Clique Aqui para Enviar ao WhatsApp da Arena (81 9989-5484)</span>
-            </a>
-          </div>
-          <div style="background: #ffffff; border: 1px solid #bbf7d0; border-radius: 8px; padding: 8px 12px; font-size: 13px; color: #166534;">
-            👉 Seu código de verificação é: <strong style="font-size: 16px; letter-spacing: 2px; color: #059669; background: #dcfce7; padding: 2px 6px; border-radius: 4px;">${_generatedOtp}</strong> (digite-o no campo ao lado e clique em Confirmar).
-          </div>
+        <div style="background: #ffffff; border: 1.5px solid #bbf7d0; border-radius: 10px; padding: 10px 14px; font-size: 13.5px; color: #166534; display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 18px;">📲</span>
+          <span>Enviamos um código de <strong>4 dígitos</strong> para o seu WhatsApp. Digite-o ao lado para validar o número e liberar seu agendamento.</span>
         </div>
       `;
     }
 
     if (btnText) btnText.textContent = 'REENVIAR';
     if (btn) btn.disabled = false;
-  }
+  };
 
-  function validateOtpCode() {
+  window.validateOtpCode = function() {
     const input = document.getElementById('otpInput');
     const status = document.getElementById('otpStatus');
     const entered = input ? input.value.trim() : '';
@@ -1034,6 +1056,37 @@
           `💰 *Valor:* ${money(price)}\n\n` +
           `_Apresente este código na recepção ao chegar. Bom jogo!_ ⚽`
         );
+
+        // Disparo AUTOMÁTICO via Evolution API (para o Cliente)
+        try {
+          fetch('/api/whatsapp/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              number: formattedPhone,
+              text: messageText
+            })
+          }).catch(e => console.warn('Evolution API envio cliente:', e));
+
+          // Disparo AUTOMÁTICO via Evolution API (para a Administração da Arena Limoeiro)
+          const adminNotice = 
+            `🏟️ *NOVO AGENDAMENTO RECEBIDO - ARENA LIMOEIRO*\n\n` +
+            `👤 *Cliente:* ${name} (${phone})\n` +
+            `📍 *Espaço:* ${courtName}\n` +
+            `📅 *Data:* ${dateText}\n` +
+            `⏰ *Horário:* ${selectedTime} às ${selectedEndTime}\n` +
+            `💰 *Valor Total:* ${money(price)}\n` +
+            `🔑 *ID Agendamento:* \`${bookingId}\``;
+
+          fetch('/api/whatsapp/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              number: '558199895484',
+              text: adminNotice
+            })
+          }).catch(e => console.warn('Evolution API envio admin:', e));
+        } catch(e) {}
 
         const zapEncoded = encodeURIComponent(messageText);
         const zapUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${zapEncoded}`;
