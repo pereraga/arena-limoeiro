@@ -17,6 +17,16 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json());
+// Rota Principal para o Sistema 2 (index (1).html com Banco de Dados vinculado)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index-sistema2.html'));
+});
+
+// Acesso opcional ao Sistema 1 no servidor local
+app.get('/sistema1', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Estado em memória
