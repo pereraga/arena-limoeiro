@@ -10987,11 +10987,11 @@ function renderAdminTabContent() {
   if (canDeleteBookings() || canStartMatches()) allowedSubTabs.push('bookings');
   if (canManageMonthly()) allowedSubTabs.push('monthly');
   if (canManageCustomers()) allowedSubTabs.push('customers');
-  if (canManageSettings()) allowedSubTabs.push('users', 'database');
+  if (canManageSettings()) allowedSubTabs.push('users', 'whatsapp', 'database');
   if (isMasterAdmin) allowedSubTabs.push('audit_logs');
   allowedSubTabs.push('backup');
 
-  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','database','audit_logs','backup'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','whatsapp','database','audit_logs','backup'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
   if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeSubTab)) {
     activeSubTab = allowedSubTabs[0];
     state.adminSubTab = activeSubTab;
@@ -11035,6 +11035,13 @@ function renderAdminTabContent() {
         ${canManageCustomers() ? `
           <button onclick="setAdminSubTab('customers')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'customers' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
             <span class="truncate">Clientes Cadastrados</span>
+          </button>
+        ` : ''}
+
+        ${canManageSettings() ? `
+          <button onclick="setAdminSubTab('whatsapp')" class="px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center space-x-1.5 ${activeSubTab === 'whatsapp' ? 'bg-emerald-600 text-white shadow font-black border border-emerald-600 ring-2 ring-emerald-400/40' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
+            <i data-lucide="message-circle" class="w-3.5 h-3.5 shrink-0 ${activeSubTab === 'whatsapp' ? 'text-white' : 'text-emerald-600'}"></i>
+            <span class="truncate">📲 Conectar WhatsApp</span>
           </button>
         ` : ''}
 
@@ -11209,6 +11216,9 @@ function openCourtWithCategory(catId) {
 }
 
 function renderAdminSubTabContent(tab) {
+  if (tab === 'whatsapp') {
+    return renderAdminWhatsappTab();
+  }
   if (tab === 'bookings') {
     return renderAdminBookingsSubTab();
   }
@@ -24094,3 +24104,299 @@ async function removeFixedWaterAllocation(allocationId) {
   `, 4000);
 }
 window.removeFixedWaterAllocation = removeFixedWaterAllocation;
+
+
+// ==============================================================================
+// 📲 ABA ADMINISTRATIVA: CONECTAR WHATSAPP & VERIFICAÇÃO DE DADOS
+// ==============================================================================
+function renderAdminWhatsappTab() {
+  setTimeout(() => {
+    if (window.checkWhatsappConnectionStatus) {
+      window.checkWhatsappConnectionStatus();
+    }
+    if (window.lucide && window.lucide.createIcons) {
+      window.lucide.createIcons();
+    }
+  }, 120);
+
+  return `
+    <div class="bg-white rounded-3xl border border-slate-200 p-5 sm:p-8 shadow-sm space-y-6">
+      
+      <!-- Header Principal -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+        <div>
+          <div class="flex items-center space-x-2.5">
+            <span class="p-2.5 rounded-2xl bg-emerald-100 text-emerald-800"><i data-lucide="message-circle" class="w-6 h-6 text-emerald-700"></i></span>
+            <div>
+              <h3 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                <span>Conectar WhatsApp da Arena & Verificação de Dados</span>
+              </h3>
+              <p class="text-xs text-slate-500 mt-0.5">Integração oficial com a Evolution API para envio automático de códigos OTP de primeiro cadastro e confirmação de agendamentos.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <span id="adminWhatsappStatusBadge" class="px-3.5 py-1.5 rounded-full text-xs font-black flex items-center space-x-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="adminWhatsappStatusText">🟢 Conectado (Instância Oficial Ativa)</span>
+          </span>
+          <button onclick="window.checkWhatsappConnectionStatus(true)" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center space-x-1 cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Verificar Conexão</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Banner Informativo: Regra de Negócio de Clientes (Busca Automática & 1º Cadastro) -->
+      <div class="p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 border border-emerald-500/40 text-white space-y-3 shadow-sm">
+        <div class="flex items-center gap-2">
+          <span class="text-emerald-400 text-lg">🛡️</span>
+          <h4 class="text-sm font-black text-emerald-300 uppercase tracking-wide">Fluxo Inteligente: Busca no Banco de Dados & Validação por WhatsApp</h4>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="bg-black/30 p-3.5 rounded-xl border border-emerald-500/20 space-y-1.5">
+            <strong class="text-emerald-400 flex items-center gap-1.5">
+              <span>👤 1. Cliente Já Cadastrado (Recorrente):</span>
+            </strong>
+            <p class="text-slate-200 leading-relaxed">
+              Ao digitar o WhatsApp no site de agendamento, o sistema consulta a tabela <code>customers</code> do Supabase. Se o cliente já tiver cadastro prévio, o sistema preenche o nome e valida na hora <strong>sem pedir código de confirmação</strong>.
+            </p>
+          </div>
+          <div class="bg-black/30 p-3.5 rounded-xl border border-emerald-500/20 space-y-1.5">
+            <strong class="text-emerald-400 flex items-center gap-1.5">
+              <span>✨ 2. Novo Cliente (Primeiro Agendamento):</span>
+            </strong>
+            <p class="text-slate-200 leading-relaxed">
+              Caso o número não seja encontrado no banco, o sistema solicita o nome e envia o código de 4 dígitos via WhatsApp da Arena. Ao confirmar o código, o cadastro (nome e telefone) é <strong>salvo de forma permanente no banco de dados</strong>, permitindo que nos próximos agendamentos o cliente jogue direto sem novo cadastro!
+            </p>
+          </div>
+        </div>
+        <div class="pt-2 flex items-center justify-between border-t border-emerald-500/20 text-xs text-emerald-200 flex-wrap gap-2">
+          <span>Tabela sincronizada: <code>customers</code> (Supabase DB2 Ativo)</span>
+          <button onclick="setAdminSubTab('customers')" class="underline hover:text-white font-bold cursor-pointer flex items-center gap-1">
+            <span>Ver Clientes Cadastrados no Banco</span>
+            <span>→</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Grid com Detalhes da Conexão e Testador -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Card 1: Informações da Instância e Conexão -->
+        <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+              <i data-lucide="smartphone" class="w-4 h-4 text-emerald-600"></i>
+              <span>Status do Aparelho & Servidor</span>
+            </h4>
+            <span class="text-[11px] font-bold text-slate-500">Evolution API v2</span>
+          </div>
+
+          <div class="space-y-2.5 text-xs">
+            <div class="flex justify-between py-1.5 border-b border-slate-200">
+              <span class="text-slate-500 font-medium">Nome da Instância:</span>
+              <span class="font-black text-slate-800">arena-limoeiro</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-slate-200">
+              <span class="text-slate-500 font-medium">Servidor da API:</span>
+              <span class="font-bold text-slate-700 truncate max-w-[220px]" title="https://evolution-api-latest-4n78.onrender.com">evolution-api-latest-4n78.onrender.com</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-slate-200">
+              <span class="text-slate-500 font-medium">Disparo Automático:</span>
+              <span class="font-bold text-emerald-700">Ativado (Sem expor número da arena)</span>
+            </div>
+            <div class="flex justify-between py-1.5 border-b border-slate-200">
+              <span class="text-slate-500 font-medium">Estado da Sessão:</span>
+              <span id="adminWhatsappInstanceState" class="font-black text-emerald-700">🟢 Conectado (open)</span>
+            </div>
+          </div>
+
+          <div class="pt-2 flex flex-col sm:flex-row gap-2">
+            <a href="/conectar-whatsapp" target="_blank" class="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black text-center shadow flex items-center justify-center gap-1.5 transition-all">
+              <i data-lucide="qr-code" class="w-4 h-4"></i>
+              <span>Abrir Leitor de QR Code</span>
+            </a>
+            <button onclick="window.loadWhatsappQrCodeInline()" class="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold text-center shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-600"></i>
+              <span>Carregar QR Code Aqui</span>
+            </button>
+          </div>
+
+          <!-- Container do QR Code Inline caso precise escanear -->
+          <div id="adminWhatsappQrContainer" style="display: none;" class="p-4 bg-white border border-slate-200 rounded-xl text-center space-y-3">
+            <h5 class="text-xs font-black text-slate-800">Escaneie com o WhatsApp da Arena:</h5>
+            <div id="adminWhatsappQrImageWrapper" class="flex justify-center">
+              <div class="w-48 h-48 bg-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-400">Carregando...</div>
+            </div>
+            <p class="text-[11px] text-slate-500">No celular: Configurações > Aparelhos Conectados > Conectar um Aparelho</p>
+          </div>
+        </div>
+
+        <!-- Card 2: Testar Envio em Tempo Real -->
+        <div class="p-5 rounded-2xl border border-slate-200 bg-white space-y-4">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+              <i data-lucide="send" class="w-4 h-4 text-emerald-600"></i>
+              <span>Testar Disparo de Mensagem</span>
+            </h4>
+            <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Ao Vivo</span>
+          </div>
+
+          <p class="text-xs text-slate-500">Digite um número de WhatsApp com DDD para testar o envio em tempo real diretamente pelo número oficial da Arena:</p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">WhatsApp de Destino:</label>
+              <input type="tel" id="adminTestZapPhone" placeholder="(81) 98463-4126" maxlength="15" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Mensagem de Teste:</label>
+              <textarea id="adminTestZapMessage" rows="2" class="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-emerald-500 focus:bg-white transition-all">🏟️ Arena Limoeiro: Teste de integração do WhatsApp realizado com sucesso! Sistema operacional.</textarea>
+            </div>
+
+            <button type="button" id="btnAdminTestZap" onclick="window.sendAdminTestWhatsapp()" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black shadow flex items-center justify-center gap-1.5 transition-all cursor-pointer">
+              <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i>
+              <span id="btnAdminTestZapText">Enviar Mensagem de Teste</span>
+            </button>
+
+            <div id="adminTestZapFeedback" style="display: none;" class="p-3 rounded-xl text-xs font-bold"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  `;
+}
+
+// Funções globais de suporte da aba WhatsApp
+window.checkWhatsappConnectionStatus = async function(isManual = false) {
+  const badgeText = document.getElementById('adminWhatsappStatusText');
+  const badge = document.getElementById('adminWhatsappStatusBadge');
+  const stateEl = document.getElementById('adminWhatsappInstanceState');
+  
+  if (badgeText && isManual) badgeText.textContent = 'Verificando...';
+
+  try {
+    const res = await fetch('/api/whatsapp/status');
+    const data = await res.json();
+    const state = (data && data.instance && data.instance.state) ? data.instance.state : 'close';
+
+    if (state === 'open') {
+      if (badgeText) badgeText.textContent = '🟢 Conectado (Instância Oficial Ativa)';
+      if (badge) {
+        badge.className = 'px-3.5 py-1.5 rounded-full text-xs font-black flex items-center space-x-1.5 bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-xs';
+      }
+      if (stateEl) {
+        stateEl.className = 'font-black text-emerald-700';
+        stateEl.textContent = '🟢 Conectado (open)';
+      }
+      if (isManual) alert('WhatsApp da Arena está 100% CONECTADO e operacional!');
+    } else {
+      if (badgeText) badgeText.textContent = '🔴 Desconectado (Necessário ler QR Code)';
+      if (badge) {
+        badge.className = 'px-3.5 py-1.5 rounded-full text-xs font-black flex items-center space-x-1.5 bg-rose-100 text-rose-800 border border-rose-300 shadow-xs';
+      }
+      if (stateEl) {
+        stateEl.className = 'font-black text-rose-600';
+        stateEl.textContent = '🔴 Desconectado (' + state + ')';
+      }
+      if (isManual) alert('WhatsApp está desconectado. Por favor, conecte via QR Code.');
+    }
+  } catch (err) {
+    console.warn('Erro ao checar status:', err);
+    if (badgeText) badgeText.textContent = '⚠️ Erro ao consultar servidor';
+  }
+};
+
+window.sendAdminTestWhatsapp = async function() {
+  const phoneEl = document.getElementById('adminTestZapPhone');
+  const msgEl = document.getElementById('adminTestZapMessage');
+  const btn = document.getElementById('btnAdminTestZap');
+  const btnText = document.getElementById('btnAdminTestZapText');
+  const feedback = document.getElementById('adminTestZapFeedback');
+
+  const phone = phoneEl ? phoneEl.value.replace(/\D/g, '') : '';
+  const message = msgEl ? msgEl.value.trim() : '';
+
+  if (!phone || phone.length < 10) {
+    if (feedback) {
+      feedback.style.display = 'block';
+      feedback.className = 'p-3 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200';
+      feedback.textContent = '⚠️ Digite um telefone válido com DDD (ex: 81 99895-4840).';
+    }
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (btnText) btnText.textContent = 'Disparando mensagem...';
+  if (feedback) feedback.style.display = 'none';
+
+  try {
+    const res = await fetch('/api/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ number: phone, text: message })
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      if (feedback) {
+        feedback.style.display = 'block';
+        feedback.className = 'p-3 rounded-xl text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200';
+        feedback.innerHTML = '✅ Mensagem enviada com sucesso para ' + phone + '! Verifique o aparelho.';
+      }
+    } else {
+      if (feedback) {
+        feedback.style.display = 'block';
+        feedback.className = 'p-3 rounded-xl text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200';
+        feedback.textContent = '⚠️ Erro retornado pela API: ' + (result.message || result.error || 'Falha no disparo');
+      }
+    }
+  } catch (err) {
+    if (feedback) {
+      feedback.style.display = 'block';
+      feedback.className = 'p-3 rounded-xl text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200';
+      feedback.textContent = '❌ Erro de conexão ao enviar: ' + err.message;
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+    if (btnText) btnText.textContent = 'Enviar Mensagem de Teste';
+  }
+};
+
+window.loadWhatsappQrCodeInline = async function() {
+  const container = document.getElementById('adminWhatsappQrContainer');
+  const wrapper = document.getElementById('adminWhatsappQrImageWrapper');
+  if (!container || !wrapper) return;
+
+  container.style.display = 'block';
+  wrapper.innerHTML = '<div class="w-48 h-48 bg-slate-100 rounded-lg flex items-center justify-center text-xs text-slate-500 animate-pulse">Gerando QR Code...</div>';
+
+  try {
+    const res = await fetch('/api/whatsapp/qrcode');
+    const data = await res.json();
+
+    if (data.instance && data.instance.state === 'open') {
+      wrapper.innerHTML = `
+        <div class="p-6 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 font-bold text-xs space-y-2">
+          <p class="text-sm">🟢 Aparelho já conectado!</p>
+          <p class="font-normal text-slate-600">O WhatsApp da Arena Limoeiro já está ativo e sincronizado com o sistema.</p>
+        </div>
+      `;
+    } else if (data.base64) {
+      wrapper.innerHTML = `<img src="${data.base64}" alt="QR Code WhatsApp" class="w-48 h-48 rounded-lg shadow-sm" />`;
+    } else {
+      wrapper.innerHTML = `
+        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
+          Não foi possível carregar o QR Code. <a href="/conectar-whatsapp" target="_blank" class="underline font-bold">Clique aqui para abrir na tela cheia</a>.
+        </div>
+      `;
+    }
+  } catch (err) {
+    wrapper.innerHTML = `<div class="text-xs text-rose-600">Erro ao buscar QR Code: ${err.message}</div>`;
+  }
+};

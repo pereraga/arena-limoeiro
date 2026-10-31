@@ -359,7 +359,7 @@
               <div class="customer-grid">
                 <label><span class="field-label">Seu nome</span><input class="control" id="customerName" type="text" placeholder="Nome completo" autocomplete="name" required /></label>
                 <div>
-                  <div class="field-label"><span>WhatsApp do Titular</span><small style="color: #059669; font-weight: 700;">Receberá o código</small></div>
+                  <div class="field-label"><span>WhatsApp do Titular</span><small id="phoneHelperLabel" style="color: #059669; font-weight: 700;">Receberá o código</small></div>
                   <div style="display: flex; gap: 8px;">
                     <input class="control" id="customerPhone" type="tel" placeholder="(00) 00000-0000" autocomplete="tel" required maxlength="15" style="flex: 1;" />
                     <button type="button" id="btnSendCode" onclick="requestOtpCode()" style="background: #0f172a; color: #ffffff; border: 1.5px solid #059669; border-radius: 12px; padding: 0 14px; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 6px;">
@@ -367,6 +367,7 @@
                       <span id="btnSendCodeText">VERIFICAR</span>
                     </button>
                   </div>
+                  <div id="customerLookupStatus" style="display: none; margin-top: 6px;"></div>
                   <div id="phoneError" style="display: none; color: #ef4444; font-size: 12px; font-weight: 700; margin-top: 6px;"></div>
                 </div>
               </div>
@@ -704,6 +705,125 @@
   let _generatedOtp = null;
   let _isPhoneVerified = false;
   let _verifiedPhone = '';
+  let _lookupDebounceTimer = null;
+
+  // Consulta inteligente do cliente no Banco de Dados Supabase (DB2)
+  async function searchCustomerByPhone(rawPhone) {
+    const cleanPhone = (rawPhone || '').replace(/\D/g, '');
+    const phoneErr = document.getElementById('phoneError');
+    const customerStatus = document.getElementById('customerLookupStatus');
+    const nameEl = document.getElementById('customerName');
+    const btnSend = document.getElementById('btnSendCode');
+    const otpBox = document.getElementById('otpBox');
+    const phoneHelper = document.getElementById('phoneHelperLabel');
+
+    if (phoneErr) phoneErr.style.display = 'none';
+
+    if (cleanPhone.length < 10) {
+      if (customerStatus) {
+        customerStatus.style.display = 'none';
+        customerStatus.innerHTML = '';
+      }
+      if (phoneHelper) {
+        phoneHelper.textContent = 'Receberá o código';
+        phoneHelper.style.color = '#059669';
+      }
+      return;
+    }
+
+    if (customerStatus) {
+      customerStatus.style.display = 'block';
+      customerStatus.innerHTML = '<span style="color:#0284c7; font-size:12px; font-weight:700;">🔍 Consultando cadastro no banco de dados da Arena...</span>';
+    }
+
+    try {
+      const last4 = cleanPhone.slice(-4);
+      let list = [];
+      if (typeof _sbClient !== 'undefined' && _sbClient) {
+        const { data } = await _sbClient.from('customers').select('*').ilike('phone', `%${last4}%`);
+        list = data || [];
+      } else {
+        const res = await fetch('https://aukrcnhuyultkjqsgvea.supabase.co/rest/v1/customers?phone=ilike.*' + last4 + '*&select=*', {
+          headers: {
+            'apikey': 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+            'Authorization': 'Bearer sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi'
+          }
+        });
+        list = await res.json();
+      }
+
+      const match = (list || []).find(c => {
+        const cp = (c.phone || '').replace(/\D/g, '');
+        return cp.slice(-8) === cleanPhone.slice(-8) || cleanPhone.slice(-8) === cp.slice(-8);
+      });
+
+      if (match) {
+        // CLIENTE JÁ CADASTRADO NO BANCO DE DADOS
+        if (nameEl && (!nameEl.value.trim() || nameEl.value.trim() === 'Cliente Arena')) {
+          nameEl.value = match.name || '';
+        }
+        _isPhoneVerified = true;
+        _verifiedPhone = cleanPhone;
+
+        if (phoneHelper) {
+          phoneHelper.textContent = 'Cliente Cadastrado';
+          phoneHelper.style.color = '#059669';
+        }
+
+        if (customerStatus) {
+          customerStatus.style.display = 'block';
+          customerStatus.innerHTML = `
+            <div style="background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 10px; padding: 8px 12px; color: #065f46; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">✅</span>
+              <span>Bem-vindo(a), <strong>${match.name}</strong>! Cadastro ativo no banco de dados. WhatsApp já verificado, pode escolher o horário e agendar direto!</span>
+            </div>
+          `;
+        }
+
+        if (btnSend) {
+          btnSend.style.background = '#059669';
+          btnSend.style.borderColor = '#059669';
+          btnSend.innerHTML = '<span>✅</span><span>CADASTRADO</span>';
+          btnSend.disabled = false;
+          btnSend.title = 'Cliente já verificado no banco de dados da Arena';
+        }
+
+        if (otpBox) {
+          otpBox.style.display = 'none';
+        }
+      } else {
+        // NOVO CLIENTE (PRIMEIRO AGENDAMENTO)
+        if (_verifiedPhone !== cleanPhone) {
+          _isPhoneVerified = false;
+        }
+
+        if (phoneHelper) {
+          phoneHelper.textContent = '1º Cadastro - Código';
+          phoneHelper.style.color = '#0284c7';
+        }
+
+        if (customerStatus) {
+          customerStatus.style.display = 'block';
+          customerStatus.innerHTML = `
+            <div style="background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 10px; padding: 8px 12px; color: #0369a1; font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 16px;">✨</span>
+              <span>Primeiro agendamento? Digite seu nome e clique em <strong>VERIFICAR</strong> para receber seu código de 4 dígitos no WhatsApp.</span>
+            </div>
+          `;
+        }
+
+        if (!_isPhoneVerified && btnSend) {
+          btnSend.style.background = '#0f172a';
+          btnSend.style.borderColor = '#059669';
+          btnSend.innerHTML = '<span>📲</span><span id="btnSendCodeText">VERIFICAR</span>';
+          btnSend.disabled = false;
+        }
+      }
+    } catch (err) {
+      console.warn('Erro na consulta de cliente:', err);
+      if (customerStatus) customerStatus.style.display = 'none';
+    }
+  }
 
   window.requestOtpCode = async function() {
     const phoneEl = document.getElementById('customerPhone');
@@ -729,8 +849,17 @@
       return;
     }
 
-    if (!name) {
-      name = 'Cliente Arena';
+    if (!name || name === 'Cliente Arena') {
+      if (phoneErr) {
+        phoneErr.innerHTML = '⚠️ Por favor, informe seu nome completo antes de solicitar o código.';
+        phoneErr.style.display = 'block';
+      }
+      if (nameEl) {
+        nameEl.focus();
+        nameEl.style.borderColor = '#ef4444';
+        setTimeout(() => { if (nameEl) nameEl.style.borderColor = ''; }, 3500);
+      }
+      return;
     }
 
     const btn = document.getElementById('btnSendCode');
@@ -745,9 +874,9 @@
     const zapMessage = 
       `🔐 *CÓDIGO DE VERIFICAÇÃO - ARENA LIMOEIRO*\n\n` +
       `Olá, *${name}*!\n` +
-      `Seu código de segurança para confirmar o agendamento é:\n\n` +
+      `Seu código de segurança para confirmar o agendamento e realizar seu cadastro permanente é:\n\n` +
       `👉 *${_generatedOtp}* 👈\n\n` +
-      `Digite este código de 4 dígitos na tela para validar o seu WhatsApp e liberar a reserva.`;
+      `Digite este código de 4 dígitos na tela para validar o seu WhatsApp e salvar seu cadastro na Arena.`;
 
     // 1. Envia para a Supabase Edge Function API-MENSAGEM
     try {
@@ -782,7 +911,7 @@
 
     const zapDeliveryInfo = document.getElementById('zapDeliveryInfo');
     if (zapDeliveryInfo) {
-      zapDeliveryInfo.innerHTML = '<span style="color:#0284c7; font-weight:700;">⏳ Enviando código para o WhatsApp ' + phone + '...</span>';
+      zapDeliveryInfo.innerHTML = '<span style="color:#0284c7; font-weight:700;">⏳ Enviando código de 4 dígitos para o WhatsApp ' + phone + '...</span>';
     }
 
     // 2. Disparo AUTOMÁTICO via Evolution API conectada
@@ -799,7 +928,7 @@
       .then(res => {
         if (zapDeliveryInfo) {
           if (res.success) {
-            zapDeliveryInfo.innerHTML = '<span style="color:#16a34a; font-weight:800;">✅ Mensagem enviada automaticamente para seu WhatsApp!</span>';
+            zapDeliveryInfo.innerHTML = '<span style="color:#16a34a; font-weight:800;">✅ Código enviado automaticamente para seu WhatsApp!</span>';
           } else {
             zapDeliveryInfo.innerHTML = '<span style="color:#eab308; font-weight:700;">⚠️ WhatsApp: ' + (res.error || 'Aguarde o envio') + '</span>';
           }
@@ -815,7 +944,7 @@
       otpStatus.innerHTML = `
         <div style="background: #ffffff; border: 1.5px solid #bbf7d0; border-radius: 10px; padding: 10px 14px; font-size: 13.5px; color: #166534; display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 18px;">📲</span>
-          <span>Enviamos um código de <strong>4 dígitos</strong> para o seu WhatsApp. Digite-o ao lado para validar o número e liberar seu agendamento.</span>
+          <span>Enviamos um código de <strong>4 dígitos</strong> para o seu WhatsApp. Digite-o ao lado para validar o número e salvar seu cadastro.</span>
         </div>
       `;
     }
@@ -824,11 +953,13 @@
     if (btn) btn.disabled = false;
   };
 
-  window.validateOtpCode = function() {
+  window.validateOtpCode = async function() {
     const input = document.getElementById('otpInput');
     const status = document.getElementById('otpStatus');
     const entered = input ? input.value.trim() : '';
     const phone = document.getElementById('customerPhone').value.replace(/\D/g, '');
+    const nameEl = document.getElementById('customerName');
+    const name = nameEl ? nameEl.value.trim() : 'Cliente Arena';
 
     if (!entered || entered.length !== 4) {
       if (status) status.innerHTML = '<span style="color:#ef4444;">Digite os 4 números do código.</span>';
@@ -838,24 +969,68 @@
     if (entered === _generatedOtp) {
       _isPhoneVerified = true;
       _verifiedPhone = phone;
-      if (status) status.innerHTML = '<span style="color:#059669; font-weight:800;">✅ WhatsApp Verificado com Sucesso!</span>';
+
+      if (status) status.innerHTML = '<span style="color:#059669; font-weight:800;">✅ WhatsApp Verificado & Cadastro Salvo no Banco!</span>';
+
       const btnSend = document.getElementById('btnSendCode');
       if (btnSend) {
         btnSend.style.background = '#059669';
         btnSend.style.borderColor = '#059669';
-        btnSend.innerHTML = '<span>✅</span><span>VERIFICADO</span>';
-        btnSend.disabled = true;
+        btnSend.innerHTML = '<span>✅</span><span>CADASTRADO</span>';
+        btnSend.disabled = false;
       }
+
       const otpBox = document.getElementById('otpBox');
       if (otpBox) {
         otpBox.style.borderColor = '#22c55e';
         otpBox.style.background = '#f0fdf4';
       }
-      alert('WhatsApp verificado com sucesso! Agora você pode finalizar o seu agendamento.');
+
+      const customerStatus = document.getElementById('customerLookupStatus');
+      if (customerStatus) {
+        customerStatus.style.display = 'block';
+        customerStatus.innerHTML = `
+          <div style="background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 10px; padding: 8px 12px; color: #065f46; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">🎉</span>
+            <span>Cadastro concluído! Seus dados foram salvos permanentemente no banco. Nos próximos agendamentos você não precisará mais de código!</span>
+          </div>
+        `;
+      }
+
+      // SALVA O CLIENTE PERMANENTEMENTE NO BANCO DE DADOS (customers)
+      try {
+        const customerPayload = {
+          id: 'cust-' + Date.now(),
+          name: name,
+          phone: phone,
+          notes: 'Cadastrado e verificado via WhatsApp - Sistema 2',
+          created_at: new Date().toISOString()
+        };
+
+        if (typeof _sbClient !== 'undefined' && _sbClient) {
+          await _sbClient.from('customers').insert([customerPayload]);
+        } else {
+          await fetch('https://aukrcnhuyultkjqsgvea.supabase.co/rest/v1/customers', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+              'Authorization': 'Bearer sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(customerPayload)
+          });
+        }
+        console.log('Cliente cadastrado com sucesso no Supabase DB2');
+      } catch (err) {
+        console.warn('Erro ao salvar cliente no banco:', err);
+      }
+
+      alert('WhatsApp verificado e cadastro salvo com sucesso no banco de dados! Agora você pode finalizar o seu agendamento.');
     } else {
       if (status) status.innerHTML = '<span style="color:#ef4444; font-weight:800;">❌ Código incorreto. Tente novamente.</span>';
     }
-  }
+  };
 
   function initEvents() {
     if (_eventsInitialized) return;
@@ -907,25 +1082,30 @@
     // Se o cliente alterar o telefone após verificar, invalida e exige nova verificação
     const phoneInput = document.getElementById('customerPhone');
     if (phoneInput) {
-      phoneInput.addEventListener('keydown', function() {
-        if (_isPhoneVerified) {
-          _isPhoneVerified = false;
-          const btn = document.getElementById('btnSendCode');
-          if (btn) {
-            btn.disabled = false;
-            btn.style.background = '#0f172a';
-            btn.innerHTML = '<span>📲</span><span id="btnSendCodeText">VERIFICAR</span>';
-          }
-        }
-      });
-    }
-    if (phoneInput) {
       phoneInput.oninput = function(e) {
         let v = e.target.value.replace(/\D/g, '').slice(0, 11);
         if(v.length > 10) v = v.replace(/^(\d{2})(\d{5})(\d{0,4}).*/, '($1) $2-$3');
         else if(v.length > 6) v = v.replace(/^(\d{2})(\d{4})(\d{0,4}).*/, '($1) $2-$3');
         else if(v.length > 2) v = v.replace(/^(\d{2})(\d{0,5})/, '($1) $2');
         e.target.value = v;
+
+        clearTimeout(_lookupDebounceTimer);
+        const clean = v.replace(/\D/g, '');
+        if (clean.length >= 10) {
+          _lookupDebounceTimer = setTimeout(() => {
+            searchCustomerByPhone(clean);
+          }, 350);
+        } else {
+          const customerStatus = document.getElementById('customerLookupStatus');
+          if (customerStatus) customerStatus.style.display = 'none';
+        }
+      };
+
+      phoneInput.onblur = function() {
+        const clean = this.value.replace(/\D/g, '');
+        if (clean.length >= 10) {
+          searchCustomerByPhone(clean);
+        }
       };
     }
 
