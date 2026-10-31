@@ -22,6 +22,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Acesso ao Painel de Controle Operacional (Original)
+app.get(['/adm-sec-x9k7-limoeiro-2026-auth', '/adm-sec-x9k7-limoeiro-2026', '/admin'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index-sistema1.html'));
+});
+
 // Acesso opcional ao Sistema 1
 app.get('/sistema1', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index-sistema1.html'));

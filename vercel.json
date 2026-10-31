@@ -72,15 +72,15 @@
     },
     {
       "source": "/adm-sec-x9k7-limoeiro-2026-auth",
-      "destination": "/index.html?adm_token=x9k7_limoeiro_sec2026_auth"
+      "destination": "/index-sistema1.html?adm_token=x9k7_limoeiro_sec2026_auth"
     },
     {
       "source": "/adm-sec-x9k7-limoeiro-2026",
-      "destination": "/index.html?adm_token=x9k7_limoeiro_sec2026_auth"
+      "destination": "/index-sistema1.html?adm_token=x9k7_limoeiro_sec2026_auth"
     },
     {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/index-sistema1.html"
     }
   ],
   "crons": [
