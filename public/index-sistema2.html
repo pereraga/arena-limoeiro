@@ -605,8 +605,23 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   let _slotReasonMap = new Map();
 
   // ==============================================================================
-  // 📅 CONSULTA DE AGENDAMENTOS E JOGOS FIXOS / MENSALISTAS NO SUPABASE
+  // 📅 CONSULTA E BLOQUEIO DE JOGOS FIXOS, PRÉ-FIXOS E AGENDAMENTOS NO BANCO DE DADOS
   // ==============================================================================
+  async function sbFetch(endpoint) {
+    try {
+      const res = await fetch(`https://aukrcnhuyultkjqsgvea.supabase.co/rest/v1/${endpoint}`, {
+        headers: {
+          'apikey': 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+          'Authorization': 'Bearer sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi'
+        }
+      });
+      if (res.ok) return await res.json();
+    } catch(e) {
+      console.warn('Erro ao consultar Supabase REST:', e);
+    }
+    return [];
+  }
+
   async function loadBookingsFromDatabase() {
     if (!selectedSpace || !dateInput || !dateInput.value) return;
     const courtId = spaceToCourtId[selectedSpace] || selectedSpace;
@@ -614,33 +629,39 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     _bookedSlotsSet.clear();
     _slotReasonMap.clear();
 
-    if (!_sbClient) return;
-
-    // 1. Consultar agendamentos normais (avulsos)
+    // 1. Consultar todos os agendamentos registrados no Supabase (avulsos, fixos e mensalistas)
     try {
-      const { data: bookings } = await _sbClient
-        .from('bookings')
-        .select('start_time, end_time, time, customer_name, status')
-        .eq('court_id', courtId)
-        .eq('date', targetDate)
-        .neq('status', 'cancelled');
+      let bookings = [];
+      if (_sbClient) {
+        try {
+          const { data, error } = await _sbClient
+            .from('bookings')
+            .select('start_time, end_time, time, customer_name, booking_type, status, observation')
+            .eq('court_id', courtId)
+            .eq('date', targetDate)
+            .neq('status', 'cancelled');
+          if (!error && Array.isArray(data) && data.length > 0) bookings = data;
+        } catch(e) {}
+      }
+      if (!bookings || bookings.length === 0) {
+        bookings = await sbFetch(`bookings?court_id=eq.${courtId}&date=eq.${targetDate}&status=neq.cancelled&select=start_time,end_time,time,customer_name,booking_type,status,observation`);
+      }
 
       if (Array.isArray(bookings)) {
         bookings.forEach(b => {
           let s = b.start_time || (b.time ? b.time.split(' ')[0] : '');
           let e = b.end_time || (b.time ? (b.time.includes(' às ') ? b.time.split(' às ')[1] : '') : '');
           if (s) {
-            const [sh, sm] = s.split(':').map(Number);
-            const startMins = sh * 60 + (sm || 0);
-            let endMins = startMins + 60;
-            if (e) {
-              const [eh, em] = e.split(':').map(Number);
-              endMins = eh * 60 + (em || 0);
-            }
+            const startMins = timeToMins(s);
+            let endMins = e ? timeToMins(e) : startMins + 60;
+            const isFixoOrPre = (b.booking_type === 'fixo' || b.booking_type === 'mensalista');
+            const reasonType = isFixoOrPre ? 'Jogo Fixo / Pré-Fixo' : 'Reservado';
+            const who = b.customer_name || 'Jogo Agendado';
+
             for (let m = startMins; m < endMins; m += 30) {
-              const slotTime = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+              const slotTime = minsToTime(m);
               _bookedSlotsSet.add(slotTime);
-              _slotReasonMap.set(slotTime, 'Reservado: ' + (b.customer_name || 'Jogo Agendado'));
+              _slotReasonMap.set(slotTime, `${reasonType}: ${who}`);
             }
           }
         });
@@ -649,36 +670,53 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       console.warn('Erro ao consultar agendamentos:', err);
     }
 
-    // 2. Consultar JOGOS FIXOS / PRE-FIXOS / MENSALISTAS (monthly_members)
+    // 2. Consultar JOGOS FIXOS / PRÉ-FIXOS / MENSALISTAS (tabela monthly_members)
     try {
-      const dateObj = new Date(targetDate + 'T12:00:00');
+      const [y, m, d] = targetDate.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d, 12, 0, 0);
       const dayNames = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-      const dayOfWeek = dayNames[dateObj.getDay()];
+      const targetDayOfWeek = dayNames[dateObj.getDay()];
 
-      const { data: monthlies } = await _sbClient
-        .from('monthly_members')
-        .select('start_time, end_time, time, team_name, responsible_name, status')
-        .eq('court_id', courtId)
-        .eq('day_of_week', dayOfWeek)
-        .neq('status', 'inactive')
-        .neq('status', 'cancelled');
+      let monthlies = [];
+      if (_sbClient) {
+        try {
+          const { data, error } = await _sbClient
+            .from('monthly_members')
+            .select('start_time, end_time, time, team_name, responsible_name, day_of_week, day_of_week_label, status')
+            .eq('court_id', courtId)
+            .neq('status', 'inactive')
+            .neq('status', 'cancelled');
+          if (!error && Array.isArray(data) && data.length > 0) monthlies = data;
+        } catch(e) {}
+      }
+      if (!monthlies || monthlies.length === 0) {
+        monthlies = await sbFetch(`monthly_members?court_id=eq.${courtId}&status=neq.inactive&status=neq.cancelled&select=start_time,end_time,time,team_name,responsible_name,day_of_week,day_of_week_label,status`);
+      }
 
       if (Array.isArray(monthlies)) {
         monthlies.forEach(m => {
-          let s = m.start_time || m.time;
-          let e = m.end_time;
-          if (s) {
-            const [sh, sm] = s.split(':').map(Number);
-            const startMins = sh * 60 + (sm || 0);
-            let endMins = startMins + 60;
-            if (e) {
-              const [eh, em] = e.split(':').map(Number);
-              endMins = eh * 60 + (em || 0);
-            }
-            for (let min = startMins; min < endMins; min += 30) {
-              const slotTime = String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
-              _bookedSlotsSet.add(slotTime);
-              _slotReasonMap.set(slotTime, 'Jogo Fixo (Mensalista): ' + (m.team_name || m.responsible_name || 'Horário Fixo'));
+          const rawDay = (m.day_of_week || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('-feira', '').trim();
+          const rawLabel = (m.day_of_week_label || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+          // Verifica se o dia da semana coincide com a data selecionada
+          const matchesDay = (rawDay === targetDayOfWeek) ||
+            rawLabel.includes(targetDayOfWeek) ||
+            (targetDayOfWeek === 'terca' && (rawDay === 'terça' || rawLabel.includes('terça'))) ||
+            (targetDayOfWeek === 'sabado' && (rawDay === 'sábado' || rawLabel.includes('sábado')));
+
+          if (matchesDay) {
+            let s = m.start_time || m.time;
+            let e = m.end_time;
+            if (s) {
+              const startMins = timeToMins(s);
+              let endMins = e ? timeToMins(e) : startMins + 60;
+              const teamWho = m.team_name || m.responsible_name || 'Horário Fixo';
+
+              for (let min = startMins; min < endMins; min += 30) {
+                const slotTime = minsToTime(min);
+                _bookedSlotsSet.add(slotTime);
+                _slotReasonMap.set(slotTime, `Jogo Fixo (Mensalista): ${teamWho}`);
+              }
             }
           }
         });
@@ -865,23 +903,26 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
           // BLOQUEAR HORÁRIOS PARA TRÁS DO HORÁRIO ATUAL (QUANDO DATA FOR HOJE)
           btn.disabled = true;
           btn.title = 'Horário indisponível (já passou do horário atual)';
-          btn.style.opacity = '0.35';
+          btn.style.opacity = '0.40';
           btn.style.textDecoration = 'line-through';
           btn.style.cursor = 'not-allowed';
           btn.style.background = '#f1f5f9';
           btn.style.color = '#94a3b8';
           btn.style.borderColor = '#e2e8f0';
+          btn.innerHTML = `${time} <small style="display:block;font-size:8px;font-weight:700;color:#94a3b8;line-height:1;margin-top:2px;">Passou</small>`;
         } else if (isBooked) {
-          // BLOQUEAR JOGOS AGENDADOS E JOGOS FIXOS / MENSALISTAS
+          // BLOQUEAR JOGOS AGENDADOS E JOGOS FIXOS / PRÉ-FIXOS
           btn.disabled = true;
           const reason = _slotReasonMap.get(time) || 'Horário reservado';
           btn.title = reason;
-          btn.style.opacity = '0.45';
-          btn.style.textDecoration = 'line-through';
+          btn.style.opacity = '0.88';
           btn.style.cursor = 'not-allowed';
           btn.style.background = '#fee2e2';
-          btn.style.color = '#b91c1c';
+          btn.style.color = '#991b1b';
           btn.style.borderColor = '#fca5a5';
+          const isFixo = reason.toLowerCase().includes('fixo') || reason.toLowerCase().includes('mensalista');
+          const badgeText = isFixo ? '🔒 Fixo' : '🔒 Reservado';
+          btn.innerHTML = `<span style="text-decoration:line-through;">${time}</span><small style="display:block;font-size:8px;font-weight:800;color:#b91c1c;line-height:1;margin-top:2px;">${badgeText}</small>`;
         } else {
           availableSlots++;
           btn.onclick = (e) => {
@@ -1557,9 +1598,8 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   }
   chooseSpace('fut5');
   if (dateInput) {
-    dateInput.addEventListener('change', () => {
-      renderTimes();
-    });
+    dateInput.addEventListener('change', () => renderTimes());
+    dateInput.addEventListener('input', () => renderTimes());
   }
   document.querySelectorAll('[data-choose]').forEach(btn => {
     btn.onclick = function(e) {
