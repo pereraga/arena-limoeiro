@@ -903,37 +903,26 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
         }
 
         const isBooked = _bookedSlotsSet.has(time);
-
         if (isBooked) {
-          // BLOQUEAR JOGOS AGENDADOS E JOGOS FIXOS / PRÉ-FIXOS
-          btn.disabled = true;
-          const reason = _slotReasonMap.get(time) || 'Horário reservado';
-          btn.title = reason;
-          btn.style.opacity = '0.88';
-          btn.style.cursor = 'not-allowed';
-          btn.style.background = '#fee2e2';
-          btn.style.color = '#991b1b';
-          btn.style.borderColor = '#fca5a5';
-          const isFixo = reason.toLowerCase().includes('fixo') || reason.toLowerCase().includes('mensalista');
-          const badgeText = isFixo ? '🔒 Fixo' : '🔒 Reservado';
-          btn.innerHTML = `<span style="text-decoration:line-through;">${time}</span><small style="display:block;font-size:8px;font-weight:800;color:#b91c1c;line-height:1;margin-top:2px;">${badgeText}</small>`;
-        } else {
-          availableSlots++;
-          btn.onclick = (e) => {
-            if (e) e.preventDefault();
-            selectedTime = time;
-            timeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
-            renderEndTimes(m);
-            updateSummary();
-            if (notice) notice.classList.remove('show');
-          };
+          // ESCONDER HORÁRIOS FIXOS, PRÉ-FIXOS OU JÁ RESERVADOS
+          continue;
         }
+
+        availableSlots++;
+        btn.onclick = (e) => {
+          if (e) e.preventDefault();
+          selectedTime = time;
+          timeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
+          renderEndTimes(m);
+          updateSummary();
+          if (notice) notice.classList.remove('show');
+        };
 
         timeOptions.appendChild(btn);
       }
 
       if (timeOptions.children.length === 0) {
-        timeOptions.innerHTML = '<div class="no-space" style="color:#64748b;padding:14px;grid-column:1/-1;">Todos os horários de hoje já passaram. Escolha outra data para agendar.</div>';
+        timeOptions.innerHTML = '<div class="no-space" style="color:#64748b;padding:14px;grid-column:1/-1;">Não há horários disponíveis para esta quadra neste dia (todos ocupados ou já passados). Escolha outra data para agendar.</div>';
       }
 
       if (availableSlots === 0) {
