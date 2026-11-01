@@ -583,44 +583,30 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   let selectedTime = '';
   let selectedEndTime = '';
   let _bookedSlotsSet = new Set();
-
-  const dateInput = document.getElementById('bookingDate');
-  const timeOptions = document.getElementById('timeOptions');
-  const endTimeOptions = document.getElementById('endTimeOptions');
-  const durationNote = document.getElementById('durationNote');
-  const notice = document.getElementById('formNotice');
-  const money = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const localISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-  const today = new Date();
-  if (dateInput) {
-    dateInput.min = localISO(today);
-    dateInput.value = localISO(today);
-  }
-  const birthEl = document.getElementById('customerBirthDate');
-  if (birthEl) {
-    birthEl.max = localISO(today);
-  }
+  let _slotReasonMap = new Map();
 
   // ==============================================================================
-  // 📅 CONSULTA DE AGENDAMENTOS EM TEMPO REAL NO SUPABASE
+  // 📅 CONSULTA DE AGENDAMENTOS E JOGOS FIXOS / MENSALISTAS NO SUPABASE
   // ==============================================================================
   async function loadBookingsFromDatabase() {
     if (!selectedSpace || !dateInput || !dateInput.value) return;
     const courtId = spaceToCourtId[selectedSpace] || selectedSpace;
     const targetDate = dateInput.value;
     _bookedSlotsSet.clear();
+    _slotReasonMap.clear();
 
     if (!_sbClient) return;
+
+    // 1. Consultar agendamentos normais (avulsos)
     try {
-      const { data: bookings, error } = await _sbClient
+      const { data: bookings } = await _sbClient
         .from('bookings')
-        .select('start_time, end_time, time, status')
+        .select('start_time, end_time, time, customer_name, status')
         .eq('court_id', courtId)
         .eq('date', targetDate)
         .neq('status', 'cancelled');
 
-      if (!error && Array.isArray(bookings)) {
+      if (Array.isArray(bookings)) {
         bookings.forEach(b => {
           let s = b.start_time || (b.time ? b.time.split(' ')[0] : '');
           let e = b.end_time || (b.time ? (b.time.includes(' às ') ? b.time.split(' às ')[1] : '') : '');
@@ -635,12 +621,51 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
             for (let m = startMins; m < endMins; m += 30) {
               const slotTime = String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
               _bookedSlotsSet.add(slotTime);
+              _slotReasonMap.set(slotTime, 'Reservado: ' + (b.customer_name || 'Jogo Agendado'));
             }
           }
         });
       }
     } catch(err) {
       console.warn('Erro ao consultar agendamentos:', err);
+    }
+
+    // 2. Consultar JOGOS FIXOS / PRE-FIXOS / MENSALISTAS (monthly_members)
+    try {
+      const dateObj = new Date(targetDate + 'T12:00:00');
+      const dayNames = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+      const dayOfWeek = dayNames[dateObj.getDay()];
+
+      const { data: monthlies } = await _sbClient
+        .from('monthly_members')
+        .select('start_time, end_time, time, team_name, responsible_name, status')
+        .eq('court_id', courtId)
+        .eq('day_of_week', dayOfWeek)
+        .neq('status', 'inactive')
+        .neq('status', 'cancelled');
+
+      if (Array.isArray(monthlies)) {
+        monthlies.forEach(m => {
+          let s = m.start_time || m.time;
+          let e = m.end_time;
+          if (s) {
+            const [sh, sm] = s.split(':').map(Number);
+            const startMins = sh * 60 + (sm || 0);
+            let endMins = startMins + 60;
+            if (e) {
+              const [eh, em] = e.split(':').map(Number);
+              endMins = eh * 60 + (em || 0);
+            }
+            for (let min = startMins; min < endMins; min += 30) {
+              const slotTime = String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0');
+              _bookedSlotsSet.add(slotTime);
+              _slotReasonMap.set(slotTime, 'Jogo Fixo (Mensalista): ' + (m.team_name || m.responsible_name || 'Horário Fixo'));
+            }
+          }
+        });
+      }
+    } catch(err) {
+      console.warn('Erro ao consultar mensalistas fixos:', err);
     }
   }
 
@@ -693,26 +718,53 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       updateSummary();
       return;
     }
+
     if (endTimeOptions) {
       endTimeOptions.innerHTML = '';
-      for (let h = startHour + 1; h <= 23; h++) {
-        const time = String(h).padStart(2, '0') + ':00';
+      let availableCount = 0;
+
+      // Limita duração de 1 até 3 horas de jogo (equivalente à hora correta de jogo)
+      // Bloqueia qualquer horário que ultrapasse um horário reservado ou jogo fixo
+      for (let duration = 1; duration <= 3; duration++) {
+        const endH = startHour + duration;
+        if (endH > 23) break;
+
+        // Se o slot intermediário imediatamente anterior estiver ocupado, não pode estender além dele
+        const intermediateSlot = String(endH - 1).padStart(2, '0') + ':00';
+        if (_bookedSlotsSet.has(intermediateSlot)) {
+          break;
+        }
+
+        const endTimeStr = String(endH).padStart(2, '0') + ':00';
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'time-btn';
-        btn.textContent = time;
+        btn.innerHTML = `${endTimeStr} <small style="display:block;font-size:9px;font-weight:800;opacity:0.85;">(${duration}h de jogo)</small>`;
+
         btn.addEventListener('click', () => {
-          selectedEndTime = time;
+          selectedEndTime = endTimeStr;
           endTimeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
-          const duration = h - startHour;
-          if (durationNote) durationNote.textContent = `Duração selecionada: ${duration} ${duration === 1 ? 'hora' : 'horas'}. O valor exibido considera todo esse período.`;
+          if (durationNote) {
+            durationNote.textContent = `Duração selecionada: ${duration} ${duration === 1 ? 'hora' : 'horas'}. O valor do agendamento considera todo esse período.`;
+          }
           updateSummary();
           if (notice) notice.classList.remove('show');
         });
+
         endTimeOptions.appendChild(btn);
+        availableCount++;
+
+        // Pré-seleciona 1 hora automaticamente por conveniência
+        if (duration === 1) {
+          btn.click();
+        }
+      }
+
+      if (availableCount === 0) {
+        endTimeOptions.innerHTML = '<div class="no-space" style="color:#ef4444;font-weight:700;">⚠️ Horário seguinte já ocupado por jogo agendado ou mensalista fixo.</div>';
       }
     }
-    if (durationNote) durationNote.textContent = `Escolha o horário final. O término deve ser depois das ${selectedTime}.`;
+
     updateSummary();
   }
 
@@ -720,7 +772,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     selectedTime = '';
     selectedEndTime = '';
     if (endTimeOptions) endTimeOptions.innerHTML = '<div class="no-space">Selecione primeiro o horário de início.</div>';
-    if (durationNote) durationNote.textContent = 'Intervalos de 1 em 1 hora.';
+    if (durationNote) durationNote.textContent = 'Escolha o horário de início da sua partida.';
 
     if (!selectedSpace || !dateInput || !dateInput.value) {
       if (timeOptions) timeOptions.innerHTML = '<div class="no-space">Escolha um espaço e uma data para ver os horários.</div>';
@@ -729,7 +781,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     }
 
     if (timeOptions) {
-      timeOptions.innerHTML = '<div class="no-space" style="color:#0284c7;">Carregando horários disponíveis...</div>';
+      timeOptions.innerHTML = '<div class="no-space" style="color:#0284c7;">Carregando horários da Arena...</div>';
     }
 
     await loadBookingsFromDatabase();
@@ -740,37 +792,65 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
 
     if (timeOptions) {
       timeOptions.innerHTML = '';
+      let availableSlots = 0;
+
       for (let h = 6; h <= 22; h++) {
         const time = String(h).padStart(2, '0') + ':00';
+        const slotMins = h * 60;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'time-btn';
         btn.textContent = time;
 
+        const isPast = isToday && (slotMins <= currentMins);
         const isBooked = _bookedSlotsSet.has(time);
-        if (isBooked) {
+
+        if (isPast) {
+          // BLOQUEAR HORÁRIOS PARA TRÁS DO HORÁRIO ATUAL (QUANDO DATA FOR HOJE)
           btn.disabled = true;
-          btn.title = 'Horário já reservado no banco de dados';
+          btn.title = 'Horário indisponível (já passou do horário atual)';
           btn.style.opacity = '0.35';
           btn.style.textDecoration = 'line-through';
           btn.style.cursor = 'not-allowed';
+          btn.style.background = '#f1f5f9';
+          btn.style.color = '#94a3b8';
+          btn.style.borderColor = '#e2e8f0';
+        } else if (isBooked) {
+          // BLOQUEAR JOGOS AGENDADOS E JOGOS FIXOS / MENSALISTAS
+          btn.disabled = true;
+          const reason = _slotReasonMap.get(time) || 'Horário reservado';
+          btn.title = reason;
+          btn.style.opacity = '0.45';
+          btn.style.textDecoration = 'line-through';
+          btn.style.cursor = 'not-allowed';
+          btn.style.background = '#fee2e2';
+          btn.style.color = '#b91c1c';
+          btn.style.borderColor = '#fca5a5';
+        } else {
+          availableSlots++;
+          btn.onclick = (e) => {
+            if (e) e.preventDefault();
+            selectedTime = time;
+            timeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
+            renderEndTimes(h);
+            updateSummary();
+            if (notice) notice.classList.remove('show');
+          };
         }
 
-        btn.onclick = (e) => {
-          if (e) e.preventDefault();
-          selectedTime = time;
-          timeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
-          renderEndTimes(h);
-          updateSummary();
-          if (notice) notice.classList.remove('show');
-        };
         timeOptions.appendChild(btn);
+      }
+
+      if (availableSlots === 0) {
+        if (notice) {
+          notice.innerHTML = '<strong>Aviso:</strong> Não há mais horários disponíveis para esta quadra no dia de hoje.';
+          notice.classList.add('show');
+        }
       }
     }
     updateSummary();
   }
 
-  window.updateSpaceSelectionUI = updateSpaceSelectionUI;
   function updateSpaceSelectionUI() {
     document.querySelectorAll('.space-option').forEach(btn => {
       btn.classList.toggle('selected', btn.getAttribute('data-space') === selectedSpace);
