@@ -582,6 +582,25 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   let selectedSpace = '';
   let selectedTime = '';
   let selectedEndTime = '';
+
+  const dateInput = document.getElementById('bookingDate');
+  const timeOptions = document.getElementById('timeOptions');
+  const endTimeOptions = document.getElementById('endTimeOptions');
+  const durationNote = document.getElementById('durationNote');
+  const notice = document.getElementById('formNotice');
+  const money = n => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const localISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+  const today = new Date();
+  const todayISO = localISO(today);
+  if (dateInput) {
+    dateInput.min = todayISO;
+    dateInput.value = todayISO;
+  }
+  const birthEl = document.getElementById('customerBirthDate');
+  if (birthEl) {
+    birthEl.max = todayISO;
+  }
   let _bookedSlotsSet = new Set();
   let _slotReasonMap = new Map();
 
@@ -1496,8 +1515,10 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   }
 
   // Inicialização
-  updateSpaceSelectionUI();
-  updateSummary();
+  if (dateInput && !dateInput.value) {
+    dateInput.value = localISO(new Date());
+  }
+  chooseSpace('fut5');
   if (dateInput) {
     dateInput.addEventListener('change', () => {
       renderTimes();
