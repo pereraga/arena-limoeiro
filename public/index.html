@@ -897,20 +897,14 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
         btn.textContent = time;
 
         const isPast = isToday && (slotMins <= currentMins);
+        if (isPast) {
+          // ESCONDER HORÁRIOS QUE JÁ PASSARAM NO DIA DE HOJE
+          continue;
+        }
+
         const isBooked = _bookedSlotsSet.has(time);
 
-        if (isPast) {
-          // BLOQUEAR HORÁRIOS PARA TRÁS DO HORÁRIO ATUAL (QUANDO DATA FOR HOJE)
-          btn.disabled = true;
-          btn.title = 'Horário indisponível (já passou do horário atual)';
-          btn.style.opacity = '0.40';
-          btn.style.textDecoration = 'line-through';
-          btn.style.cursor = 'not-allowed';
-          btn.style.background = '#f1f5f9';
-          btn.style.color = '#94a3b8';
-          btn.style.borderColor = '#e2e8f0';
-          btn.innerHTML = `${time} <small style="display:block;font-size:8px;font-weight:700;color:#94a3b8;line-height:1;margin-top:2px;">Passou</small>`;
-        } else if (isBooked) {
+        if (isBooked) {
           // BLOQUEAR JOGOS AGENDADOS E JOGOS FIXOS / PRÉ-FIXOS
           btn.disabled = true;
           const reason = _slotReasonMap.get(time) || 'Horário reservado';
@@ -938,9 +932,13 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
         timeOptions.appendChild(btn);
       }
 
+      if (timeOptions.children.length === 0) {
+        timeOptions.innerHTML = '<div class="no-space" style="color:#64748b;padding:14px;grid-column:1/-1;">Todos os horários de hoje já passaram. Escolha outra data para agendar.</div>';
+      }
+
       if (availableSlots === 0) {
         if (notice) {
-          notice.innerHTML = '<strong>Aviso:</strong> Não há mais horários disponíveis para esta quadra no dia de hoje.';
+          notice.innerHTML = '<strong>Aviso:</strong> Não há mais horários disponíveis para esta quadra no dia selecionado.';
           notice.classList.add('show');
         }
       }
