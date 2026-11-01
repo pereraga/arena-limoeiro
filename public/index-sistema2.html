@@ -430,12 +430,12 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
               <section class="form-panel" aria-labelledby="space-title">
                 <div class="panel-heading"><span class="panel-number">01</span><div><h3 id="space-title">Escolha o espaço</h3><p>Selecione a quadra ou modalidade para sua partida.</p></div></div>
                 <div class="space-grid" id="spaceOptions" role="group" aria-label="Escolha o espaço">
-                  <button type="button" class="space-option" data-space="fut5" aria-pressed="false"><span class="space-icon">⚽</span><span class="space-name">FUT 5 · SOCCER 5</span><span class="space-price">R$ 90/h · promo R$ 50</span><span class="space-capacity">👥 10 a 12 jogadores</span></button>
-                  <button type="button" class="space-option" data-space="fut6" aria-pressed="false"><span class="space-icon">⚽</span><span class="space-name">FUT 6 · SOCCER 6</span><span class="space-price">R$ 100/h · promo R$ 60</span><span class="space-capacity">👥 12 a 14 jogadores</span></button>
-                  <button type="button" class="space-option" data-space="fut7" aria-pressed="false"><span class="space-icon">🏟️</span><span class="space-name">FUT 7 · SOCCER 7</span><span class="space-price">R$ 110/h · promo R$ 70</span><span class="space-capacity">👥 14 a 20 jogadores</span></button>
-                  <button type="button" class="space-option" data-space="foot" aria-pressed="false"><span class="space-icon">🎯</span><span class="space-name">FOOT TABLE · FUTMESA</span><span class="space-price">R$ 35/h · promo R$ 25</span><span class="space-capacity">👥 Capacidade a confirmar</span></button>
-                  <button type="button" class="space-option" data-space="beach" aria-pressed="false"><span class="space-icon">🏖️</span><span class="space-name">QUADRA DE AREIA</span><span class="space-price">R$ 50/h · promo R$ 30</span><span class="space-capacity">👥 4 a 8 jogadores</span></button>
-                  <button type="button" class="space-option" data-space="society" aria-pressed="false"><span class="space-icon">🥅</span><span class="space-name">QUADRA SOCIETY</span><span class="space-price">R$ 60/h · promo R$ 40</span><span class="space-capacity">👥 Capacidade a confirmar</span></button>
+                  <button type="button" class="space-option" data-space="fut5" onclick="chooseSpace('fut5')" aria-pressed="false"><span class="space-icon">⚽</span><span class="space-name">FUT 5 · SOCCER 5</span><span class="space-price">R$ 90/h · promo R$ 50</span><span class="space-capacity">👥 10 a 12 jogadores</span></button>
+                  <button type="button" class="space-option" data-space="fut6" onclick="chooseSpace('fut6')" aria-pressed="false"><span class="space-icon">⚽</span><span class="space-name">FUT 6 · SOCCER 6</span><span class="space-price">R$ 100/h · promo R$ 60</span><span class="space-capacity">👥 12 a 14 jogadores</span></button>
+                  <button type="button" class="space-option" data-space="fut7" onclick="chooseSpace('fut7')" aria-pressed="false"><span class="space-icon">🏟️</span><span class="space-name">FUT 7 · SOCCER 7</span><span class="space-price">R$ 110/h · promo R$ 70</span><span class="space-capacity">👥 14 a 20 jogadores</span></button>
+                  <button type="button" class="space-option" data-space="foot" onclick="chooseSpace('foot')" aria-pressed="false"><span class="space-icon">🎯</span><span class="space-name">FOOT TABLE · FUTMESA</span><span class="space-price">R$ 35/h · promo R$ 25</span><span class="space-capacity">👥 Capacidade a confirmar</span></button>
+                  <button type="button" class="space-option" data-space="beach" onclick="chooseSpace('beach')" aria-pressed="false"><span class="space-icon">🏖️</span><span class="space-name">QUADRA DE AREIA</span><span class="space-price">R$ 50/h · promo R$ 30</span><span class="space-capacity">👥 4 a 8 jogadores</span></button>
+                  <button type="button" class="space-option" data-space="society" onclick="chooseSpace('society')" aria-pressed="false"><span class="space-icon">🥅</span><span class="space-name">QUADRA SOCIETY</span><span class="space-price">R$ 60/h · promo R$ 40</span><span class="space-capacity">👥 Capacidade a confirmar</span></button>
                 </div>
               </section>
 
@@ -531,12 +531,12 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     <section class="section shell" id="espacos">
       <div class="section-heading"><div><div class="section-kicker">Encontre seu espaço</div><h2>Um lugar para cada partida.</h2></div><p>Toque no espaço para selecioná-lo e ver a capacidade. Os limites ainda não cadastrados aparecem como “a confirmar”.</p></div>
       <div class="spaces">
-        <article class="space-card"><div class="card-top"><div class="card-icon">⚽</div><span class="card-tag">FUTEBOL</span></div><h3>FUT 5 · SOCCER 5</h3><div class="card-capacity">👥 10 a 12 jogadores</div><p>Jogo rápido e dinâmico em gramado sintético.</p><div class="card-bottom"><div class="card-price"><strong>R$ 90,00</strong><small>R$ 50/h das 09h às 16h</small></div><button class="choose-btn" data-choose="fut5">ESCOLHER ↗</button></div></article>
-        <article class="space-card"><div class="card-top"><div class="card-icon">⚽</div><span class="card-tag">FUTEBOL</span></div><h3>FUT 6 · SOCCER 6</h3><div class="card-capacity">👥 12 a 14 jogadores</div><p>O equilíbrio entre o jogo rápido e o campo tradicional.</p><div class="card-bottom"><div class="card-price"><strong>R$ 100,00</strong><small>R$ 60/h das 09h às 16h</small></div><button class="choose-btn" data-choose="fut6">ESCOLHER ↗</button></div></article>
-        <article class="space-card"><div class="card-top"><div class="card-icon">🏟️</div><span class="card-tag">FUTEBOL</span></div><h3>FUT 7 · SOCCER 7</h3><div class="card-capacity">👥 14 a 20 jogadores</div><p>Espaço amplo para partidas, campeonatos e jogos com a turma.</p><div class="card-bottom"><div class="card-price"><strong>R$ 110,00</strong><small>R$ 70/h das 09h às 16h</small></div><button class="choose-btn" data-choose="fut7">ESCOLHER ↗</button></div></article>
-        <article class="space-card"><div class="card-top"><div class="card-icon">🎯</div><span class="card-tag">FUTMESA</span></div><h3>FOOT TABLE · FUTMESA</h3><div class="card-capacity pending">👥 Capacidade a confirmar</div><p>Área dedicada à técnica, aos desafios e às disputas de futmesa.</p><div class="card-bottom"><div class="card-price"><strong>R$ 35,00</strong><small>R$ 25/h das 09h às 16h</small></div><button class="choose-btn" data-choose="foot">ESCOLHER ↗</button></div></article>
-        <article class="space-card"><div class="card-top"><div class="card-icon">🏖️</div><span class="card-tag">ARENA BEACH</span></div><h3>QUADRA DE AREIA</h3><div class="card-capacity">👥 4 a 8 jogadores</div><p>Areia nivelada para futevôlei, beach tennis e atividades ao ar livre.</p><div class="card-bottom"><div class="card-price"><strong>R$ 50,00</strong><small>R$ 30/h das 09h às 16h</small></div><button class="choose-btn" data-choose="beach">ESCOLHER ↗</button></div></article>
-        <article class="space-card"><div class="card-top"><div class="card-icon">🥅</div><span class="card-tag">SOCIETY</span></div><h3>QUADRA SOCIETY</h3><div class="card-capacity pending">👥 Capacidade a confirmar</div><p>Espaço versátil para partidas descontraídas e jogos entre amigos.</p><div class="card-bottom"><div class="card-price"><strong>R$ 60,00</strong><small>R$ 40/h das 09h às 16h</small></div><button class="choose-btn" data-choose="society">ESCOLHER ↗</button></div></article>
+        <article class="space-card"><div class="card-top"><div class="card-icon">⚽</div><span class="card-tag">FUTEBOL</span></div><h3>FUT 5 · SOCCER 5</h3><div class="card-capacity">👥 10 a 12 jogadores</div><p>Jogo rápido e dinâmico em gramado sintético.</p><div class="card-bottom"><div class="card-price"><strong>R$ 90,00</strong><small>R$ 50/h das 09h às 16h</small></div><button class="choose-btn" data-choose="fut5" onclick="chooseSpace('fut5', true)">ESCOLHER ↗</button></div></article>
+        <article class="space-card"><div class="card-top"><div class="card-icon">⚽</div><span class="card-tag">FUTEBOL</span></div><h3>FUT 6 · SOCCER 6</h3><div class="card-capacity">👥 12 a 14 jogadores</div><p>O equilíbrio entre o jogo rápido e o campo tradicional.</p><div class="card-bottom"><div class="card-price"><strong>R$ 100,00</strong><small>R$ 60/h das 09h às 16h</small></div><button class="choose-btn" data-choose="fut6" onclick="chooseSpace('fut6', true)">ESCOLHER ↗</button></div></article>
+        <article class="space-card"><div class="card-top"><div class="card-icon">🏟️</div><span class="card-tag">FUTEBOL</span></div><h3>FUT 7 · SOCCER 7</h3><div class="card-capacity">👥 14 a 20 jogadores</div><p>Espaço amplo para partidas, campeonatos e jogos com a turma.</p><div class="card-bottom"><div class="card-price"><strong>R$ 110,00</strong><small>R$ 70/h das 09h às 16h</small></div><button class="choose-btn" data-choose="fut7" onclick="chooseSpace('fut7', true)">ESCOLHER ↗</button></div></article>
+        <article class="space-card"><div class="card-top"><div class="card-icon">🎯</div><span class="card-tag">FUTMESA</span></div><h3>FOOT TABLE · FUTMESA</h3><div class="card-capacity pending">👥 Capacidade a confirmar</div><p>Área dedicada à técnica, aos desafios e às disputas de futmesa.</p><div class="card-bottom"><div class="card-price"><strong>R$ 35,00</strong><small>R$ 25/h das 09h às 16h</small></div><button class="choose-btn" data-choose="foot" onclick="chooseSpace('foot', true)">ESCOLHER ↗</button></div></article>
+        <article class="space-card"><div class="card-top"><div class="card-icon">🏖️</div><span class="card-tag">ARENA BEACH</span></div><h3>QUADRA DE AREIA</h3><div class="card-capacity">👥 4 a 8 jogadores</div><p>Areia nivelada para futevôlei, beach tennis e atividades ao ar livre.</p><div class="card-bottom"><div class="card-price"><strong>R$ 50,00</strong><small>R$ 30/h das 09h às 16h</small></div><button class="choose-btn" data-choose="beach" onclick="chooseSpace('beach', true)">ESCOLHER ↗</button></div></article>
+        <article class="space-card"><div class="card-top"><div class="card-icon">🥅</div><span class="card-tag">SOCIETY</span></div><h3>QUADRA SOCIETY</h3><div class="card-capacity pending">👥 Capacidade a confirmar</div><p>Espaço versátil para partidas descontraídas e jogos entre amigos.</p><div class="card-bottom"><div class="card-price"><strong>R$ 60,00</strong><small>R$ 40/h das 09h às 16h</small></div><button class="choose-btn" data-choose="society" onclick="chooseSpace('society', true)">ESCOLHER ↗</button></div></article>
       </div>
     </section>
 
@@ -770,6 +770,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     updateSummary();
   }
 
+  window.updateSpaceSelectionUI = updateSpaceSelectionUI;
   function updateSpaceSelectionUI() {
     document.querySelectorAll('.space-option').forEach(btn => {
       btn.classList.toggle('selected', btn.getAttribute('data-space') === selectedSpace);
@@ -782,6 +783,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     });
   }
 
+  window.chooseSpace = chooseSpace;
   function chooseSpace(space, scroll = false) {
     if (!spaces[space]) return;
     selectedSpace = space;
@@ -1364,7 +1366,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       const zapMessage = 
         `🏟️ *ARENA LIMOEIRO - COMPROVANTE DE AGENDAMENTO*\n\n` +
         `Olá, *${name}*! Seu agendamento foi registrado e confirmado com sucesso.\n\n` +
-        `🔑 *Código da Reserva:* `${bookingId}`\n` +
+        `🔑 *Código da Reserva:* *${bookingId}*\n` +
         `📍 *Espaço:* ${courtName}\n` +
         `📅 *Data:* ${dateText}\n` +
         `⏰ *Horário:* ${selectedTime} às ${selectedEndTime} (${duration}h)\n` +
