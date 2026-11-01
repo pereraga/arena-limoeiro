@@ -688,15 +688,42 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     }
   }
 
+  function timeToMins(t) {
+    if (!t) return 0;
+    const [h, m] = t.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  }
+
+  function minsToTime(m) {
+    const h = Math.floor(m / 60);
+    const min = m % 60;
+    return String(h).padStart(2, '0') + ':' + String(min).padStart(2, '0');
+  }
+
+  function formatDuration(start, end) {
+    const startM = timeToMins(start);
+    const endM = timeToMins(end);
+    const diffM = Math.max(0, endM - startM);
+    const h = Math.floor(diffM / 60);
+    const m = diffM % 60;
+    if (h > 0 && m > 0) return `${h}h${m}`;
+    if (h > 0) return `${h}h`;
+    return `${m} min`;
+  }
+
   function priceForPeriod(start, end) {
     if (!selectedSpace || !start || !end) return null;
-    const startHour = Number(start.slice(0, 2));
-    const endHour = Number(end.slice(0, 2));
-    if (endHour <= startHour) return null;
+    const startMins = timeToMins(start);
+    const endMins = timeToMins(end);
+    if (endMins <= startMins) return null;
     const s = spaces[selectedSpace];
+    if (!s) return null;
     let total = 0;
-    for (let hour = startHour; hour < endHour; hour++) {
-      total += (hour >= 9 && hour < 16) ? s.promo : s.normal;
+    // Percorre em blocos de 30 minutos (meia em meia hora)
+    for (let m = startMins; m < endMins; m += 30) {
+      const h = Math.floor(m / 60);
+      const isPromo = (h >= 9 && h < 16);
+      total += (isPromo ? s.promo : s.normal) / 2;
     }
     return total;
   }
@@ -713,8 +740,8 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     const dateText = (dateInput && dateInput.value) ? new Date(dateInput.value + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'A definir';
     let timeText = 'A definir';
     if (selectedTime && selectedEndTime) {
-      const hours = Number(selectedEndTime.slice(0, 2)) - Number(selectedTime.slice(0, 2));
-      timeText = `${dateText} • ${selectedTime} às ${selectedEndTime} (${hours}h)`;
+      const durLabel = formatDuration(selectedTime, selectedEndTime);
+      timeText = `${dateText} • ${selectedTime} às ${selectedEndTime} (${durLabel})`;
     } else if (selectedTime) {
       timeText = `${dateText} • início às ${selectedTime}`;
     } else if (dateInput && dateInput.value) {
@@ -729,7 +756,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     }
   }
 
-  function renderEndTimes(startHour) {
+  function renderEndTimes(startVal) {
     selectedEndTime = '';
     if (!selectedTime) {
       if (endTimeOptions) endTimeOptions.innerHTML = '<div class="no-space">Selecione primeiro o horário de início.</div>';
@@ -738,33 +765,40 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       return;
     }
 
+    const startMins = typeof startVal === 'number' ? startVal : timeToMins(startVal || selectedTime);
+
     if (endTimeOptions) {
       endTimeOptions.innerHTML = '';
       let availableCount = 0;
 
-      // Limita duração de 1 até 3 horas de jogo (equivalente à hora correta de jogo)
+      // Limita duração de 30 min até 3 horas de jogo (de meia em meia hora: 30, 60, 90, 120, 150, 180 min)
       // Bloqueia qualquer horário que ultrapasse um horário reservado ou jogo fixo
-      for (let duration = 1; duration <= 3; duration++) {
-        const endH = startHour + duration;
-        if (endH > 23) break;
+      for (let durMins = 30; durMins <= 180; durMins += 30) {
+        const endMins = startMins + durMins;
+        if (endMins > 23 * 60) break; // limite 23:00
 
-        // Se o slot intermediário imediatamente anterior estiver ocupado, não pode estender além dele
-        const intermediateSlot = String(endH - 1).padStart(2, '0') + ':00';
+        // Se o slot de 30 min imediatamente anterior estiver ocupado, não pode estender além dele
+        const prevSlotMins = endMins - 30;
+        const intermediateSlot = minsToTime(prevSlotMins);
         if (_bookedSlotsSet.has(intermediateSlot)) {
           break;
         }
 
-        const endTimeStr = String(endH).padStart(2, '0') + ':00';
+        const endTimeStr = minsToTime(endMins);
+        const h = Math.floor(durMins / 60);
+        const m = durMins % 60;
+        const durLabel = (h > 0 && m > 0) ? `${h}h${m}` : (h > 0 ? `${h}h` : `${m} min`);
+
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'time-btn';
-        btn.innerHTML = `${endTimeStr} <small style="display:block;font-size:9px;font-weight:800;opacity:0.85;">(${duration}h de jogo)</small>`;
+        btn.innerHTML = `${endTimeStr} <small style="display:block;font-size:9px;font-weight:800;opacity:0.85;">(${durLabel} de jogo)</small>`;
 
         btn.addEventListener('click', () => {
           selectedEndTime = endTimeStr;
           endTimeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
           if (durationNote) {
-            durationNote.textContent = `Duração selecionada: ${duration} ${duration === 1 ? 'hora' : 'horas'}. O valor do agendamento considera todo esse período.`;
+            durationNote.textContent = `Duração selecionada: ${durLabel}. O valor exibido considera todo esse período.`;
           }
           updateSummary();
           if (notice) notice.classList.remove('show');
@@ -773,8 +807,10 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
         endTimeOptions.appendChild(btn);
         availableCount++;
 
-        // Pré-seleciona 1 hora automaticamente por conveniência
-        if (duration === 1) {
+        // Pré-seleciona 1 hora se disponível, ou primeira opção de 30 min
+        if (durMins === 60) {
+          btn.click();
+        } else if (durMins === 30 && availableCount === 1) {
           btn.click();
         }
       }
@@ -813,9 +849,10 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       timeOptions.innerHTML = '';
       let availableSlots = 0;
 
-      for (let h = 6; h <= 22; h++) {
-        const time = String(h).padStart(2, '0') + ':00';
-        const slotMins = h * 60;
+      // Horários de meia em meia hora, de 06:00 até 22:00
+      for (let m = 6 * 60; m <= 22 * 60; m += 30) {
+        const time = minsToTime(m);
+        const slotMins = m;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'time-btn';
@@ -851,7 +888,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
             if (e) e.preventDefault();
             selectedTime = time;
             timeOptions.querySelectorAll('.time-btn').forEach(b => b.classList.toggle('selected', b === btn));
-            renderEndTimes(h);
+            renderEndTimes(m);
             updateSummary();
             if (notice) notice.classList.remove('show');
           };
@@ -1377,7 +1414,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       const dateVal = dateInput ? dateInput.value : '';
       const dateText = new Date(dateVal + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
       const price = priceForPeriod(selectedTime, selectedEndTime);
-      const duration = Number(selectedEndTime.slice(0, 2)) - Number(selectedTime.slice(0, 2));
+      const durationLabel = formatDuration(selectedTime, selectedEndTime);
       const courtId = spaceToCourtId[selectedSpace] || selectedSpace;
       const courtName = spaces[selectedSpace].name;
 
@@ -1468,7 +1505,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
         `🔑 *Código da Reserva:* *${bookingId}*\n` +
         `📍 *Espaço:* ${courtName}\n` +
         `📅 *Data:* ${dateText}\n` +
-        `⏰ *Horário:* ${selectedTime} às ${selectedEndTime} (${duration}h)\n` +
+        `⏰ *Horário:* ${selectedTime} às ${selectedEndTime} (${durationLabel})\n` +
         `💰 *Valor:* ${money(price)}\n\n` +
         `_Apresente este código na recepção ao chegar. Bom jogo!_ ⚽`;
 
@@ -1491,7 +1528,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
               Olá, <strong>${escapeHtml(name)}</strong>! Seu jogo foi garantido na agenda oficial da Arena Limoeiro.<br>
               <strong>Espaço:</strong> ${courtName}<br>
               <strong>Data:</strong> ${dateText}<br>
-              <strong>Horário:</strong> ${selectedTime} às ${selectedEndTime} (${duration}h)<br>
+              <strong>Horário:</strong> ${selectedTime} às ${selectedEndTime} (${durationLabel})<br>
               <strong>Valor Total:</strong> <span style="font-weight: 800; color: #047857;">${money(price)}</span><br>
               <strong>Código do Agendamento:</strong> <code style="background: #d1fae5; padding: 2px 6px; border-radius: 6px; font-weight: 900; font-size: 14px;">${bookingId}</code>
             </div>
