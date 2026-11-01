@@ -467,26 +467,39 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
                       <input class="control" id="customerPhone" type="tel" placeholder="(00) 00000-0000" autocomplete="tel" required maxlength="15" />
                       <button class="lookup-btn" type="button" id="lookupCustomer">CONSULTAR</button>
                     </div>
-                    <div class="customer-status" id="customerStatus" role="status" aria-live="polite">Consulte o número para localizar um cadastro ou registrar um novo titular.</div>
+                    <div class="customer-status" id="customerStatus" role="status" aria-live="polite">Digite o WhatsApp e clique em "CONSULTAR" para verificar seu cadastro ou registrar novo titular.</div>
 
                     <!-- 📲 CAIXA DE DIGITAÇÃO DO CÓDIGO DO WHATSAPP (OTP) -->
                     <div id="otpBox" style="display: none; background: #f0fdf4; border: 2px dashed #10b981; border-radius: 14px; padding: 16px; margin-top: 14px;">
-                      <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13.5px; color: #065f46; margin-bottom: 6px;">
-                        <span>📲</span> <span>Código de Verificação do WhatsApp</span>
+                      <div id="otpFormSection">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13.5px; color: #065f46; margin-bottom: 6px;">
+                          <span>📲</span> <span>Código de Verificação do WhatsApp</span>
+                        </div>
+                        <p id="otpPhoneNotice" style="font-size: 11px; color: #047857; margin: 0 0 10px; line-height: 1.4;">
+                          Enviamos um código de <strong>4 dígitos</strong> para o seu WhatsApp para confirmar que o número é real. Digite o código abaixo:
+                        </p>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                          <input type="text" id="otpCodeInput" maxlength="4" placeholder="0000" inputmode="numeric" style="width: 130px; text-align: center; font-size: 22px; font-weight: 900; letter-spacing: 6px; padding: 9px 12px; border: 2px solid #10b981; border-radius: 10px; background: #fff; color: #065f46; outline: none;" />
+                          <button type="button" id="confirmOtpBtn" style="flex: 1; min-height: 48px; background: #059669; color: #fff; border: none; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; transition: 0.15s; padding: 10px 16px;">
+                            CONFIRMAR CÓDIGO
+                          </button>
+                        </div>
+                        <div id="otpFeedback" style="font-size: 11.5px; margin-top: 8px; font-weight: 700;"></div>
+                        <div style="margin-top: 8px; font-size: 10.5px; color: #059669; display: flex; align-items: center; justify-content: space-between;">
+                          <span>Não recebeu o código?</span>
+                          <button type="button" id="resendOtpBtn" style="background: none; border: none; color: #047857; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0;">Reenviar via WhatsApp</button>
+                        </div>
                       </div>
-                      <p id="otpPhoneNotice" style="font-size: 11px; color: #047857; margin: 0 0 10px; line-height: 1.4;">
-                        Enviamos um código de <strong>4 dígitos</strong> para o seu WhatsApp para confirmar que o número é real. Digite o código abaixo:
-                      </p>
-                      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="otpCodeInput" maxlength="4" placeholder="0000" inputmode="numeric" style="width: 130px; text-align: center; font-size: 22px; font-weight: 900; letter-spacing: 6px; padding: 9px 12px; border: 2px solid #10b981; border-radius: 10px; background: #fff; color: #065f46; outline: none;" />
-                        <button type="button" id="confirmOtpBtn" style="flex: 1; min-height: 48px; background: #059669; color: #fff; border: none; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; transition: 0.15s; padding: 10px 16px;">
-                          CONFIRMAR CÓDIGO
-                        </button>
-                      </div>
-                      <div id="otpFeedback" style="font-size: 11.5px; margin-top: 8px; font-weight: 700;"></div>
-                      <div style="margin-top: 8px; font-size: 10.5px; color: #059669; display: flex; align-items: center; justify-content: space-between;">
-                        <span>Não recebeu o código?</span>
-                        <button type="button" id="resendOtpBtn" style="background: none; border: none; color: #047857; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 0;">Reenviar via WhatsApp</button>
+                      <div id="otpSuccessSection" style="display: none;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #065f46;">
+                          <span style="font-size: 18px;">✅</span>
+                          <div>
+                            <div>WhatsApp Verificado e Autenticado!</div>
+                            <div id="otpSuccessNotice" style="font-size: 11px; font-weight: 600; color: #047857; margin-top: 2px;">
+                              Número confirmado. Agora preencha os dados do titular abaixo e tire sua foto de identificação.
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1184,13 +1197,26 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     currentOtpToken = '';
     lastLookedUpPhone = '';
     const otpBox = document.getElementById('otpBox');
-    if (otpBox) otpBox.style.display = 'none';
+    if (otpBox) {
+      otpBox.style.display = 'none';
+      otpBox.style.border = '2px dashed #10b981';
+      otpBox.style.background = '#f0fdf4';
+    }
+    const otpFormSection = document.getElementById('otpFormSection');
+    if (otpFormSection) otpFormSection.style.display = 'block';
+    const otpSuccessSection = document.getElementById('otpSuccessSection');
+    if (otpSuccessSection) otpSuccessSection.style.display = 'none';
     const otpCodeInput = document.getElementById('otpCodeInput');
-    if (otpCodeInput) otpCodeInput.value = '';
+    if (otpCodeInput) {
+      otpCodeInput.value = '';
+      otpCodeInput.style.borderColor = '#10b981';
+    }
+    const otpFeedback = document.getElementById('otpFeedback');
+    if (otpFeedback) otpFeedback.innerHTML = '';
     if (customerFields) customerFields.hidden = true;
     clearCustomerFields();
     if (photoMandatoryBadge) {
-      photoMandatoryBadge.textContent = 'Obrigatório para 1º Cadastro';
+      photoMandatoryBadge.textContent = '📸 Obrigatório para 1º Cadastro';
       photoMandatoryBadge.style.color = '#dc2626';
       photoMandatoryBadge.style.background = '#fef2f2';
       photoMandatoryBadge.style.borderColor = '#fecaca';
@@ -1241,12 +1267,21 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   // Envia código de 4 dígitos para o WhatsApp via API da Arena
   async function sendOtpCode(digits, rawPhone) {
     const otpBox = document.getElementById('otpBox');
+    const otpFormSection = document.getElementById('otpFormSection');
+    const otpSuccessSection = document.getElementById('otpSuccessSection');
     const otpFeedback = document.getElementById('otpFeedback');
     const otpCodeInput = document.getElementById('otpCodeInput');
     const otpPhoneNotice = document.getElementById('otpPhoneNotice');
 
-    if (otpFeedback) otpFeedback.innerHTML = '<span style="color:#0284c7;">⏳ Enviando código de 4 dígitos para o seu WhatsApp...</span>';
-    if (otpBox) otpBox.style.display = 'block';
+    if (otpBox) {
+      otpBox.style.display = 'block';
+      otpBox.style.border = '2px dashed #10b981';
+      otpBox.style.background = '#f0fdf4';
+    }
+    if (otpFormSection) otpFormSection.style.display = 'block';
+    if (otpSuccessSection) otpSuccessSection.style.display = 'none';
+
+    if (otpFeedback) otpFeedback.innerHTML = '<span style="color:#0284c7; font-weight:700;">⏳ Enviando código de 4 dígitos para o seu WhatsApp...</span>';
     if (otpPhoneNotice) {
       otpPhoneNotice.innerHTML = `Enviamos um código de <strong>4 dígitos</strong> para o seu WhatsApp <strong>${rawPhone || digits}</strong> para confirmar que o número é real. Digite o código abaixo:`;
     }
@@ -1262,21 +1297,35 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       if (data.success && data.token) {
         currentOtpToken = data.token;
         if (otpFeedback) {
-          otpFeedback.innerHTML = '<span style="color:#059669;">✅ Código enviado com sucesso para o seu WhatsApp! Digite os 4 dígitos acima.</span>';
+          otpFeedback.innerHTML = '<span style="color:#059669; font-weight:700;">✅ Código enviado com sucesso no seu WhatsApp! Digite os 4 dígitos acima:</span>';
         }
         if (otpCodeInput) {
           otpCodeInput.value = '';
+          otpCodeInput.style.borderColor = '#10b981';
           otpCodeInput.focus();
         }
       } else {
-        if (otpFeedback) {
-          otpFeedback.innerHTML = `<span style="color:#dc2626;">❌ ${data.message || 'Erro ao enviar código. Verifique se o número está correto.'}</span>`;
+        if (otpBox) otpBox.style.display = 'none';
+        setCustomerStatus(`
+          <div style="background: #fef2f2; border: 1.5px solid #ef4444; border-radius: 12px; padding: 10px 14px; color: #991b1b; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">❌</span>
+            <div>
+              <div>Número não verificado</div>
+              <div style="font-size: 11px; font-weight: 600; color: #b91c1c; margin-top: 2px;">
+                ${data.message || 'Este número não é real ou não possui WhatsApp ativo. Verifique os dígitos informados.'}
+              </div>
+            </div>
+          </div>
+        `, 'new');
+        if (customerPhone) {
+          customerPhone.style.borderColor = '#ef4444';
+          customerPhone.focus();
         }
       }
     } catch(err) {
       console.warn('Erro ao chamar /api/whatsapp/send-code:', err);
       if (otpFeedback) {
-        otpFeedback.innerHTML = '<span style="color:#dc2626;">❌ Erro ao enviar código via API. Tente novamente.</span>';
+        otpFeedback.innerHTML = '<span style="color:#dc2626; font-weight:700;">❌ Erro de conexão ao enviar código via API. Tente novamente.</span>';
       }
     }
   }
@@ -1288,18 +1337,29 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     const otpCodeInput = document.getElementById('otpCodeInput');
     const otpFeedback = document.getElementById('otpFeedback');
     const otpBox = document.getElementById('otpBox');
+    const otpFormSection = document.getElementById('otpFormSection');
+    const otpSuccessSection = document.getElementById('otpSuccessSection');
+    const otpSuccessNotice = document.getElementById('otpSuccessNotice');
+    const confirmOtpBtn = document.getElementById('confirmOtpBtn');
     const code = otpCodeInput ? otpCodeInput.value.trim() : '';
 
     if (!code || code.length !== 4) {
       if (otpFeedback) {
-        otpFeedback.innerHTML = '<span style="color:#dc2626;">⚠️ Digite o código completo de 4 dígitos recebido no seu WhatsApp.</span>';
+        otpFeedback.innerHTML = '<span style="color:#dc2626; font-weight:700;">⚠️ Digite o código completo de 4 dígitos recebido no seu WhatsApp.</span>';
       }
-      if (otpCodeInput) otpCodeInput.focus();
+      if (otpCodeInput) {
+        otpCodeInput.style.borderColor = '#ef4444';
+        otpCodeInput.focus();
+      }
       return;
     }
 
+    if (confirmOtpBtn) {
+      confirmOtpBtn.disabled = true;
+      confirmOtpBtn.textContent = '⏳ VALIDANDO...';
+    }
     if (otpFeedback) {
-      otpFeedback.innerHTML = '<span style="color:#0284c7;">⏳ Validando código...</span>';
+      otpFeedback.innerHTML = '<span style="color:#0284c7; font-weight:700;">⏳ Validando código...</span>';
     }
 
     try {
@@ -1320,19 +1380,14 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
 
         if (customerPhone) customerPhone.style.borderColor = '#10b981';
 
-        // Atualiza a caixa do OTP para sucesso permanente
+        // Atualiza a caixa do OTP para sucesso
+        if (otpFormSection) otpFormSection.style.display = 'none';
+        if (otpSuccessSection) otpSuccessSection.style.display = 'block';
+        if (otpSuccessNotice) {
+          otpSuccessNotice.innerHTML = `Número <strong>${raw}</strong> confirmado. Agora preencha os dados do titular abaixo e tire sua foto de identificação.`;
+        }
         if (otpBox) {
-          otpBox.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #065f46;">
-              <span style="font-size: 18px;">✅</span>
-              <div>
-                <div>WhatsApp Verificado e Autenticado!</div>
-                <div style="font-size: 11px; font-weight: 600; color: #047857; margin-top: 2px;">
-                  Número <strong>${raw}</strong> confirmado. Agora preencha os dados do titular abaixo e tire sua foto de identificação.
-                </div>
-              </div>
-            </div>
-          `;
+          otpBox.style.display = 'block';
           otpBox.style.background = '#ecfdf5';
           otpBox.style.border = '2px solid #10b981';
         }
@@ -1357,7 +1412,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
 
       } else {
         if (otpFeedback) {
-          otpFeedback.innerHTML = `<span style="color:#dc2626;">❌ ${data.message || 'Código incorreto. Verifique o WhatsApp.'}</span>`;
+          otpFeedback.innerHTML = `<span style="color:#dc2626; font-weight:700;">❌ ${data.message || 'Código incorreto. Verifique o WhatsApp.'}</span>`;
         }
         if (otpCodeInput) {
           otpCodeInput.style.borderColor = '#ef4444';
@@ -1367,7 +1422,12 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
     } catch(err) {
       console.warn('Erro ao verificar código:', err);
       if (otpFeedback) {
-        otpFeedback.innerHTML = '<span style="color:#dc2626;">❌ Erro de conexão ao validar código. Tente novamente.</span>';
+        otpFeedback.innerHTML = '<span style="color:#dc2626; font-weight:700;">❌ Erro de conexão ao validar código. Tente novamente.</span>';
+      }
+    } finally {
+      if (confirmOtpBtn) {
+        confirmOtpBtn.disabled = false;
+        confirmOtpBtn.textContent = 'CONFIRMAR CÓDIGO';
       }
     }
   }
@@ -1383,7 +1443,7 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       if (customerFields) customerFields.hidden = true;
       const otpBox = document.getElementById('otpBox');
       if (otpBox) otpBox.style.display = 'none';
-      setCustomerStatus('⚠️ Informe um WhatsApp válido com DDD (ex: 81 99895-4840) para consultar o cadastro.', 'new');
+      setCustomerStatus('⚠️ Digite seu WhatsApp com DDD (10 ou 11 dígitos) e clique em "CONSULTAR".', 'new');
       if (customerPhone) {
         customerPhone.style.borderColor = '#ef4444';
         customerPhone.focus();
@@ -1391,98 +1451,115 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       return;
     }
 
-    setCustomerStatus('🔍 Verificando WhatsApp e consultando banco de dados da Arena...', '');
-
-    // 1. PRIMEIRO: CONSULTA SE JÁ TEM CADASTRO NO SUPABASE
-    const record = await searchCustomerInDatabase(digits);
-    customerLookupDone = true;
-    lastLookedUpPhone = digits;
-    pendingPhotoData = '';
-
-    const otpBox = document.getElementById('otpBox');
-
-    if (record) {
-      // ✅ CLIENTE JÁ CADASTRADO: DISPENSADO DE CÓDIGO, FOTO E NOVO CADASTRO!
-      activeCustomer = record;
-      isCustomerRegistered = true;
-      isPhoneVerifiedReal = true;
-      isOtpConfirmed = true;
-
-      if (otpBox) otpBox.style.display = 'none';
-      if (customerFields) customerFields.hidden = false;
-      if (customerPhone) customerPhone.style.borderColor = '#10b981';
-
-      if (customerName) customerName.value = record.name || '';
-      if (customerCpf) customerCpf.value = formatCpf(record.document || '');
-
-      let meta = {};
-      try {
-        if (record.notes && record.notes.startsWith('{')) {
-          meta = JSON.parse(record.notes);
-        }
-      } catch(e) {}
-
-      if (customerBirthDate && meta.birthDate) {
-        customerBirthDate.value = meta.birthDate;
-      }
-      if (meta.photoData) {
-        pendingPhotoData = meta.photoData;
-        showCustomerPhoto(meta.photoData);
-      }
-
-      if (photoMandatoryBadge) {
-        photoMandatoryBadge.textContent = '✅ Identificação Confirmada (Dispensado)';
-        photoMandatoryBadge.style.color = '#166534';
-        photoMandatoryBadge.style.background = '#dcfce7';
-        photoMandatoryBadge.style.borderColor = '#86efac';
-      }
-
-      setCustomerStatus(`
-        <div style="background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 12px; padding: 10px 14px; color: #065f46; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">✅</span>
-          <div>
-            <div>Cadastro Ativo Encontrado: <strong>${record.name}</strong>!</div>
-            <div style="font-size: 11px; font-weight: 600; color: #047857; margin-top: 2px;">
-              Identificação confirmada no banco de dados. <strong>Você não precisa digitar código nem tirar foto.</strong> Pode escolher o horário e agendar direto!
-            </div>
-          </div>
-        </div>
-      `, 'found');
-    } else {
-      // ✨ CLIENTE NÃO CADASTRADO:
-      // OS CAMPOS DE CADASTRO (NOME, CPF, NASCIMENTO, FOTO) PERMANECEM OCULTOS
-      // ATÉ ELE DIGITAR E CONFIRMAR O CÓDIGO ENVIADO NO WHATSAPP!
-      activeCustomer = null;
-      isCustomerRegistered = false;
-      isPhoneVerifiedReal = false;
-      isOtpConfirmed = false;
-      clearCustomerFields();
-      if (customerFields) customerFields.hidden = true; // OCULTO ATÉ CONFIRMAR CÓDIGO!
-
-      if (photoMandatoryBadge) {
-        photoMandatoryBadge.textContent = '📸 Obrigatório para 1º Cadastro';
-        photoMandatoryBadge.style.color = '#dc2626';
-        photoMandatoryBadge.style.background = '#fef2f2';
-        photoMandatoryBadge.style.borderColor = '#fecaca';
-      }
-
-      setCustomerStatus(`
-        <div style="background: #f0fdf4; border: 1.5px solid #10b981; border-radius: 12px; padding: 10px 14px; color: #166534; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 18px;">📲</span>
-          <div>
-            <div>Verificação de WhatsApp em Andamento...</div>
-            <div style="font-size: 11px; font-weight: 600; color: #15803d; margin-top: 2px;">
-              Enviamos um código de 4 dígitos para <strong>${raw}</strong>. Digite-o no campo abaixo para autenticar seu WhatsApp e liberar os campos de cadastro.
-            </div>
-          </div>
-        </div>
-      `, 'new');
-
-      // Dispara envio do código via API
-      await sendOtpCode(digits, raw);
+    if (lookupCustomerButton) {
+      lookupCustomerButton.disabled = true;
+      lookupCustomerButton.textContent = '⏳ CONSULTANDO...';
     }
+    setCustomerStatus('🔍 Verificando WhatsApp e consultando cadastro na Arena...', '');
 
-    if (notice) notice.classList.remove('show');
+    try {
+      // 1. PRIMEIRO: CONSULTA SE JÁ TEM CADASTRO NO SUPABASE
+      const record = await searchCustomerInDatabase(digits);
+      customerLookupDone = true;
+      lastLookedUpPhone = digits;
+      pendingPhotoData = '';
+
+      const otpBox = document.getElementById('otpBox');
+
+      if (record) {
+        // ✅ CLIENTE JÁ CADASTRADO: DISPENSADO DE CÓDIGO, FOTO E NOVO CADASTRO!
+        activeCustomer = record;
+        isCustomerRegistered = true;
+        isPhoneVerifiedReal = true;
+        isOtpConfirmed = true;
+
+        if (otpBox) otpBox.style.display = 'none';
+        if (customerFields) customerFields.hidden = false;
+        if (customerPhone) customerPhone.style.borderColor = '#10b981';
+
+        if (customerName) customerName.value = record.name || '';
+        if (customerCpf) customerCpf.value = formatCpf(record.document || '');
+
+        let meta = {};
+        try {
+          if (record.notes && record.notes.startsWith('{')) {
+            meta = JSON.parse(record.notes);
+          }
+        } catch(e) {}
+
+        if (customerBirthDate && meta.birthDate) {
+          customerBirthDate.value = meta.birthDate;
+        }
+        if (meta.photoData) {
+          pendingPhotoData = meta.photoData;
+          showCustomerPhoto(meta.photoData);
+        }
+
+        if (photoMandatoryBadge) {
+          photoMandatoryBadge.textContent = '✅ Identificação Confirmada (Dispensado)';
+          photoMandatoryBadge.style.color = '#166534';
+          photoMandatoryBadge.style.background = '#dcfce7';
+          photoMandatoryBadge.style.borderColor = '#86efac';
+        }
+
+        setCustomerStatus(`
+          <div style="background: #ecfdf5; border: 1.5px solid #10b981; border-radius: 12px; padding: 10px 14px; color: #065f46; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">✅</span>
+            <div>
+              <div>Cadastro Ativo Encontrado: <strong>${record.name}</strong>!</div>
+              <div style="font-size: 11px; font-weight: 600; color: #047857; margin-top: 2px;">
+                Identificação confirmada no banco de dados. <strong>Você não precisa digitar código nem tirar foto.</strong> Pode escolher o horário e agendar direto!
+              </div>
+            </div>
+          </div>
+        `, 'found');
+      } else {
+        // ✨ CLIENTE NÃO CADASTRADO:
+        // OS CAMPOS DE CADASTRO (NOME, CPF, NASCIMENTO, FOTO) PERMANECEM OCULTOS
+        // ATÉ ELE DIGITAR E CONFIRMAR O CÓDIGO ENVIADO NO WHATSAPP!
+        activeCustomer = null;
+        isCustomerRegistered = false;
+        isPhoneVerifiedReal = false;
+        isOtpConfirmed = false;
+        clearCustomerFields();
+        if (customerFields) customerFields.hidden = true; // OCULTO ATÉ CONFIRMAR CÓDIGO!
+
+        if (photoMandatoryBadge) {
+          photoMandatoryBadge.textContent = '📸 Obrigatório para 1º Cadastro';
+          photoMandatoryBadge.style.color = '#dc2626';
+          photoMandatoryBadge.style.background = '#fef2f2';
+          photoMandatoryBadge.style.borderColor = '#fecaca';
+        }
+
+        if (lookupCustomerButton) {
+          lookupCustomerButton.textContent = '📲 ENVIANDO CÓDIGO...';
+        }
+
+        setCustomerStatus(`
+          <div style="background: #f0fdf4; border: 1.5px solid #10b981; border-radius: 12px; padding: 10px 14px; color: #166534; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 18px;">📲</span>
+            <div>
+              <div>Verificação de WhatsApp em Andamento...</div>
+              <div style="font-size: 11px; font-weight: 600; color: #15803d; margin-top: 2px;">
+                Enviamos um código de 4 dígitos para <strong>${raw}</strong>. Digite-o no campo abaixo para autenticar seu WhatsApp e liberar os campos de cadastro.
+              </div>
+            </div>
+          </div>
+        `, 'new');
+
+        // Dispara envio do código via API
+        await sendOtpCode(digits, raw);
+      }
+    } catch (err) {
+      console.warn('Erro ao consultar/enviar código:', err);
+      setCustomerStatus('❌ Ocorreu um erro ao consultar. Tente novamente.', 'new');
+    } finally {
+      if (lookupCustomerButton) {
+        lookupCustomerButton.disabled = false;
+        lookupCustomerButton.textContent = 'CONSULTAR';
+      }
+      if (notice) notice.classList.remove('show');
+    }
   };
 
   if (lookupCustomerButton) {
@@ -1496,10 +1573,18 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
 
   const resendOtpBtn = document.getElementById('resendOtpBtn');
   if (resendOtpBtn) {
-    resendOtpBtn.onclick = () => {
+    resendOtpBtn.onclick = async () => {
       const raw = customerPhone ? customerPhone.value : '';
       const digits = normalizePhone(raw);
-      if (digits.length >= 10) sendOtpCode(digits, raw);
+      if (digits.length >= 10) {
+        resendOtpBtn.disabled = true;
+        resendOtpBtn.textContent = 'Enviando...';
+        await sendOtpCode(digits, raw);
+        setTimeout(() => {
+          resendOtpBtn.disabled = false;
+          resendOtpBtn.textContent = 'Reenviar via WhatsApp';
+        }, 5000);
+      }
     };
   }
 
@@ -1523,7 +1608,6 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
   // ==============================================================================
   // 📋 LISTENERS DE CAMPOS E UPLOAD DE FOTO
   // ==============================================================================
-  let _phoneLookupTimer = null;
   if (customerPhone) {
     customerPhone.addEventListener('input', e => {
       let v = e.target.value.replace(/\D/g, '').slice(0, 11);
@@ -1536,18 +1620,11 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       if (customerLookupDone && digits !== lastLookedUpPhone) {
         resetCustomerLookup();
       }
-
-      clearTimeout(_phoneLookupTimer);
-      if (digits.length >= 10) {
-        _phoneLookupTimer = setTimeout(() => {
-          doCustomerLookup();
-        }, 500);
-      }
     });
 
-    customerPhone.addEventListener('blur', () => {
-      const digits = normalizePhone(customerPhone.value);
-      if (digits.length >= 10 && (!customerLookupDone || digits !== lastLookedUpPhone)) {
+    customerPhone.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
         doCustomerLookup();
       }
     });

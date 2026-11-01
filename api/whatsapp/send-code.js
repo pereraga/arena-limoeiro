@@ -37,6 +37,7 @@ export default async function handler(req, res) {
 
     const formatted = clean.startsWith('55') ? clean : ('55' + clean);
 
+    let targetNumber = formatted;
     // 1. Verifica se o número existe no WhatsApp através da Evolution API
     try {
       const checkRes = await fetch(`${EVOLUTION_API_URL}/chat/whatsappNumbers/${EVOLUTION_INSTANCE}`, {
@@ -57,6 +58,9 @@ export default async function handler(req, res) {
               isReal: false,
               message: 'Este número não é real ou não possui conta de WhatsApp ativa.'
             });
+          }
+          if (checkData[0].jid) {
+            targetNumber = checkData[0].jid.replace('@s.whatsapp.net', '');
           }
         }
       }
@@ -87,7 +91,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        number: formatted,
+        number: targetNumber,
         text: msg
       })
     });
