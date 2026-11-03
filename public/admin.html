@@ -5165,7 +5165,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const modal = document.getElementById('arenaFinishModal');
       if (modal) {
-        modal.style.display = 'flex';
+        modal.style.setProperty('display', 'flex', 'important');
         modal.classList.remove('hidden');
       }
       if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
@@ -5635,8 +5635,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (window.location.hash.includes('openBalcao')) {
         setTimeout(() => { openDirectBookingModal(); }, 200);
       }
-      if (window.location.search.includes('finish=1') || window.location.hash.includes('openFinishFirst')) {
-        setTimeout(() => { if (matches && matches[0]) window.openFinishGame(matches[0].id); }, 200);
+      if (window.location.search.includes('finish=1') || window.location.hash.includes('openFinishFirst') || window.location.hash.includes('openFinishModal')) {
+        setTimeout(() => {
+          if (matches && matches[0]) {
+            window.openFinishGame(matches[0].id);
+            if (window.location.hash.includes('split') || window.location.search.includes('split=1')) {
+              setTimeout(() => {
+                window.setPaymentMode('split');
+                window.onSplitAmountChange(1, 40);
+              }, 100);
+            }
+          }
+        }, 150);
       }
     }
 
