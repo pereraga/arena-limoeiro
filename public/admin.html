@@ -949,6 +949,156 @@
   background: #64748b;
 }
 
+
+    /* ==========================================================================
+       RESPONSIVIDADE MULTIDISPOSITIVOS: COMPUTADOR, TABLET E CELULAR
+       Compactação inteligente para que todas as informações fiquem 100% visíveis
+       ========================================================================== */
+
+    /* Regras Gerais para Modais */
+    .modal-dialog-responsive {
+      max-height: 94vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    .modal-body-responsive {
+      overflow-y: auto !important;
+      flex: 1 1 auto !important;
+      overscroll-behavior: contain !important;
+    }
+
+    /* Telas Médias / Tablets e Notebooks (largura <= 1024px ou altura <= 800px) */
+    @media (max-width: 1024px), (max-height: 800px) {
+      .modal-dialog-responsive {
+        max-height: 96vh !important;
+      }
+      .booking-main-grid {
+        gap: 12px !important;
+        padding: 12px 14px 4px !important;
+      }
+      .timebox-mint {
+        min-height: 82px !important;
+        padding: 6px 4px !important;
+      }
+      .timebox-mint strong {
+        font-size: 18px !important;
+      }
+      .booking-title-text {
+        font-size: 15px !important;
+      }
+      .booking-time-control-box {
+        gap: 8px !important;
+        padding: 8px 10px !important;
+      }
+    }
+
+    /* Telas Tablets e Celulares (largura <= 768px) */
+    @media (max-width: 768px) {
+      .booking-card {
+        border-radius: 14px !important;
+        margin-bottom: 10px !important;
+      }
+      .booking-main-grid {
+        grid-template-columns: 76px minmax(0, 1fr) !important;
+        gap: 10px !important;
+        padding: 10px 12px 4px !important;
+      }
+      .booking-side-col {
+        grid-column: 1 / -1 !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        padding-top: 8px !important;
+        border-top: 1px dashed #e2e8f0 !important;
+        margin-top: 4px !important;
+      }
+      .timebox-mint {
+        min-height: 76px !important;
+        padding: 4px 2px !important;
+        border-radius: 10px !important;
+      }
+      .timebox-mint strong {
+        font-size: 16px !important;
+      }
+      .timebox-mint span {
+        font-size: 9.5px !important;
+      }
+      .booking-chips {
+        gap: 4px !important;
+        margin-bottom: 4px !important;
+      }
+      .pill-chip {
+        padding: 2px 6px !important;
+        font-size: 9px !important;
+      }
+      .booking-title-text {
+        font-size: 13.5px !important;
+        line-height: 1.25 !important;
+      }
+      .booking-meta-row {
+        font-size: 10.5px !important;
+        gap: 8px !important;
+      }
+      .booking-time-control-box {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 6px !important;
+        padding: 6px 8px !important;
+        margin-top: 6px !important;
+      }
+      .tc-input-num {
+        width: 28px !important;
+        font-size: 10px !important;
+      }
+      .booking-finish-red-btn {
+        padding: 7px 12px !important;
+        font-size: 11px !important;
+        border-radius: 10px !important;
+      }
+      .booking-timer-bar-wrapper {
+        margin: 6px 0 4px 0 !important;
+        padding: 6px 8px !important;
+      }
+    }
+
+    /* Telas de Celular (largura <= 480px) */
+    @media (max-width: 480px) {
+      .booking-main-grid {
+        grid-template-columns: 64px minmax(0, 1fr) !important;
+        gap: 8px !important;
+        padding: 8px 10px 4px !important;
+      }
+      .timebox-mint {
+        min-height: 70px !important;
+      }
+      .timebox-mint strong {
+        font-size: 14px !important;
+      }
+      .timebox-mint span {
+        font-size: 8.5px !important;
+      }
+      .booking-title-text {
+        font-size: 12.5px !important;
+      }
+      .booking-meta-row {
+        font-size: 9.5px !important;
+        flex-wrap: wrap !important;
+        gap: 4px 6px !important;
+      }
+      .booking-time-control-box {
+        grid-template-columns: 1fr !important;
+        gap: 5px !important;
+        padding: 6px !important;
+      }
+      .booking-price-text {
+        font-size: 14px !important;
+      }
+      .booking-finish-red-btn {
+        padding: 6px 10px !important;
+        font-size: 10.5px !important;
+        gap: 4px !important;
+      }
+    }
+
 </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col pb-20">
@@ -3631,297 +3781,289 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- Toast Notifier -->
 <!-- Modal 4: Concluir / Fechar Jogo com Cálculo Automático de Tempo Extra, Atraso e Pagamento -->
-<div id="arenaFinishModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-  <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[94vh]">
+<div id="arenaFinishModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-2xl sm:rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[96vh] sm:max-h-[92vh] modal-dialog-responsive">
     
-    <!-- Cabeçalho -->
-    <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 p-5 text-white flex items-center justify-between">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
-          <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+    <!-- Cabeçalho Compacto -->
+    <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 py-3 px-3.5 sm:py-3.5 sm:px-5 text-white flex items-center justify-between shrink-0">
+      <div class="flex items-center space-x-2.5 sm:space-x-3">
+        <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+          <i data-lucide="check-circle-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
         </div>
         <div>
-          <h3 class="text-base font-black tracking-tight uppercase">Concluir e Fechar Partida</h3>
-          <p class="text-xs text-emerald-300 font-medium">Cálculo automático de tempo extra, atraso e fechamento financeiro</p>
+          <h3 class="text-xs sm:text-sm font-black tracking-tight uppercase">Concluir e Fechar Partida</h3>
+          <p class="text-[10px] sm:text-xs text-emerald-300 font-medium">Cálculo de tempo extra, atraso e fechamento financeiro</p>
         </div>
       </div>
       <button type="button" onclick="closeArenaModal('arenaFinishModal')" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
-        <i data-lucide="x" class="w-6 h-6"></i>
+        <i data-lucide="x" class="w-5 h-5"></i>
       </button>
     </div>
 
-    <form id="arenaFinishForm" onsubmit="saveFinishGame(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+    <form id="arenaFinishForm" onsubmit="saveFinishGame(event)" class="p-3 sm:p-4 space-y-2 sm:space-y-2.5 overflow-y-auto flex-1 text-xs modal-body-responsive">
       <input type="hidden" id="finishMatchId">
       <input type="hidden" id="finishBasePrice" value="100">
       <input type="hidden" id="finishHourlyRate" value="100">
 
-      <!-- Resumo da Partida -->
-      <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+      <!-- Resumo da Partida (Compacto) -->
+      <div class="py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs">
         <div>
-          <span class="block font-black text-slate-800 text-sm" id="finishMatchTitle">Esc Ariadnes</span>
-          <span class="text-slate-500 text-[11px]" id="finishMatchSubtitle">Quadra FUT 7 · 18:00 às 19:00 (1h)</span>
+          <span class="block font-black text-slate-800 text-xs sm:text-sm leading-tight" id="finishMatchTitle">Esc Ariadnes</span>
+          <span class="text-slate-500 text-[10px] sm:text-[11px]" id="finishMatchSubtitle">Quadra FUT 7 · 18:00 às 19:00 (1h)</span>
         </div>
         <div class="text-right">
-          <span class="text-[10px] font-bold text-slate-400 uppercase block">Valor Base</span>
-          <span class="font-black text-slate-800 text-sm" id="finishBaseDisplay">R$ 100,00</span>
+          <span class="text-[9px] font-bold text-slate-400 uppercase block leading-tight">Valor Base</span>
+          <span class="font-black text-slate-800 text-xs sm:text-sm" id="finishBaseDisplay">R$ 100,00</span>
         </div>
       </div>
 
-      <!-- 1. TEMPO DE ATRASO DA EQUIPE -->
-      <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <label class="block text-xs font-black text-amber-900 uppercase flex items-center gap-1.5">
-            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
-            <span>Tempo de Atraso da Equipe</span>
-          </label>
-          <span id="finishLateBadge" class="text-[11px] font-black text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
-            Sem atraso
-          </span>
-        </div>
-
-        <input type="hidden" id="finishMatchLate" value="0">
-        <div class="grid grid-cols-5 gap-1.5" id="finishLateButtonsContainer">
-          <button type="button" onclick="setFinishLateMinutes(0)" data-late="0" class="btn-finish-late py-1.5 px-1 text-xs font-black text-white bg-amber-600 border border-amber-700 rounded-xl shadow-xs text-center cursor-pointer">
-            0 min
-          </button>
-          <button type="button" onclick="setFinishLateMinutes(5)" data-late="5" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
-            5 min
-          </button>
-          <button type="button" onclick="setFinishLateMinutes(10)" data-late="10" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
-            10 min
-          </button>
-          <button type="button" onclick="setFinishLateMinutes(15)" data-late="15" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
-            15 min
-          </button>
-          <button type="button" onclick="setFinishLateMinutes(20)" data-late="20" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
-            20+ min
-          </button>
-        </div>
-        <div class="flex items-center gap-2 mt-2 pt-2 border-t border-amber-200/60 text-xs flex-wrap">
-          <span class="text-slate-600 font-bold">Ou digite:</span>
-          <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-xs">
-            <input type="number" min="0" max="23" id="finishInputLateH" placeholder="0" 
-                   class="w-8 text-xs font-bold text-center outline-none" 
-                   oninput="onModalLateHMType()" />
-            <span class="text-[10px] font-bold text-slate-500 ml-1">h</span>
-          </div>
-          <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-xs">
-            <input type="number" min="0" max="59" step="5" id="finishInputLateM" placeholder="0" 
-                   class="w-10 text-xs font-bold text-center outline-none" 
-                   oninput="onModalLateHMType()" />
-            <span class="text-[10px] font-bold text-slate-500 ml-1">min</span>
-          </div>
-          <span class="text-slate-400 font-bold">ou horário de chegada:</span>
-          <input type="time" id="finishInputArrivalTime" 
-                 class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none"
-                 onchange="onModalArrivalTimeType(this.value)" />
-        </div>
-      </div>
-
-      <!-- 2. TEMPO DE HORÁRIO EXTRA / PRORROGAÇÃO -->
-      <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3.5 space-y-2">
-        <div class="flex items-center justify-between">
-          <label class="block text-xs font-black text-emerald-900 uppercase flex items-center gap-1.5">
-            <i data-lucide="clock-9" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Tempo de Horário Extra (Prorrogação)</span>
-          </label>
-          <span id="finishExtraBadge" class="text-[11px] font-black text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">
-            Sem tempo extra
-          </span>
-        </div>
-
-        <input type="hidden" id="finishMatchExtra" value="0">
-        <div class="grid grid-cols-5 gap-1.5" id="finishExtraButtonsContainer">
-          <button type="button" onclick="setFinishExtraMinutes(0)" data-extra="0" class="btn-finish-extra py-1.5 px-1 text-xs font-black text-white bg-emerald-600 border border-emerald-700 rounded-xl shadow-xs text-center cursor-pointer">
-            0 min
-          </button>
-          <button type="button" onclick="setFinishExtraMinutes(15)" data-extra="15" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
-            +15 min
-          </button>
-          <button type="button" onclick="setFinishExtraMinutes(30)" data-extra="30" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
-            +30 min
-          </button>
-          <button type="button" onclick="setFinishExtraMinutes(45)" data-extra="45" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
-            +45 min
-          </button>
-          <button type="button" onclick="setFinishExtraMinutes(60)" data-extra="60" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
-            +1 hora
-          </button>
-        </div>
-        <div class="flex items-center gap-2 mt-2 pt-2 border-t border-emerald-200/60 text-xs flex-wrap">
-          <span class="text-slate-600 font-bold">Ou digite:</span>
-          <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-xs">
-            <input type="number" min="0" max="23" id="finishInputExtraH" placeholder="0" 
-                   class="w-8 text-xs font-bold text-center outline-none" 
-                   oninput="onModalExtraHMType()" />
-            <span class="text-[10px] font-bold text-slate-500 ml-1">h</span>
-          </div>
-          <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-xs">
-            <input type="number" min="0" max="59" step="5" id="finishInputExtraM" placeholder="0" 
-                   class="w-10 text-xs font-bold text-center outline-none" 
-                   oninput="onModalExtraHMType()" />
-            <span class="text-[10px] font-bold text-slate-500 ml-1">min</span>
-          </div>
-          <span class="text-slate-400 font-bold">ou jogou até:</span>
-          <input type="time" id="finishInputEndTime" 
-                 class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none"
-                 onchange="onModalEndTimeType(this.value)" />
-        </div>
-      </div>
-
-      <!-- 3. BOX DE CÁLCULO AUTOMÁTICO DO VALOR FINAL -->
-      <div class="p-4 bg-gradient-to-br from-emerald-900 to-teal-950 text-white rounded-2xl shadow-md space-y-2">
-        <div class="flex items-center justify-between text-xs text-emerald-200">
-          <span>Valor base contratado:</span>
-          <span id="finishCalcBase">R$ 100,00</span>
-        </div>
-        <div class="flex items-center justify-between text-xs text-emerald-200">
-          <span>Adicional tempo extra (<span id="finishCalcExtraMins">0 min</span>):</span>
-          <span id="finishCalcExtraAmount" class="font-bold text-emerald-300">+ R$ 0,00</span>
-        </div>
-        <div class="border-t border-emerald-700/60 pt-2 flex items-center justify-between">
-          <div>
-            <span class="text-xs font-black uppercase text-emerald-100 tracking-wide block">Cálculo Automático Total a Cobrar:</span>
-            <span class="text-[10px] text-emerald-300 font-medium">Calculado automaticamente com base na taxa horária</span>
-          </div>
-          <span id="finishCalcTotal" class="text-2xl font-black text-white">R$ 100,00</span>
-        </div>
-      </div>
-
-      <!-- 4. RECEBER BOLA DA QUADRA -->
-
-      <!-- 5. ORIGEM DA MARCAÇÃO & FORMA DE PAGAMENTO COM RATEIO -->
-      <div class="space-y-3 pt-1">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Onde foi marcado o jogo? *</label>
-            <select id="finishMatchOrigin" required
-                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-              <option value="Marcado no Balcão">Marcado no Balcão</option>
-              <option value="No Agendamento">No Agendamento (Online / App)</option>
-              <option value="Avulso">Avulso</option>
-              <option value="Mensalista">Mensalista</option>
-            </select>
+      <!-- Grade Responsiva: Atraso (Esquerda) e Horário Extra (Direita) lado a lado em telas >= sm -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+        <!-- 1. TEMPO DE ATRASO DA EQUIPE -->
+        <div class="bg-amber-50/70 border border-amber-200/80 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <label class="block text-[11px] font-black text-amber-900 uppercase flex items-center gap-1">
+              <i data-lucide="alert-triangle" class="w-3 h-3 text-amber-600"></i>
+              <span>Atraso da Equipe</span>
+            </label>
+            <span id="finishLateBadge" class="text-[10px] font-black text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded-full">
+              Sem atraso
+            </span>
           </div>
 
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="block text-xs font-bold text-slate-700 uppercase">Modo de Pagamento *</label>
+          <input type="hidden" id="finishMatchLate" value="0">
+          <div class="grid grid-cols-5 gap-1" id="finishLateButtonsContainer">
+            <button type="button" onclick="setFinishLateMinutes(0)" data-late="0" class="btn-finish-late py-1 px-0.5 text-[10.5px] font-black text-white bg-amber-600 border border-amber-700 rounded-lg shadow-xs text-center cursor-pointer">
+              0m
+            </button>
+            <button type="button" onclick="setFinishLateMinutes(5)" data-late="5" class="btn-finish-late py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-amber-100 text-center cursor-pointer">
+              5m
+            </button>
+            <button type="button" onclick="setFinishLateMinutes(10)" data-late="10" class="btn-finish-late py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-amber-100 text-center cursor-pointer">
+              10m
+            </button>
+            <button type="button" onclick="setFinishLateMinutes(15)" data-late="15" class="btn-finish-late py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-amber-100 text-center cursor-pointer">
+              15m
+            </button>
+            <button type="button" onclick="setFinishLateMinutes(20)" data-late="20" class="btn-finish-late py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-amber-100 text-center cursor-pointer">
+              20+
+            </button>
+          </div>
+          <div class="flex items-center gap-1 pt-1 border-t border-amber-200/60 text-[10.5px] flex-wrap">
+            <span class="text-slate-500 font-bold">Digitar:</span>
+            <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1 py-0.5 shadow-2xs">
+              <input type="number" min="0" max="23" id="finishInputLateH" placeholder="0" 
+                     class="w-6 text-[10.5px] font-bold text-center outline-none" 
+                     oninput="onModalLateHMType()" />
+              <span class="text-[8.5px] font-bold text-slate-500 ml-0.5">h</span>
             </div>
-            <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
-              <button type="button" id="payModeSingleTab" onclick="setPaymentMode('single')" 
-                      class="py-1.5 px-2 rounded-lg bg-white text-emerald-900 font-black shadow-xs text-center cursor-pointer transition">
-                Único
-              </button>
-              <button type="button" id="payModeSplitTab" onclick="setPaymentMode('split')" 
-                      class="py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 font-bold text-center cursor-pointer transition">
-                Dividir (Dinheiro+PIX)
-              </button>
+            <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1 py-0.5 shadow-2xs">
+              <input type="number" min="0" max="59" step="5" id="finishInputLateM" placeholder="0" 
+                     class="w-7 text-[10.5px] font-bold text-center outline-none" 
+                     oninput="onModalLateHMType()" />
+              <span class="text-[8.5px] font-bold text-slate-500 ml-0.5">m</span>
             </div>
-            <input type="hidden" id="finishPaymentMode" value="single">
+            <span class="text-slate-400 font-bold ml-auto">às:</span>
+            <input type="time" id="finishInputArrivalTime" 
+                   class="bg-white border border-slate-300 rounded-md px-1 py-0.5 text-[10.5px] font-bold text-slate-800 outline-none"
+                   onchange="onModalArrivalTimeType(this.value)" />
           </div>
         </div>
 
-        <!-- Seção Pagamento Único -->
-        <div id="sectionPaySingle" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          <div class="sm:col-span-2">
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Forma de Pagamento Integral *</label>
-            <select id="finishMatchPayment"
-                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+        <!-- 2. TEMPO DE HORÁRIO EXTRA / PRORROGAÇÃO -->
+        <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-xl p-2.5 space-y-1.5 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <label class="block text-[11px] font-black text-emerald-900 uppercase flex items-center gap-1">
+              <i data-lucide="clock-9" class="w-3 h-3 text-emerald-600"></i>
+              <span>Horário Extra (Prorrogação)</span>
+            </label>
+            <span id="finishExtraBadge" class="text-[10px] font-black text-emerald-700 bg-white border border-emerald-200 px-1.5 py-0.5 rounded-full">
+              Sem extra
+            </span>
+          </div>
+
+          <input type="hidden" id="finishMatchExtra" value="0">
+          <div class="grid grid-cols-5 gap-1" id="finishExtraButtonsContainer">
+            <button type="button" onclick="setFinishExtraMinutes(0)" data-extra="0" class="btn-finish-extra py-1 px-0.5 text-[10.5px] font-black text-white bg-emerald-600 border border-emerald-700 rounded-lg shadow-xs text-center cursor-pointer">
+              0m
+            </button>
+            <button type="button" onclick="setFinishExtraMinutes(15)" data-extra="15" class="btn-finish-extra py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 text-center cursor-pointer">
+              +15m
+            </button>
+            <button type="button" onclick="setFinishExtraMinutes(30)" data-extra="30" class="btn-finish-extra py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 text-center cursor-pointer">
+              +30m
+            </button>
+            <button type="button" onclick="setFinishExtraMinutes(45)" data-extra="45" class="btn-finish-extra py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 text-center cursor-pointer">
+              +45m
+            </button>
+            <button type="button" onclick="setFinishExtraMinutes(60)" data-extra="60" class="btn-finish-extra py-1 px-0.5 text-[10.5px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 text-center cursor-pointer">
+              +1h
+            </button>
+          </div>
+          <div class="flex items-center gap-1 pt-1 border-t border-emerald-200/60 text-[10.5px] flex-wrap">
+            <span class="text-slate-500 font-bold">Digitar:</span>
+            <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1 py-0.5 shadow-2xs">
+              <input type="number" min="0" max="23" id="finishInputExtraH" placeholder="0" 
+                     class="w-6 text-[10.5px] font-bold text-center outline-none" 
+                     oninput="onModalExtraHMType()" />
+              <span class="text-[8.5px] font-bold text-slate-500 ml-0.5">h</span>
+            </div>
+            <div class="inline-flex items-center bg-white border border-slate-300 rounded-md px-1 py-0.5 shadow-2xs">
+              <input type="number" min="0" max="59" step="5" id="finishInputExtraM" placeholder="0" 
+                     class="w-7 text-[10.5px] font-bold text-center outline-none" 
+                     oninput="onModalExtraHMType()" />
+              <span class="text-[8.5px] font-bold text-slate-500 ml-0.5">m</span>
+            </div>
+            <span class="text-slate-400 font-bold ml-auto">até:</span>
+            <input type="time" id="finishInputEndTime" 
+                   class="bg-white border border-slate-300 rounded-md px-1 py-0.5 text-[10.5px] font-bold text-slate-800 outline-none"
+                   onchange="onModalEndTimeType(this.value)" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. BOX DE CÁLCULO AUTOMÁTICO DO VALOR FINAL (Ultra compacto) -->
+      <div class="p-2 sm:p-2.5 bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 text-white rounded-xl shadow-xs space-y-1">
+        <div class="flex items-center justify-between text-[11px] text-emerald-200">
+          <span>Base contratado: <b id="finishCalcBase" class="text-white font-black">R$ 100,00</b></span>
+          <span>Adicional extra (<span id="finishCalcExtraMins">0 min</span>): <b id="finishCalcExtraAmount" class="text-emerald-300 font-black">+ R$ 0,00</b></span>
+        </div>
+        <div class="border-t border-emerald-800/70 pt-1 flex items-center justify-between">
+          <div>
+            <span class="text-[10px] sm:text-[11px] font-black uppercase text-emerald-100 tracking-wide block leading-tight">Total a Cobrar:</span>
+            <span class="text-[8.5px] text-emerald-300 font-medium">Cálculo automático proporcional à taxa horária</span>
+          </div>
+          <span id="finishCalcTotal" class="text-lg sm:text-xl font-black text-white">R$ 100,00</span>
+        </div>
+      </div>
+
+      <!-- 4. ORIGEM DA MARCAÇÃO & MODO DE PAGAMENTO COM RATEIO -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+        <div>
+          <label class="block text-[10.5px] font-bold text-slate-700 uppercase mb-0.5">Onde foi marcado o jogo? *</label>
+          <select id="finishMatchOrigin" required
+                  class="w-full p-1.5 sm:p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Marcado no Balcão">Marcado no Balcão</option>
+            <option value="No Agendamento">No Agendamento (Online / App)</option>
+            <option value="Avulso">Avulso</option>
+            <option value="Mensalista">Mensalista</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10.5px] font-bold text-slate-700 uppercase mb-0.5">Modo de Pagamento *</label>
+          <div class="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10.5px] font-bold">
+            <button type="button" id="payModeSingleTab" onclick="setPaymentMode('single')" 
+                    class="py-1 px-1 rounded-md bg-white text-emerald-900 font-black shadow-xs text-center cursor-pointer transition">
+              Único
+            </button>
+            <button type="button" id="payModeSplitTab" onclick="setPaymentMode('split')" 
+                    class="py-1 px-1 rounded-md text-slate-600 hover:text-slate-900 font-bold text-center cursor-pointer transition">
+              Dividir (Dinheiro+PIX)
+            </button>
+          </div>
+          <input type="hidden" id="finishPaymentMode" value="single">
+        </div>
+      </div>
+
+      <!-- Seção Pagamento Único -->
+      <div id="sectionPaySingle">
+        <label class="block text-[10.5px] font-bold text-slate-700 uppercase mb-0.5">Forma de Pagamento Integral *</label>
+        <select id="finishMatchPayment"
+                class="w-full p-1.5 sm:p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+          <option value="PIX">PIX</option>
+          <option value="Dinheiro">Dinheiro</option>
+          <option value="Cartão de Débito">Cartão de Débito</option>
+          <option value="Cartão de Crédito">Cartão de Crédito</option>
+          <option value="Mensalidade Faturada">Mensalidade Faturada</option>
+          <option value="Pendente / Pagar depois">Pendente / Pagar depois</option>
+        </select>
+      </div>
+
+      <!-- Seção Pagamento Dividido (Rateio Dinâmico) -->
+      <div id="sectionPaySplit" style="display:none;" class="space-y-2 bg-emerald-50/50 p-2.5 rounded-xl border border-emerald-200/80">
+        <div class="flex items-center justify-between border-b border-emerald-100 pb-1.5">
+          <div>
+            <span class="block text-[11px] font-black text-emerald-950 uppercase leading-tight">Dividir Pagamento</span>
+            <span class="block text-[9.5px] text-emerald-700">Informe valor em dinheiro e saldo em PIX/cartão</span>
+          </div>
+          <button type="button" onclick="splitFiftyFifty()" 
+                  class="text-[10px] font-black px-2 py-1 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-lg shadow-2xs cursor-pointer transition">
+            ⚖️ Dividir 50%/50%
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <!-- Parte 1 -->
+          <div class="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
+            <label class="block text-[9px] font-black text-slate-500 uppercase mb-0.5">1ª Parte: Forma</label>
+            <select id="splitMethod1" onchange="updateSplitBalance()" class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs font-bold text-slate-800 mb-1 cursor-pointer">
+              <option value="Dinheiro" selected>Dinheiro</option>
               <option value="PIX">PIX</option>
+              <option value="Cartão de Débito">Cartão de Débito</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+            </select>
+            <label class="block text-[9px] font-black text-slate-500 uppercase mb-0.5">Valor Pago</label>
+            <div class="relative">
+              <span class="absolute left-2 top-1.5 text-xs font-bold text-slate-400">R$</span>
+              <input type="number" step="0.50" min="0" id="splitAmount1" 
+                     oninput="onSplitAmountChange(1, this.value)" 
+                     placeholder="0,00" 
+                     class="w-full pl-7 pr-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Parte 2 -->
+          <div class="bg-white p-2 rounded-lg border border-emerald-100 shadow-2xs">
+            <label class="block text-[9px] font-black text-slate-500 uppercase mb-0.5">2ª Parte: Forma</label>
+            <select id="splitMethod2" onchange="updateSplitBalance()" class="w-full p-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs font-bold text-slate-800 mb-1 cursor-pointer">
+              <option value="PIX" selected>PIX</option>
               <option value="Dinheiro">Dinheiro</option>
               <option value="Cartão de Débito">Cartão de Débito</option>
               <option value="Cartão de Crédito">Cartão de Crédito</option>
-              <option value="Mensalidade Faturada">Mensalidade Faturada</option>
-              <option value="Pendente / Pagar depois">Pendente / Pagar depois</option>
             </select>
+            <label class="block text-[9px] font-black text-slate-500 uppercase mb-0.5">Valor Pago / Restante</label>
+            <div class="relative">
+              <span class="absolute left-2 top-1.5 text-xs font-bold text-slate-400">R$</span>
+              <input type="number" step="0.50" min="0" id="splitAmount2" 
+                     oninput="onSplitAmountChange(2, this.value)" 
+                     placeholder="0,00" 
+                     class="w-full pl-7 pr-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            </div>
           </div>
         </div>
 
-        <!-- Seção Pagamento Dividido (Rateio Dinâmico) -->
-        <div id="sectionPaySplit" style="display:none;" class="space-y-3 bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-200/80">
-          <div class="flex items-center justify-between border-b border-emerald-100 pb-2">
-            <div>
-              <span class="block text-xs font-black text-emerald-950 uppercase">Dividir Pagamento da Partida</span>
-              <span class="block text-[11px] text-emerald-700">Informe quanto foi em dinheiro e quanto falta em PIX/cartão</span>
-            </div>
-            <button type="button" onclick="splitFiftyFifty()" 
-                    class="text-[11px] font-black px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl shadow-2xs cursor-pointer transition">
-              ⚖️ Dividir 50% / 50%
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <!-- Parte 1 -->
-            <div class="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
-              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">1ª Parte: Forma</label>
-              <select id="splitMethod1" onchange="updateSplitBalance()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 mb-2 cursor-pointer">
-                <option value="Dinheiro" selected>Dinheiro</option>
-                <option value="PIX">PIX</option>
-                <option value="Cartão de Débito">Cartão de Débito</option>
-                <option value="Cartão de Crédito">Cartão de Crédito</option>
-              </select>
-              <label class="block text-[10px] font-black text-slate-500 uppercase mb-0.5">Valor Pago</label>
-              <div class="relative">
-                <span class="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R$</span>
-                <input type="number" step="0.50" min="0" id="splitAmount1" 
-                       oninput="onSplitAmountChange(1, this.value)" 
-                       placeholder="0,00" 
-                       class="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-              </div>
-            </div>
-
-            <!-- Parte 2 -->
-            <div class="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
-              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">2ª Parte: Forma</label>
-              <select id="splitMethod2" onchange="updateSplitBalance()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 mb-2 cursor-pointer">
-                <option value="PIX" selected>PIX</option>
-                <option value="Dinheiro">Dinheiro</option>
-                <option value="Cartão de Débito">Cartão de Débito</option>
-                <option value="Cartão de Crédito">Cartão de Crédito</option>
-              </select>
-              <label class="block text-[10px] font-black text-slate-500 uppercase mb-0.5">Valor Pago / Restante</label>
-              <div class="relative">
-                <span class="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R$</span>
-                <input type="number" step="0.50" min="0" id="splitAmount2" 
-                       oninput="onSplitAmountChange(2, this.value)" 
-                       placeholder="0,00" 
-                       class="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-              </div>
-            </div>
-          </div>
-
-          <!-- Feedback do Saldo da Divisão -->
-          <div id="splitStatusNotice" class="p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 bg-emerald-100/80 border-emerald-300 text-emerald-950 transition-all">
-            <span id="splitStatusIcon" class="text-sm">✓</span>
-            <span id="splitStatusText">Total 100% quitado: R$ 50,00 (Dinheiro) + R$ 50,00 (PIX)</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Pagamento</label>
-            <select id="finishPaymentStatus"
-                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-              <option value="Pago">✓ Pago e Confirmado</option>
-              <option value="Pendente">⏳ Pagamento Pendente</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do Fechamento</label>
-            <input type="text" id="finishMatchObs" placeholder="Ex.: R$ 50 no PIX e R$ 50 em espécie"
-                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-          </div>
+        <!-- Feedback do Saldo da Divisão -->
+        <div id="splitStatusNotice" class="p-1.5 rounded-lg border text-[10.5px] font-bold flex items-center gap-1.5 bg-emerald-100/80 border-emerald-300 text-emerald-950 transition-all">
+          <span id="splitStatusIcon" class="text-xs">✓</span>
+          <span id="splitStatusText">Total 100% quitado: R$ 50,00 (Dinheiro) + R$ 50,00 (PIX)</span>
         </div>
       </div>
 
-      <!-- Botões de Ação -->
-      <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
-        <button type="button" onclick="closeArenaModal('arenaFinishModal')" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
+      <!-- Status do Pagamento & Observações -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
+        <div>
+          <label class="block text-[10.5px] font-bold text-slate-700 uppercase mb-0.5">Status do Pagamento</label>
+          <select id="finishPaymentStatus"
+                  class="w-full p-1.5 sm:p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Pago">✓ Pago e Confirmado</option>
+            <option value="Pendente">⏳ Pagamento Pendente</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10.5px] font-bold text-slate-700 uppercase mb-0.5">Observações do Fechamento</label>
+          <input type="text" id="finishMatchObs" placeholder="Ex.: R$ 50 no PIX e R$ 50 em espécie"
+                 class="w-full p-1.5 sm:p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Botões de Ação Fixos no Rodapé do Modal -->
+      <div class="sticky bottom-0 bg-white/95 backdrop-blur-sm pt-2 pb-0.5 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+        <button type="button" onclick="closeArenaModal('arenaFinishModal')" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
           Voltar
         </button>
-        <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
+        <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
           <i data-lucide="check" class="w-4 h-4"></i>
           <span>Concluir e Salvar Jogo</span>
         </button>
