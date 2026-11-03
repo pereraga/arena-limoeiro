@@ -1291,10 +1291,11 @@
             </span>
             <div class="relative flex-1 min-w-0 max-w-full">
               <select id="movementStatusFilter" onchange="filterMovementMatches()" class="w-full min-w-0 p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-sm">
-                <option value="all">Todos os Status</option>
+                <option value="all">Partidas Ativas (Ocultar Finalizadas)</option>
                 <option value="live">🟢 Ao Vivo / Em Andamento</option>
                 <option value="confirmed">🔵 Confirmados / Próximos</option>
-                <option value="finished">✅ Finalizados</option>
+                <option value="finished">✅ Finalizados / Concluídos</option>
+                <option value="everything">👁 Exibir Todas (Com Finalizadas)</option>
               </select>
               <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
@@ -4093,13 +4094,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
 
         // Evita duplicatas se já existe mensalista no mesmo horário e campo
-        const existing = matches.find(m => m.court_id === court.id && m.start_time === startT);
+        const existing = matches.find(m => String(m.id) === String(b.id) || (m.court_id === court.id && m.start_time === startT));
         if (existing) {
-          if (b.customer_name && !existing.customer_name.includes(b.customer_name)) {
-            existing.customer_name = b.customer_name;
-          }
-          if (b.customer_phone) existing.customer_phone = b.customer_phone;
-          if (b.total_price) existing.total_price = b.total_price;
+          Object.assign(existing, b);
         } else {
           matches.push({
             id: b.id,
@@ -5402,9 +5399,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveAdminGameState();
     closeArenaModal('arenaFinishModal');
-    if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
-    if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
-    arenaToast('Jogo concluído com sucesso! Valor final: R$ ' + calculatedTotal.toFixed(2).replace('.', ','));
+
+    // Efeito visual imediato: o jogo concluído some da janela
+    const cardEl = document.getElementById('card-' + id);
+    if (cardEl) {
+      cardEl.style.transition = 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'scale(0.96) translateY(-8px)';
+      cardEl.style.maxHeight = '0';
+      cardEl.style.marginBottom = '0';
+      cardEl.style.overflow = 'hidden';
+    }
+
+    setTimeout(() => {
+      if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+      if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
+    }, 280);
+
+    arenaToast('✓ Jogo concluído e bola recebida! Partida arquivada com sucesso.');
   };
 
   window.closeArenaModal = function(id) {
@@ -5767,8 +5779,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (courtFilter && courtFilter !== 'all') {
       matches = matches.filter(m => m.court_id === courtFilter);
     }
-    if (statusFilter && statusFilter !== 'all') {
+    if (statusFilter === 'finished') {
+      matches = matches.filter(m => m.status === 'finished');
+    } else if (statusFilter && statusFilter !== 'all' && statusFilter !== 'everything') {
       matches = matches.filter(m => m.status === statusFilter);
+    } else if (statusFilter === 'everything') {
+      // Exibe todas, inclusive finalizadas
+    } else {
+      // REGRA: Ao concluir e salvar jogos, o jogo finalizado some da janela operacional
+      matches = matches.filter(m => m.status !== 'finished');
     }
 
     if (countEl) {
@@ -5777,11 +5796,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Atualiza KPIs do topo com base no dia atual (Dia 3)
     if (dateStr === '2026-11-03') {
-      const topRevenue = matches.reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
+      const allDayMatches = getMatchesForDate(dateStr);
+      const topRevenue = allDayMatches.reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
       const kpiRev = document.querySelector('.kpi-value-revenue');
       const kpiGames = document.querySelector('.kpi-value-games');
       if (kpiRev) kpiRev.textContent = 'R$ ' + topRevenue.toFixed(2).replace('.', ',');
-      if (kpiGames) kpiGames.textContent = matches.length + ' partidas';
+      if (kpiGames) kpiGames.textContent = allDayMatches.length + ' partidas';
     }
 
     if (!container) return;
