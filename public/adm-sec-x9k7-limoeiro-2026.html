@@ -558,28 +558,54 @@
   background: #ffe3e3;
 }
 
-.booking-card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 16px 14px 124px;
-  gap: 10px;
-  flex-wrap: wrap;
+.booking-card-footer,
+.booking-presence-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  padding: 4px 16px 12px 124px !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
-.booking-detail-toggle {
-  border: 0;
-  background: transparent;
-  color: #0a8b4d;
+@media (max-width: 768px) {
+  .booking-card-footer,
+  .booking-presence-row {
+    padding: 6px 14px 12px 14px !important;
+  }
+}
+.booking-presence-text {
   font-size: 11px;
-  font-weight: 900;
-  padding: 4px 6px;
-  cursor: pointer;
+  color: #64748b;
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
-.booking-detail-toggle:hover {
-  text-decoration: underline;
+.booking-presence-text strong {
+  color: #1e293b;
+  font-weight: 800;
+}
+.booking-detail-toggle,
+.booking-toggle-btn {
+  border: 0 !important;
+  background: transparent !important;
+  color: #0a8b4d !important;
+  font-size: 11.5px !important;
+  font-weight: 900 !important;
+  padding: 4px 6px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  white-space: nowrap !important;
+  transition: all 0.15s ease !important;
+  margin-left: auto !important;
+}
+.booking-detail-toggle:hover,
+.booking-toggle-btn:hover {
+  color: #065f46 !important;
+  text-decoration: underline !important;
 }
 
 .booking-expanded-panel {
@@ -4596,12 +4622,13 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- Linha de Status de Presença e Toggle de Detalhes -->
-        <div class="booking-presence-row">
-          <div class="booking-presence-text">
-            Presença: <strong>${attendance}${m.checkinAt ? ' (' + m.checkinAt + ')' : ''}</strong>
+        <div class="booking-card-footer booking-presence-row">
+          <div class="booking-presence-text text-xs text-slate-500 font-medium">
+            Presença: <strong class="text-slate-800 font-bold">${attendance}${m.checkinAt ? ' (' + m.checkinAt + ')' : ''}</strong>
           </div>
-          <button type="button" class="booking-toggle-btn" onclick="toggleDetails('${m.id}')">
-            Detalhes e ações ▾
+          <button type="button" class="booking-detail-toggle booking-toggle-btn" onclick="toggleDetails('${m.id}')">
+            <span>Detalhes e ações</span>
+            <span>▾</span>
           </button>
         </div>
 
