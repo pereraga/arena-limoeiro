@@ -375,7 +375,320 @@
   
 
 
-  </style>
+  
+/* ====== NOVO CARD DE PARTIDA OPERACIONAL (AGENDA DIARIA / MOVIMENTAÇÃO) ====== */
+.booking-card {
+  border: 1px solid #e2eae5;
+  border-radius: 16px;
+  background: #ffffff;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  margin-bottom: 14px;
+}
+.booking-card:hover {
+  border-color: #a7dfbc;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.08);
+}
+.booking-main-grid {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 16px 16px 6px;
+  align-items: center;
+}
+.timebox-mint {
+  align-self: stretch;
+  min-height: 96px;
+  border-radius: 14px;
+  background: linear-gradient(150deg, #eaf8ef, #f5fbf7);
+  border: 1px solid #cce8d5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #0b7640;
+  text-align: center;
+  padding: 8px 4px;
+}
+.timebox-mint strong {
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: #086b39;
+}
+.timebox-mint span {
+  font-size: 11px;
+  color: #4f7d63;
+  font-weight: 800;
+  margin-top: 2px;
+}
+.timebox-mint em {
+  font-style: normal;
+  font-size: 10px;
+  color: #6d8677;
+  font-weight: 700;
+  margin-top: 4px;
+  background: #ffffffb0;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid #d4ebdc;
+}
+.booking-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.pill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.pill-field { background: #e7f7ee; color: #087c45; border: 1px solid #c3e9d1; }
+.pill-confirmed { background: #e9f1ff; color: #245b9d; border: 1px solid #cbdcff; }
+.pill-playing { background: #e6f8f4; color: #087b65; border: 1px solid #bde9dd; }
+.pill-finished { background: #eef2ef; color: #5d6c63; border: 1px solid #dde5df; }
+.pill-noshow { background: #fff0f0; color: #b42d2d; border: 1px solid #ffd3d3; }
+.pill-pending { background: #fff7e6; color: #96600d; border: 1px solid #f1dfb7; }
+.pill-type { background: #f0edff; color: #5e4aa4; border: 1px solid #d9d2ff; }
+.pill-late { background: #fff1dc; color: #a05a00; border: 1px solid #fed7aa; }
+
+.booking-title-text {
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #11261d;
+  margin: 0 0 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.booking-meta-row {
+  display: flex;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  color: #55695f;
+  font-size: 11px;
+  font-weight: 700;
+}
+.booking-meta-row span, .booking-meta-row a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.booking-subnote {
+  font-size: 11px;
+  color: #798d82;
+  font-style: italic;
+  margin-top: 6px;
+}
+.booking-side-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 130px;
+}
+.booking-price-val {
+  font-weight: 900;
+  color: #087d45;
+  font-size: 18px;
+  line-height: 1;
+}
+.booking-pay-status {
+  font-size: 10px;
+  font-weight: 800;
+  color: #708479;
+}
+.booking-actions-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.booking-quick-btn {
+  border: 1px solid #dbe6df;
+  background: #ffffff;
+  color: #274033;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.booking-quick-btn:hover {
+  background: #f0f8f3;
+  border-color: #a9dcbe;
+  transform: translateY(-1px);
+}
+.booking-quick-btn.green {
+  background: #eaf8ef;
+  border-color: #c4e8d0;
+  color: #087a43;
+}
+.booking-quick-btn.green:hover {
+  background: #dcf3e4;
+}
+.booking-quick-btn.dark {
+  background: #0f2c20;
+  color: #ffffff;
+  border-color: #0f2c20;
+}
+.booking-quick-btn.dark:hover {
+  background: #184232;
+}
+.booking-quick-btn.red {
+  background: #fff1f1;
+  border-color: #ffd6d6;
+  color: #b72f2f;
+}
+.booking-quick-btn.red:hover {
+  background: #ffe3e3;
+}
+
+.booking-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 16px 14px 124px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.booking-detail-toggle {
+  border: 0;
+  background: transparent;
+  color: #0a8b4d;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.booking-detail-toggle:hover {
+  text-decoration: underline;
+}
+
+.booking-expanded-panel {
+  border-top: 1px solid #edf2ee;
+  background: #fbfdfb;
+  padding: 16px 18px 18px;
+}
+.booking-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.booking-detail-item {
+  padding: 11px 12px;
+  border: 1px solid #e2ece5;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.booking-detail-item small {
+  display: block;
+  color: #798d82;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 9px;
+  font-weight: 900;
+}
+.booking-detail-item b {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: #1e3529;
+  font-weight: 800;
+}
+.booking-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.booking-event-log {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #d1e2d7;
+}
+.booking-event-log h4 {
+  font-size: 11px;
+  font-weight: 900;
+  margin: 0 0 8px;
+  color: #3b5447;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.booking-log-row {
+  font-size: 11px;
+  color: #5d7166;
+  padding: 4px 0;
+  line-height: 1.4;
+}
+
+@media(max-width: 900px) {
+  .booking-main-grid {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+  .booking-side-col {
+    grid-column: 2;
+    align-items: flex-start;
+    min-width: 0;
+  }
+  .booking-card-footer {
+    padding-left: 110px;
+  }
+  .booking-detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media(max-width: 620px) {
+  .booking-main-grid {
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 10px;
+    padding: 12px 12px 4px;
+  }
+  .timebox-mint {
+    min-height: 90px;
+  }
+  .timebox-mint strong {
+    font-size: 17px;
+  }
+  .booking-title-text {
+    font-size: 14px;
+    white-space: normal;
+  }
+  .booking-side-col {
+    grid-column: 1 / -1;
+    border-top: 1px solid #eef2ef;
+    padding-top: 10px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .booking-card-footer {
+    padding: 6px 12px 12px;
+  }
+  .booking-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+</style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col pb-20">
 
@@ -2816,77 +3129,655 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Renderizador de Card de Partida (Movimentação e Feed)
+  // Helper de cálculo de duração
+  function calcDuration(a, b) {
+    if (!a || !b) return '1h';
+    const [ha, ma] = a.split(':').map(Number);
+    const [hb, mb] = b.split(':').map(Number);
+    const diff = (hb * 60 + mb) - (ha * 60 + ma);
+    if (diff <= 0) return '1h';
+    const h = Math.floor(diff / 60);
+    const min = diff % 60;
+    return (h > 0 ? h + 'h' : '') + (min > 0 ? (h > 0 ? String(min).padStart(2, '0') + 'min' : min + 'min') : '');
+  }
+
+  // Toast flutuante de feedback
+  window.arenaToast = function(msg) {
+    const t = document.getElementById('arenaToast');
+    const txt = document.getElementById('arenaToastText');
+    if (!t) return;
+    if (txt) txt.textContent = msg;
+    t.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
+    t.classList.add('opacity-100', 'translate-y-0');
+    if (window.lucide) lucide.createIcons();
+    clearTimeout(window.arenaToastTimer);
+    window.arenaToastTimer = setTimeout(() => {
+      t.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
+      t.classList.remove('opacity-100', 'translate-y-0');
+    }, 2800);
+  };
+
+  // Helper para buscar ou promover um jogo para o estado de bookings
+  window.getGame = function(id) {
+    let g = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id));
+    if (g) return g;
+    if (String(id).startsWith('monthly-')) {
+      const rawId = String(id).replace('monthly-', '');
+      const m = (window.adminGameState.monthlyMembers || []).find(x => String(x.id) === rawId);
+      if (m) {
+        const court = getCourtById(m.court_id || m.courtId);
+        const startT = m.start_time || m.startTime || m.time || '18:00';
+        const endT = m.end_time || m.endTime || (startT.includes(':') ? String(Number(startT.split(':')[0]) + 1).padStart(2, '0') + ':' + startT.split(':')[1] : '19:00');
+        const promoted = {
+          id: String(id),
+          court_id: court.id,
+          court_name: court.name,
+          date: window.adminGameState.selectedDate || '2026-11-03',
+          customer_name: (m.team_name || m.teamName || 'Mensalista') + (m.responsible_name && m.responsible_name !== m.team_name ? ' (' + m.responsible_name + ')' : ''),
+          name: (m.team_name || m.teamName || 'Mensalista') + (m.responsible_name && m.responsible_name !== m.team_name ? ' (' + m.responsible_name + ')' : ''),
+          customer_phone: m.phone || '(81) 9 9556-2893',
+          phone: m.phone || '(81) 9 9556-2893',
+          customer_cpf: m.cpf || '',
+          start_time: startT,
+          start: startT,
+          end_time: endT,
+          end: endT,
+          time: startT + ' às ' + endT,
+          total_price: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4 || 100,
+          price: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4 || 100,
+          status: 'confirmed',
+          isMensalista: true,
+          booking_type: 'mensalista',
+          type: 'Mensalista',
+          payment: 'Pago',
+          players: 14,
+          dayFixed: (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase(),
+          observation: 'Horário Fixo Semanal (' + (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase() + ')',
+          note: 'Horário Fixo Semanal (' + (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase() + ')',
+          attendance: 'Aguardando chegada',
+          late: 0,
+          log: [{ at: 'Reserva cadastrada', text: 'Horário fixo semanal · ' + (m.day_of_week || m.dayOfWeek || 'terça-feira') }],
+          contract: {
+            number: 'AL-MENS-' + m.id,
+            type: 'Mensalista',
+            start: '2026-10-01',
+            end: '2026-12-31',
+            day: (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase(),
+            due: '10',
+            amount: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4 || 100,
+            signed: 'Assinado',
+            terms: 'Horário fixo semanal às ' + (m.day_of_week || m.dayOfWeek || 'terças-feiras') + '. Comunicar alterações com antecedência.'
+          }
+        };
+        window.adminGameState.bookings.push(promoted);
+        return promoted;
+      }
+    }
+    return null;
+  };
+
+  // Helper de log
+  window.addMatchLog = function(g, at, text) {
+    g.log = g.log || [];
+    g.log.unshift({ at, text });
+  };
+
+  // Salva no storage e atualiza ambas as listas
+  window.saveAdminGameState = function() {
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+    } catch(e) {}
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+  };
+
+  // Funções de ação rápida
+  window.toggleDetails = function(id) {
+    const el = document.getElementById('details-' + id);
+    if (el) {
+      if (el.style.display === 'none' || el.classList.contains('hidden')) {
+        el.style.display = 'block';
+        el.classList.remove('hidden');
+      } else {
+        el.style.display = 'none';
+        el.classList.add('hidden');
+      }
+    }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.markArrived = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    if (['no-show', 'cancelled', 'finished'].includes(g.status)) {
+      arenaToast('Esta partida não aceita check-in neste status.');
+      return;
+    }
+    g.attendance = 'Chegou';
+    g.checkinAt = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    addMatchLog(g, 'Presença', 'Titular/equipe chegou às ' + g.checkinAt);
+    saveAdminGameState();
+    arenaToast('Presença registrada às ' + g.checkinAt);
+  };
+
+  window.startGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    if (g.status === 'no-show' || g.status === 'cancelled') {
+      arenaToast('Não é possível iniciar uma partida ausente ou cancelada.');
+      return;
+    }
+    g.status = 'live';
+    g.attendance = 'Chegou';
+    g.checkinAt = g.checkinAt || new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    g.startedAt = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    addMatchLog(g, 'Jogo iniciado', 'Partida iniciada às ' + g.startedAt);
+    saveAdminGameState();
+    arenaToast('Partida iniciada.');
+  };
+
+  window.finishGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    g.status = 'finished';
+    g.finishedAt = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    addMatchLog(g, 'Jogo encerrado', 'Partida encerrada às ' + g.finishedAt);
+    saveAdminGameState();
+    arenaToast('Partida finalizada com sucesso.');
+  };
+
+  // Ajuste de Horário
+  window.arenaAdjustDirection = 'advance';
+  window.arenaAdjustMinutes = 5;
+
+  window.setAdjustDirection = function(dir) {
+    window.arenaAdjustDirection = dir;
+    document.querySelectorAll('#adjustDirectionButtons button').forEach(b => {
+      if (b.dataset.dir === dir) {
+        b.className = 'flex-1 px-3.5 py-2.5 rounded-xl text-xs font-black bg-emerald-600 text-white border border-emerald-600 shadow-sm cursor-pointer text-center';
+      } else {
+        b.className = 'flex-1 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer text-center';
+      }
+    });
+  };
+
+  window.setAdjustMinutes = function(min) {
+    window.arenaAdjustMinutes = Number(min);
+    document.querySelectorAll('#adjustMinutesButtons button').forEach(b => {
+      if (Number(b.dataset.min) === Number(min)) {
+        b.className = 'flex-1 px-3 py-2 rounded-xl text-xs font-black bg-emerald-600 text-white border border-emerald-600 shadow-sm cursor-pointer text-center';
+      } else {
+        b.className = 'flex-1 px-3 py-2 rounded-xl text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer text-center';
+      }
+    });
+  };
+
+  window.openAdjust = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    document.getElementById('adjustMatchId').value = id;
+    setAdjustDirection('advance');
+    setAdjustMinutes(5);
+    document.getElementById('adjustReasonInput').value = '';
+    const s = g.start_time || g.start || '18:00';
+    const e = g.end_time || g.end || '19:00';
+    document.getElementById('adjustPreviewText').textContent = 'Horário atual: ' + s + '–' + e + '. A duração será mantida.';
+    const m = document.getElementById('arenaAdjustModal');
+    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.applyAdjust = function() {
+    const id = document.getElementById('adjustMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+    const s = g.start_time || g.start || '18:00';
+    const e = g.end_time || g.end || '19:00';
+    const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const fromMin = v => { v = (v + 1440) % 1440; return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0'); };
+    const delta = window.arenaAdjustDirection === 'advance' ? -window.arenaAdjustMinutes : window.arenaAdjustMinutes;
+    const ns = fromMin(toMin(s) + delta);
+    const ne = fromMin(toMin(e) + delta);
+    if (toMin(ne) <= toMin(ns)) {
+      arenaToast('O ajuste gerou um horário inválido.');
+      return;
+    }
+    const oldStr = s + '–' + e;
+    g.start_time = ns;
+    g.start = ns;
+    g.end_time = ne;
+    g.end = ne;
+    g.time = ns + ' às ' + ne;
+    const reason = document.getElementById('adjustReasonInput').value.trim();
+    addMatchLog(g, 'Horário ajustado', oldStr + ' → ' + ns + '–' + ne + ' (' + (window.arenaAdjustDirection === 'advance' ? 'adiantado' : 'atrasado') + ' ' + window.arenaAdjustMinutes + ' min). ' + (reason ? 'Motivo: ' + reason : ''));
+    saveAdminGameState();
+    closeArenaModal('arenaAdjustModal');
+    arenaToast('Horário atualizado com sucesso mantendo a duração!');
+  };
+
+  // Atraso
+  window.arenaLateMinutes = 5;
+  window.selectLateMinutes = function(min) {
+    window.arenaLateMinutes = Number(min);
+    document.querySelectorAll('#lateMinutesButtons button').forEach(b => {
+      if (Number(b.dataset.min) === Number(min)) {
+        b.className = 'px-3 py-2 rounded-xl text-xs font-black bg-amber-600 text-white border border-amber-600 shadow-sm cursor-pointer text-center';
+      } else {
+        b.className = 'px-3 py-2 rounded-xl text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer text-center';
+      }
+    });
+  };
+
+  window.openLate = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    document.getElementById('lateMatchId').value = id;
+    selectLateMinutes(5);
+    document.getElementById('lateNoteInput').value = '';
+    const m = document.getElementById('arenaLateModal');
+    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.applyLate = function() {
+    const id = document.getElementById('lateMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+    g.late = window.arenaLateMinutes;
+    g.attendance = 'Atrasado';
+    const note = document.getElementById('lateNoteInput').value.trim();
+    addMatchLog(g, 'Atraso da equipe', (window.arenaLateMinutes === 20 ? '20 ou mais' : window.arenaLateMinutes) + ' minutos. ' + (note ? 'Obs: ' + note : ''));
+    saveAdminGameState();
+    closeArenaModal('arenaLateModal');
+    arenaToast('Atraso registrado; horário da reserva mantido.');
+  };
+
+  // Não compareceu
+  window.openNoShow = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    document.getElementById('noShowMatchId').value = id;
+    document.getElementById('noShowReasonInput').value = '';
+    const m = document.getElementById('arenaNoShowModal');
+    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.applyNoShow = function() {
+    const id = document.getElementById('noShowMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+    g.status = 'no-show';
+    g.attendance = 'Não compareceu';
+    const reason = document.getElementById('noShowReasonInput').value.trim();
+    addMatchLog(g, 'Não compareceu', reason || 'Ausência registrada pela administração.');
+    saveAdminGameState();
+    closeArenaModal('arenaNoShowModal');
+    arenaToast('Ausência registrada no histórico.');
+  };
+
+  // Contrato
+  window.openContract = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    const c = g.contract || {};
+    document.getElementById('contractMatchId').value = id;
+    document.getElementById('cNumber').value = c.number || ('AL-' + (g.id || '2026'));
+    document.getElementById('cType').value = c.type || (g.isMensalista ? 'Mensalista' : (g.type || 'Avulso'));
+    document.getElementById('cStart').value = c.start || g.date || '2026-11-03';
+    document.getElementById('cEnd').value = c.end || g.date || '2026-11-03';
+    document.getElementById('cDay').value = c.day || g.dayFixed || 'TERÇA';
+    document.getElementById('cDue').value = c.due || '10';
+    document.getElementById('cAmount').value = c.amount ?? (g.total_price || g.price || 100);
+    document.getElementById('cSigned').value = c.signed || 'Assinado';
+    document.getElementById('cTerms').value = c.terms || 'Horário fixo semanal na Arena Limoeiro. Comunicar alterações com antecedência.';
+    
+    const court = getCourtById(g.court_id || g.courtId);
+    const p = document.getElementById('contractPreviewText');
+    if (p) {
+      p.innerHTML = '<b>Resumo:</b> ' + (g.customer_name || g.name) + ' · ' + (g.type || (g.isMensalista ? 'Mensalista' : 'Avulso')) + ' · ' + court.name + ' · ' + g.date + ' · ' + (g.time || '18:00 às 19:00') + ' · R$ ' + Number(g.total_price || g.price || 100).toFixed(2).replace('.', ',') + '.<br>Preencha os campos para atualizar os termos. Este resumo é administrativo.';
+    }
+    const m = document.getElementById('arenaContractModal');
+    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.saveContract = function(e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('contractMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+    g.contract = {
+      number: document.getElementById('cNumber').value.trim(),
+      type: document.getElementById('cType').value,
+      start: document.getElementById('cStart').value,
+      end: document.getElementById('cEnd').value,
+      day: document.getElementById('cDay').value,
+      due: document.getElementById('cDue').value,
+      amount: Number(document.getElementById('cAmount').value || 0),
+      signed: document.getElementById('cSigned').value,
+      terms: document.getElementById('cTerms').value.trim()
+    };
+    g.type = g.contract.type;
+    g.isMensalista = g.contract.type === 'Mensalista';
+    if (g.contract.day) g.dayFixed = g.contract.day;
+    addMatchLog(g, 'Contrato atualizado', 'Termo ' + (g.contract.number || 'sem número') + ' · ' + g.contract.signed);
+    saveAdminGameState();
+    closeArenaModal('arenaContractModal');
+    arenaToast('Contrato / termo atualizado.');
+  };
+
+  window.printContract = function() {
+    const id = document.getElementById('contractMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+    const c = {
+      number: document.getElementById('cNumber').value,
+      type: document.getElementById('cType').value,
+      start: document.getElementById('cStart').value,
+      end: document.getElementById('cEnd').value,
+      day: document.getElementById('cDay').value,
+      due: document.getElementById('cDue').value,
+      amount: document.getElementById('cAmount').value,
+      signed: document.getElementById('cSigned').value,
+      terms: document.getElementById('cTerms').value
+    };
+    const court = getCourtById(g.court_id || g.courtId);
+    const w = window.open('', '_blank');
+    if (!w) { alert('Habilite popups para imprimir o termo.'); return; }
+    w.document.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Termo ' + (c.number || '') + '</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:40px auto;line-height:1.6;color:#193327;padding:20px}h1{color:#087a43;margin-bottom:4px}h2{color:#333;font-size:18px;margin-top:0}hr{border:0;border-top:1px solid #ccc;margin:20px 0}.foot{color:#777;font-size:12px}</style></head><body><h1>ARENA LIMOEIRO</h1><h2>Resumo de Reserva / Termo Administrativo</h2><p><b>Nº Termo:</b> ' + (c.number || 'Não informado') + '</p><p><b>Responsável / Titular:</b> ' + (g.customer_name || g.name) + '</p><p><b>WhatsApp / Contato:</b> ' + (g.customer_phone || g.phone || 'Não informado') + '</p><p><b>Espaço / Campo:</b> ' + court.name + '</p><p><b>Data e Horário:</b> ' + g.date + ', ' + (g.time || (g.start_time + ' às ' + g.end_time)) + '</p><p><b>Vínculo:</b> ' + c.type + ' · <b>Dia Fixo:</b> ' + (c.day || 'Não se aplica') + '</p><p><b>Vigência:</b> ' + (c.start || '—') + ' até ' + (c.end || '—') + ' · <b>Dia Vencimento:</b> ' + (c.due || '—') + '</p><p><b>Valor Contratado:</b> R$ ' + Number(c.amount || 0).toFixed(2).replace('.', ',') + '</p><p><b>Status do Documento:</b> ' + c.signed + '</p><p><b>Condições Gerais:</b><br>' + (c.terms || '—') + '</p><hr><p class="foot">Documento para conferência operacional da Arena Limoeiro.</p></body></html>');
+    w.document.close();
+    setTimeout(() => w.print(), 250);
+  };
+
+  // Duplicar e Cancelar
+  window.duplicateGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    const copy = JSON.parse(JSON.stringify(g));
+    copy.id = 'game-' + Date.now();
+    copy.status = 'pending';
+    copy.attendance = 'Aguardando chegada';
+    copy.checkinAt = '';
+    copy.startedAt = '';
+    copy.finishedAt = '';
+    copy.log = [];
+    addMatchLog(copy, 'Partida duplicada', 'Criada a partir de ' + (g.customer_name || g.name) + '; revise data e horário.');
+    window.adminGameState.bookings.unshift(copy);
+    saveAdminGameState();
+    arenaToast('Partida duplicada. Edite data e horário antes de confirmar.');
+  };
+
+  window.cancelGame = function(id) {
+    if (!confirm('Deseja cancelar esta reserva? Ela continuará registrada no histórico do dia.')) return;
+    const g = getGame(id);
+    if (!g) return;
+    g.status = 'cancelled';
+    addMatchLog(g, 'Reserva cancelada', 'Cancelamento manual registrado pela administração.');
+    saveAdminGameState();
+    arenaToast('Partida cancelada.');
+  };
+
+  // Editar Jogo
+  window.openEditGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+    document.getElementById('editMatchId').value = id;
+    document.getElementById('editMatchDate').value = g.date || window.adminGameState.selectedDate || '2026-11-03';
+    
+    const courtSelect = document.getElementById('editMatchCourt');
+    if (courtSelect) {
+      const c = getCourtById(g.court_id || g.courtId);
+      courtSelect.value = c.id;
+    }
+    
+    document.getElementById('editMatchName').value = g.customer_name || g.name || '';
+    document.getElementById('editMatchPhone').value = g.customer_phone || g.phone || '';
+    document.getElementById('editMatchType').value = g.type || (g.isMensalista ? 'Mensalista' : 'Avulso');
+    document.getElementById('editMatchStatus').value = g.status || 'confirmed';
+    document.getElementById('editMatchStart').value = g.start_time || g.start || '18:00';
+    document.getElementById('editMatchEnd').value = g.end_time || g.end || '19:00';
+    document.getElementById('editMatchPrice').value = g.total_price || g.price || 100;
+    document.getElementById('editMatchPayment').value = g.payment || 'Pago';
+    document.getElementById('editMatchPlayers').value = g.players || 14;
+    document.getElementById('editMatchDayFixed').value = g.dayFixed || '';
+    document.getElementById('editMatchNote').value = g.observation || g.note || '';
+    
+    const m = document.getElementById('arenaEditModal');
+    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.saveEditGame = function(e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('editMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+    
+    const oldStart = g.start_time || g.start;
+    const oldEnd = g.end_time || g.end;
+    
+    g.date = document.getElementById('editMatchDate').value;
+    g.court_id = document.getElementById('editMatchCourt').value;
+    const court = getCourtById(g.court_id);
+    g.court_name = court.name;
+    g.customer_name = document.getElementById('editMatchName').value.trim();
+    g.name = g.customer_name;
+    g.customer_phone = document.getElementById('editMatchPhone').value.trim();
+    g.phone = g.customer_phone;
+    g.type = document.getElementById('editMatchType').value;
+    g.isMensalista = g.type === 'Mensalista';
+    g.status = document.getElementById('editMatchStatus').value;
+    g.start_time = document.getElementById('editMatchStart').value;
+    g.start = g.start_time;
+    g.end_time = document.getElementById('editMatchEnd').value;
+    g.end = g.end_time;
+    g.time = g.start_time + ' às ' + g.end_time;
+    g.total_price = Number(document.getElementById('editMatchPrice').value || 0);
+    g.price = g.total_price;
+    g.payment = document.getElementById('editMatchPayment').value;
+    g.players = Number(document.getElementById('editMatchPlayers').value || 14);
+    g.dayFixed = document.getElementById('editMatchDayFixed').value;
+    g.observation = document.getElementById('editMatchNote').value.trim();
+    g.note = g.observation;
+    
+    addMatchLog(g, 'Partida editada', 'Dados atualizados (' + oldStart + '–' + oldEnd + ' → ' + g.start + '–' + g.end + ')');
+    saveAdminGameState();
+    closeArenaModal('arenaEditModal');
+    arenaToast('Partida atualizada com sucesso!');
+  };
+
+  window.closeArenaModal = function(id) {
+    const m = document.getElementById(id);
+    if (m) {
+      m.style.display = 'none';
+      m.classList.add('hidden');
+    }
+  };
+
+  // Renderizador Oficial do Card de Partida (IDÊNTICO À FOTO FORNECIDA PELO USUÁRIO)
   function renderMatchCardHtml(m) {
-    const court = getCourtById(m.court_id);
-    const cleanPhone = (m.customer_phone || '').replace(/\D/g, '');
-    const zapText = encodeURIComponent('Olá ' + m.customer_name + '! Confirmamos seu jogo na ' + court.name + ' às ' + m.time + ' na Arena Limoeiro.');
+    const court = getCourtById(m.court_id || m.courtId);
+    const startT = m.start_time || m.start || (m.time ? m.time.split(' ')[0] : '18:00');
+    const endT = m.end_time || m.end || (m.time && m.time.includes('às') ? m.time.split('às')[1].trim() : '19:00');
+    const durStr = calcDuration(startT, endT);
+
+    const isMensalista = m.isMensalista || m.type === 'Mensalista' || m.booking_type === 'mensalista';
+    const typeLabel = isMensalista ? '★ Mensalista' : (m.type || m.booking_type || 'Avulso');
+    
+    const cleanPhone = (m.customer_phone || m.phone || '').replace(/\D/g, '');
+    const phoneDisplay = formatPhone(m.customer_phone || m.phone) || '(81) 9 9556-2893';
+    const zapText = encodeURIComponent('Olá ' + (m.customer_name || m.name) + '! Confirmamos seu jogo na ' + court.name + ' às ' + startT + ' na Arena Limoeiro.');
     const zapUrl = cleanPhone.length >= 10 ? 'https://wa.me/55' + cleanPhone + '?text=' + zapText : '#';
 
-    let statusBadge = '';
-    if (m.status === 'live' || m.status === 'in_progress') {
-      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-500 text-white shadow-xs animate-pulse">🟢 Em Andamento</span>';
-    } else if (m.status === 'finished') {
-      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">✅ Finalizado</span>';
-    } else {
-      statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">🔵 Confirmado</span>';
+    // Status classes and labels
+    const st = m.status || 'confirmed';
+    let statusClass = 'pill-confirmed';
+    let statusLabel = '● Confirmado';
+    if (st === 'live' || st === 'playing' || st === 'in_progress') {
+      statusClass = 'pill-playing';
+      statusLabel = '● Em andamento';
+    } else if (st === 'finished') {
+      statusClass = 'pill-finished';
+      statusLabel = '● Finalizado';
+    } else if (st === 'no-show') {
+      statusClass = 'pill-noshow';
+      statusLabel = '! Não compareceu';
+    } else if (st === 'pending') {
+      statusClass = 'pill-pending';
+      statusLabel = '● Pendente';
+    } else if (st === 'cancelled') {
+      statusClass = 'pill-finished';
+      statusLabel = 'Cancelado';
     }
 
-    const price = Number(m.total_price || 0).toFixed(2).replace('.', ',');
+    const price = Number(m.total_price || m.price || 100).toFixed(2).replace('.', ',');
+    const payment = m.payment || (m.payment_method ? (m.payment_method.includes('Pago') || m.payment_method.includes('PIX') ? 'Pago' : m.payment_method) : 'Pago');
+    const playersCount = m.players || 14;
+    const observation = m.observation || m.note || (m.dayFixed ? 'Horário Fixo Semanal (' + m.dayFixed + ')' : 'Horário Fixo Semanal (TERÇA)');
+    
+    const attendance = m.attendance || (['live', 'playing', 'in_progress'].includes(st) ? 'Chegou' : (st === 'finished' ? 'Finalizado' : (st === 'no-show' ? 'Não compareceu' : 'Aguardando chegada')));
+    const arrived = attendance === 'Chegou';
+    const lateMin = Number(m.late || 0);
+
+    const logs = Array.isArray(m.log) && m.log.length > 0 ? m.log : [
+      { at: 'Reserva cadastrada', text: observation }
+    ];
 
     return `
-      <div class="p-4 sm:p-5 rounded-2xl border border-slate-200 bg-white hover:border-emerald-300 hover:shadow-sm transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
-        
-        <div class="flex items-start sm:items-center space-x-3.5 flex-1 min-w-0">
-          <img src="${court.image}" alt="${court.name}" class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover shrink-0 border border-slate-200 shadow-2xs">
+      <article class="booking-card" id="card-${m.id}">
+        <div class="booking-main-grid">
+          
+          <!-- Bloco Lateral de Horário (Menta) -->
+          <div class="timebox-mint">
+            <strong>${startT}</strong>
+            <span>até ${endT}</span>
+            <em>${durStr}</em>
+          </div>
 
-          <div class="space-y-1.5 flex-1 min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
-                🏟️ ${court.name}
-              </span>
-              <span class="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-800 flex items-center gap-1">
-                <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i>
-                ${m.time}
-              </span>
-              ${statusBadge}
-              ${m.isMensalista ? '<span class="px-2.5 py-0.5 rounded-lg text-xs font-black bg-indigo-100 text-indigo-900 border border-indigo-200 shadow-2xs">⭐ Mensalista</span>' : ''}
+          <!-- Informações Centrais -->
+          <div class="min-w-0">
+            <div class="booking-chips">
+              <span class="pill-chip pill-field">■ ${court.name}</span>
+              <span class="pill-chip ${statusClass}">${statusLabel}</span>
+              <span class="pill-chip pill-type">${typeLabel}</span>
+              ${lateMin > 0 ? `<span class="pill-chip pill-late">Atraso equipe: ${lateMin} min</span>` : ''}
             </div>
 
-            <div class="flex flex-wrap items-center gap-3 text-xs text-slate-700">
-              <div class="flex items-center space-x-1.5 font-black text-slate-900 flex-wrap">
-                <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
-                <span>${m.customer_name}</span>
-              </div>
-              ${m.customer_cpf ? `<span class="font-mono text-[11px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-600">CPF: ${formatCPF(m.customer_cpf)}</span>` : ''}
-              ${cleanPhone ? `
-                <a href="${zapUrl}" target="_blank" class="text-emerald-700 hover:text-emerald-800 font-bold flex items-center space-x-1 hover:underline">
-                  <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-                  <span>${formatPhone(m.customer_phone)}</span>
-                </a>
-              ` : ''}
-              <span class="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                R$ ${price}
+            <h3 class="booking-title-text">${m.customer_name || m.name}</h3>
+
+            <div class="booking-meta-row">
+              <a href="${zapUrl}" target="_blank" class="text-slate-600 hover:text-emerald-700 transition" title="Enviar WhatsApp">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>${phoneDisplay}</span>
+              </a>
+              <span>
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>${playersCount} jogadores previstos</span>
+              </span>
+              <span>
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <span>${payment}</span>
               </span>
             </div>
 
-            ${m.observation ? `<p class="text-[11px] text-slate-500 italic truncate">${m.observation}</p>` : ''}
+            <div class="booking-subnote">${observation}</div>
+          </div>
+
+          <!-- Coluna Direita: Preço e Ações Rápidas -->
+          <div class="booking-side-col">
+            <div class="text-right">
+              <div class="booking-price-val">R$ ${price}</div>
+              <div class="booking-pay-status">${payment}</div>
+            </div>
+
+            <div class="booking-actions-row">
+              ${st === 'live' || st === 'playing' || st === 'in_progress' ? `
+                <button type="button" class="booking-quick-btn green" onclick="finishGame('${m.id}')">
+                  <i data-lucide="stop-circle" class="w-3.5 h-3.5"></i>
+                  <span>■ Encerrar</span>
+                </button>
+              ` : (['finished', 'no-show', 'cancelled'].includes(st) ? `
+                <span class="booking-pay-status font-bold text-slate-500 py-1.5">
+                  ${st === 'finished' ? 'Partida finalizada' : (st === 'no-show' ? 'Ausência registrada' : 'Reserva cancelada')}
+                </span>
+              ` : `
+                <button type="button" class="booking-quick-btn green" onclick="markArrived('${m.id}')">
+                  ${arrived ? '✓ Presença ok' : '✓ Chegou'}
+                </button>
+                <button type="button" class="booking-quick-btn dark" onclick="startGame('${m.id}')">
+                  ▶ Iniciar
+                </button>
+              `)}
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Rodapé do Card (Presença + Detalhes e ações) -->
+        <div class="booking-card-footer">
+          <span class="text-xs text-slate-500 font-medium">
+            ${arrived ? 'Presença registrada' + (m.checkinAt ? ' às ' + m.checkinAt : '') : (st === 'no-show' ? 'Ausência registrada' : 'Presença: ' + attendance)}
+          </span>
+          <button type="button" class="booking-detail-toggle" onclick="toggleDetails('${m.id}')">
+            <span>Detalhes e ações</span>
+            <span>▾</span>
+          </button>
+        </div>
+
+        <!-- Seção Expansível de Detalhes e Ações -->
+        <div class="booking-expanded-panel hidden" id="details-${m.id}" style="display:none;">
+          <div class="booking-detail-grid">
+            <div class="booking-detail-item">
+              <small>Campo / Modalidade</small>
+              <b>${court.name}</b>
+            </div>
+            <div class="booking-detail-item">
+              <small>Tipo de Reserva</small>
+              <b>${typeLabel}${m.dayFixed ? ' · ' + m.dayFixed : ''}</b>
+            </div>
+            <div class="booking-detail-item">
+              <small>Presença</small>
+              <b>${attendance}${m.checkinAt ? ' (' + m.checkinAt + ')' : ''}</b>
+            </div>
+            <div class="booking-detail-item">
+              <small>Pagamento</small>
+              <b class="text-emerald-800">${payment} · R$ ${price}</b>
+            </div>
+          </div>
+
+          <div class="booking-detail-actions">
+            <button type="button" class="booking-quick-btn" onclick="openEditGame('${m.id}')">
+              ✎ Editar jogo
+            </button>
+            <button type="button" class="booking-quick-btn" onclick="openAdjust('${m.id}')">
+              ↔ Ajustar horário ±5/10/15
+            </button>
+            <button type="button" class="booking-quick-btn" onclick="openLate('${m.id}')">
+              ◷ Registrar atraso
+            </button>
+            <button type="button" class="booking-quick-btn" onclick="openContract('${m.id}')">
+              ▤ Editar contrato
+            </button>
+            <button type="button" class="booking-quick-btn" onclick="openNoShow('${m.id}')">
+              ! Não compareceu
+            </button>
+            <button type="button" class="booking-quick-btn" onclick="duplicateGame('${m.id}')">
+              ⧉ Duplicar
+            </button>
+            <button type="button" class="booking-quick-btn red" onclick="cancelGame('${m.id}')">
+              Cancelar partida
+            </button>
+          </div>
+
+          <div class="booking-event-log">
+            <h4>Histórico desta partida</h4>
+            ${logs.map(x => `<div class="booking-log-row">• <b>${x.at}</b> — ${x.text}</div>`).join('')}
           </div>
         </div>
 
-        <div class="flex items-center gap-2 self-end md:self-center shrink-0">
-          <button onclick="toggleMatchStatus('${m.id}')" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 transition cursor-pointer flex items-center gap-1">
-            <i data-lucide="play-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Iniciar</span>
-          </button>
-          <a href="${zapUrl}" target="_blank" class="p-2 rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition" title="Enviar WhatsApp">
-            <i data-lucide="message-circle" class="w-4 h-4"></i>
-          </a>
-          <button onclick="deleteMatchPrompt('${m.id}')" class="p-2 rounded-xl text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer" title="Cancelar / Excluir">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
-        </div>
-
-      </div>
+      </article>
     `;
   }
 
@@ -2975,6 +3866,10 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     } else {
       container.innerHTML = matches.map(renderMatchCardHtml).join('');
+      if (window.location.search.includes('expand=1') || window.location.hash.includes('expandFirst')) {
+        const firstPanel = container.querySelector('.booking-expanded-panel');
+        if (firstPanel) { firstPanel.style.display = 'block'; firstPanel.classList.remove('hidden'); }
+      }
     }
 
     if (window.lucide) lucide.createIcons();
