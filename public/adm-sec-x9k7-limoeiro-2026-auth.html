@@ -4097,17 +4097,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 2. Carregamento de Bookings e MonthlyMembers
   function getLoadedBookings() {
+    let list = [];
     try {
       const stored = localStorage.getItem('arena_local_bookings');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
       }
     } catch(e) {}
-    if (window.ARENA_DEFAULT_DATA && Array.isArray(window.ARENA_DEFAULT_DATA.initialBookings)) {
-      return [...window.ARENA_DEFAULT_DATA.initialBookings];
+    if (list.length === 0 && window.ARENA_DEFAULT_DATA && Array.isArray(window.ARENA_DEFAULT_DATA.initialBookings)) {
+      list = [...window.ARENA_DEFAULT_DATA.initialBookings];
     }
-    return [];
+    // Higienização automática: remove IDs de teste legados e registros com horário inválido
+    const obsoleteIds = new Set(['ARENA-M4066', 'ARENA-M2526', 'ARENA-8673']);
+    list = list.filter(b => !obsoleteIds.has(b.id) && (b.start_time || b.time));
+    return list;
   }
 
   function getLoadedMonthly() {
@@ -4251,21 +4255,21 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Fallback garantido para terça-feira 03/11/2026 se a lista estiver vazia
+    // Fallback garantido para terça-feira 03/11/2026 com sequência cronológica limpa
     if (matches.length === 0 && (dateStr === '2026-11-03' || dateStr.endsWith('-11-03'))) {
       matches = [
         {
-          id: 'monthly-1',
-          court_id: 'court-1',
-          court_name: 'QUADRA SOCIETY',
+          id: 'ARENA-2913',
+          court_id: 'court-society-1',
+          court_name: 'SOCIETY - ARENA CENTRAL',
           date: '2026-11-03',
-          customer_name: 'Esc Ariadnes (Esc Ariadnes)',
-          customer_phone: '(81) 99999-2609',
-          customer_cpf: '',
+          customer_name: 'Esc Ariadnes',
+          customer_phone: '(81) 99556-2693',
+          customer_cpf: '000.000.000-00',
           start_time: '16:00',
           end_time: '18:00',
           time: '16:00 às 18:00',
-          total_price: 100,
+          total_price: 500,
           status: 'confirmed',
           isMensalista: true,
           booking_type: 'mensalista',
@@ -4273,58 +4277,57 @@ document.addEventListener('DOMContentLoaded', () => {
           observation: 'Horário Fixo Semanal (TERÇA)'
         },
         {
-          id: 'monthly-2',
-          court_id: 'court-2',
-          court_name: 'FUT 5 - SOCCER 5',
-          date: '2026-11-03',
-          customer_name: 'Esc Ariadnes (Esc Ariadnes)',
-          customer_phone: '(81) 99999-2609',
-          customer_cpf: '',
-          start_time: '16:00',
-          end_time: '18:00',
-          time: '16:00 às 18:00',
-          total_price: 100,
-          status: 'confirmed',
-          isMensalista: true,
-          booking_type: 'mensalista',
-          payment_method: 'Mensalidade Faturada',
-          observation: 'Horário Fixo Semanal (TERÇA)'
-        },
-        {
-          id: 'booking-nov3-3',
-          court_id: 'court-1',
+          id: 'ARENA-3251',
+          court_id: 'court-futsal-1788963178368',
           court_name: 'QUADRA SOCIETY',
           date: '2026-11-03',
           customer_name: 'Aline',
-          customer_phone: '(81) 98888-1234',
+          customer_phone: '(81) 99246-3081',
           customer_cpf: '',
-          start_time: '18:30',
-          end_time: '20:00',
-          time: '18:30 às 20:00',
+          start_time: '18:00',
+          end_time: '19:30',
+          time: '18:00 às 19:30',
           total_price: 150,
           status: 'confirmed',
-          isMensalista: false,
-          booking_type: 'avulso',
-          payment_method: 'PIX Balcão',
+          isMensalista: true,
+          booking_type: 'mensalista',
+          payment_method: 'pago_balcao',
           observation: 'Reserva direta confirmada'
         },
         {
-          id: 'booking-nov3-4',
-          court_id: 'court-3',
+          id: 'ARENA-GENILSON-1103',
+          court_id: 'court-society-2',
           court_name: 'FUT 6 - SOCCER 6',
           date: '2026-11-03',
           customer_name: 'Genilson',
-          customer_phone: '(81) 97777-5678',
+          customer_phone: '(81) 99966-4317',
           customer_cpf: '',
-          start_time: '20:00',
-          end_time: '21:30',
-          time: '20:00 às 21:30',
+          start_time: '19:30',
+          end_time: '21:00',
+          time: '19:30 às 21:00',
           total_price: 140,
           status: 'confirmed',
-          isMensalista: false,
+          isMensalista: true,
+          booking_type: 'mensalista',
+          payment_method: 'pago_balcao',
+          observation: 'Horário Fixo Semanal (TERÇA)'
+        },
+        {
+          id: 'ARENA-ZELUIZ-1103',
+          court_id: 'court-beach-1',
+          court_name: 'FUT 7 - SOCCER 7',
+          date: '2026-11-03',
+          customer_name: 'Zé Luiz',
+          customer_phone: '(81) 98877-6655',
+          customer_cpf: '',
+          start_time: '21:00',
+          end_time: '22:30',
+          time: '21:00 às 22:30',
+          total_price: 160,
+          status: 'confirmed',
           booking_type: 'avulso',
-          payment_method: 'Dinheiro',
-          observation: 'Reserva direta confirmada'
+          payment_method: 'PIX Balcão',
+          observation: 'Reserva Avulsa Noturna'
         }
       ];
     }
@@ -5529,23 +5532,57 @@ document.addEventListener('DOMContentLoaded', () => {
     saveAdminGameState();
     closeArenaModal('arenaFinishModal');
 
-    // Efeito visual imediato: o jogo concluído some da janela
+    // Limpeza preventiva: marca outros registros idênticos daquele mesmo horário como finalizados
+    if (g.date && g.start_time) {
+      (window.adminGameState.bookings || []).forEach(other => {
+        if (other && other.date === g.date && other.start_time === g.start_time && other.id !== g.id) {
+          other.status = 'finished';
+        }
+      });
+    }
+
+    // Efeito visual imediato: o jogo concluído some da janela instantaneamente
     const cardEl = document.getElementById('card-' + id);
     if (cardEl) {
       cardEl.style.transition = 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
       cardEl.style.opacity = '0';
       cardEl.style.transform = 'scale(0.96) translateY(-8px)';
       cardEl.style.maxHeight = '0';
-      cardEl.style.marginBottom = '0';
+      cardEl.style.margin = '0';
+      cardEl.style.padding = '0';
       cardEl.style.overflow = 'hidden';
     }
 
     setTimeout(() => {
       if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
       if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
-    }, 280);
 
-    arenaToast('✓ Jogo concluído e bola recebida! Partida arquivada com sucesso.');
+      // Identifica e exibe imediatamente o próximo jogo da hora agendado
+      const dateStr = window.adminGameState.selectedDate || '2026-11-03';
+      const activeList = (typeof window.getMatchesForDate === 'function')
+        ? window.getMatchesForDate(dateStr).filter(m => m.status !== 'finished')
+        : [];
+
+      if (activeList.length > 0) {
+        const next = activeList[0];
+        const nextName = next.customer_name || next.name || 'Próxima Equipe';
+        const nextTime = next.start_time || '';
+        const nextCourt = next.court_name || 'Quadra';
+        arenaToast('✓ Jogo concluído! Próximo jogo: ' + nextName + ' às ' + nextTime + ' (' + nextCourt + ')');
+
+        const nextEl = document.getElementById('card-' + next.id);
+        if (nextEl) {
+          nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          nextEl.style.transition = 'box-shadow 0.4s ease';
+          nextEl.style.boxShadow = '0 0 0 3px #10b981, 0 10px 25px -5px rgba(16, 185, 129, 0.35)';
+          setTimeout(() => {
+            nextEl.style.boxShadow = '';
+          }, 3500);
+        }
+      } else {
+        arenaToast('✓ Partida finalizada com sucesso! Todos os jogos deste período foram concluídos.');
+      }
+    }, 280);
   };
 
   window.closeArenaModal = function(id) {
@@ -5557,7 +5594,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Renderizador Oficial do Card de Partida (IDÊNTICO À FOTO FORNECIDA PELO USUÁRIO)
-  function renderMatchCardHtml(m) {
+  function renderMatchCardHtml(m, isNextUpcoming) {
     const court = getCourtById(m.court_id || m.courtId);
     const startT = m.start_time || m.start || (m.time ? m.time.split(' ')[0] : '18:00');
     const endT = m.end_time || m.end || (m.time && m.time.includes('às') ? m.time.split('às')[1].trim() : '19:00');
@@ -5631,7 +5668,7 @@ document.addEventListener('DOMContentLoaded', () => {
       : { percent: 0, label: 'Início automático às ' + startT, counter: durStr, fillClass: '', badgeClass: '' };
 
     return `
-      <article class="booking-card" id="card-${m.id}">
+      <article class="booking-card ${isNextUpcoming ? 'is-next-upcoming' : ''}" id="card-${m.id}" style="${isNextUpcoming ? 'border: 2px solid #10b981 !important; box-shadow: 0 4px 16px -2px rgba(16, 185, 129, 0.18) !important;' : ''}">
         <div class="booking-main-grid">
           
           <!-- Bloco Lateral de Horário (Menta) -->
@@ -5644,6 +5681,12 @@ document.addEventListener('DOMContentLoaded', () => {
           <!-- Informações Centrais -->
           <div class="min-w-0">
             <div class="booking-chips">
+              ${isNextUpcoming ? `
+              <span class="pill-chip" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important; color: #ffffff !important; font-weight: 900 !important; border: 1px solid #059669 !important; box-shadow: 0 2px 6px rgba(16,185,129,0.35) !important; display: inline-flex !important; align-items: center !important; gap: 4px !important;">
+                <span style="display:inline-block; width:6px; height:6px; border-radius:9999px; background:#a7f3d0;"></span>
+                ⚡ Próximo Jogo da Hora
+              </span>
+              ` : ''}
               <span class="pill-chip pill-field">■ ${court.name}</span>
               <span class="pill-chip ${statusClass}">${statusLabel}</span>
               <span class="pill-chip pill-type">${typeLabel}</span>
@@ -5948,7 +5991,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
     } else {
-      container.innerHTML = matches.map(renderMatchCardHtml).join('');
+      container.innerHTML = matches.map((m, idx) => renderMatchCardHtml(m, idx === 0)).join('');
       if (window.location.search.includes('expand=1') || window.location.hash.includes('expandFirst')) {
         const firstPanel = container.querySelector('.booking-expanded-panel');
         if (firstPanel) { firstPanel.style.display = 'block'; firstPanel.classList.remove('hidden'); }
