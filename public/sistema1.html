@@ -555,7 +555,7 @@
       <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">JOGOS AGENDADOS</span>
-          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block">0 <span class="text-xs font-semibold text-slate-400">partidas</span></span>
+          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block kpi-value-games">4 <span class="text-xs font-semibold text-slate-400">partidas</span></span>
         </div>
         <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
           <i data-lucide="calendar" class="w-6 h-6"></i>
@@ -611,7 +611,7 @@
           <button class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">&gt;</button>
           <button class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100">Mês &gt;</button>
           <span class="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50 flex items-center gap-1">
-            <span>01 / 11 / 2026</span>
+            <span>03 / 11 / 2026</span>
             <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
           </span>
         </div>
@@ -637,24 +637,26 @@
           <span class="text-[9px] text-slate-400 block">Out</span>
           <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">6 jogos</span>
         </div>
-        <!-- DIA ATUAL: DOM 01 -->
-        <div class="min-w-[75px] p-2.5 rounded-2xl text-center bg-emerald-700 text-white shadow-lg ring-2 ring-emerald-600">
-          <span class="text-[10px] uppercase font-bold text-emerald-200 block">DOM •</span>
-          <span class="text-lg font-black text-white block">01</span>
-          <span class="text-[9px] text-emerald-200 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-800 text-white text-[9px] font-black inline-block">Sem jogos</span>
+        <!-- DOM 01 -->
+        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-01" onclick="selectMovementDay('2026-11-01', this)">
+          <span class="text-[10px] uppercase font-bold text-slate-400 block">DOM</span>
+          <span class="text-base font-black text-slate-800 block">01</span>
+          <span class="text-[9px] text-slate-400 block">Nov</span>
+          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black inline-block">Sem jogos</span>
         </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300">
+        <!-- SEG 02 -->
+        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-02" onclick="selectMovementDay('2026-11-02', this)">
           <span class="text-[10px] uppercase font-bold text-slate-400 block">SEG</span>
           <span class="text-base font-black text-slate-800 block">02</span>
           <span class="text-[9px] text-slate-400 block">Nov</span>
           <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">12 jogos</span>
         </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">TER</span>
-          <span class="text-base font-black text-slate-800 block">03</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">8 jogos</span>
+        <!-- DIA ATUAL: TER 03 (HOJE) -->
+        <div class="min-w-[75px] p-2.5 rounded-2xl text-center bg-emerald-700 text-white shadow-lg ring-2 ring-emerald-600 transition cursor-pointer" data-date="2026-11-03" onclick="selectMovementDay('2026-11-03', this)">
+          <span class="text-[10px] uppercase font-bold text-emerald-200 block">TER • HOJE</span>
+          <span class="text-lg font-black text-white block">03</span>
+          <span class="text-[9px] text-emerald-200 block">Nov</span>
+          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-800 text-white text-[9px] font-black inline-block">4 jogos</span>
         </div>
         <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300">
           <span class="text-[10px] uppercase font-bold text-slate-400 block">QUA</span>
@@ -750,7 +752,7 @@
           <div>
             <h3 class="text-base sm:text-lg font-black text-slate-900 flex items-center">
               <i data-lucide="list-ordered" class="w-5 h-5 text-emerald-600 mr-2"></i>
-              <span id="movementFeedTitle">Partidas Programadas para Segunda-feira, 02 de Novembro de 2026</span>
+              <span id="movementFeedTitle">Partidas Programadas para Terça-feira, 03 de Novembro de 2026</span>
             </h3>
             <p class="text-xs text-slate-500 mt-0.5">Acompanhamento ao vivo, cronômetro automático, gestão de atrasos e prevenção de choques</p>
           </div>
@@ -2478,6 +2480,160 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 
+
+
+<!-- ========================================================================= -->
+<!-- MODAL: NOVA RESERVA BALCÃO (DIRETA E SINCRONIZADA EM TODAS AS PLATAFORMAS) -->
+<!-- ========================================================================= -->
+<div id="directBookingModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+    
+    <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 p-5 text-white flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+          <i data-lucide="calendar-plus" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black tracking-tight uppercase">Nova Reserva Balcão</h3>
+          <p class="text-xs text-emerald-300 font-medium">Cadastre e libere a partida imediatamente em todas as plataformas</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeDirectBookingModal()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <form onsubmit="handleSaveDirectBooking(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+      
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome do Titular *</label>
+          <input type="text" id="directBookingName" required placeholder="Ex.: Gabriel Silva"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
+          <input type="tel" id="directBookingPhone" required placeholder="(81) 98765-4321"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quadra / Espaço *</label>
+          <select id="directBookingCourt" onchange="autoCalculateDirectBookingPrice()" required
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="fut5">FUT 5 – SOCCER 5 (R$ 90/h)</option>
+            <option value="fut6">FUT 6 – SOCCER 6 (R$ 100/h)</option>
+            <option value="fut7" selected>FUT 7 – SOCCER 7 (R$ 110/h)</option>
+            <option value="futmesa">FOOT TABLE – FUTMESA (R$ 35/h)</option>
+            <option value="areia">AREIA – BEACH SPORTS (R$ 60/h)</option>
+            <option value="society">SOCIETY – ARENA CENTRAL (R$ 120/h)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data do Jogo *</label>
+          <input type="date" id="directBookingDate" required value="2026-11-03"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Início *</label>
+          <select id="directBookingStart" onchange="autoCalculateDirectBookingPrice()" required
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="06:00">06:00</option>
+            <option value="07:00">07:00</option>
+            <option value="08:00">08:00</option>
+            <option value="09:00">09:00 (Promo)</option>
+            <option value="10:00">10:00 (Promo)</option>
+            <option value="11:00">11:00 (Promo)</option>
+            <option value="12:00">12:00 (Promo)</option>
+            <option value="13:00">13:00 (Promo)</option>
+            <option value="14:00">14:00 (Promo)</option>
+            <option value="15:00">15:00 (Promo)</option>
+            <option value="16:00">16:00</option>
+            <option value="17:00">17:00</option>
+            <option value="18:00">18:00</option>
+            <option value="19:00" selected>19:00</option>
+            <option value="20:00">20:00</option>
+            <option value="21:00">21:00</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fim *</label>
+          <select id="directBookingEnd" onchange="autoCalculateDirectBookingPrice()" required
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="07:00">07:00</option>
+            <option value="08:00">08:00</option>
+            <option value="09:00">09:00</option>
+            <option value="10:00">10:00</option>
+            <option value="11:00">11:00</option>
+            <option value="12:00">12:00</option>
+            <option value="13:00">13:00</option>
+            <option value="14:00">14:00</option>
+            <option value="15:00">15:00</option>
+            <option value="16:00">16:00</option>
+            <option value="17:00">17:00</option>
+            <option value="18:00">18:00</option>
+            <option value="19:00">19:00</option>
+            <option value="20:00" selected>20:00</option>
+            <option value="21:00">21:00</option>
+            <option value="22:00">22:00</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Total (R$) *</label>
+          <input type="number" id="directBookingPrice" required value="110" step="5" min="0"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-emerald-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Pagamento</label>
+          <select id="directBookingPayment"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="PIX Balcão" selected>Pago no Balcão (PIX)</option>
+            <option value="Dinheiro Balcão">Pago no Balcão (Dinheiro)</option>
+            <option value="Cartão Balcão">Pago no Balcão (Cartão)</option>
+            <option value="Pagar pós jogo">Pagar no Fim da Pelada</option>
+            <option value="Pendente">Pagamento Pendente</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CPF (Opcional)</label>
+          <input type="text" id="directBookingCpf" placeholder="000.000.000-00"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do Agendamento</label>
+        <textarea id="directBookingObs" rows="2" placeholder="Ex.: Time do camisa 10, levar coletes..."
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none"></textarea>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeDirectBookingModal()" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
+          Cancelar
+        </button>
+        <button type="submit" id="btnSubmitDirectBooking" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
+          <span>Confirmar e Salvar Reserva Balcão</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
 <!-- ========================================================================= -->
 <!-- JAVASCRIPT INTEGRADO: GESTÃO COMPLETA DE JOGOS & MOVIMENTAÇÃO DIÁRIA      -->
 <!-- ========================================================================= -->
@@ -2517,12 +2673,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return [];
   }
 
-  // Estado global do admin
+  // Estado global do admin - Data Inicial definida para o DIA ATUAL: 2026-11-03
   window.adminGameState = {
     bookings: getLoadedBookings(),
     monthlyMembers: getLoadedMonthly(),
     courts: ADMIN_COURTS,
-    selectedDate: '2026-11-02',
+    selectedDate: '2026-11-03',
     movementFilterCourt: 'all',
     movementFilterStatus: 'all',
     cadastrosFilterCourt: 'all',
@@ -2562,16 +2718,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Mapeamento de quadras por court_id
+  // Mapeamento preciso de quadras por ID do banco de dados
   function getCourtById(cId) {
     if (!cId) return ADMIN_COURTS[0];
     const clean = String(cId).toLowerCase();
-    if (clean.includes('fut5') || clean.includes('soccer-5')) return ADMIN_COURTS[0];
-    if (clean.includes('fut6') || clean.includes('soccer-6')) return ADMIN_COURTS[1];
-    if (clean.includes('fut7') || clean.includes('soccer-7') || clean.includes('futsal')) return ADMIN_COURTS[2];
+    if (clean === 'court-esportes-de-quadra-1788962671043' || clean.includes('fut5')) return ADMIN_COURTS[0];
+    if (clean === 'court-society-2' || clean.includes('fut6')) return ADMIN_COURTS[1];
+    if (clean === 'court-futsal-1788963178368' || clean.includes('fut7')) return ADMIN_COURTS[2];
     if (clean.includes('futmesa') || clean.includes('foot-table')) return ADMIN_COURTS[3];
-    if (clean.includes('areia') || clean.includes('beach')) return ADMIN_COURTS[4];
-    if (clean.includes('society') || clean.includes('central')) return ADMIN_COURTS[5];
+    if (clean === 'court-beach-1' || clean === 'court-beach-2' || clean.includes('areia') || clean.includes('beach')) return ADMIN_COURTS[4];
+    if (clean === 'court-society-1' || clean.includes('society')) return ADMIN_COURTS[5];
     return ADMIN_COURTS.find(c => c.id === cId) || ADMIN_COURTS[0];
   }
 
@@ -2587,24 +2743,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Mensalistas fixos do dia da semana
     (window.adminGameState.monthlyMembers || []).forEach(m => {
       if (!m || m.status === 'inactive') return;
-      const mDay = (m.dayOfWeek || m.day_of_week || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const mDay = (m.day_of_week || m.dayOfWeek || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       if (mDay === currentDayOfWeek) {
-        const startT = m.startTime || m.start_time || m.time || '19:00';
-        const endT = m.endTime || m.end_time || '20:00';
-        const court = getCourtById(m.courtId || m.court_id);
+        const startT = m.start_time || m.startTime || m.time || '19:00';
+        const endT = m.end_time || m.endTime || (startT.includes(':') ? String(Number(startT.split(':')[0]) + 1).padStart(2, '0') + ':' + startT.split(':')[1] : '20:00');
+        const court = getCourtById(m.court_id || m.courtId);
         
         matches.push({
           id: 'monthly-' + m.id,
           court_id: court.id,
           court_name: court.name,
           date: dateStr,
-          customer_name: (m.teamName || m.team_name || 'Mensalista') + ' (' + (m.responsibleName || m.responsible_name || 'Responsável') + ')',
+          customer_name: (m.team_name || m.teamName || 'Mensalista') + (m.responsible_name && m.responsible_name !== m.team_name ? ' (' + m.responsible_name + ')' : ''),
           customer_phone: m.phone || '(81) 98765-4321',
           customer_cpf: m.cpf || '',
           start_time: startT,
           end_time: endT,
           time: startT + ' às ' + endT,
-          total_price: parseFloat(m.monthlyPrice || m.monthly_price || 0) / 4 || 100,
+          total_price: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4 || 100,
           status: 'confirmed',
           isMensalista: true,
           booking_type: 'mensalista',
@@ -2623,8 +2779,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
 
         // Evita duplicatas se já existe mensalista no mesmo horário e campo
-        const exists = matches.some(m => m.court_id === court.id && m.start_time === startT);
-        if (!exists) {
+        const existing = matches.find(m => m.court_id === court.id && m.start_time === startT);
+        if (existing) {
+          if (b.customer_name && !existing.customer_name.includes(b.customer_name)) {
+            existing.customer_name = b.customer_name;
+          }
+          if (b.customer_phone) existing.customer_phone = b.customer_phone;
+          if (b.total_price) existing.total_price = b.total_price;
+        } else {
           matches.push({
             id: b.id,
             court_id: court.id,
@@ -2649,7 +2811,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // Ordenação cronológica por horário
     matches.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
     return matches;
   }
@@ -2763,7 +2924,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.renderMovementMatches = function() {
-    const dateStr = window.adminGameState.selectedDate || '2026-11-02';
+    const dateStr = window.adminGameState.selectedDate || '2026-11-03';
     const container = document.getElementById('movementMatchesListContainer');
     const titleEl = document.getElementById('movementFeedTitle');
     const countEl = document.getElementById('movementFeedCount');
@@ -2789,6 +2950,15 @@ document.addEventListener('DOMContentLoaded', () => {
       countEl.textContent = matches.length + (matches.length === 1 ? ' partida listada' : ' partidas listadas');
     }
 
+    // Atualiza KPIs do topo com base no dia atual (Dia 3)
+    if (dateStr === '2026-11-03') {
+      const topRevenue = matches.reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
+      const kpiRev = document.querySelector('.kpi-value-revenue');
+      const kpiGames = document.querySelector('.kpi-value-games');
+      if (kpiRev) kpiRev.textContent = 'R$ ' + topRevenue.toFixed(2).replace('.', ',');
+      if (kpiGames) kpiGames.textContent = matches.length + ' partidas';
+    }
+
     if (!container) return;
 
     if (matches.length === 0) {
@@ -2797,7 +2967,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <i data-lucide="calendar-check" class="w-10 h-10 mx-auto mb-2 text-emerald-500"></i>
           <h4 class="text-sm font-bold text-slate-800">Nenhum jogo agendado com os filtros para esta data.</h4>
           <p class="text-xs text-slate-400 mt-1">Todos os campos estão livres para novas reservas ou manutenções.</p>
-          <button onclick="openDirectBookingModal()" class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow inline-flex items-center gap-1.5 transition">
+          <button type="button" onclick="openDirectBookingModal()" class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow inline-flex items-center gap-1.5 transition cursor-pointer">
             <i data-lucide="plus-circle" class="w-4 h-4"></i>
             <span>Nova Reserva Balcão</span>
           </button>
@@ -2835,6 +3005,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (contentJogos) contentJogos.classList.remove('hidden');
       if (contentModalidades) contentModalidades.classList.add('hidden');
       renderCadastrosBookingsList();
+
+    if (window.location.hash === "#openModal" || window.location.search.includes("modal=direct")) {
+      openDirectBookingModal();
+    }
     } else {
       if (btnJogos) btnJogos.className = 'px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs flex items-center gap-1.5';
       if (btnModalidades) btnModalidades.className = 'px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer bg-slate-900 text-white shadow border border-slate-900 flex items-center gap-1.5';
@@ -2869,7 +3043,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return (a.start_time || '').localeCompare(b.start_time || '');
     });
 
-    const todayStr = '2026-11-02';
+    const todayStr = '2026-11-03';
     const countToday = all.filter(b => b.date === todayStr && b.status !== 'cancelled').length;
     const countUpcoming = all.filter(b => b.date >= todayStr && b.status !== 'cancelled' && b.status !== 'finished').length;
     const countFinished = all.filter(b => b.status === 'finished').length;
@@ -2932,6 +3106,138 @@ document.addEventListener('DOMContentLoaded', () => {
     renderCadastrosBookingsList();
   };
 
+  // =========================================================================
+  // GESTÃO DO MODAL DE NOVA RESERVA BALCÃO (COM SUPABASE + BROADCAST)
+  // =========================================================================
+  window.openDirectBookingModal = function() {
+    const modal = document.getElementById('directBookingModal');
+    if (!modal) return;
+    const dateInput = document.getElementById('directBookingDate');
+    if (dateInput) {
+      dateInput.value = window.adminGameState.selectedDate || '2026-11-03';
+    }
+    autoCalculateDirectBookingPrice();
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.closeDirectBookingModal = function() {
+    const modal = document.getElementById('directBookingModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  };
+
+  window.autoCalculateDirectBookingPrice = function() {
+    const courtSelect = document.getElementById('directBookingCourt');
+    const startSelect = document.getElementById('directBookingStart');
+    const endSelect = document.getElementById('directBookingEnd');
+    const priceInput = document.getElementById('directBookingPrice');
+    if (!courtSelect || !priceInput) return;
+
+    const cId = courtSelect.value;
+    const court = ADMIN_COURTS.find(c => c.id === cId) || ADMIN_COURTS[0];
+
+    const sH = parseInt((startSelect ? startSelect.value : '19:00').split(':')[0], 10);
+    const eH = parseInt((endSelect ? endSelect.value : '20:00').split(':')[0], 10);
+    const duration = Math.max(1, eH - sH);
+
+    const isPromo = sH >= 9 && sH < 16;
+    const hourlyRate = isPromo ? (court.promo || 50) : (court.normal || 90);
+    priceInput.value = hourlyRate * duration;
+  };
+
+  window.handleSaveDirectBooking = async function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const name = document.getElementById('directBookingName')?.value.trim();
+    const phone = document.getElementById('directBookingPhone')?.value.trim();
+    const courtId = document.getElementById('directBookingCourt')?.value || 'fut7';
+    const date = document.getElementById('directBookingDate')?.value || window.adminGameState.selectedDate || '2026-11-03';
+    const start = document.getElementById('directBookingStart')?.value || '19:00';
+    const end = document.getElementById('directBookingEnd')?.value || '20:00';
+    const price = parseFloat(document.getElementById('directBookingPrice')?.value || 90);
+    const payment = document.getElementById('directBookingPayment')?.value || 'PIX Balcão';
+    const cpf = document.getElementById('directBookingCpf')?.value.trim() || '';
+    const obs = document.getElementById('directBookingObs')?.value.trim() || 'Reserva Balcão Direta';
+
+    if (!name || !phone) {
+      alert('Por favor informe o Nome e Telefone do Titular.');
+      return;
+    }
+
+    const bookingId = 'ARENA-B' + Math.floor(1000 + Math.random() * 9000);
+    const court = getCourtById(courtId);
+
+    // Mapeamento para o formato do banco de dados
+    let dbCourtId = courtId;
+    if (courtId === 'fut5') dbCourtId = 'court-esportes-de-quadra-1788962671043';
+    if (courtId === 'fut6') dbCourtId = 'court-society-2';
+    if (courtId === 'fut7') dbCourtId = 'court-futsal-1788963178368';
+    if (courtId === 'society') dbCourtId = 'court-society-1';
+    if (courtId === 'areia') dbCourtId = 'court-beach-1';
+    if (courtId === 'futmesa') dbCourtId = 'court-futmesa-1';
+
+    const newBooking = {
+      id: bookingId,
+      court_id: dbCourtId,
+      customer_name: name,
+      customer_phone: phone,
+      customer_cpf: cpf,
+      date: date,
+      start_time: start,
+      end_time: end,
+      time: start + ' às ' + end,
+      duration: 60,
+      total_price: price,
+      status: 'confirmed',
+      booking_type: 'avulso',
+      payment_method: payment,
+      observation: obs,
+      created_at: new Date().toISOString()
+    };
+
+    // 1. Salva imediatamente em memória
+    window.adminGameState.bookings.unshift(newBooking);
+
+    // 2. Salva em localStorage
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+    } catch(err) {}
+
+    // 3. Salva no Supabase (Banco Secundário Oficial)
+    try {
+      fetch('https://aukrcnhuyultkjqsgvea.supabase.co/rest/v1/bookings', {
+        method: 'POST',
+        headers: {
+          'apikey': 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+          'Authorization': 'Bearer sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(newBooking)
+      }).catch(err => console.warn('Supabase backup warning:', err));
+    } catch(err) {}
+
+    // 4. Broadcast para sincronização imediata em todas as abas e dispositivos
+    try {
+      const bc = new BroadcastChannel('arena_limoeiro_sync');
+      bc.postMessage({ type: 'new_booking', booking: newBooking });
+    } catch(err) {}
+
+    // 5. Atualiza a tela imediatamente
+    closeDirectBookingModal();
+    if (window.adminGameState.selectedDate !== date) {
+      window.selectMovementDay(date);
+    } else {
+      renderMovementMatches();
+    }
+    renderCadastrosBookingsList();
+
+    alert('✓ Reserva de ' + name + ' registrada com sucesso no balcão! Horário ' + start + ' às ' + end + ' liberado na ' + court.name + '.');
+  };
+
   // Ações de partida
   window.toggleMatchStatus = function(id) {
     const booking = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id));
@@ -2959,7 +3265,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.exportMovementDailyExcel = function() {
-    const dateStr = window.adminGameState.selectedDate || '2026-11-02';
+    const dateStr = window.adminGameState.selectedDate || '2026-11-03';
     const matches = getMatchesForDate(dateStr);
     let csv = 'Data;Horario;Quadra;Cliente;Telefone;Valor;Status\n';
     matches.forEach(m => {
@@ -2973,31 +3279,20 @@ document.addEventListener('DOMContentLoaded', () => {
     a.click();
   };
 
-  window.openDirectBookingModal = function() {
-    const name = prompt('Nome do Cliente:');
-    if (!name) return;
-    const phone = prompt('WhatsApp / Telefone:', '819');
-    const time = prompt('Horário (ex: 19:00 às 20:00):', '19:00 às 20:00');
-    const newBooking = {
-      id: 'ARENA-' + Math.floor(1000 + Math.random() * 9000),
-      court_id: 'fut5',
-      date: window.adminGameState.selectedDate || '2026-11-02',
-      customer_name: name,
-      customer_phone: phone || '',
-      start_time: time ? time.split(' ')[0] : '19:00',
-      end_time: time ? time.split(' às ')[1] : '20:00',
-      time: time || '19:00 às 20:00',
-      total_price: 90,
-      status: 'confirmed',
-      booking_type: 'avulso',
-      payment_method: 'Balcão'
+  // Sincronização Broadcast em tempo real entre abas
+  try {
+    const bc = new BroadcastChannel('arena_limoeiro_sync');
+    bc.onmessage = function(ev) {
+      if (ev && ev.data && ev.data.type === 'new_booking') {
+        const b = ev.data.booking;
+        if (!window.adminGameState.bookings.some(x => x.id === b.id)) {
+          window.adminGameState.bookings.unshift(b);
+          renderMovementMatches();
+          renderCadastrosBookingsList();
+        }
+      }
     };
-    window.adminGameState.bookings.unshift(newBooking);
-    localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-    renderMovementMatches();
-    renderCadastrosBookingsList();
-    alert('Reserva balcão cadastrada com sucesso!');
-  };
+  } catch(e) {}
 
   // Inicialização no carregamento da página
   function initAdminGames() {
@@ -3023,9 +3318,28 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Inicializa renderizações
+    // Inicializa renderizações no DIA 3 (Hoje)
     renderMovementMatches();
     renderCadastrosBookingsList();
+
+    if (window.location.hash === "#openModal" || window.location.search.includes("modal=direct")) {
+      setTimeout(openDirectBookingModal, 50);
+    }
+
+    // Sincroniza em segundo plano com o Supabase oficial
+    fetch('https://aukrcnhuyultkjqsgvea.supabase.co/rest/v1/bookings?select=*&order=date.desc', {
+      headers: {
+        'apikey': 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+        'Authorization': 'Bearer sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi'
+      }
+    }).then(res => res.json()).then(cloudBookings => {
+      if (Array.isArray(cloudBookings) && cloudBookings.length > 0) {
+        window.adminGameState.bookings = cloudBookings;
+        localStorage.setItem('arena_local_bookings', JSON.stringify(cloudBookings));
+        renderMovementMatches();
+        renderCadastrosBookingsList();
+      }
+    }).catch(err => console.warn('Background sync note:', err));
   }
 
   if (document.readyState === 'loading') {
