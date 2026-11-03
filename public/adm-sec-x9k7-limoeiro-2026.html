@@ -2853,6 +2853,26 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
+      
+      <div class="sm:col-span-3 flex items-center justify-between p-2 bg-emerald-50/70 border border-emerald-200/80 rounded-xl">
+        <span class="text-[11px] font-black text-emerald-900 uppercase flex items-center gap-1.5">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Duração Rápida do Jogo:</span>
+        </span>
+        <div class="flex items-center gap-1.5">
+          <button type="button" onclick="setDirectBookingDuration(1)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
+            1 hora
+          </button>
+          <button type="button" onclick="setDirectBookingDuration(1.5)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
+            1h 30min
+          </button>
+          <button type="button" onclick="setDirectBookingDuration(2)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
+            2 horas
+          </button>
+        </div>
+      </div>
+
+
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Início *</label>
@@ -2904,7 +2924,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Total (R$) *</label>
           <input type="number" id="directBookingPrice" required value="110" step="5" min="0"
                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-emerald-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-        </div>
+        
+      
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -2945,6 +2966,412 @@ document.addEventListener('DOMContentLoaded', () => {
 
     </form>
   </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAIS OPERACIONAIS: EDIÇÃO, HORÁRIOS, ATRASO, CONTRATO E FALTA           -->
+<!-- ========================================================================= -->
+
+<!-- Modal 1: Editar Jogo com Ajuste de Horário e Atraso -->
+<div id="arenaEditModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+    <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 p-5 text-white flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+          <i data-lucide="edit-3" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black tracking-tight uppercase">Editar Partida / Agendamento</h3>
+          <p class="text-xs text-emerald-300 font-medium">Ajuste horários, atraso da equipe, modalidade e dados da reserva</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeArenaModal('arenaEditModal')" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <form id="arenaEditForm" onsubmit="saveEditGame(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+      <input type="hidden" id="editMatchId">
+      
+      <!-- Dados Principais -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Titular / Equipe *</label>
+          <input type="text" id="editMatchName" required placeholder="Nome do responsável"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone</label>
+          <input type="tel" id="editMatchPhone" placeholder="(81) 99999-9999"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data da Partida *</label>
+          <input type="date" id="editMatchDate" required
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quadra / Espaço *</label>
+          <select id="editMatchCourt" required
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="fut5">FUT 5 – SOCCER 5</option>
+            <option value="fut6">FUT 6 – SOCCER 6</option>
+            <option value="fut7">FUT 7 – SOCCER 7</option>
+            <option value="futmesa">FOOT TABLE – FUTMESA</option>
+            <option value="areia">AREIA – BEACH SPORTS</option>
+            <option value="society">SOCIETY – ARENA CENTRAL</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SEÇÃO: AJUSTE DE HORÁRIO DA PARTIDA -->
+      <div class="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-3.5 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-black text-emerald-900 uppercase flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Horário da Partida</span>
+          </label>
+          <span id="editDurationBadge" class="text-[11px] font-black text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">
+            Duração: 1h
+          </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Início</label>
+            <input type="time" id="editMatchStart" required onchange="onEditMatchTimeChange()"
+                   class="w-full p-2 bg-white border border-emerald-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">Término</label>
+            <input type="time" id="editMatchEnd" required onchange="onEditMatchTimeChange()"
+                   class="w-full p-2 bg-white border border-emerald-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+        </div>
+
+        <!-- Botões de Ajuste Rápido de Horário -->
+        <div>
+          <span class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ajuste rápido de horário (mantém a duração):</span>
+          <div class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+            <button type="button" onclick="adjustGameMinutes(-15)" class="py-1 px-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition text-center cursor-pointer">
+              ‹ -15 min
+            </button>
+            <button type="button" onclick="adjustGameMinutes(-10)" class="py-1 px-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition text-center cursor-pointer">
+              ‹ -10 min
+            </button>
+            <button type="button" onclick="adjustGameMinutes(-5)" class="py-1 px-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition text-center cursor-pointer">
+              ‹ -5 min
+            </button>
+            <button type="button" onclick="adjustGameMinutes(5)" class="py-1 px-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition text-center cursor-pointer">
+              +5 min ›
+            </button>
+            <button type="button" onclick="adjustGameMinutes(10)" class="py-1 px-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition text-center cursor-pointer">
+              +10 min ›
+            </button>
+            <button type="button" onclick="adjustGameMinutes(15)" class="py-1 px-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-emerald-100 hover:border-emerald-300 transition text-center cursor-pointer">
+              +15 min ›
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SEÇÃO: AJUSTE DE ATRASO DA EQUIPE -->
+      <div class="bg-amber-50/60 border border-amber-200/80 rounded-2xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-black text-amber-900 uppercase flex items-center gap-1.5">
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Atraso da Equipe / Chegada</span>
+          </label>
+          <span id="editLateBadge" class="text-[11px] font-black text-amber-800 bg-white border border-amber-200 px-2 py-0.5 rounded-full">
+            Sem atraso
+          </span>
+        </div>
+
+        <input type="hidden" id="editMatchLate" value="0">
+        <div class="grid grid-cols-5 gap-1.5" id="editLateButtonsContainer">
+          <button type="button" onclick="setEditLateMinutes(0)" data-late="0" class="btn-late-opt py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            0 min
+          </button>
+          <button type="button" onclick="setEditLateMinutes(5)" data-late="5" class="btn-late-opt py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            5 min
+          </button>
+          <button type="button" onclick="setEditLateMinutes(10)" data-late="10" class="btn-late-opt py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            10 min
+          </button>
+          <button type="button" onclick="setEditLateMinutes(15)" data-late="15" class="btn-late-opt py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            15 min
+          </button>
+          <button type="button" onclick="setEditLateMinutes(20)" data-late="20" class="btn-late-opt py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            20+ min
+          </button>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-amber-800 uppercase mb-0.5">Motivo / Observação do Atraso</label>
+          <input type="text" id="editMatchLateReason" placeholder="Ex.: Trânsito intenso, avisou via WhatsApp"
+                 class="w-full p-2 bg-white border border-amber-200 rounded-xl text-xs font-medium text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Outros Campos: Tipo, Status, Preço, Pagamento -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo de Reserva *</label>
+          <select id="editMatchType"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Mensalista">Mensalista</option>
+            <option value="Avulso">Avulso</option>
+            <option value="Cortesia">Cortesia</option>
+            <option value="Treino">Treino</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status da Reserva</label>
+          <select id="editMatchStatus"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="confirmed">Confirmado</option>
+            <option value="pending">Pendente</option>
+            <option value="in_progress">Em andamento</option>
+            <option value="finished">Finalizado</option>
+            <option value="cancelled">Cancelado</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Total (R$) *</label>
+          <input type="number" id="editMatchPrice" step="5" min="0" required
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-emerald-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Pagamento</label>
+          <select id="editMatchPayment"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Pago">Pago</option>
+            <option value="Pendente">Pendente</option>
+            <option value="Mensalidade Faturada">Mensalidade Faturada</option>
+            <option value="PIX Balcão">PIX Balcão</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Cartão">Cartão</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nº Jogadores</label>
+          <input type="number" id="editMatchPlayers" min="1" max="40" value="14"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dia Fixo Semanal (Mensalista)</label>
+          <select id="editMatchDayFixed"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="">Não é dia fixo</option>
+            <option value="SEGUNDA">SEGUNDA</option>
+            <option value="TERÇA">TERÇA</option>
+            <option value="QUARTA">QUARTA</option>
+            <option value="QUINTA">QUINTA</option>
+            <option value="SEXTA">SEXTA</option>
+            <option value="SÁBADO">SÁBADO</option>
+            <option value="DOMINGO">DOMINGO</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações da Partida</label>
+          <input type="text" id="editMatchNote" placeholder="Ex.: Levar coletes e bola extra"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeArenaModal('arenaEditModal')" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
+          Cancelar
+        </button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Salvar Alterações</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 2: Editar Contrato -->
+<div id="arenaContractModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 p-5 text-white flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-emerald-400">
+          <i data-lucide="file-text" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black tracking-tight uppercase">Contrato / Termo de Mensalista</h3>
+          <p class="text-xs text-slate-300 font-medium">Gestão de vigência, dia fixo semanal e termo impresso</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeArenaModal('arenaContractModal')" class="text-slate-400 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <form id="arenaContractForm" onsubmit="saveContract(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+      <input type="hidden" id="contractMatchId">
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nº do Contrato / Termo</label>
+          <input type="text" id="contractNumber" placeholder="Ex.: AL-2026-089"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Vínculo</label>
+          <select id="contractType"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Mensalista">Mensalista Oficial</option>
+            <option value="Avulso">Reserva Avulsa</option>
+            <option value="Cortesia">Cortesia / Parceria</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Início da Validade</label>
+          <input type="date" id="contractStart"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fim da Validade</label>
+          <input type="date" id="contractEnd"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dia Fixo</label>
+          <select id="contractDayFixed"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="SEGUNDA">Segunda</option>
+            <option value="TERÇA">Terça</option>
+            <option value="QUARTA">Quarta</option>
+            <option value="QUINTA">Quinta</option>
+            <option value="SEXTA">Sexta</option>
+            <option value="SÁBADO">Sábado</option>
+            <option value="DOMINGO">Domingo</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Vencimento (Dia)</label>
+          <input type="number" id="contractDueDay" min="1" max="31" placeholder="Ex.: 10"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Mensal (R$)</label>
+          <input type="number" id="contractAmount" step="10" min="0" placeholder="R$ 400"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-emerald-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status da Assinatura</label>
+        <select id="contractStatus"
+                class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+          <option value="Assinado / Vigente">✓ Assinado e Vigente</option>
+          <option value="Aguardando assinatura">⏳ Aguardando assinatura física / digital</option>
+          <option value="Em renovação">🔄 Em processo de renovação</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Termos e Condições Especiais</label>
+        <textarea id="contractTerms" rows="2" placeholder="Ex.: Tolerância máxima de 10 min, aviso prévio de 48h para cancelamento..."
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none"></textarea>
+      </div>
+
+      <div class="pt-2 flex items-center justify-between border-t border-slate-100">
+        <button type="button" onclick="printContractTerm()" class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="printer" class="w-4 h-4 text-slate-600"></i>
+          <span>Imprimir Termo</span>
+        </button>
+
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeArenaModal('arenaContractModal')" class="px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
+            Voltar
+          </button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>Salvar Contrato</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal 3: Não Compareceu / Falta -->
+<div id="arenaNoShowModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col">
+    <div class="bg-gradient-to-r from-red-800 via-rose-800 to-red-900 p-5 text-white flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-red-500/20 border border-red-400/30 flex items-center justify-center text-red-300">
+          <i data-lucide="alert-octagon" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black tracking-tight uppercase">Registrar Falta / Não Compareceu</h3>
+          <p class="text-xs text-red-200 font-medium">Confirme a ausência da equipe na quadra</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeArenaModal('arenaNoShowModal')" class="text-red-300 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <form onsubmit="applyNoShow(event)" class="p-5 sm:p-6 space-y-4">
+      <input type="hidden" id="noShowMatchId">
+
+      <div class="p-3 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 font-medium">
+        Você está prestes a marcar esta partida como <strong class="font-black text-red-950">Não compareceu</strong>. O histórico da partida registrará a ocorrência de falta.
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo / Justificativa da Falta</label>
+        <textarea id="noShowReason" rows="3" required placeholder="Ex.: Equipe não apareceu e não atendeu as tentativas de contato via WhatsApp."
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-red-500 focus:outline-none"></textarea>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeArenaModal('arenaNoShowModal')" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
+          Voltar
+        </button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="alert-circle" class="w-4 h-4"></i>
+          <span>Confirmar Falta</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast Notifier -->
+<div id="arenaToast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-800 text-xs font-bold">
+  <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+  <span id="arenaToastMsg">Alteração salva com sucesso!</span>
 </div>
 
 <!-- ========================================================================= -->
@@ -3864,6 +4291,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const firstPanel = container.querySelector('.booking-expanded-panel');
         if (firstPanel) { firstPanel.style.display = 'block'; firstPanel.classList.remove('hidden'); }
       }
+      if (window.location.hash.includes('openEditFirst')) {
+        setTimeout(() => { if (matches && matches[0]) openEditGame(matches[0].id); }, 200);
+      }
+      if (window.location.hash.includes('openContractFirst')) {
+        setTimeout(() => { if (matches && matches[0]) openContract(matches[0].id); }, 200);
+      }
+      if (window.location.hash.includes('openBalcao')) {
+        setTimeout(() => { openDirectBookingModal(); }, 200);
+      }
     }
 
     if (window.lucide) lucide.createIcons();
@@ -4184,6 +4620,509 @@ document.addEventListener('DOMContentLoaded', () => {
   } catch(e) {}
 
   // Inicialização no carregamento da página
+  // =========================================================================
+  // FUNÇÕES OPERACIONAIS: EDIÇÃO, HORÁRIOS, ATRASO, CONTRATO E AÇÕES
+  // =========================================================================
+
+  window.closeArenaModal = function(id) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.display = 'none';
+      el.classList.add('hidden');
+    }
+  };
+
+  window.arenaToast = function(msg) {
+    const t = document.getElementById('arenaToast');
+    const m = document.getElementById('arenaToastMsg');
+    if (!t) {
+      console.log('Toast:', msg);
+      return;
+    }
+    if (m) m.textContent = msg;
+    t.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+    t.classList.add('translate-y-0', 'opacity-100');
+    clearTimeout(window.__arenaToastTimer);
+    window.__arenaToastTimer = setTimeout(() => {
+      t.classList.remove('translate-y-0', 'opacity-100');
+      t.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+    }, 3500);
+  };
+
+  // Helper para converter HH:MM em minutos
+  function parseTimeToMinutes(t) {
+    if (!t || typeof t !== 'string' || !t.includes(':')) return 0;
+    const parts = t.split(':');
+    return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+  }
+
+  // Helper para converter minutos em HH:MM
+  function formatMinutesToTime(m) {
+    let normalized = ((m % 1440) + 1440) % 1440;
+    const hh = String(Math.floor(normalized / 60)).padStart(2, '0');
+    const mm = String(normalized % 60).padStart(2, '0');
+    return hh + ':' + mm;
+  }
+
+  // Atualizar badge de duração no modal de edição
+  window.onEditMatchTimeChange = function() {
+    const s = document.getElementById('editMatchStart')?.value || '18:00';
+    const e = document.getElementById('editMatchEnd')?.value || '19:00';
+    const sm = parseTimeToMinutes(s);
+    const em = parseTimeToMinutes(e);
+    let diff = em - sm;
+    if (diff < 0) diff += 1440;
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    let txt = 'Duração: ';
+    if (h > 0) txt += h + 'h';
+    if (m > 0) txt += (h > 0 ? ' ' : '') + m + 'min';
+    if (diff === 0) txt = 'Duração: 0min';
+    const badge = document.getElementById('editDurationBadge');
+    if (badge) badge.textContent = txt;
+  };
+
+  // Ajuste rápido de horário mantendo a duração do jogo (+/- 5, 10, 15 min)
+  window.adjustGameMinutes = function(deltaMin) {
+    const startInput = document.getElementById('editMatchStart');
+    const endInput = document.getElementById('editMatchEnd');
+    if (!startInput || !endInput) return;
+
+    let sMin = parseTimeToMinutes(startInput.value);
+    let eMin = parseTimeToMinutes(endInput.value);
+    let dur = eMin - sMin;
+    if (dur <= 0) dur += 1440;
+
+    let newS = sMin + deltaMin;
+    let newE = newS + dur;
+
+    startInput.value = formatMinutesToTime(newS);
+    endInput.value = formatMinutesToTime(newE);
+    onEditMatchTimeChange();
+  };
+
+  // Ajuste do atraso da equipe no modal de edição
+  window.setEditLateMinutes = function(mins) {
+    const hidden = document.getElementById('editMatchLate');
+    if (hidden) hidden.value = mins;
+
+    const badge = document.getElementById('editLateBadge');
+    if (badge) {
+      if (mins > 0) {
+        badge.textContent = 'Atraso: ' + mins + ' min';
+        badge.className = 'text-[11px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full';
+      } else {
+        badge.textContent = 'Sem atraso';
+        badge.className = 'text-[11px] font-black text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full';
+      }
+    }
+
+    const container = document.getElementById('editLateButtonsContainer');
+    if (container) {
+      const btns = container.querySelectorAll('.btn-late-opt');
+      btns.forEach(btn => {
+        const bMin = parseInt(btn.getAttribute('data-late'), 10);
+        if (bMin === mins) {
+          btn.className = 'btn-late-opt py-1.5 px-1 text-xs font-black text-white bg-amber-600 border border-amber-700 rounded-xl shadow-sm text-center cursor-pointer';
+        } else {
+          btn.className = 'btn-late-opt py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer';
+        }
+      });
+    }
+  };
+
+  // 1. Abrir Modal de Edição de Jogo
+  window.openEditGame = function(id) {
+    const g = getGame(id);
+    if (!g) {
+      console.warn('Game not found:', id);
+      return;
+    }
+
+    document.getElementById('editMatchId').value = id;
+    document.getElementById('editMatchName').value = g.customer_name || g.name || '';
+    document.getElementById('editMatchPhone').value = g.customer_phone || g.phone || '';
+    document.getElementById('editMatchDate').value = g.date || window.adminGameState.selectedDate || '2026-11-03';
+    
+    const courtSelect = document.getElementById('editMatchCourt');
+    if (courtSelect) {
+      const c = getCourtById(g.court_id || g.courtId);
+      courtSelect.value = c.id;
+    }
+
+    const startTime = g.start_time || g.start || '18:00';
+    const endTime = g.end_time || g.end || '19:00';
+    document.getElementById('editMatchStart').value = startTime;
+    document.getElementById('editMatchEnd').value = endTime;
+    onEditMatchTimeChange();
+
+    const lateMin = parseInt(g.late || 0, 10);
+    setEditLateMinutes(lateMin);
+    document.getElementById('editMatchLateReason').value = g.lateReason || g.late_reason || '';
+
+    document.getElementById('editMatchType').value = g.type || (g.isMensalista ? 'Mensalista' : 'Avulso');
+    document.getElementById('editMatchStatus').value = g.status || 'confirmed';
+    document.getElementById('editMatchPrice').value = g.total_price || g.price || 100;
+    document.getElementById('editMatchPayment').value = g.payment || 'Pago';
+    document.getElementById('editMatchPlayers').value = g.players || 14;
+    document.getElementById('editMatchDayFixed').value = g.dayFixed || (g.isMensalista ? 'TERÇA' : '');
+    document.getElementById('editMatchNote').value = g.observation || g.note || '';
+
+    const modal = document.getElementById('arenaEditModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  // Salvar Edição de Jogo
+  window.saveEditGame = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const id = document.getElementById('editMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+
+    const oldStart = g.start_time || g.start;
+    const oldEnd = g.end_time || g.end;
+    const newStart = document.getElementById('editMatchStart').value;
+    const newEnd = document.getElementById('editMatchEnd').value;
+    const newDate = document.getElementById('editMatchDate').value;
+    const newCourtId = document.getElementById('editMatchCourt').value;
+    const court = getCourtById(newCourtId);
+
+    const oldLate = parseInt(g.late || 0, 10);
+    const newLate = parseInt(document.getElementById('editMatchLate').value || 0, 10);
+    const newLateReason = document.getElementById('editMatchLateReason').value.trim();
+
+    g.customer_name = document.getElementById('editMatchName').value.trim();
+    g.name = g.customer_name;
+    g.customer_phone = document.getElementById('editMatchPhone').value.trim();
+    g.phone = g.customer_phone;
+    g.date = newDate;
+    g.court_id = court.id;
+    g.courtId = court.id;
+    g.space = court.name;
+    g.courtName = court.name;
+    g.start_time = newStart;
+    g.start = newStart;
+    g.end_time = newEnd;
+    g.end = newEnd;
+    g.late = newLate;
+    g.lateReason = newLateReason;
+    g.type = document.getElementById('editMatchType').value;
+    g.status = document.getElementById('editMatchStatus').value;
+    g.total_price = parseFloat(document.getElementById('editMatchPrice').value || 0);
+    g.price = g.total_price;
+    g.payment = document.getElementById('editMatchPayment').value;
+    g.players = parseInt(document.getElementById('editMatchPlayers').value || 14, 10);
+    g.dayFixed = document.getElementById('editMatchDayFixed').value;
+    g.observation = document.getElementById('editMatchNote').value.trim();
+    g.note = g.observation;
+
+    // Log de alterações no histórico
+    if (oldStart !== newStart || oldEnd !== newEnd) {
+      addMatchLog(g, 'Horário ajustado', 'Alterado de ' + oldStart + '–' + oldEnd + ' para ' + newStart + '–' + newEnd);
+    }
+    if (newLate > 0 && newLate !== oldLate) {
+      addMatchLog(g, 'Atraso de equipe registrado', newLate + ' min' + (newLateReason ? ' (' + newLateReason + ')' : ''));
+    }
+
+    saveAdminGameState();
+    closeArenaModal('arenaEditModal');
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Partida atualizada com sucesso!');
+  };
+
+  // 2. Abrir Modal de Contrato
+  window.openContract = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+
+    if (!g.contract) g.contract = {};
+    document.getElementById('contractMatchId').value = id;
+    document.getElementById('contractNumber').value = g.contract.number || 'AL-2026-' + (id.replace(/[^0-9]/g, '').slice(-3) || '042');
+    document.getElementById('contractType').value = g.contract.type || g.type || 'Mensalista';
+    document.getElementById('contractStart').value = g.contract.start || '2026-01-01';
+    document.getElementById('contractEnd').value = g.contract.end || '2026-12-31';
+    document.getElementById('contractDayFixed').value = g.contract.dayFixed || g.dayFixed || 'TERÇA';
+    document.getElementById('contractDueDay').value = g.contract.dueDay || 10;
+    document.getElementById('contractAmount').value = g.contract.amount || g.total_price || g.price || 400;
+    document.getElementById('contractStatus').value = g.contract.status || 'Assinado / Vigente';
+    document.getElementById('contractTerms').value = g.contract.terms || 'Reserva semanal fixa com tolerância de 10 minutos. Cancelamentos devem ser avisados com 48h de antecedência.';
+
+    const modal = document.getElementById('arenaContractModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  // Salvar Contrato
+  window.saveContract = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const id = document.getElementById('contractMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+
+    if (!g.contract) g.contract = {};
+    g.contract.number = document.getElementById('contractNumber').value.trim();
+    g.contract.type = document.getElementById('contractType').value;
+    g.contract.start = document.getElementById('contractStart').value;
+    g.contract.end = document.getElementById('contractEnd').value;
+    g.contract.dayFixed = document.getElementById('contractDayFixed').value;
+    g.contract.dueDay = parseInt(document.getElementById('contractDueDay').value || 10, 10);
+    g.contract.amount = parseFloat(document.getElementById('contractAmount').value || 0);
+    g.contract.status = document.getElementById('contractStatus').value;
+    g.contract.terms = document.getElementById('contractTerms').value.trim();
+
+    addMatchLog(g, 'Contrato atualizado', 'Termo ' + g.contract.number + ' salvo com vencimento dia ' + g.contract.dueDay);
+    saveAdminGameState();
+    closeArenaModal('arenaContractModal');
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Contrato do mensalista salvo com sucesso!');
+  };
+
+  // Imprimir Termo / Contrato
+  window.printContractTerm = function() {
+    const id = document.getElementById('contractMatchId')?.value;
+    const g = getGame(id) || {};
+    const c = g.contract || {};
+    const printWindow = window.open('', '_blank', 'width=800,height=900');
+    if (!printWindow) {
+      alert('Por favor permita popups para imprimir o termo de contrato.');
+      return;
+    }
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Termo de Compromisso / Contrato - Arena Limoeiro</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #1e293b; line-height: 1.6; }
+          .header { text-align: center; border-bottom: 2px solid #059669; padding-bottom: 20px; margin-bottom: 30px; }
+          .header h1 { margin: 0; color: #065f46; font-size: 24px; text-transform: uppercase; }
+          .header p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+          .section { margin-bottom: 24px; }
+          .section-title { font-size: 14px; font-weight: 800; text-transform: uppercase; color: #059669; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-bottom: 12px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 13px; }
+          .box { background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0; }
+          .box strong { display: block; color: #475569; font-size: 11px; text-transform: uppercase; }
+          .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 60px; padding-top: 20px; }
+          .sign-line { border-top: 1px solid #94a3b8; text-align: center; padding-top: 8px; font-size: 12px; }
+          @media print { body { padding: 20px; } button { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Arena Limoeiro – Complexo Poliesportivo</h1>
+          <p>Termo de Adesão e Contrato de Locação Contínua (Mensalista)</p>
+          <p><strong>Nº do Contrato:</strong> ${c.number || 'AL-2026-001'} &bull; <strong>Emissão:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">1. Dados do Contratante e Agendamento</div>
+          <div class="grid">
+            <div class="box"><strong>Responsável / Equipe:</strong> ${g.customer_name || g.name || '---'}</div>
+            <div class="box"><strong>WhatsApp / Contato:</strong> ${g.customer_phone || g.phone || '---'}</div>
+            <div class="box"><strong>Quadra / Espaço:</strong> ${g.courtName || g.space || '---'}</div>
+            <div class="box"><strong>Dia da Semana / Horário:</strong> ${c.dayFixed || g.dayFixed || 'TERÇA'} das ${g.start_time || g.start || '18:00'} às ${g.end_time || g.end || '19:00'}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">2. Condições Financeiras e Vigência</div>
+          <div class="grid">
+            <div class="box"><strong>Valor Mensal Contratado:</strong> R$ ${parseFloat(c.amount || g.total_price || 400).toFixed(2)}</div>
+            <div class="box"><strong>Dia de Vencimento:</strong> Todo dia ${c.dueDay || 10} de cada mês</div>
+            <div class="box"><strong>Início da Vigência:</strong> ${c.start || '01/01/2026'}</div>
+            <div class="box"><strong>Término da Vigência:</strong> ${c.end || '31/12/2026'}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">3. Regras e Condições Especiais</div>
+          <p style="font-size: 12px; color: #475569; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+            ${c.terms || 'A tolerância máxima para início da partida é de 10 minutos. Cancelamentos ou reagendamentos de rodada devem ser informados com no mínimo 48 horas de antecedência. É vedado o uso de calçados inadequados que danifiquem o gramado ou piso.'}
+          </p>
+        </div>
+
+        <div class="signatures">
+          <div class="sign-line">
+            <strong>${g.customer_name || g.name || 'Contratante / Responsável'}</strong><br>
+            CPF: ${g.cpf || '_____________________'}
+          </div>
+          <div class="sign-line">
+            <strong>Arena Limoeiro Gestão Esportiva</strong><br>
+            Administração Oficial
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px;">
+          <button onclick="window.print()" style="padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+            Imprimir Termo
+          </button>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  // 3. Abrir Modal de Não Comparecimento / Falta
+  window.openNoShow = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+
+    document.getElementById('noShowMatchId').value = id;
+    document.getElementById('noShowReason').value = '';
+
+    const modal = document.getElementById('arenaNoShowModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+    if (window.lucide) lucide.createIcons();
+  };
+
+  // Confirmar Falta / Não Compareceu
+  window.applyNoShow = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const id = document.getElementById('noShowMatchId').value;
+    const g = getGame(id);
+    if (!g) return;
+
+    const reason = document.getElementById('noShowReason').value.trim() || 'Equipe não compareceu';
+    g.attendance = 'Não compareceu';
+    g.status = 'cancelled';
+    addMatchLog(g, 'Falta registrada', reason);
+
+    saveAdminGameState();
+    closeArenaModal('arenaNoShowModal');
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Falta registrada no histórico da partida.');
+  };
+
+  // 4. Duplicar Partida
+  window.duplicateGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+
+    const copy = JSON.parse(JSON.stringify(g));
+    copy.id = 'ARENA-DUP-' + Math.floor(1000 + Math.random() * 9000);
+    copy.status = 'pending';
+    copy.attendance = 'Aguardando chegada';
+    copy.late = 0;
+    copy.lateReason = '';
+    copy.checkinAt = '';
+    copy.startedAt = '';
+    copy.finishedAt = '';
+    copy.log = [];
+    addMatchLog(copy, 'Partida duplicada', 'Criada a partir de ' + (g.customer_name || g.name) + '. Revise data e horário.');
+
+    window.adminGameState.bookings.unshift(copy);
+    saveAdminGameState();
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    openEditGame(copy.id);
+    arenaToast('Partida duplicada com sucesso! Revise data e horário.');
+  };
+
+  // 5. Cancelar Partida
+  window.cancelGame = function(id) {
+    if (!confirm('Deseja realmente cancelar esta partida? O cancelamento ficará registrado no histórico.')) return;
+    const g = getGame(id);
+    if (!g) return;
+
+    g.status = 'cancelled';
+    g.attendance = 'Cancelada';
+    addMatchLog(g, 'Partida cancelada', 'Cancelamento manual registrado pela administração.');
+    saveAdminGameState();
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Partida cancelada com sucesso.');
+  };
+
+  // 6. Confirmar Chegada / Presença
+  window.markArrived = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    g.attendance = 'Presença confirmada';
+    g.checkinAt = timeStr;
+    addMatchLog(g, 'Chegada confirmada', 'Equipe no local às ' + timeStr);
+    saveAdminGameState();
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Presença confirmada para ' + (g.customer_name || g.name));
+  };
+
+  // 7. Iniciar Partida
+  window.startGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    g.status = 'in_progress';
+    g.attendance = 'Em quadra';
+    g.startedAt = timeStr;
+    addMatchLog(g, 'Partida iniciada', 'Cronômetro iniciado às ' + timeStr);
+    saveAdminGameState();
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Partida iniciada com sucesso!');
+  };
+
+  // 8. Encerrar Partida
+  window.finishGame = function(id) {
+    const g = getGame(id);
+    if (!g) return;
+
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    g.status = 'finished';
+    g.attendance = 'Finalizada';
+    g.finishedAt = timeStr;
+    addMatchLog(g, 'Partida encerrada', 'Jogo finalizado às ' + timeStr);
+    saveAdminGameState();
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Partida finalizada com sucesso!');
+  };
+
+  // 9. Atalhos de Horário e Duração para o Modal de Adicionar Jogo Balcão
+  window.setDirectBookingDuration = function(hours) {
+    const startSelect = document.getElementById('directBookingStart');
+    const endSelect = document.getElementById('directBookingEnd');
+    if (!startSelect || !endSelect) return;
+
+    const startTime = startSelect.value || '19:00';
+    const sMin = parseTimeToMinutes(startTime);
+    const durMin = Math.round(hours * 60);
+    const newEnd = formatMinutesToTime(sMin + durMin);
+
+    // Se o select de fim tiver essa opção, seleciona; se não, cria temporariamente
+    let opt = Array.from(endSelect.options).find(o => o.value === newEnd);
+    if (!opt) {
+      opt = new Option(newEnd, newEnd);
+      endSelect.add(opt);
+    }
+    endSelect.value = newEnd;
+
+    // Recalcular preço
+    if (window.autoCalculateDirectBookingPrice) {
+      window.autoCalculateDirectBookingPrice();
+    }
+  };
+
   function initAdminGames() {
     // Configura botões de dias na barra de 21 dias com onclick
     const strip = document.getElementById('movementDaysStrip');
