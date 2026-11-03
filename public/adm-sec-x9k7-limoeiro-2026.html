@@ -3680,47 +3680,144 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <!-- 4. ORIGEM DA MARCAÇÃO & FORMA DE PAGAMENTO -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Onde foi marcado o jogo? *</label>
-          <select id="finishMatchOrigin" required
-                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-            <option value="Marcado no Balcão">Marcado no Balcão</option>
-            <option value="No Agendamento">No Agendamento (Online / App)</option>
-            <option value="Avulso">Avulso</option>
-            <option value="Mensalista">Mensalista</option>
-          </select>
+      <!-- 4. RECEBER BOLA DA QUADRA -->
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center justify-between shadow-2xs">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg shadow-sm">⚽</div>
+          <div>
+            <span class="block text-xs font-black text-slate-800">Conferência & Devolução da Bola</span>
+            <span class="block text-[11px] text-slate-500 font-medium">Confirme se a bola do jogo/aula foi entregue na recepção</span>
+          </div>
         </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Forma de Pagamento *</label>
-          <select id="finishMatchPayment" required
-                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-            <option value="PIX">PIX</option>
-            <option value="Dinheiro">Dinheiro</option>
-            <option value="Cartão de Débito">Cartão de Débito</option>
-            <option value="Cartão de Crédito">Cartão de Crédito</option>
-            <option value="Mensalidade Faturada">Mensalidade Faturada</option>
-            <option value="Pendente / Pagar depois">Pendente / Pagar depois</option>
-          </select>
-        </div>
+        <label class="inline-flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-amber-300 shadow-2xs text-xs font-black text-amber-900 select-none">
+          <input type="checkbox" id="finishBallReturned" checked class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer">
+          <span>Bola Recebida ✓</span>
+        </label>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Pagamento</label>
-          <select id="finishPaymentStatus"
-                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-            <option value="Pago">✓ Pago e Confirmado</option>
-            <option value="Pendente">⏳ Pagamento Pendente</option>
-          </select>
+      <!-- 5. ORIGEM DA MARCAÇÃO & FORMA DE PAGAMENTO COM RATEIO -->
+      <div class="space-y-3 pt-1">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Onde foi marcado o jogo? *</label>
+            <select id="finishMatchOrigin" required
+                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+              <option value="Marcado no Balcão">Marcado no Balcão</option>
+              <option value="No Agendamento">No Agendamento (Online / App)</option>
+              <option value="Avulso">Avulso</option>
+              <option value="Mensalista">Mensalista</option>
+            </select>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-bold text-slate-700 uppercase">Modo de Pagamento *</label>
+            </div>
+            <div class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-[11px] font-bold">
+              <button type="button" id="payModeSingleTab" onclick="setPaymentMode('single')" 
+                      class="py-1.5 px-2 rounded-lg bg-white text-emerald-900 font-black shadow-xs text-center cursor-pointer transition">
+                Único
+              </button>
+              <button type="button" id="payModeSplitTab" onclick="setPaymentMode('split')" 
+                      class="py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 font-bold text-center cursor-pointer transition">
+                Dividir (Dinheiro+PIX)
+              </button>
+            </div>
+            <input type="hidden" id="finishPaymentMode" value="single">
+          </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do Fechamento</label>
-          <input type="text" id="finishMatchObs" placeholder="Ex.: Pagou no PIX no balcão"
-                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        <!-- Seção Pagamento Único -->
+        <div id="sectionPaySingle" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Forma de Pagamento Integral *</label>
+            <select id="finishMatchPayment"
+                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+              <option value="PIX">PIX</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Cartão de Débito">Cartão de Débito</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Mensalidade Faturada">Mensalidade Faturada</option>
+              <option value="Pendente / Pagar depois">Pendente / Pagar depois</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Seção Pagamento Dividido (Rateio Dinâmico) -->
+        <div id="sectionPaySplit" style="display:none;" class="space-y-3 bg-emerald-50/50 p-3.5 rounded-2xl border border-emerald-200/80">
+          <div class="flex items-center justify-between border-b border-emerald-100 pb-2">
+            <div>
+              <span class="block text-xs font-black text-emerald-950 uppercase">Dividir Pagamento da Partida</span>
+              <span class="block text-[11px] text-emerald-700">Informe quanto foi em dinheiro e quanto falta em PIX/cartão</span>
+            </div>
+            <button type="button" onclick="splitFiftyFifty()" 
+                    class="text-[11px] font-black px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl shadow-2xs cursor-pointer transition">
+              ⚖️ Dividir 50% / 50%
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Parte 1 -->
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">1ª Parte: Forma</label>
+              <select id="splitMethod1" onchange="updateSplitBalance()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 mb-2 cursor-pointer">
+                <option value="Dinheiro" selected>Dinheiro</option>
+                <option value="PIX">PIX</option>
+                <option value="Cartão de Débito">Cartão de Débito</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
+              </select>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-0.5">Valor Pago</label>
+              <div class="relative">
+                <span class="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R$</span>
+                <input type="number" step="0.50" min="0" id="splitAmount1" 
+                       oninput="onSplitAmountChange(1, this.value)" 
+                       placeholder="0,00" 
+                       class="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+              </div>
+            </div>
+
+            <!-- Parte 2 -->
+            <div class="bg-white p-2.5 rounded-xl border border-emerald-100 shadow-2xs">
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">2ª Parte: Forma</label>
+              <select id="splitMethod2" onchange="updateSplitBalance()" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 mb-2 cursor-pointer">
+                <option value="PIX" selected>PIX</option>
+                <option value="Dinheiro">Dinheiro</option>
+                <option value="Cartão de Débito">Cartão de Débito</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
+              </select>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-0.5">Valor Pago / Restante</label>
+              <div class="relative">
+                <span class="absolute left-2.5 top-2 text-xs font-bold text-slate-400">R$</span>
+                <input type="number" step="0.50" min="0" id="splitAmount2" 
+                       oninput="onSplitAmountChange(2, this.value)" 
+                       placeholder="0,00" 
+                       class="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-black text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- Feedback do Saldo da Divisão -->
+          <div id="splitStatusNotice" class="p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 bg-emerald-100/80 border-emerald-300 text-emerald-950 transition-all">
+            <span id="splitStatusIcon" class="text-sm">✓</span>
+            <span id="splitStatusText">Total 100% quitado: R$ 50,00 (Dinheiro) + R$ 50,00 (PIX)</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Pagamento</label>
+            <select id="finishPaymentStatus"
+                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+              <option value="Pago">✓ Pago e Confirmado</option>
+              <option value="Pendente">⏳ Pagamento Pendente</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do Fechamento</label>
+            <input type="text" id="finishMatchObs" placeholder="Ex.: R$ 50 no PIX e R$ 50 em espécie"
+                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
         </div>
       </div>
 
@@ -4681,6 +4778,174 @@ document.addEventListener('DOMContentLoaded', () => {
     if (totalEl) totalEl.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
   };
 
+  
+  // =========================================================================
+  // GESTÃO DE RATEIO / DIVIDIR PAGAMENTO E TIMER AUTOMÁTICO
+  // =========================================================================
+  window.getFinishCurrentTotal = function() {
+    const base = parseFloat(document.getElementById('finishBasePrice')?.value || 100);
+    const hourly = parseFloat(document.getElementById('finishHourlyRate')?.value || 100);
+    const extra = parseInt(document.getElementById('finishMatchExtra')?.value || 0, 10);
+    const extraAmt = Math.round((extra / 60) * hourly);
+    return base + extraAmt;
+  };
+
+  window.setPaymentMode = function(mode) {
+    const hidden = document.getElementById('finishPaymentMode');
+    const secSingle = document.getElementById('sectionPaySingle');
+    const secSplit = document.getElementById('sectionPaySplit');
+    const tabSingle = document.getElementById('payModeSingleTab');
+    const tabSplit = document.getElementById('payModeSplitTab');
+    if (!hidden) return;
+    hidden.value = mode;
+
+    if (mode === 'split') {
+      if (secSingle) secSingle.style.display = 'none';
+      if (secSplit) secSplit.style.display = 'block';
+      if (tabSingle) {
+        tabSingle.className = 'py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 font-bold text-center cursor-pointer transition';
+      }
+      if (tabSplit) {
+        tabSplit.className = 'py-1.5 px-2 rounded-lg bg-white text-emerald-900 font-black shadow-xs text-center cursor-pointer transition';
+      }
+      const total = window.getFinishCurrentTotal();
+      const in1 = document.getElementById('splitAmount1');
+      const in2 = document.getElementById('splitAmount2');
+      if (in1 && (!in1.value || parseFloat(in1.value) === 0)) {
+        in1.value = (total / 2).toFixed(2);
+        if (in2) in2.value = (total / 2).toFixed(2);
+      }
+      window.updateSplitBalance();
+    } else {
+      if (secSingle) secSingle.style.display = 'grid';
+      if (secSplit) secSplit.style.display = 'none';
+      if (tabSingle) {
+        tabSingle.className = 'py-1.5 px-2 rounded-lg bg-white text-emerald-900 font-black shadow-xs text-center cursor-pointer transition';
+      }
+      if (tabSplit) {
+        tabSplit.className = 'py-1.5 px-2 rounded-lg text-slate-600 hover:text-slate-900 font-bold text-center cursor-pointer transition';
+      }
+    }
+  };
+
+  window.onSplitAmountChange = function(which, val) {
+    const total = window.getFinishCurrentTotal();
+    const num = parseFloat(val) || 0;
+    const in1 = document.getElementById('splitAmount1');
+    const in2 = document.getElementById('splitAmount2');
+
+    if (which === 1 && in2) {
+      const rest = Math.max(0, total - num);
+      in2.value = rest > 0 ? rest.toFixed(2) : '0.00';
+    } else if (which === 2 && in1) {
+      const rest = Math.max(0, total - num);
+      in1.value = rest > 0 ? rest.toFixed(2) : '0.00';
+    }
+    window.updateSplitBalance();
+  };
+
+  window.splitFiftyFifty = function() {
+    const total = window.getFinishCurrentTotal();
+    const half = (total / 2).toFixed(2);
+    const in1 = document.getElementById('splitAmount1');
+    const in2 = document.getElementById('splitAmount2');
+    if (in1) in1.value = half;
+    if (in2) in2.value = half;
+    window.updateSplitBalance();
+  };
+
+  window.updateSplitBalance = function() {
+    const total = window.getFinishCurrentTotal();
+    const a1 = parseFloat(document.getElementById('splitAmount1')?.value || 0);
+    const a2 = parseFloat(document.getElementById('splitAmount2')?.value || 0);
+    const m1 = document.getElementById('splitMethod1')?.value || 'Dinheiro';
+    const m2 = document.getElementById('splitMethod2')?.value || 'PIX';
+    const notice = document.getElementById('splitStatusNotice');
+    const icon = document.getElementById('splitStatusIcon');
+    const text = document.getElementById('splitStatusText');
+    if (!notice || !text) return;
+
+    const sum = a1 + a2;
+    const diff = Math.round((total - sum) * 100) / 100;
+
+    if (Math.abs(diff) < 0.05) {
+      notice.className = 'p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 bg-emerald-100/80 border-emerald-300 text-emerald-950 transition-all';
+      if (icon) icon.textContent = '✓';
+      text.textContent = 'Total 100% quitado: R$ ' + a1.toFixed(2).replace('.', ',') + ' (' + m1 + ') + R$ ' + a2.toFixed(2).replace('.', ',') + ' (' + m2 + ')';
+    } else if (diff > 0) {
+      notice.className = 'p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 bg-amber-100/90 border-amber-300 text-amber-950 transition-all';
+      if (icon) icon.textContent = '⚠️';
+      text.textContent = 'Falta R$ ' + diff.toFixed(2).replace('.', ',') + ' em ' + m2 + ' para atingir o total de R$ ' + total.toFixed(2).replace('.', ',');
+    } else {
+      const over = Math.abs(diff);
+      notice.className = 'p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 bg-rose-100/90 border-rose-300 text-rose-950 transition-all';
+      if (icon) icon.textContent = '⚠️';
+      text.textContent = 'Soma dos valores (R$ ' + sum.toFixed(2).replace('.', ',') + ') excede o total em R$ ' + over.toFixed(2).replace('.', ',');
+    }
+  };
+
+  window.calcMatchTimer = function(startT, endT, extraMin, st) {
+    const parseMin = (s) => {
+      if (!s) return 0;
+      const p = s.split(':');
+      return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
+    };
+    const sM = parseMin(startT);
+    let eM = parseMin(endT);
+    if (eM <= sM) eM += 24 * 60;
+    const baseSched = eM - sM;
+    const totalDuration = baseSched + (extraMin || 0);
+
+    if (st === 'finished') {
+      return {
+        percent: 100,
+        label: 'Partida concluída',
+        counter: totalDuration + ' min finalizados',
+        fillClass: 'timer-fill-finished',
+        badgeClass: 'timer-finished',
+        isOverdue: false
+      };
+    }
+
+    const now = new Date();
+    const currentM = now.getHours() * 60 + now.getMinutes();
+
+    if (currentM < sM) {
+      const minUntil = sM - currentM;
+      return {
+        percent: 0,
+        label: 'Início automático às ' + startT,
+        counter: 'Inicia em ' + minUntil + ' min',
+        fillClass: '',
+        badgeClass: 'timer-future',
+        isOverdue: false
+      };
+    } else if (currentM <= (eM + (extraMin || 0))) {
+      const elapsed = currentM - sM;
+      const remaining = (eM + (extraMin || 0)) - currentM;
+      const percent = Math.min(100, Math.max(0, Math.round((elapsed / totalDuration) * 100)));
+      const fillClass = percent >= 85 ? 'timer-fill-warn' : '';
+      return {
+        percent,
+        label: elapsed + ' min decorridos (' + percent + '%)',
+        counter: remaining + ' min restantes',
+        fillClass,
+        badgeClass: '',
+        isOverdue: false
+      };
+    } else {
+      const overdue = currentM - (eM + (extraMin || 0));
+      return {
+        percent: 100,
+        label: 'Tempo limite atingido (' + totalDuration + ' min)',
+        counter: overdue > 0 ? '+' + overdue + ' min (Receber bola)' : 'Concluir aula',
+        fillClass: 'timer-fill-red',
+        badgeClass: 'timer-overdue',
+        isOverdue: true
+      };
+    }
+  };
+
   window.openFinishGame = function(id) {
     try {
       let g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
@@ -4773,6 +5038,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const fObs = document.getElementById('finishMatchObs');
       if (fObs) fObs.value = g.finishObs || '';
 
+      const ballCb = document.getElementById('finishBallReturned');
+      if (ballCb) ballCb.checked = (g.ballReturned !== false);
+
+      if (g.splitPayment && g.splitDetail) {
+        window.setPaymentMode('split');
+        const sM1 = document.getElementById('splitMethod1');
+        const sA1 = document.getElementById('splitAmount1');
+        const sM2 = document.getElementById('splitMethod2');
+        const sA2 = document.getElementById('splitAmount2');
+        if (sM1) sM1.value = g.splitDetail.m1 || 'Dinheiro';
+        if (sA1) sA1.value = parseFloat(g.splitDetail.a1 || 0).toFixed(2);
+        if (sM2) sM2.value = g.splitDetail.m2 || 'PIX';
+        if (sA2) sA2.value = parseFloat(g.splitDetail.a2 || 0).toFixed(2);
+        window.updateSplitBalance();
+      } else {
+        window.setPaymentMode('single');
+      }
+
       const modal = document.getElementById('arenaFinishModal');
       if (modal) {
         modal.style.display = 'flex';
@@ -4793,31 +5076,51 @@ document.addEventListener('DOMContentLoaded', () => {
     const late = parseInt(document.getElementById('finishMatchLate')?.value || 0, 10);
     const extraTime = parseInt(document.getElementById('finishMatchExtra')?.value || 0, 10);
     const origin = document.getElementById('finishMatchOrigin')?.value || 'Marcado no Balcão';
-    const payment = document.getElementById('finishMatchPayment')?.value || 'PIX';
+    const payMode = document.getElementById('finishPaymentMode')?.value || 'single';
     const payStatus = document.getElementById('finishPaymentStatus')?.value || 'Pago';
     const obs = document.getElementById('finishMatchObs')?.value.trim() || '';
+    const ballReturned = document.getElementById('finishBallReturned')?.checked !== false;
 
     const basePrice = parseFloat(document.getElementById('finishBasePrice')?.value || 100);
     const hourlyRate = parseFloat(document.getElementById('finishHourlyRate')?.value || 100);
     const extraAmount = Math.round((extraTime / 60) * hourlyRate);
     const calculatedTotal = basePrice + extraAmount;
 
+    let paymentFinalStr = '';
+    let splitDetail = null;
+    if (payMode === 'split') {
+      const m1 = document.getElementById('splitMethod1')?.value || 'Dinheiro';
+      const a1 = parseFloat(document.getElementById('splitAmount1')?.value || 0);
+      const m2 = document.getElementById('splitMethod2')?.value || 'PIX';
+      const a2 = parseFloat(document.getElementById('splitAmount2')?.value || 0);
+      paymentFinalStr = m1 + ': R$ ' + a1.toFixed(2).replace('.', ',') + ' + ' + m2 + ': R$ ' + a2.toFixed(2).replace('.', ',');
+      splitDetail = { m1, a1, m2, a2 };
+      g.splitPayment = true;
+      g.splitDetail = splitDetail;
+    } else {
+      paymentFinalStr = document.getElementById('finishMatchPayment')?.value || 'PIX';
+      g.splitPayment = false;
+      delete g.splitDetail;
+    }
+
     const now = new Date();
     const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
 
     g.status = 'finished';
     g.attendance = 'Finalizada';
+    g.ballReturned = ballReturned;
     g.finishedAt = timeStr;
     g.late = late;
     g.extraTime = extraTime;
     g.extraAmount = extraAmount;
     g.booking_origin = origin;
-    g.payment = (payStatus === 'Pago' ? payment : payment + ' (Pendente)');
+    g.payment = (payStatus === 'Pago' ? paymentFinalStr : paymentFinalStr + ' (Pendente)');
     g.total_price = calculatedTotal;
     g.price = calculatedTotal;
     g.finishObs = obs;
 
     let logText = 'Partida concluída';
+    if (ballReturned) logText += ' • Bola devolvida e conferida';
     if (extraTime > 0) logText += ' • ' + extraTime + 'm extra (+R$ ' + extraAmount + ')';
     if (late > 0) logText += ' • Atraso: ' + late + 'm';
     logText += ' • Total: R$ ' + calculatedTotal.toFixed(2) + ' • ' + g.payment + ' • ' + origin;
@@ -4906,6 +5209,10 @@ document.addEventListener('DOMContentLoaded', () => {
       { at: 'Reserva cadastrada', text: observation }
     ];
 
+    const matchTimer = (typeof window.calcMatchTimer === 'function') 
+      ? window.calcMatchTimer(startT, endT, extraMin, st) 
+      : { percent: 0, label: 'Início automático às ' + startT, counter: durStr, fillClass: '', badgeClass: '' };
+
     return `
       <article class="booking-card" id="card-${m.id}">
         <div class="booking-main-grid">
@@ -4945,6 +5252,17 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <div class="booking-subnote">${observation}</div>
+
+            <!-- Barra de Progresso Minuto a Minuto -->
+            <div class="booking-timer-bar-wrapper">
+              <div class="booking-timer-info">
+                <span class="booking-timer-label">⏱ <strong>${matchTimer.label}</strong></span>
+                <span class="booking-timer-counter ${matchTimer.badgeClass}">${matchTimer.counter}</span>
+              </div>
+              <div class="booking-timer-track">
+                <div class="booking-timer-fill ${matchTimer.fillClass}" style="width: ${matchTimer.percent}%;"></div>
+              </div>
+            </div>
           </div>
 
           <!-- Coluna Direita (Preço e Ações) -->
@@ -4955,27 +5273,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
 
             <div class="booking-quick-actions">
-              ${!arrived && st !== 'finished' && st !== 'cancelled' ? `
-                <button type="button" class="booking-quick-btn" onclick="markArrived('${m.id}')">
-                  ✓ Chegou
-                </button>
+              ${st === 'finished' ? `
+                <span class="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-xl px-3 py-2 inline-flex items-center gap-1.5 shadow-sm">
+                  ✓ Finalizada · Bola Recebida
+                </span>
               ` : `
-                <span class="pill-chip pill-confirmed" style="padding:6px 10px;">✓ Presença ok</span>
+                <button type="button" class="booking-finish-red-btn" onclick="openFinishGame('${m.id}')" title="Encerrar aula/jogo e receber a bola">
+                  <span class="btn-ball-icon">⚽</span>
+                  <span>Finalizar / Receber Bola</span>
+                </button>
               `}
-
-              ${st === 'live' || st === 'playing' || st === 'in_progress' ? `
-                <button type="button" class="booking-quick-btn btn-primary" onclick="openFinishGame('${m.id}')">
-                  ■ Encerrar
-                </button>
-              ` : (st === 'finished' ? `
-                <button type="button" class="booking-quick-btn" onclick="openFinishGame('${m.id}')">
-                  ✓ Finalizado
-                </button>
-              ` : `
-                <button type="button" class="booking-quick-btn btn-primary" onclick="startGame('${m.id}')">
-                  ► Iniciar
-                </button>
-              `)}
             </div>
           </div>
 
@@ -4984,7 +5291,10 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- Linha de Status de Presença e Toggle de Detalhes -->
         <div class="booking-card-footer booking-presence-row">
           <div class="booking-presence-text text-xs text-slate-500 font-medium">
-            Presença: <strong class="text-slate-800 font-bold">${attendance}${m.checkinAt ? ' (' + m.checkinAt + ')' : ''}</strong>
+            Status: <strong class="text-slate-800 font-bold">${
+              st === 'finished' ? '✓ Finalizada · Bola recebida' : 
+              (st === 'cancelled' ? 'Cancelada' : '🟢 Em andamento (Início automático)')
+            }</strong>
           </div>
           <button type="button" class="booking-detail-toggle booking-toggle-btn" onclick="toggleDetails('${m.id}')">
             <span>Detalhes e ações</span>
