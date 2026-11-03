@@ -10983,7 +10983,7 @@ function renderAdminTabContent() {
 
   // Calcula quais sub-abas o usuário logado tem permissão de acessar
   const allowedSubTabs = [];
-  if (canEditCourts()) allowedSubTabs.push('spaces', 'positions');
+  if (canEditCourts()) allowedSubTabs.push('positions');
   if (canDeleteBookings() || canStartMatches()) allowedSubTabs.push('bookings');
   if (canManageMonthly()) allowedSubTabs.push('monthly');
   if (canManageCustomers()) allowedSubTabs.push('customers');
@@ -10991,7 +10991,7 @@ function renderAdminTabContent() {
   if (isMasterAdmin) allowedSubTabs.push('audit_logs');
   allowedSubTabs.push('backup');
 
-  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','whatsapp','database','audit_logs','backup'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'spaces'));
+  let activeSubTab = state.adminSubTab || (['spaces','bookings','categories','positions','monthly','users','customers','whatsapp','database','audit_logs','backup'].includes(currentTab) ? currentTab : (allowedSubTabs[0] || 'bookings'));
   if (allowedSubTabs.length > 0 && !allowedSubTabs.includes(activeSubTab)) {
     activeSubTab = allowedSubTabs[0];
     state.adminSubTab = activeSubTab;
@@ -11002,11 +11002,7 @@ function renderAdminTabContent() {
       
       <!-- Sub-navegação de Cadastros -->
       <div class="flex flex-wrap items-center gap-2 pb-2 w-full">
-        ${canEditCourts() ? `
-          <button onclick="setAdminSubTab('spaces')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'spaces' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">
-            <span class="truncate">Espaços / Quadras</span>
-          </button>
-        ` : ''}
+        
 
         ${(canDeleteBookings() || canStartMatches()) ? `
           <button onclick="setAdminSubTab('bookings')" class="px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'bookings' ? 'bg-slate-900 text-white shadow font-black border border-slate-900' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 shadow-xs'}">

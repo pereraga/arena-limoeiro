@@ -1906,6 +1906,76 @@ footer{background:#06150e;color:#fff;padding:25px 0}.footer-inner{display:flex;j
       if (sp) chooseSpace(sp, false);
     };
   });
+
+  // =========================================================================
+  // REORDENAÇÃO DINÂMICA DAS MODALIDADES/QUADRAS BASEADA NA PREFERÊNCIA DO ADM
+  // =========================================================================
+  function applyClientSpacesOrder() {
+    let order = [];
+    try {
+      const orderRaw = localStorage.getItem('arena_limoeiro_quadras_order');
+      if (orderRaw) order = JSON.parse(orderRaw);
+    } catch(e) {}
+
+    if (!order || !order.length) {
+      try {
+        const raw = localStorage.getItem('arena_limoeiro_quadras_demo_v2');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.courts)) {
+            order = parsed.courts.map(c => c.id);
+          }
+        }
+      } catch(e) {}
+    }
+
+    if (!order || !order.length) return;
+
+    const idMap = {
+      'futmesa': 'foot',
+      'foot': 'foot',
+      'areia': 'beach',
+      'beach': 'beach',
+      'fut5': 'fut5',
+      'fut6': 'fut6',
+      'fut7': 'fut7',
+      'society': 'society'
+    };
+
+    const clientOrder = order.map(id => idMap[id] || id);
+
+    // 1. Reordenar cards de apresentação na vitrine (.spaces)
+    const spacesContainer = document.querySelector('.spaces');
+    if (spacesContainer) {
+      const cards = Array.from(spacesContainer.querySelectorAll('.space-card'));
+      clientOrder.forEach(key => {
+        const card = cards.find(c => {
+          const btn = c.querySelector('[data-choose]');
+          return btn && (btn.getAttribute('data-choose') === key);
+        });
+        if (card) spacesContainer.appendChild(card);
+      });
+    }
+
+    // 2. Reordenar botões de seleção de agendamento (#spaceOptions)
+    const spaceOptions = document.getElementById('spaceOptions');
+    if (spaceOptions) {
+      const btns = Array.from(spaceOptions.querySelectorAll('.space-option'));
+      clientOrder.forEach(key => {
+        const btn = btns.find(b => b.getAttribute('data-space') === key);
+        if (btn) spaceOptions.appendChild(btn);
+      });
+    }
+  }
+
+  // Executar na carga e ouvir mudanças em tempo real
+  applyClientSpacesOrder();
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'arena_limoeiro_quadras_order' || e.key === 'arena_limoeiro_quadras_demo_v2') {
+      applyClientSpacesOrder();
+    }
+  });
+
 </script>
 </body>
 </html>
