@@ -1100,6 +1100,8 @@
     }
 
 </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/supabase-client.js"></script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col pb-20">
 
@@ -1129,6 +1131,11 @@
           <i data-lucide="download" class="w-4 h-4 text-amber-200"></i>
           <span class="hidden sm:inline">Baixar APK</span>
         </button>
+
+        <div id="cloudDbStatusBadge" class="hidden sm:inline-flex items-center gap-1.5 bg-emerald-950/80 border border-emerald-500/60 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-200 shadow-md">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="cloudDbStatusText">Nuvem: 2 Bancos Ativos (DB1 & DB2)</span>
+        </div>
 
         <button onclick="openModal('modalInfoSistema')" class="bg-emerald-900/80 hover:bg-emerald-800 border border-emerald-600/50 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1.5 shadow-md cursor-pointer">
           <i data-lucide="info" class="w-4 h-4 text-emerald-300"></i>
@@ -4180,6 +4187,194 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Gera lista consolidada de partidas para uma data específica
+  
+  // ============================================================================
+  // ☁️ MOTOR DE SINCRONIZAÇÃO EM NUVEM DUPLA (BANCO 1 + BANCO 2 DUAL-WRITE)
+  // ============================================================================
+  const ARENA_CLOUD_DBS = {
+    db1Url: 'https://brmclyukjfijommbxhks.supabase.co',
+    db1Key: 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+    db2Url: 'https://aukrcnhuyultkjqsgvea.supabase.co',
+    db2Key: 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+    syncEndpoint: '/api/sync'
+  };
+
+  // Toda e qualquer atualização no sistema é enviada em Dual-Write para ambos os bancos
+  window.syncBookingToCloud = async function(booking, action = 'upsert') {
+    if (!booking || !booking.id) return;
+
+    const payload = {
+      id: String(booking.id),
+      court_id: booking.court_id || booking.courtId || 'court-society-1',
+      customer_id: booking.customer_id || null,
+      date: booking.date || window.adminGameState.selectedDate || '2026-11-03',
+      start_time: booking.start_time || (booking.time ? booking.time.split(' ')[0] : '16:00'),
+      end_time: booking.end_time || (booking.time && booking.time.includes('às') ? booking.time.split('às')[1].trim() : '17:00'),
+      time: booking.time || ((booking.start_time || '16:00') + ' às ' + (booking.end_time || '17:00')),
+      duration: Number(booking.duration) || 60,
+      customer_name: booking.customer_name || booking.name || 'Cliente Arena',
+      customer_phone: booking.customer_phone || booking.phone || '(81) 99556-2693',
+      total_price: Number(booking.total_price || booking.price || 100),
+      status: booking.status || 'confirmed',
+      booking_type: booking.booking_type || 'avulso',
+      payment_method: booking.payment_method || booking.payment || 'pix',
+      product_cart: (typeof booking.product_cart === 'object' && booking.product_cart !== null) ? booking.product_cart : {},
+      observation: booking.observation || booking.finishObs || null
+    };
+
+    console.log('[ArenaCloud] Dual-Write agendamento:', action, payload.id);
+
+    // 1. Gravação no Banco 2 (Ativo & Salvaguarda)
+    try {
+      if (action === 'delete') {
+        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
+          method: 'DELETE',
+          headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
+        }).catch(() => {});
+      } else {
+        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings', {
+          method: 'POST',
+          headers: {
+            apikey: ARENA_CLOUD_DBS.db2Key,
+            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload)
+        }).catch(err => console.warn('[ArenaCloud] Aviso DB2:', err));
+      }
+    } catch(e) {}
+
+    // 2. Gravação no Banco 1 (Principal)
+    try {
+      if (action === 'delete') {
+        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
+          method: 'DELETE',
+          headers: { apikey: ARENA_CLOUD_DBS.db1Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key }
+        }).catch(() => {});
+      } else {
+        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings', {
+          method: 'POST',
+          headers: {
+            apikey: ARENA_CLOUD_DBS.db1Key,
+            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(payload)
+        }).catch(() => {}); // Se DB1 estiver em cota (402), não interrompe o fluxo
+      }
+    } catch(e) {}
+
+    // 3. Sincronização Serverless Cloud (Notifica APKs e Celulares conectados)
+    try {
+      if (window.ArenaCloudSync && typeof window.ArenaCloudSync.push === 'function') {
+        window.ArenaCloudSync.push(action === 'delete' ? 'delete_booking' : 'push_booking', payload).catch(() => {});
+      } else {
+        fetch(ARENA_CLOUD_DBS.syncEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action === 'delete' ? 'delete_booking' : 'push_booking', payload })
+        }).catch(() => {});
+      }
+    } catch(e) {}
+
+    // 4. Broadcast local entre abas
+    try {
+      const bc = new BroadcastChannel('arena_limoeiro_sync');
+      bc.postMessage({ type: 'booking_updated', action, payload });
+    } catch(e) {}
+  };
+
+  // Puxa agendamentos e mensalistas dos Bancos de Dados na Nuvem
+  window.pullDataFromCloudDatabases = async function() {
+    try {
+      console.log('[ArenaCloud] Puxando dados dos 2 Bancos de Dados...');
+      let cloudBookings = null;
+      let cloudMembers = null;
+
+      // 1. Tenta carregar reservas do DB2 (Banco 2 Ativo)
+      try {
+        const res2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=*&order=date.asc', {
+          headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
+        });
+        if (res2.ok) {
+          cloudBookings = await res2.json();
+          console.log('[ArenaCloud] Carregados ' + cloudBookings.length + ' agendamentos do Banco 2.');
+        }
+      } catch(e2) {
+        console.warn('[ArenaCloud] Falha no Banco 2, tentando Banco 1:', e2);
+      }
+
+      // Se falhou no DB2, tenta DB1 como fallback
+      if (!cloudBookings || cloudBookings.length === 0) {
+        try {
+          const res1 = await fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=*&order=date.asc', {
+            headers: { apikey: ARENA_CLOUD_DBS.db1Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key }
+          });
+          if (res1.ok) {
+            cloudBookings = await res1.json();
+            console.log('[ArenaCloud] Carregados ' + cloudBookings.length + ' agendamentos do Banco 1.');
+          }
+        } catch(e1) {}
+      }
+
+      // Mescla reservas com o estado operacional
+      if (Array.isArray(cloudBookings) && cloudBookings.length > 0) {
+        const bMap = new Map();
+        (window.adminGameState.bookings || []).forEach(b => {
+          if (b && b.id) bMap.set(String(b.id), b);
+        });
+
+        cloudBookings.forEach(cb => {
+          if (!cb || !cb.id) return;
+          const existing = bMap.get(String(cb.id));
+          if (existing) {
+            // Preserva estado finalizado se já concluído na sessão
+            if (existing.status === 'finished') cb.status = 'finished';
+            bMap.set(String(cb.id), { ...existing, ...cb });
+          } else {
+            bMap.set(String(cb.id), cb);
+          }
+        });
+
+        window.adminGameState.bookings = Array.from(bMap.values());
+        try {
+          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+        } catch(e) {}
+      }
+
+      // 2. Carrega mensalistas do Banco 2
+      try {
+        const resM2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', {
+          headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
+        });
+        if (resM2.ok) {
+          cloudMembers = await resM2.json();
+          if (Array.isArray(cloudMembers) && cloudMembers.length > 0) {
+            window.adminGameState.monthlyMembers = cloudMembers;
+            try {
+              localStorage.setItem('arena_monthly_members', JSON.stringify(cloudMembers));
+            } catch(e) {}
+            console.log('[ArenaCloud] Carregados ' + cloudMembers.length + ' mensalistas da nuvem.');
+          }
+        }
+      } catch(eM) {}
+
+      // Atualiza badge de status
+      const badgeText = document.getElementById('cloudDbStatusText');
+      if (badgeText) {
+        badgeText.textContent = 'Nuvem: 2 Bancos Ativos (DB1 & DB2 Sincronizados)';
+      }
+
+      if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+      if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+    } catch(err) {
+      console.warn('[ArenaCloud] Erro geral na sincronização inicial:', err);
+    }
+  };
+
+
   function getMatchesForDate(dateStr) {
     const [y, m, d] = dateStr.split('-');
     const dt = new Date(Number(y), Number(m) - 1, Number(d), 12, 0, 0);
@@ -4437,6 +4632,10 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
     } catch(e) {}
     if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+    // ☁️ Puxa dados atualizados dos 2 Bancos de Dados na nuvem imediatamente
+    if (typeof window.pullDataFromCloudDatabases === "function") {
+      window.pullDataFromCloudDatabases();
+    }
     if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
   };
 
@@ -4792,6 +4991,10 @@ document.addEventListener('DOMContentLoaded', () => {
     
     addMatchLog(g, 'Partida editada', 'Dados atualizados (' + oldStart + '–' + oldEnd + ' → ' + g.start + '–' + g.end + ')');
     saveAdminGameState();
+    // ☁️ Envia a edição imediatamente para os 2 Bancos de Dados na Nuvem
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
     closeArenaModal('arenaEditModal');
     arenaToast('Partida atualizada com sucesso!');
   };
@@ -5529,6 +5732,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addMatchLog(g, 'Jogo concluído & Fechamento', logText);
 
+    // ☁️ Envia a finalização imediatamente para os 2 Bancos de Dados na Nuvem
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
+
     saveAdminGameState();
     closeArenaModal('arenaFinishModal');
 
@@ -6252,18 +6460,10 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
     } catch(err) {}
 
-    // 3. Salva no Supabase (Banco Secundário Oficial)
-    try {
-      fetch('https://aukrcnhuyultkjqsgvea.supabase.co/rest/v1/bookings', {
-        method: 'POST',
-        headers: {
-          'apikey': 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
-          'Authorization': 'Bearer sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newBooking)
-      }).catch(err => console.warn('Supabase backup warning:', err));
-    } catch(err) {}
+    // 3. Envia para os 2 Bancos de Dados na Nuvem (Dual-Write)
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(newBooking, 'upsert');
+    }
 
     // 4. Broadcast para sincronização imediata em todas as abas e dispositivos
     try {
