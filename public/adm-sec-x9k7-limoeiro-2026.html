@@ -688,6 +688,44 @@
   }
 }
 
+/* Bloco de Controle de Tempo, Horário Extra e Origem */
+.booking-time-control-box {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f4faf6;
+  border: 1px solid #d3e8dc;
+  border-radius: 12px;
+}
+.booking-tc-item {
+  display: flex;
+  flex-direction: column;
+}
+.booking-tc-item .tc-label {
+  font-size: 9px;
+  font-weight: 900;
+  color: #557262;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+.booking-tc-item .tc-val {
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+@media(max-width: 768px) {
+  .booking-time-control-box {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+@media(max-width: 480px) {
+  .booking-time-control-box {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col pb-20">
@@ -3369,6 +3407,185 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- Toast Notifier -->
+<!-- Modal 4: Concluir / Fechar Jogo com Cálculo Automático de Tempo Extra, Atraso e Pagamento -->
+<div id="arenaFinishModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[94vh]">
+    
+    <!-- Cabeçalho -->
+    <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 p-5 text-white flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+          <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black tracking-tight uppercase">Concluir e Fechar Partida</h3>
+          <p class="text-xs text-emerald-300 font-medium">Cálculo automático de tempo extra, atraso e fechamento financeiro</p>
+        </div>
+      </div>
+      <button type="button" onclick="closeArenaModal('arenaFinishModal')" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <form id="arenaFinishForm" onsubmit="saveFinishGame(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+      <input type="hidden" id="finishMatchId">
+      <input type="hidden" id="finishBasePrice" value="100">
+      <input type="hidden" id="finishHourlyRate" value="100">
+
+      <!-- Resumo da Partida -->
+      <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+        <div>
+          <span class="block font-black text-slate-800 text-sm" id="finishMatchTitle">Esc Ariadnes</span>
+          <span class="text-slate-500 text-[11px]" id="finishMatchSubtitle">Quadra FUT 7 · 18:00 às 19:00 (1h)</span>
+        </div>
+        <div class="text-right">
+          <span class="text-[10px] font-bold text-slate-400 uppercase block">Valor Base</span>
+          <span class="font-black text-slate-800 text-sm" id="finishBaseDisplay">R$ 100,00</span>
+        </div>
+      </div>
+
+      <!-- 1. TEMPO DE ATRASO DA EQUIPE -->
+      <div class="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-black text-amber-900 uppercase flex items-center gap-1.5">
+            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-600"></i>
+            <span>Tempo de Atraso da Equipe</span>
+          </label>
+          <span id="finishLateBadge" class="text-[11px] font-black text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+            Sem atraso
+          </span>
+        </div>
+
+        <input type="hidden" id="finishMatchLate" value="0">
+        <div class="grid grid-cols-5 gap-1.5" id="finishLateButtonsContainer">
+          <button type="button" onclick="setFinishLateMinutes(0)" data-late="0" class="btn-finish-late py-1.5 px-1 text-xs font-black text-white bg-amber-600 border border-amber-700 rounded-xl shadow-xs text-center cursor-pointer">
+            0 min
+          </button>
+          <button type="button" onclick="setFinishLateMinutes(5)" data-late="5" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            5 min
+          </button>
+          <button type="button" onclick="setFinishLateMinutes(10)" data-late="10" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            10 min
+          </button>
+          <button type="button" onclick="setFinishLateMinutes(15)" data-late="15" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            15 min
+          </button>
+          <button type="button" onclick="setFinishLateMinutes(20)" data-late="20" class="btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer">
+            20+ min
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. TEMPO DE HORÁRIO EXTRA / PRORROGAÇÃO -->
+      <div class="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-3.5 space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-black text-emerald-900 uppercase flex items-center gap-1.5">
+            <i data-lucide="clock-9" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Tempo de Horário Extra (Prorrogação)</span>
+          </label>
+          <span id="finishExtraBadge" class="text-[11px] font-black text-emerald-700 bg-white border border-emerald-200 px-2 py-0.5 rounded-full">
+            Sem tempo extra
+          </span>
+        </div>
+
+        <input type="hidden" id="finishMatchExtra" value="0">
+        <div class="grid grid-cols-5 gap-1.5" id="finishExtraButtonsContainer">
+          <button type="button" onclick="setFinishExtraMinutes(0)" data-extra="0" class="btn-finish-extra py-1.5 px-1 text-xs font-black text-white bg-emerald-600 border border-emerald-700 rounded-xl shadow-xs text-center cursor-pointer">
+            0 min
+          </button>
+          <button type="button" onclick="setFinishExtraMinutes(15)" data-extra="15" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
+            +15 min
+          </button>
+          <button type="button" onclick="setFinishExtraMinutes(30)" data-extra="30" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
+            +30 min
+          </button>
+          <button type="button" onclick="setFinishExtraMinutes(45)" data-extra="45" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
+            +45 min
+          </button>
+          <button type="button" onclick="setFinishExtraMinutes(60)" data-extra="60" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
+            +1 hora
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. BOX DE CÁLCULO AUTOMÁTICO DO VALOR FINAL -->
+      <div class="p-4 bg-gradient-to-br from-emerald-900 to-teal-950 text-white rounded-2xl shadow-md space-y-2">
+        <div class="flex items-center justify-between text-xs text-emerald-200">
+          <span>Valor base contratado:</span>
+          <span id="finishCalcBase">R$ 100,00</span>
+        </div>
+        <div class="flex items-center justify-between text-xs text-emerald-200">
+          <span>Adicional tempo extra (<span id="finishCalcExtraMins">0 min</span>):</span>
+          <span id="finishCalcExtraAmount" class="font-bold text-emerald-300">+ R$ 0,00</span>
+        </div>
+        <div class="border-t border-emerald-700/60 pt-2 flex items-center justify-between">
+          <div>
+            <span class="text-xs font-black uppercase text-emerald-100 tracking-wide block">Cálculo Automático Total a Cobrar:</span>
+            <span class="text-[10px] text-emerald-300 font-medium">Calculado automaticamente com base na taxa horária</span>
+          </div>
+          <span id="finishCalcTotal" class="text-2xl font-black text-white">R$ 100,00</span>
+        </div>
+      </div>
+
+      <!-- 4. ORIGEM DA MARCAÇÃO & FORMA DE PAGAMENTO -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Onde foi marcado o jogo? *</label>
+          <select id="finishMatchOrigin" required
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Marcado no Balcão">Marcado no Balcão</option>
+            <option value="No Agendamento">No Agendamento (Online / App)</option>
+            <option value="Avulso">Avulso</option>
+            <option value="Mensalista">Mensalista</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Forma de Pagamento *</label>
+          <select id="finishMatchPayment" required
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="PIX">PIX</option>
+            <option value="Dinheiro">Dinheiro</option>
+            <option value="Cartão de Débito">Cartão de Débito</option>
+            <option value="Cartão de Crédito">Cartão de Crédito</option>
+            <option value="Mensalidade Faturada">Mensalidade Faturada</option>
+            <option value="Pendente / Pagar depois">Pendente / Pagar depois</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Status do Pagamento</label>
+          <select id="finishPaymentStatus"
+                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+            <option value="Pago">✓ Pago e Confirmado</option>
+            <option value="Pendente">⏳ Pagamento Pendente</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do Fechamento</label>
+          <input type="text" id="finishMatchObs" placeholder="Ex.: Pagou no PIX no balcão"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Botões de Ação -->
+      <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeArenaModal('arenaFinishModal')" class="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer">
+          Voltar
+        </button>
+        <button type="submit" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Concluir e Salvar Jogo</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
 <div id="arenaToast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-800 text-xs font-bold">
   <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
   <span id="arenaToastMsg">Alteração salva com sucesso!</span>
@@ -3576,7 +3793,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (txt) txt.textContent = msg;
     t.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
     t.classList.add('opacity-100', 'translate-y-0');
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
     clearTimeout(window.arenaToastTimer);
     window.arenaToastTimer = setTimeout(() => {
       t.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
@@ -4015,6 +4232,226 @@ document.addEventListener('DOMContentLoaded', () => {
     arenaToast('Partida atualizada com sucesso!');
   };
 
+  // =========================================================================
+  // FUNÇÕES DE CONCLUSÃO, CÁLCULO AUTOMÁTICO DE TEMPO EXTRA E ORIGEM
+  // =========================================================================
+
+  window.setFinishLateMinutes = function(mins) {
+    mins = parseInt(mins || 0, 10);
+    const hidden = document.getElementById('finishMatchLate');
+    if (hidden) hidden.value = mins;
+
+    const badge = document.getElementById('finishLateBadge');
+    if (badge) {
+      if (mins > 0) {
+        badge.textContent = mins + ' min de atraso';
+        badge.className = 'text-[11px] font-black text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full';
+      } else {
+        badge.textContent = 'Sem atraso';
+        badge.className = 'text-[11px] font-black text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full';
+      }
+    }
+
+    const container = document.getElementById('finishLateButtonsContainer');
+    if (container) {
+      const btns = container.querySelectorAll('.btn-finish-late');
+      btns.forEach(btn => {
+        const bMin = parseInt(btn.getAttribute('data-late'), 10);
+        if (bMin === mins) {
+          btn.className = 'btn-finish-late py-1.5 px-1 text-xs font-black text-white bg-amber-600 border border-amber-700 rounded-xl shadow-xs text-center cursor-pointer';
+        } else {
+          btn.className = 'btn-finish-late py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-amber-100 text-center cursor-pointer';
+        }
+      });
+    }
+  };
+
+  window.setFinishExtraMinutes = function(mins) {
+    mins = parseInt(mins || 0, 10);
+    const hidden = document.getElementById('finishMatchExtra');
+    if (hidden) hidden.value = mins;
+
+    const badge = document.getElementById('finishExtraBadge');
+    if (badge) {
+      if (mins > 0) {
+        badge.textContent = '+' + mins + ' min extras';
+        badge.className = 'text-[11px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full';
+      } else {
+        badge.textContent = 'Sem tempo extra';
+        badge.className = 'text-[11px] font-black text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-full';
+      }
+    }
+
+    const container = document.getElementById('finishExtraButtonsContainer');
+    if (container) {
+      const btns = container.querySelectorAll('.btn-finish-extra');
+      btns.forEach(btn => {
+        const bMin = parseInt(btn.getAttribute('data-extra'), 10);
+        if (bMin === mins) {
+          btn.className = 'btn-finish-extra py-1.5 px-1 text-xs font-black text-white bg-emerald-600 border border-emerald-700 rounded-xl shadow-xs text-center cursor-pointer';
+        } else {
+          btn.className = 'btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer';
+        }
+      });
+    }
+
+    // Cálculo Automático Proporcional
+    const basePrice = parseFloat(document.getElementById('finishBasePrice')?.value || 100);
+    const hourlyRate = parseFloat(document.getElementById('finishHourlyRate')?.value || 100);
+    const extraAmount = Math.round((mins / 60) * hourlyRate);
+    const total = basePrice + extraAmount;
+
+    const extraMinsEl = document.getElementById('finishCalcExtraMins');
+    if (extraMinsEl) extraMinsEl.textContent = mins + ' min';
+
+    const extraAmountEl = document.getElementById('finishCalcExtraAmount');
+    if (extraAmountEl) extraAmountEl.textContent = '+ R$ ' + extraAmount.toFixed(2).replace('.', ',');
+
+    const totalEl = document.getElementById('finishCalcTotal');
+    if (totalEl) totalEl.textContent = 'R$ ' + total.toFixed(2).replace('.', ',');
+  };
+
+  window.openFinishGame = function(id) {
+    try {
+      let g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+      if (!g) {
+        const allB = (window.adminGameState && window.adminGameState.bookings) || [];
+        g = allB.find(b => String(b.id) === String(id)) || allB[0] || {
+          id: id || 'game-default',
+          customer_name: 'Esc Ariadnes (Esc Ariadnes)',
+          start_time: '16:00',
+          end_time: '18:00',
+          total_price: 100,
+          payment: 'PIX',
+          status: 'confirmed'
+        };
+      }
+
+      const court = (typeof getCourtById === 'function') ? getCourtById(g.court_id || g.courtId) : { name: 'Quadra', normal: 100 };
+      const hourlyRate = court && court.normal ? court.normal : 100;
+      const basePrice = parseFloat(g.total_price || g.price || 100);
+
+      const fId = document.getElementById('finishMatchId');
+      if (fId) fId.value = id;
+      const fBase = document.getElementById('finishBasePrice');
+      if (fBase) fBase.value = basePrice;
+      const fRate = document.getElementById('finishHourlyRate');
+      if (fRate) fRate.value = hourlyRate;
+
+      const startT = g.start_time || g.start || '18:00';
+      const endT = g.end_time || g.end || '19:00';
+      const durStr = (typeof calcDuration === 'function') ? calcDuration(startT, endT) : '1h';
+
+      const fTitle = document.getElementById('finishMatchTitle');
+      if (fTitle) fTitle.textContent = g.customer_name || g.name || 'Equipe';
+      const fSub = document.getElementById('finishMatchSubtitle');
+      if (fSub) fSub.textContent = court.name + ' · ' + startT + ' às ' + endT + ' (' + durStr + ')';
+      const fBaseDisp = document.getElementById('finishBaseDisplay');
+      if (fBaseDisp) fBaseDisp.textContent = 'R$ ' + basePrice.toFixed(2).replace('.', ',');
+      const fCalcBase = document.getElementById('finishCalcBase');
+      if (fCalcBase) fCalcBase.textContent = 'R$ ' + basePrice.toFixed(2).replace('.', ',');
+
+      // Atraso pré-existente
+      const initialLate = parseInt(g.late || 0, 10);
+      window.setFinishLateMinutes(initialLate);
+
+      // Tempo extra pré-existente
+      const initialExtra = parseInt(g.extraTime || 0, 10);
+      window.setFinishExtraMinutes(initialExtra);
+
+      // Origem
+      let orig = g.booking_origin;
+      if (!orig) {
+        if (g.isMensalista || g.type === 'Mensalista') orig = 'Mensalista';
+        else if (String(id).startsWith('ARENA-B')) orig = 'Marcado no Balcão';
+        else orig = 'No Agendamento';
+      }
+      const originSelect = document.getElementById('finishMatchOrigin');
+      if (originSelect) originSelect.value = orig;
+
+      // Forma de pagamento
+      const paymentSelect = document.getElementById('finishMatchPayment');
+      if (paymentSelect && paymentSelect.options) {
+        const curPayment = (g.payment || 'PIX').toLowerCase();
+        let found = false;
+        for (let i = 0; i < paymentSelect.options.length; i++) {
+          if (paymentSelect.options[i].value.toLowerCase().includes(curPayment)) {
+            paymentSelect.value = paymentSelect.options[i].value;
+            found = true;
+            break;
+          }
+        }
+        if (!found) paymentSelect.value = 'PIX';
+      }
+
+      // Status do pagamento
+      const paymentStatusSelect = document.getElementById('finishPaymentStatus');
+      if (paymentStatusSelect) {
+        paymentStatusSelect.value = (g.payment && g.payment.includes('Pendente')) ? 'Pendente' : 'Pago';
+      }
+
+      const fObs = document.getElementById('finishMatchObs');
+      if (fObs) fObs.value = g.finishObs || '';
+
+      const modal = document.getElementById('arenaFinishModal');
+      if (modal) {
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+    } catch (err) {
+      console.error('Error opening finish modal:', err);
+    }
+  };
+
+  window.saveFinishGame = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const id = document.getElementById('finishMatchId')?.value;
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (!g) return;
+
+    const late = parseInt(document.getElementById('finishMatchLate')?.value || 0, 10);
+    const extraTime = parseInt(document.getElementById('finishMatchExtra')?.value || 0, 10);
+    const origin = document.getElementById('finishMatchOrigin')?.value || 'Marcado no Balcão';
+    const payment = document.getElementById('finishMatchPayment')?.value || 'PIX';
+    const payStatus = document.getElementById('finishPaymentStatus')?.value || 'Pago';
+    const obs = document.getElementById('finishMatchObs')?.value.trim() || '';
+
+    const basePrice = parseFloat(document.getElementById('finishBasePrice')?.value || 100);
+    const hourlyRate = parseFloat(document.getElementById('finishHourlyRate')?.value || 100);
+    const extraAmount = Math.round((extraTime / 60) * hourlyRate);
+    const calculatedTotal = basePrice + extraAmount;
+
+    const now = new Date();
+    const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+    g.status = 'finished';
+    g.attendance = 'Finalizada';
+    g.finishedAt = timeStr;
+    g.late = late;
+    g.extraTime = extraTime;
+    g.extraAmount = extraAmount;
+    g.booking_origin = origin;
+    g.payment = (payStatus === 'Pago' ? payment : payment + ' (Pendente)');
+    g.total_price = calculatedTotal;
+    g.price = calculatedTotal;
+    g.finishObs = obs;
+
+    let logText = 'Partida concluída';
+    if (extraTime > 0) logText += ' • ' + extraTime + 'm extra (+R$ ' + extraAmount + ')';
+    if (late > 0) logText += ' • Atraso: ' + late + 'm';
+    logText += ' • Total: R$ ' + calculatedTotal.toFixed(2) + ' • ' + g.payment + ' • ' + origin;
+    if (obs) logText += ' (' + obs + ')';
+
+    addMatchLog(g, 'Jogo concluído & Fechamento', logText);
+
+    saveAdminGameState();
+    closeArenaModal('arenaFinishModal');
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Jogo concluído com sucesso! Valor final: R$ ' + calculatedTotal.toFixed(2).replace('.', ','));
+  };
+
   window.closeArenaModal = function(id) {
     const m = document.getElementById(id);
     if (m) {
@@ -4065,8 +4502,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const observation = m.observation || m.note || (m.dayFixed ? 'Horário Fixo Semanal (' + m.dayFixed + ')' : 'Horário Fixo Semanal (TERÇA)');
     
     const attendance = m.attendance || (['live', 'playing', 'in_progress'].includes(st) ? 'Chegou' : (st === 'finished' ? 'Finalizado' : (st === 'no-show' ? 'Não compareceu' : 'Aguardando chegada')));
-    const arrived = attendance === 'Chegou';
+    const arrived = attendance === 'Chegou' || attendance === 'Presença confirmada';
     const lateMin = Number(m.late || 0);
+    const extraMin = Number(m.extraTime || 0);
+    const extraAmount = Number(m.extraAmount || 0);
+    const extraAmountStr = extraAmount > 0 ? extraAmount.toFixed(2).replace('.', ',') : '0,00';
+
+    let originDisplay = m.booking_origin;
+    if (!originDisplay) {
+      if (isMensalista) originDisplay = 'Mensalista';
+      else if (String(m.id).startsWith('ARENA-B')) originDisplay = 'Marcado no Balcão';
+      else if (String(m.id).startsWith('game-')) originDisplay = 'Avulso';
+      else originDisplay = 'No Agendamento';
+    }
 
     const logs = Array.isArray(m.log) && m.log.length > 0 ? m.log : [
       { at: 'Reserva cadastrada', text: observation }
@@ -4089,6 +4537,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="pill-chip pill-field">■ ${court.name}</span>
               <span class="pill-chip ${statusClass}">${statusLabel}</span>
               <span class="pill-chip pill-type">${typeLabel}</span>
+              ${extraMin > 0 ? `<span class="pill-chip pill-playing font-black">+${extraMin}m extra</span>` : ''}
               ${lateMin > 0 ? `<span class="pill-chip pill-late">Atraso equipe: ${lateMin} min</span>` : ''}
             </div>
 
@@ -4104,7 +4553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span>${playersCount} jogadores previstos</span>
               </span>
               <span>
-                <i data-lucide="check-square" class="w-3.5 h-3.5 text-emerald-600"></i>
+                <i data-lucide="check-square" class="w-3.5 h-3.5 text-slate-400"></i>
                 <span>${payment}</span>
               </span>
             </div>
@@ -4112,29 +4561,33 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="booking-subnote">${observation}</div>
           </div>
 
-          <!-- Coluna Direita: Preço e Ações Rápidas -->
+          <!-- Coluna Direita (Preço e Ações) -->
           <div class="booking-side-col">
-            <div class="text-right">
-              <div class="booking-price-val">R$ ${price}</div>
+            <div>
+              <div class="booking-price-text">R$ ${price}</div>
               <div class="booking-pay-status">${payment}</div>
             </div>
 
-            <div class="booking-actions-row">
-              ${st === 'live' || st === 'playing' || st === 'in_progress' ? `
-                <button type="button" class="booking-quick-btn green" onclick="finishGame('${m.id}')">
-                  <i data-lucide="stop-circle" class="w-3.5 h-3.5"></i>
-                  <span>■ Encerrar</span>
+            <div class="booking-quick-actions">
+              ${!arrived && st !== 'finished' && st !== 'cancelled' ? `
+                <button type="button" class="booking-quick-btn" onclick="markArrived('${m.id}')">
+                  ✓ Chegou
                 </button>
-              ` : (['finished', 'no-show', 'cancelled'].includes(st) ? `
-                <span class="booking-pay-status font-bold text-slate-500 py-1.5">
-                  ${st === 'finished' ? 'Partida finalizada' : (st === 'no-show' ? 'Ausência registrada' : 'Reserva cancelada')}
-                </span>
               ` : `
-                <button type="button" class="booking-quick-btn green" onclick="markArrived('${m.id}')">
-                  ${arrived ? '✓ Presença ok' : '✓ Chegou'}
+                <span class="pill-chip pill-confirmed" style="padding:6px 10px;">✓ Presença ok</span>
+              `}
+
+              ${st === 'live' || st === 'playing' || st === 'in_progress' ? `
+                <button type="button" class="booking-quick-btn btn-primary" onclick="openFinishGame('${m.id}')">
+                  ■ Encerrar
                 </button>
-                <button type="button" class="booking-quick-btn dark" onclick="startGame('${m.id}')">
-                  ▶ Iniciar
+              ` : (st === 'finished' ? `
+                <button type="button" class="booking-quick-btn" onclick="openFinishGame('${m.id}')">
+                  ✓ Finalizado
+                </button>
+              ` : `
+                <button type="button" class="booking-quick-btn btn-primary" onclick="startGame('${m.id}')">
+                  ► Iniciar
                 </button>
               `)}
             </div>
@@ -4142,18 +4595,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         </div>
 
-        <!-- Rodapé do Card (Presença + Detalhes e ações) -->
-        <div class="booking-card-footer">
-          <span class="text-xs text-slate-500 font-medium">
-            ${arrived ? 'Presença registrada' + (m.checkinAt ? ' às ' + m.checkinAt : '') : (st === 'no-show' ? 'Ausência registrada' : 'Presença: ' + attendance)}
-          </span>
-          <button type="button" class="booking-detail-toggle" onclick="toggleDetails('${m.id}')">
-            <span>Detalhes e ações</span>
-            <span>▾</span>
+        <!-- Linha de Status de Presença e Toggle de Detalhes -->
+        <div class="booking-presence-row">
+          <div class="booking-presence-text">
+            Presença: <strong>${attendance}${m.checkinAt ? ' (' + m.checkinAt + ')' : ''}</strong>
+          </div>
+          <button type="button" class="booking-toggle-btn" onclick="toggleDetails('${m.id}')">
+            Detalhes e ações ▾
           </button>
         </div>
 
-        <!-- Seção Expansível de Detalhes e Ações -->
+        <!-- Seção Expansível -->
         <div class="booking-expanded-panel hidden" id="details-${m.id}" style="display:none;">
           <div class="booking-detail-grid">
             <div class="booking-detail-item">
@@ -4174,6 +4626,37 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
 
+          <!-- Bloco de Controle de Tempo, Horário Extra e Origem -->
+          <div class="booking-time-control-box">
+            <div class="booking-tc-item">
+              <span class="tc-label">Tempo de Atraso da Equipe</span>
+              <span class="tc-val ${lateMin > 0 ? 'text-amber-800 font-black' : 'text-slate-600 font-bold'}">
+                ${lateMin > 0 ? `◷ ${lateMin} min de atraso` : '✓ Sem atraso (no horário)'}
+              </span>
+            </div>
+
+            <div class="booking-tc-item">
+              <span class="tc-label">Tempo de Horário Extra</span>
+              <span class="tc-val ${extraMin > 0 ? 'text-emerald-800 font-black' : 'text-slate-600 font-bold'}">
+                ${extraMin > 0 ? `+${extraMin} min extras (+ R$ ${extraAmountStr})` : 'Sem tempo extra'}
+              </span>
+            </div>
+
+            <div class="booking-tc-item">
+              <span class="tc-label">Onde foi Marcado (Origem)</span>
+              <span class="tc-val text-slate-800 font-black">
+                ${originDisplay}
+              </span>
+            </div>
+
+            <div class="booking-tc-item">
+              <span class="tc-label">Cálculo Automático / Valor</span>
+              <span class="tc-val text-emerald-800 font-black">
+                R$ ${price} · ${payment}
+              </span>
+            </div>
+          </div>
+
           <div class="booking-detail-actions">
             <button type="button" class="booking-quick-btn" onclick="openEditGame('${m.id}')">
               ✎ Editar jogo
@@ -4181,13 +4664,16 @@ document.addEventListener('DOMContentLoaded', () => {
             <button type="button" class="booking-quick-btn" onclick="openContract('${m.id}')">
               ▤ Editar contrato
             </button>
+            <button type="button" class="booking-quick-btn bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-black" onclick="openFinishGame('${m.id}')">
+              ✓ Concluir / Fechar partida
+            </button>
             <button type="button" class="booking-quick-btn" onclick="openNoShow('${m.id}')">
               ! Não compareceu
             </button>
             <button type="button" class="booking-quick-btn" onclick="duplicateGame('${m.id}')">
               ⧉ Duplicar
             </button>
-            <button type="button" class="booking-quick-btn red" onclick="cancelGame('${m.id}')">
+            <button type="button" class="booking-quick-btn btn-danger" onclick="cancelGame('${m.id}')">
               Cancelar partida
             </button>
           </div>
@@ -4299,6 +4785,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (window.location.hash.includes('openBalcao')) {
         setTimeout(() => { openDirectBookingModal(); }, 200);
+      }
+      if (window.location.search.includes('finish=1') || window.location.hash.includes('openFinishFirst')) {
+        setTimeout(() => { if (matches && matches[0]) window.openFinishGame(matches[0].id); }, 200);
       }
     }
 
