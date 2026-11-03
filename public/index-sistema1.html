@@ -741,6 +741,96 @@
   font-size: 11.5px;
   line-height: 1.3;
 }
+.tc-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+.tc-input-group {
+  display: inline-flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 1px 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: all 0.15s ease-in-out;
+}
+.tc-input-group:focus-within {
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+}
+.tc-input-num {
+  width: 36px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+  color: #1e293b;
+  text-align: center;
+  padding: 1px 0;
+}
+.tc-unit {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #64748b;
+  margin-left: 1px;
+}
+.tc-divider {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+.tc-input-time {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 1px 3px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #1e293b;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  max-width: 82px;
+}
+.tc-input-time:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+}
+.tc-select-hours, .tc-select-origin {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 1px 4px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #1e293b;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  cursor: pointer;
+  max-width: 135px;
+}
+.tc-select-hours:focus, .tc-select-origin:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15);
+}
+.tc-status-text {
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 3px;
+  line-height: 1.25;
+}
+.tc-calc-total {
+  font-size: 12px;
+  line-height: 1.3;
+}
+.tc-calc-detail {
+  font-size: 9.5px;
+  margin-top: 2px;
+}
 @media(max-width: 768px) {
   .booking-time-control-box {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3500,6 +3590,19 @@ document.addEventListener('DOMContentLoaded', () => {
             20+ min
           </button>
         </div>
+        <div class="flex items-center gap-2 mt-2 pt-2 border-t border-amber-200/60 text-xs flex-wrap">
+          <span class="text-slate-600 font-bold">Ou digite:</span>
+          <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-xs">
+            <input type="number" min="0" max="300" step="1" id="finishInputLateMins" placeholder="0" 
+                   class="w-12 text-xs font-bold text-center outline-none" 
+                   oninput="onModalLateMinutesType(this.value)" />
+            <span class="text-[10px] font-bold text-slate-500 ml-1">minutos</span>
+          </div>
+          <span class="text-slate-400 font-bold">ou horário de chegada:</span>
+          <input type="time" id="finishInputArrivalTime" 
+                 class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none"
+                 onchange="onModalArrivalTimeType(this.value)" />
+        </div>
       </div>
 
       <!-- 2. TEMPO DE HORÁRIO EXTRA / PRORROGAÇÃO -->
@@ -3531,6 +3634,30 @@ document.addEventListener('DOMContentLoaded', () => {
           <button type="button" onclick="setFinishExtraMinutes(60)" data-extra="60" class="btn-finish-extra py-1.5 px-1 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-emerald-100 text-center cursor-pointer">
             +1 hora
           </button>
+        </div>
+        <div class="flex items-center gap-2 mt-2 pt-2 border-t border-emerald-200/60 text-xs flex-wrap">
+          <span class="text-slate-600 font-bold">Ou digite:</span>
+          <div class="inline-flex items-center bg-white border border-slate-300 rounded-lg px-2 py-1 shadow-xs">
+            <input type="number" min="0" max="300" step="5" id="finishInputExtraMins" placeholder="0" 
+                   class="w-12 text-xs font-bold text-center outline-none" 
+                   oninput="onModalExtraMinutesType(this.value)" />
+            <span class="text-[10px] font-bold text-slate-500 ml-1">minutos</span>
+          </div>
+          <span class="text-slate-400 font-bold">ou em horas:</span>
+          <select id="finishSelectExtraHours" onchange="onModalExtraHoursSelect(this.value)" 
+                  class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none">
+            <option value="">horas...</option>
+            <option value="15">15 min (0.25h)</option>
+            <option value="30">30 min (0.5h)</option>
+            <option value="45">45 min (0.75h)</option>
+            <option value="60">1 hora</option>
+            <option value="90">1h 30m</option>
+            <option value="120">2 horas</option>
+          </select>
+          <span class="text-slate-400 font-bold">ou jogou até:</span>
+          <input type="time" id="finishInputEndTime" 
+                 class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none"
+                 onchange="onModalEndTimeType(this.value)" />
         </div>
       </div>
 
@@ -4262,10 +4389,224 @@ document.addEventListener('DOMContentLoaded', () => {
   // FUNÇÕES DE CONCLUSÃO, CÁLCULO AUTOMÁTICO DE TEMPO EXTRA E ORIGEM
   // =========================================================================
 
+  // Funções de Cálculo e Conversão de Horários
+  window.calcDelayFromArrival = function(startTimeStr, arrivalTimeStr) {
+    if (!startTimeStr || !arrivalTimeStr) return 0;
+    const [sh, sm] = startTimeStr.split(':').map(Number);
+    const [ah, am] = arrivalTimeStr.split(':').map(Number);
+    const diff = (ah * 60 + am) - (sh * 60 + sm);
+    return Math.max(0, diff);
+  };
+
+  window.calcArrivalFromDelay = function(startTimeStr, delayMins) {
+    if (!startTimeStr) return '';
+    const [sh, sm] = startTimeStr.split(':').map(Number);
+    let totalMins = sh * 60 + sm + Number(delayMins || 0);
+    const h = Math.floor(totalMins / 60) % 24;
+    const m = totalMins % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  };
+
+  window.calcExtraFromExtendedEnd = function(endTimeStr, actualEndTimeStr) {
+    if (!endTimeStr || !actualEndTimeStr) return 0;
+    const [eh, em] = endTimeStr.split(':').map(Number);
+    const [ah, am] = actualEndTimeStr.split(':').map(Number);
+    const diff = (ah * 60 + am) - (eh * 60 + em);
+    return Math.max(0, diff);
+  };
+
+  window.calcExtendedEndFromExtra = function(endTimeStr, extraMins) {
+    if (!endTimeStr) return '';
+    const [eh, em] = endTimeStr.split(':').map(Number);
+    let totalMins = eh * 60 + em + Number(extraMins || 0);
+    const h = Math.floor(totalMins / 60) % 24;
+    const m = totalMins % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  };
+
+  // 1. Digitar minutos de atraso no card
+  window.onGameDelayInput = function(id, val) {
+    const mins = Math.max(0, parseInt(val || 0, 10));
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (!g) return;
+    g.late = mins;
+
+    const startT = g.start_time || g.start || '18:00';
+    const arrTime = mins > 0 ? window.calcArrivalFromDelay(startT, mins) : '';
+    g.arrival_time = arrTime;
+
+    const inputArr = document.getElementById('input-arr-' + id);
+    if (inputArr && document.activeElement !== inputArr) inputArr.value = arrTime;
+
+    const statusEl = document.getElementById('status-delay-' + id);
+    if (statusEl) {
+      if (mins > 0) {
+        statusEl.className = 'tc-status-text text-amber-800';
+        statusEl.textContent = `◷ ${mins} min de atraso` + (arrTime ? ` (Chegou às ${arrTime})` : '');
+      } else {
+        statusEl.className = 'tc-status-text text-emerald-700';
+        statusEl.textContent = '✓ Sem atraso (no horário)';
+      }
+    }
+    if (typeof saveAdminGameState === 'function') saveAdminGameState();
+  };
+
+  // 2. Digitar horário de chegada no card
+  window.onGameArrivalInput = function(id, timeVal) {
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (!g) return;
+    const startT = g.start_time || g.start || '18:00';
+    const mins = window.calcDelayFromArrival(startT, timeVal);
+    g.late = mins;
+    g.arrival_time = timeVal;
+
+    const inputDelay = document.getElementById('input-delay-' + id);
+    if (inputDelay) inputDelay.value = mins > 0 ? mins : '';
+
+    const statusEl = document.getElementById('status-delay-' + id);
+    if (statusEl) {
+      if (mins > 0) {
+        statusEl.className = 'tc-status-text text-amber-800';
+        statusEl.textContent = `◷ ${mins} min de atraso (Chegou às ${timeVal})`;
+      } else {
+        statusEl.className = 'tc-status-text text-emerald-700';
+        statusEl.textContent = '✓ Sem atraso (no horário)';
+      }
+    }
+    if (typeof saveAdminGameState === 'function') saveAdminGameState();
+  };
+
+  // 3. Digitar minutos extras no card
+  window.onGameExtraInput = function(id, val) {
+    const mins = Math.max(0, parseInt(val || 0, 10));
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (!g) return;
+
+    const court = (typeof getCourtById === 'function') ? getCourtById(g.court_id || g.courtId) : { normal: 100 };
+    const hourlyRate = court && court.normal ? court.normal : 100;
+    const extraAmount = Math.round((mins / 60) * hourlyRate);
+    const extraAmountStr = extraAmount.toFixed(2).replace('.', ',');
+    const basePrice = parseFloat(g.total_price || g.price || 100);
+    const totalCalculated = basePrice + extraAmount;
+    const totalCalculatedStr = totalCalculated.toFixed(2).replace('.', ',');
+
+    g.extraTime = mins;
+    g.extraAmount = extraAmount;
+
+    // Atualiza select de horas se coincidir
+    const selectHrs = document.getElementById('select-extra-hrs-' + id);
+    if (selectHrs) selectHrs.value = [15, 30, 45, 60, 90, 120].includes(mins) ? String(mins) : '';
+
+    const statusExtra = document.getElementById('status-extra-' + id);
+    if (statusExtra) {
+      if (mins > 0) {
+        statusExtra.className = 'tc-status-text text-emerald-800 font-black';
+        statusExtra.textContent = `+${mins} min extras (+ R$ ${extraAmountStr})`;
+      } else {
+        statusExtra.className = 'tc-status-text text-slate-500 font-bold';
+        statusExtra.textContent = 'Sem tempo extra';
+      }
+    }
+
+    // Atualiza Cálculo Automático
+    const calcTotal = document.getElementById('status-calc-total-' + id);
+    if (calcTotal) {
+      const pay = g.payment || 'Pago';
+      calcTotal.textContent = `R$ ${totalCalculatedStr} · ${pay}`;
+    }
+    const calcDetail = document.getElementById('status-calc-detail-' + id);
+    if (calcDetail) {
+      calcDetail.textContent = mins > 0 ? `Base: R$ ${basePrice.toFixed(2).replace('.', ',')} + Extra (${mins}m): R$ ${extraAmountStr}` : `Valor contratado: R$ ${basePrice.toFixed(2).replace('.', ',')}`;
+    }
+
+    if (typeof saveAdminGameState === 'function') saveAdminGameState();
+  };
+
+  // 4. Selecionar horas extras no card
+  window.onGameExtraHoursSelect = function(id, val) {
+    const mins = parseInt(val || 0, 10);
+    const inputExtra = document.getElementById('input-extra-' + id);
+    if (inputExtra) inputExtra.value = mins > 0 ? mins : '';
+    window.onGameExtraInput(id, mins);
+  };
+
+  // 5. Mudar origem no card
+  window.onGameOriginChange = function(id, originVal) {
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (!g) return;
+    g.booking_origin = originVal;
+    const statusOrig = document.getElementById('status-origin-' + id);
+    if (statusOrig) statusOrig.textContent = originVal;
+    if (typeof saveAdminGameState === 'function') saveAdminGameState();
+  };
+
+  // Handlers para digitação no modal #arenaFinishModal
+  window.onModalLateMinutesType = function(val) {
+    const mins = parseInt(val || 0, 10);
+    window.setFinishLateMinutes(mins);
+    const id = document.getElementById('finishMatchId')?.value;
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (g) {
+      const startT = g.start_time || g.start || '18:00';
+      const arrTime = mins > 0 ? window.calcArrivalFromDelay(startT, mins) : '';
+      const arrInput = document.getElementById('finishInputArrivalTime');
+      if (arrInput) arrInput.value = arrTime;
+    }
+  };
+
+  window.onModalArrivalTimeType = function(timeVal) {
+    const id = document.getElementById('finishMatchId')?.value;
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (g) {
+      const startT = g.start_time || g.start || '18:00';
+      const mins = window.calcDelayFromArrival(startT, timeVal);
+      const lateInput = document.getElementById('finishInputLateMins');
+      if (lateInput) lateInput.value = mins > 0 ? mins : '';
+      window.setFinishLateMinutes(mins);
+    }
+  };
+
+  window.onModalExtraMinutesType = function(val) {
+    const mins = parseInt(val || 0, 10);
+    window.setFinishExtraMinutes(mins);
+    const selHours = document.getElementById('finishSelectExtraHours');
+    if (selHours) selHours.value = [15, 30, 45, 60, 90, 120].includes(mins) ? String(mins) : '';
+    const id = document.getElementById('finishMatchId')?.value;
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (g) {
+      const endT = g.end_time || g.end || '19:00';
+      const extTime = mins > 0 ? window.calcExtendedEndFromExtra(endT, mins) : '';
+      const endInput = document.getElementById('finishInputEndTime');
+      if (endInput) endInput.value = extTime;
+    }
+  };
+
+  window.onModalExtraHoursSelect = function(val) {
+    const mins = parseInt(val || 0, 10);
+    const extraInput = document.getElementById('finishInputExtraMins');
+    if (extraInput) extraInput.value = mins > 0 ? mins : '';
+    window.onModalExtraMinutesType(mins);
+  };
+
+  window.onModalEndTimeType = function(timeVal) {
+    const id = document.getElementById('finishMatchId')?.value;
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (g) {
+      const endT = g.end_time || g.end || '19:00';
+      const mins = window.calcExtraFromExtendedEnd(endT, timeVal);
+      const extraInput = document.getElementById('finishInputExtraMins');
+      if (extraInput) extraInput.value = mins > 0 ? mins : '';
+      window.onModalExtraMinutesType(mins);
+    }
+  };
+
   window.setFinishLateMinutes = function(mins) {
     mins = parseInt(mins || 0, 10);
     const hidden = document.getElementById('finishMatchLate');
     if (hidden) hidden.value = mins;
+
+    const inLate = document.getElementById('finishInputLateMins');
+    if (inLate && document.activeElement !== inLate) inLate.value = mins > 0 ? mins : '';
 
     const badge = document.getElementById('finishLateBadge');
     if (badge) {
@@ -4296,6 +4637,9 @@ document.addEventListener('DOMContentLoaded', () => {
     mins = parseInt(mins || 0, 10);
     const hidden = document.getElementById('finishMatchExtra');
     if (hidden) hidden.value = mins;
+
+    const inExtra = document.getElementById('finishInputExtraMins');
+    if (inExtra && document.activeElement !== inExtra) inExtra.value = mins > 0 ? mins : '';
 
     const badge = document.getElementById('finishExtraBadge');
     if (badge) {
@@ -4380,10 +4724,20 @@ document.addEventListener('DOMContentLoaded', () => {
       // Atraso pré-existente
       const initialLate = parseInt(g.late || 0, 10);
       window.setFinishLateMinutes(initialLate);
+      const fInLate = document.getElementById('finishInputLateMins');
+      if (fInLate) fInLate.value = initialLate > 0 ? initialLate : '';
+      const fInArr = document.getElementById('finishInputArrivalTime');
+      if (fInArr) fInArr.value = g.arrival_time || (initialLate > 0 ? window.calcArrivalFromDelay(startT, initialLate) : '');
 
       // Tempo extra pré-existente
       const initialExtra = parseInt(g.extraTime || 0, 10);
       window.setFinishExtraMinutes(initialExtra);
+      const fInExtra = document.getElementById('finishInputExtraMins');
+      if (fInExtra) fInExtra.value = initialExtra > 0 ? initialExtra : '';
+      const fSelExtra = document.getElementById('finishSelectExtraHours');
+      if (fSelExtra) fSelExtra.value = [15, 30, 45, 60, 90, 120].includes(initialExtra) ? String(initialExtra) : '';
+      const fInEnd = document.getElementById('finishInputEndTime');
+      if (fInEnd) fInEnd.value = initialExtra > 0 ? window.calcExtendedEndFromExtra(endT, initialExtra) : '';
 
       // Origem
       let orig = g.booking_origin;
@@ -4533,6 +4887,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const extraMin = Number(m.extraTime || 0);
     const extraAmount = Number(m.extraAmount || 0);
     const extraAmountStr = extraAmount > 0 ? extraAmount.toFixed(2).replace('.', ',') : '0,00';
+    const basePriceNum = parseFloat(m.total_price || m.price || 100);
+    const hourlyRateCourt = (court && court.normal) ? court.normal : 100;
+    const computedExtraAmount = extraAmount > 0 ? extraAmount : (extraMin > 0 ? Math.round((extraMin / 60) * hourlyRateCourt) : 0);
+    const currentTotalNum = basePriceNum + computedExtraAmount;
+    const currentTotalStr = currentTotalNum.toFixed(2).replace('.', ',');
+    const computedExtraAmountStr = computedExtraAmount > 0 ? computedExtraAmount.toFixed(2).replace('.', ',') : '0,00';
 
     let originDisplay = m.booking_origin;
     if (!originDisplay) {
@@ -4655,32 +5015,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <!-- Bloco de Controle de Tempo, Horário Extra e Origem -->
           <div class="booking-time-control-box">
-            <div class="booking-tc-item">
+            <!-- 1. TEMPO DE ATRASO DA EQUIPE -->
+            <div class="booking-tc-item" id="tc-delay-${m.id}">
               <span class="tc-label">Tempo de Atraso da Equipe</span>
-              <span class="tc-val ${lateMin > 0 ? 'text-amber-800 font-black' : 'text-slate-600 font-bold'}">
+              <div class="tc-input-row">
+                <div class="tc-input-group" title="Digitar minutos de atraso">
+                  <input type="number" min="0" max="300" step="5" 
+                         class="tc-input-num" id="input-delay-${m.id}" 
+                         value="${lateMin > 0 ? lateMin : ''}" placeholder="0" 
+                         oninput="onGameDelayInput('${m.id}', this.value)" />
+                  <span class="tc-unit">min</span>
+                </div>
+                <span class="tc-divider">ou às</span>
+                <input type="time" class="tc-input-time" id="input-arr-${m.id}" 
+                       value="${m.arrival_time || (lateMin > 0 ? window.calcArrivalFromDelay(startT, lateMin) : '')}"
+                       onchange="onGameArrivalInput('${m.id}', this.value)"
+                       title="Digitar horário de chegada da equipe (ex: 16:15)" />
+              </div>
+              <div class="tc-status-text ${lateMin > 0 ? 'text-amber-800' : 'text-emerald-700'}" id="status-delay-${m.id}">
                 ${lateMin > 0 ? `◷ ${lateMin} min de atraso` : '✓ Sem atraso (no horário)'}
-              </span>
+              </div>
             </div>
 
-            <div class="booking-tc-item">
+            <!-- 2. TEMPO DE HORÁRIO EXTRA -->
+            <div class="booking-tc-item" id="tc-extra-${m.id}">
               <span class="tc-label">Tempo de Horário Extra</span>
-              <span class="tc-val ${extraMin > 0 ? 'text-emerald-800 font-black' : 'text-slate-600 font-bold'}">
-                ${extraMin > 0 ? `+${extraMin} min extras (+ R$ ${extraAmountStr})` : 'Sem tempo extra'}
-              </span>
+              <div class="tc-input-row">
+                <div class="tc-input-group" title="Digitar minutos de horário extra">
+                  <input type="number" min="0" max="300" step="5" 
+                         class="tc-input-num" id="input-extra-${m.id}" 
+                         value="${extraMin > 0 ? extraMin : ''}" placeholder="0" 
+                         oninput="onGameExtraInput('${m.id}', this.value)" />
+                  <span class="tc-unit">min</span>
+                </div>
+                <span class="tc-divider">ou</span>
+                <select class="tc-select-hours" id="select-extra-hrs-${m.id}" onchange="onGameExtraHoursSelect('${m.id}', this.value)" title="Escolher em horas ou minutos">
+                  <option value="">horas...</option>
+                  <option value="15" ${extraMin === 15 ? 'selected' : ''}>15 min (0.25h)</option>
+                  <option value="30" ${extraMin === 30 ? 'selected' : ''}>30 min (0.5h)</option>
+                  <option value="45" ${extraMin === 45 ? 'selected' : ''}>45 min (0.75h)</option>
+                  <option value="60" ${extraMin === 60 ? 'selected' : ''}>1 hora</option>
+                  <option value="90" ${extraMin === 90 ? 'selected' : ''}>1h 30m</option>
+                  <option value="120" ${extraMin === 120 ? 'selected' : ''}>2 horas</option>
+                </select>
+              </div>
+              <div class="tc-status-text ${extraMin > 0 ? 'text-emerald-800' : 'text-slate-500'}" id="status-extra-${m.id}">
+                ${extraMin > 0 ? `+${extraMin} min extras (+ R$ ${computedExtraAmountStr})` : 'Sem tempo extra'}
+              </div>
             </div>
 
+            <!-- 3. ONDE FOI MARCADO (ORIGEM) -->
             <div class="booking-tc-item">
               <span class="tc-label">Onde foi Marcado (Origem)</span>
-              <span class="tc-val text-slate-800 font-black">
+              <div class="tc-input-row">
+                <select class="tc-select-origin font-black text-slate-800" id="select-origin-${m.id}" onchange="onGameOriginChange('${m.id}', this.value)" title="Alterar ou confirmar onde foi marcado">
+                  <option value="Marcado no Balcão" ${originDisplay.toLowerCase().includes('balcão') ? 'selected' : ''}>Marcado no Balcão</option>
+                  <option value="No Agendamento" ${originDisplay.toLowerCase().includes('agendamento') ? 'selected' : ''}>No Agendamento</option>
+                  <option value="Mensalista" ${originDisplay.toLowerCase().includes('mensalista') ? 'selected' : ''}>Mensalista</option>
+                  <option value="Avulso" ${originDisplay.toLowerCase().includes('avulso') ? 'selected' : ''}>Avulso</option>
+                </select>
+              </div>
+              <div class="tc-status-text text-slate-600 font-bold" id="status-origin-${m.id}">
                 ${originDisplay}
-              </span>
+              </div>
             </div>
 
+            <!-- 4. CÁLCULO AUTOMÁTICO / VALOR -->
             <div class="booking-tc-item">
               <span class="tc-label">Cálculo Automático / Valor</span>
-              <span class="tc-val text-emerald-800 font-black">
-                R$ ${price} · ${payment}
-              </span>
+              <div class="tc-calc-total text-emerald-800 font-black" id="status-calc-total-${m.id}">
+                R$ ${currentTotalStr} · ${payment}
+              </div>
+              <div class="tc-calc-detail text-slate-500 font-medium" id="status-calc-detail-${m.id}">
+                ${extraMin > 0 ? `Base: R$ ${price} + Extra (${extraMin}m): R$ ${computedExtraAmountStr}` : `Valor contratado: R$ ${price}`}
+              </div>
             </div>
           </div>
 
