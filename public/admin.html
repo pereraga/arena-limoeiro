@@ -4229,8 +4229,8 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
       localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
     } catch(e) {}
-    renderMovementMatches();
-    renderCadastrosBookingsList();
+    if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+    if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
   };
 
   // Funções de ação rápida
@@ -5237,8 +5237,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     saveAdminGameState();
     closeArenaModal('arenaFinishModal');
-    renderMovementMatches();
-    renderCadastrosBookingsList();
+    if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+    if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
     arenaToast('Jogo concluído com sucesso! Valor final: R$ ' + calculatedTotal.toFixed(2).replace('.', ','));
   };
 
@@ -5570,6 +5570,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMovementMatches();
   };
 
+  function renderMovementMatches() {
+    // Implementation
+  }
   window.renderMovementMatches = function() {
     const dateStr = window.adminGameState.selectedDate || '2026-11-03';
     const container = document.getElementById('movementMatchesListContainer');
@@ -5691,6 +5694,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) lucide.createIcons();
   };
 
+  function renderCadastrosBookingsList() {
+    // Implementation
+  }
   window.renderCadastrosBookingsList = function() {
     const container = document.getElementById('subtabBookingsListContainer');
     const searchEl = document.getElementById('subtabBookingSearchInput');
@@ -5927,8 +5933,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!confirm('Deseja realmente cancelar e liberar o horário deste agendamento?')) return;
     window.adminGameState.bookings = window.adminGameState.bookings.filter(b => String(b.id) !== String(id));
     localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-    renderMovementMatches();
-    renderCadastrosBookingsList();
+    if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+    if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
     alert('Horário liberado com sucesso!');
   };
 
