@@ -4357,10 +4357,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } catch(eM) {}
 
       // Atualiza badge de status
-      const badgeText = document.getElementById('cloudDbStatusText');
-      if (badgeText) {
-        badgeText.textContent = 'Nuvem: 2 Bancos Ativos (DB1 & DB2 Sincronizados)';
-      }
+      
 
       if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
       if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
