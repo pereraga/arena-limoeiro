@@ -1,9 +1,12 @@
 const fs = require('fs');
-const content = fs.readFileSync('public/admin.html', 'utf8');
+const path = require('path');
 
-const regex = /switchCadastrosSubTab/g;
-let m;
-while ((m = regex.exec(content)) !== null) {
-  const lineNum = content.substring(0, m.index).split('\n').length;
-  console.log(`Line ${lineNum}: ${content.substring(m.index - 20, m.index + 80).replace(/\n/g, ' ')}`);
+const adminPath = path.join(__dirname, '..', 'public', 'admin.html');
+const content = fs.readFileSync(adminPath, 'utf8');
+
+const target = 'switchCadastrosSubTab';
+let idx = -1;
+while ((idx = content.indexOf(target, idx + 1)) !== -1) {
+  console.log('Found at:', idx);
+  console.log(content.substring(Math.max(0, idx - 40), Math.min(content.length, idx + 150)));
 }
