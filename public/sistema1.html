@@ -6236,6 +6236,48 @@ document.addEventListener('DOMContentLoaded', () => {
     window.showNotification('Nota adicionada ao histórico da partida!');
   };
 
+  
+  window.handleGameMainAction = function(id) {
+    const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+    if (!g) return;
+
+    const st = g.status || 'confirmed';
+    const isLive = (st === 'live' || st === 'playing' || st === 'in_progress');
+
+    if (isLive) {
+      if (typeof window.openFinishGame === 'function') {
+        window.openFinishGame(id);
+      }
+    } else {
+      g.status = 'live';
+      g.attendance = 'Em Quadra';
+      if (!Array.isArray(g.log)) g.log = [];
+      const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      g.log.push({ at: 'Partida iniciada (' + nowTime + ')', text: 'Operador deu início à partida na quadra.' });
+
+      // Transforma o botão imediatamente para Vermelho (Finalizar)
+      const btn = document.getElementById('btn-main-action-' + id);
+      if (btn) {
+        btn.className = "w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-xs text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 shadow-md shadow-red-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer";
+        btn.innerHTML = '<i class="fa-solid fa-check text-[11px]"></i> Finalizar';
+        btn.title = "Finalizar partida";
+      }
+
+      try {
+        localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+      } catch(e) {}
+      if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
+      if (typeof window.syncBookingToCloud === 'function') window.syncBookingToCloud(g, 'upsert');
+      if (typeof window.showNotification === 'function') {
+        window.showNotification("Partida iniciada! O botão mudou para 'Finalizar'.");
+      }
+
+      if (typeof window.renderMovementMatches === 'function') {
+        window.renderMovementMatches();
+      }
+    }
+  };
+
   window.renderMatchCardHtml = renderMatchCardHtml;
   function renderMatchCardHtml(m, isNextUpcoming) {
     const isPanelOpen = !!(window.__openDetailsIds && window.__openDetailsIds.has(String(m.id)));
@@ -6259,6 +6301,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isToday = mDate === todayStr;
 
     const st = m.status || 'confirmed';
+    const isLive = (st === 'live' || st === 'playing' || st === 'in_progress');
 
     // Status classes and labels
     let statusBadgeClass = 'bg-blue-50 text-blue-700 border border-blue-200';
@@ -6526,7 +6569,7 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
 
-            <!-- BOTÃO PRINCIPAL VISÍVEL: FINALIZAR (VERMELHO) OU FINALIZADA + RECIBO -->
+            <!-- BOTÃO PRINCIPAL VISÍVEL: VERDE PARA INICIAR -> APÓS APERTAR, FICA VERMELHO (FINALIZAR) -->
             <div class="w-full flex justify-end">
               ${st === 'finished' ? `
                 <div class="flex items-center gap-2">
@@ -6537,11 +6580,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     <i class="fa-solid fa-receipt text-slate-500"></i> Recibo
                   </button>
                 </div>
-              ` : `
-                <button type="button" onclick="openFinishGame('${m.id}')" class="w-full sm:w-auto px-6 py-2.5 rounded-2xl font-bold text-xs text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 shadow-md shadow-red-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
+              ` : (isLive ? `
+                <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Finalizar partida" class="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-xs text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 shadow-md shadow-red-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
                   <i class="fa-solid fa-check text-[11px]"></i> Finalizar
                 </button>
-              `}
+              ` : `
+                <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Iniciar jogo na quadra" class="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-600 shadow-md shadow-emerald-700/25 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
+                  <i class="fa-solid fa-play text-[10px]"></i> Iniciar Jogo na Quadra
+                </button>
+              `)}
             </div>
           </div>
 
@@ -6689,7 +6736,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
 
-          <!-- BOTÕES DE GESTÃO SECUNDÁRIA -->
+          <!-- BOTÕES DE GESTÃO SECUNDÁRIA (EXATAMENTE COMO NA FOTO GRUPO VERDE) -->
           <div class="flex flex-wrap items-center justify-between gap-2.5 pb-3">
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" onclick="openEditGame('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
@@ -6699,15 +6746,6 @@ document.addEventListener('DOMContentLoaded', () => {
               <button type="button" onclick="openContract('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
                 <i class="fa-solid fa-file-contract text-slate-400"></i> Editar contrato
               </button>
-
-              ${st !== 'finished' ? `
-              <button type="button" onclick="startGameNow('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                <i class="fa-solid fa-play text-emerald-600"></i> Iniciar Jogo na Quadra
-              </button>
-              <button type="button" onclick="openFinishGame('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                <i class="fa-solid fa-check text-emerald-600"></i> Finalizar
-              </button>
-              ` : ''}
             </div>
 
             <div class="flex items-center gap-2">
