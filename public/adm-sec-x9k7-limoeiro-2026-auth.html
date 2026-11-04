@@ -1127,16 +1127,6 @@
 
       <!-- Ações do Topo -->
       <div class="flex items-center space-x-2">
-        <button onclick="openModal('modalDownloadApk')" class="bg-amber-600 hover:bg-amber-500 border border-amber-400/70 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1.5 shadow-md cursor-pointer">
-          <i data-lucide="download" class="w-4 h-4 text-amber-200"></i>
-          <span class="hidden sm:inline">Baixar APK</span>
-        </button>
-
-        <button onclick="openModal('modalInfoSistema')" class="bg-emerald-900/80 hover:bg-emerald-800 border border-emerald-600/50 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1.5 shadow-md cursor-pointer">
-          <i data-lucide="info" class="w-4 h-4 text-emerald-300"></i>
-          <span class="hidden sm:inline">Info Sistema</span>
-        </button>
-
         <button onclick="openModal('modalCompartilhar')" class="bg-emerald-600 hover:bg-emerald-500 border border-emerald-400/60 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white transition-all flex items-center space-x-1.5 shadow-md cursor-pointer">
           <i data-lucide="share-2" class="w-4 h-4"></i>
           <span class="hidden sm:inline">Compartilhar Link</span>
@@ -1201,13 +1191,6 @@
           <span class="badge-count">4</span>
         </button>
 
-        <!-- Aba 4: Bar & Lanchonete -->
-        <button onclick="showAdminTab('bar')" id="btnTab-bar" class="tab-btn tab-inactive">
-          <i data-lucide="coffee" class="w-4 h-4 shrink-0 text-slate-700"></i>
-          <span>Bar & Lanchonete</span>
-          <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0 ml-0.5"></span>
-        </button>
-
         <!-- Aba 5: Cadastros & Ajustes -->
         <button onclick="showAdminTab('cadastros')" id="btnTab-cadastros" class="tab-btn tab-inactive">
           <i data-lucide="sliders" class="w-4 h-4 shrink-0 text-slate-700"></i>
@@ -1237,47 +1220,8 @@
 
     <!-- 🟢 PAINEL 1: MOVIMENTAÇÃO -->
     <section id="panel-movement" class="space-y-6">
-      <!-- ALERTA CRÍTICO: ESTOQUE DE ÁGUA -->
-    <div class="rounded-3xl p-5 sm:p-6 text-white shadow-xl border border-rose-900/50 relative overflow-hidden" style="background: linear-gradient(135deg, #180509 0%, #2b0c14 50%, #150508 100%);">
-      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div class="flex items-start gap-4">
-          <div class="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0 text-rose-400">
-            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
-          </div>
-          <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2.5 py-0.5 rounded-full bg-rose-500/30 text-rose-300 text-[10px] font-black uppercase tracking-wider border border-rose-500/40">
-                ABAIXO DO LIMITE MÍNIMO
-              </span>
-            </div>
-            <h3 class="text-base sm:text-lg font-black text-white mt-1 flex items-center gap-2">
-              <span>Estoque de água cheia em nível crítico</span>
-              <span class="text-xs font-bold text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded-md border border-rose-800">0 un disponíveis</span>
-            </h3>
-            <p class="text-xs text-rose-200/80 mt-1 flex items-center gap-3 flex-wrap">
-              <span>📦 <strong>Lote ideal de reposição:</strong> 35 galões</span>
-              <span>📈 <strong>Consumo previsto (48h):</strong> 0 unidades</span>
-            </p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 self-end md:self-center">
-          <button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow flex items-center gap-1.5 transition">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>+ Fazer Pedido</span>
-          </button>
-          <button class="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition">
-            Ver Registro
-          </button>
-        </div>
-      </div>
-      <div class="mt-4 pt-3 border-t border-rose-900/40 flex items-center justify-between text-[11px] text-rose-300">
-        <span>Nível de Reserva no Complexo: <strong>0% (Esgotado)</strong></span>
-        <span>Capacidade Ideal: <strong>36 un</strong></span>
-      </div>
-    </div>
-
-    <!-- 4 KPIS OPERACIONAIS -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- 3 KPIS OPERACIONAIS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">JOGOS AGENDADOS</span>
@@ -1305,16 +1249,7 @@
           <i data-lucide="dollar-sign" class="w-6 h-6"></i>
         </div>
       </div>
-      <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
-        <div>
-          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">BAR & BEBIDAS</span>
-          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block">0 <span class="text-xs font-semibold text-slate-400">a entregar</span></span>
-        </div>
-        <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
-          <i data-lucide="coffee" class="w-6 h-6"></i>
-        </div>
       </div>
-    </div>
 
     <!-- CALENDÁRIO HORIZONTAL DE DIAS -->
     <div class="bg-white rounded-3xl border border-slate-200 p-5 shadow-sm space-y-4">
@@ -1697,106 +1632,6 @@
       </div>
 
     </div>
-    </section>
-
-    <!-- 🟢 PAINEL 4: BAR & LANCHONETE -->
-    <section id="panel-bar" class="space-y-6 hidden">
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div class="flex items-center space-x-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center font-black">
-              <i data-lucide="coffee" class="w-6 h-6"></i>
-            </div>
-            <div>
-              <h3 class="text-xl font-black text-slate-900">Bar & Lanchonete da Arena</h3>
-              <p class="text-xs text-slate-500">Controle de estoque de bebidas, reposições e vendas diretas do balcão</p>
-            </div>
-          </div>
-          <button onclick="openModal('modalNovoProduto')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center space-x-2 shadow-sm transition-all cursor-pointer">
-            <i data-lucide="plus" class="w-4 h-4"></i>
-            <span>Adicionar Produto</span>
-          </button>
-        </div>
-
-        <!-- Alerta de Água Mineral -->
-        <div class="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center justify-between gap-3 mb-6">
-          <div class="flex items-center space-x-3">
-            <div class="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <strong class="text-xs font-bold text-rose-900 block">Estoque de Água Mineral em Nível Crítico</strong>
-              <p class="text-[11px] text-rose-700">0 unidades disponíveis. Lote ideal de reposição: 35 galões.</p>
-            </div>
-          </div>
-          <button onclick="openModal('modalReporAgua')" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow cursor-pointer">
-            Fazer Pedido
-          </button>
-        </div>
-
-        <!-- Grade de Produtos do Bar -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <div class="border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-              <div>
-                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Bebidas</span>
-                <h4 class="text-sm font-bold text-slate-900 mt-1">Água Mineral 500ml</h4>
-                <p class="text-xs text-slate-500">Com ou sem gás</p>
-              </div>
-              <span class="text-xs font-black text-emerald-600">R$ 4,00</span>
-            </div>
-            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Estoque: <strong class="text-slate-800">48 un</strong></span>
-              <button onclick="mostrarToast('Venda registrada no balcão!')" class="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer">+ Venda</button>
-            </div>
-          </div>
-
-          <div class="border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-              <div>
-                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Isotônicos</span>
-                <h4 class="text-sm font-bold text-slate-900 mt-1">Gatorade 500ml</h4>
-                <p class="text-xs text-slate-500">Sabores variados</p>
-              </div>
-              <span class="text-xs font-black text-emerald-600">R$ 9,00</span>
-            </div>
-            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Estoque: <strong class="text-slate-800">24 un</strong></span>
-              <button onclick="mostrarToast('Venda registrada no balcão!')" class="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer">+ Venda</button>
-            </div>
-          </div>
-
-          <div class="border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-              <div>
-                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Energéticos</span>
-                <h4 class="text-sm font-bold text-slate-900 mt-1">Red Bull 250ml</h4>
-                <p class="text-xs text-slate-500">Tradicional / Sugar Free</p>
-              </div>
-              <span class="text-xs font-black text-emerald-600">R$ 14,00</span>
-            </div>
-            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Estoque: <strong class="text-slate-800">18 un</strong></span>
-              <button onclick="mostrarToast('Venda registrada no balcão!')" class="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer">+ Venda</button>
-            </div>
-          </div>
-
-          <div class="border border-slate-200 rounded-2xl p-4 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div class="flex items-start justify-between">
-              <div>
-                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Cervejas</span>
-                <h4 class="text-sm font-bold text-slate-900 mt-1">Heineken Long Neck</h4>
-                <p class="text-xs text-slate-500">330ml Puro Malte</p>
-              </div>
-              <span class="text-xs font-black text-emerald-600">R$ 11,00</span>
-            </div>
-            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Estoque: <strong class="text-slate-800">60 un</strong></span>
-              <button onclick="mostrarToast('Venda registrada no balcão!')" class="text-emerald-600 hover:text-emerald-700 font-bold cursor-pointer">+ Venda</button>
-            </div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- 🟢 PAINEL 5: CADASTROS & AJUSTES -->
@@ -2301,7 +2136,7 @@
   <!-- 6. JAVASCRIPT DE NAVEGAÇÃO E INTERATIVIDADE DO PAINEL           -->
   <!-- ============================================================== -->
   <script>
-    const tabsList = ['movement', 'courts', 'modalities', 'bar', 'cadastros', 'reports', 'backup'];
+    const tabsList = ['movement', 'courts', 'modalities', 'cadastros', 'reports', 'backup'];
 
     function showAdminTab(targetTab) {
       tabsList.forEach(t => {
