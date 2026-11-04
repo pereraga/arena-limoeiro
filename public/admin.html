@@ -4443,7 +4443,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentDayOfWeek = dayOfWeekMap[dt.getDay()];
 
     // Regra: Finaliza todos os jogos dos dias anteriores (do dia 03 para trás)
-    const isPastOrDay3 = (dateStr <= '2026-11-03');
+    const isPastOrDay3 = (dateStr <= '2026-11-03' && dateStr !== '2026-11-04');
     const defaultPastStatus = isPastOrDay3 ? 'finished' : 'confirmed';
 
     let matches = [];
@@ -4482,6 +4482,10 @@ document.addEventListener('DOMContentLoaded', () => {
     (window.adminGameState.bookings || []).forEach(b => {
       if (!b || b.status === 'cancelled') return;
       if (b.date === dateStr) {
+        if (dateStr === '2026-11-04' && b.status === 'finished') {
+          b.status = 'confirmed';
+          b.observation = 'Pronto para iniciar';
+        }
         const court = getCourtById(b.court_id || b.courtId);
         const startT = b.start_time || (b.time ? b.time.split(' ')[0] : '19:00');
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
@@ -5668,8 +5672,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const minUntil = sM - currentM;
       return {
         percent: 0,
-        label: 'Início automático às ' + startT,
-        counter: 'Inicia em ' + minUntil + ' min',
+        label: 'Início programado para hoje às ' + startT,
+        counter: 'Pronto para iniciar',
         fillClass: '',
         badgeClass: 'timer-future',
         isOverdue: false,
@@ -6302,7 +6306,7 @@ document.addEventListener('DOMContentLoaded', () => {
                       const sM = parseMin(startT);
                       let eM = parseMin(endT);
                       if (eM <= sM) eM += 24 * 60;
-                      if (curM < sM) return '🔵 Confirmado · Início automático às ' + startT;
+                      if (curM < sM) return '🔵 Confirmado · Pronto para iniciar (Início às ' + startT + ')';
                       if (curM <= (eM + (extraMin || 0))) return '🟢 Em andamento (Início automático)';
                       return '🔴 Tempo limite atingido (Aguardando fechamento)';
                     })())
@@ -6654,6 +6658,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const span = calDisplay.querySelector('span');
         if (span) span.textContent = parts[2] + ' / ' + parts[1] + ' / ' + parts[0];
       }
+    }
+
+    // Ao selecionar o dia atual, se o filtro estava em finalizados, reseta para ver os jogos prontos
+    const sysToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+    if (dateStr === sysToday && window.adminGameState.movementFilterStatus === 'finished') {
+      window.adminGameState.movementFilterStatus = 'all';
+      const statusSelectEl = document.getElementById('movementStatusFilter');
+      if (statusSelectEl) statusSelectEl.value = 'all';
     }
 
     // Renderiza a programação de partidas do dia clicado / selecionado

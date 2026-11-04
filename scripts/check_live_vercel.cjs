@@ -8,10 +8,11 @@ https.get(url, (res) => {
   res.on('end', () => {
     console.log('Status code:', res.statusCode);
     console.log('Body length:', body.length);
-    console.log('Contains renderMovementCalendarStrip:', body.includes('renderMovementCalendarStrip'));
-    console.log('Contains selectMovementDay:', body.includes('selectMovementDay'));
-    console.log('Contains lastKnownSystemDate:', body.includes('__lastKnownSystemDate'));
-    console.log('Contains window.initAdminGames:', body.includes('window.initAdminGames'));
+    console.log('Contains Finalizar button text:', body.includes('<span>Finalizar</span>'));
+    console.log('Contains isPastOrDay3:', body.includes('isPastOrDay3'));
+    console.log('Contains any "Receber bola":', body.includes('Receber bola'));
+    console.log('Contains any "Bola Recebida":', body.includes('Bola Recebida'));
+    console.log('Contains any "Bola Devolvida":', body.includes('Bola Devolvida'));
   });
 }).on('error', (e) => {
   console.error('Fetch error:', e.message);

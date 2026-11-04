@@ -6,7 +6,7 @@ const cwd = path.join(__dirname, '..');
 console.log('1. Git Add & Commit...');
 execSync('git add public/ supabase/ scripts/', { cwd, stdio: 'inherit' });
 try {
-  execSync('git commit -m "feat: finalizar todos os jogos anteriores (<= 03/11), remover mencoes de recebimento de bola e atualizar botao para Finalizar"', { cwd, stdio: 'inherit' });
+  execSync('git commit -m "feat: resetar entrada indevida dos jogos do dia 04 deixando-os confirmados e prontos para iniciar o jogo"', { cwd, stdio: 'inherit' });
 } catch(e) {
   console.log('No new commit needed or already committed.');
 }
