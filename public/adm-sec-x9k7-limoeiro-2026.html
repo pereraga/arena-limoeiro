@@ -3961,7 +3961,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return [];
   }
 
-  // Estado global do admin - Data Inicial definida para o DIA ATUAL: 2026-11-03
+  // Helper oficial de data atual do sistema (adaptação automática quando vira o dia)
+  window.getSystemToday = function() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  };
+
+  // Estado global do admin - Data Inicial definida para o DIA ATUAL:
   window.adminGameState = {
     bookings: getLoadedBookings(),
     monthlyMembers: getLoadedMonthly(),
@@ -5312,7 +5321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  window.calcMatchTimer = function(startT, endT, extraMin, st) {
+  window.calcMatchTimer = function(startT, endT, extraMin, st, matchDate) {
     const parseMin = (s) => {
       if (!s) return 0;
       const p = s.split(':');
@@ -5331,10 +5340,52 @@ document.addEventListener('DOMContentLoaded', () => {
         counter: totalDuration + ' min finalizados',
         fillClass: 'timer-fill-finished',
         badgeClass: 'timer-finished',
-        isOverdue: false
+        isOverdue: false,
+        isFuture: false
       };
     }
 
+    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
+    const mDate = matchDate || todayStr;
+
+    // CASO 1: JOGO DE DIA FUTURO (Ainda não é o dia do jogo)
+    // Regra: Os jogos dos dias pra frente NÃO podem ser contabilizados em minutos ou início automático
+    if (mDate > todayStr) {
+      let dateLabel = mDate;
+      try {
+        const parts = mDate.split('-');
+        dateLabel = parts[2] + '/' + parts[1];
+      } catch(e) {}
+      return {
+        percent: 0,
+        label: 'Início programado para ' + dateLabel + ' às ' + startT,
+        counter: 'Aguardando data do jogo',
+        fillClass: '',
+        badgeClass: 'timer-future',
+        isOverdue: false,
+        isFuture: true
+      };
+    }
+
+    // CASO 2: JOGO DE DATA PASSADA (Dias anteriores que ficaram pendentes)
+    if (mDate < todayStr) {
+      let dateLabel = mDate;
+      try {
+        const parts = mDate.split('-');
+        dateLabel = parts[2] + '/' + parts[1];
+      } catch(e) {}
+      return {
+        percent: 100,
+        label: 'Partida de data anterior (' + dateLabel + ')',
+        counter: 'Pendente de fechamento',
+        fillClass: 'timer-fill-warn',
+        badgeClass: 'timer-overdue',
+        isOverdue: true,
+        isFuture: false
+      };
+    }
+
+    // CASO 3: JOGO DO DIA ATUAL (Hoje: dia 3 hoje; quando virar o dia, dia 4, e assim sucessivamente)
     const now = new Date();
     const currentM = now.getHours() * 60 + now.getMinutes();
 
@@ -5346,7 +5397,8 @@ document.addEventListener('DOMContentLoaded', () => {
         counter: 'Inicia em ' + minUntil + ' min',
         fillClass: '',
         badgeClass: 'timer-future',
-        isOverdue: false
+        isOverdue: false,
+        isFuture: false
       };
     } else if (currentM <= (eM + (extraMin || 0))) {
       const elapsed = currentM - sM;
@@ -5359,17 +5411,19 @@ document.addEventListener('DOMContentLoaded', () => {
         counter: remaining + ' min restantes',
         fillClass,
         badgeClass: '',
-        isOverdue: false
+        isOverdue: false,
+        isFuture: false
       };
     } else {
       const overdue = currentM - (eM + (extraMin || 0));
       return {
         percent: 100,
         label: 'Tempo limite atingido (' + totalDuration + ' min)',
-        counter: overdue > 0 ? '+' + overdue + ' min (Receber bola)' : 'Concluir aula',
+        counter: overdue > 0 ? '+' + overdue + ' min (Receber bola)' : 'Concluir partida',
         fillClass: 'timer-fill-red',
         badgeClass: 'timer-overdue',
-        isOverdue: true
+        isOverdue: true,
+        isFuture: false
       };
     }
   };
@@ -5646,25 +5700,49 @@ document.addEventListener('DOMContentLoaded', () => {
     const zapText = encodeURIComponent('Olá ' + (m.customer_name || m.name) + '! Confirmamos seu jogo na ' + court.name + ' às ' + startT + ' na Arena Limoeiro.');
     const zapUrl = cleanPhone.length >= 10 ? 'https://wa.me/55' + cleanPhone + '?text=' + zapText : '#';
 
+    const mDate = m.date || window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03');
+    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
+    const isFutureDay = mDate > todayStr;
+    const isPastDay = mDate < todayStr;
+    const isToday = mDate === todayStr;
+
     // Status classes and labels
     const st = m.status || 'confirmed';
     let statusClass = 'pill-confirmed';
     let statusLabel = '● Confirmado';
-    if (st === 'live' || st === 'playing' || st === 'in_progress') {
-      statusClass = 'pill-playing';
-      statusLabel = '● Em andamento';
-    } else if (st === 'finished') {
+    if (st === 'finished') {
       statusClass = 'pill-finished';
       statusLabel = '● Finalizado';
+    } else if (st === 'cancelled') {
+      statusClass = 'pill-finished';
+      statusLabel = 'Cancelado';
     } else if (st === 'no-show') {
       statusClass = 'pill-noshow';
       statusLabel = '! Não compareceu';
     } else if (st === 'pending') {
       statusClass = 'pill-pending';
       statusLabel = '● Pendente';
-    } else if (st === 'cancelled') {
-      statusClass = 'pill-finished';
-      statusLabel = 'Cancelado';
+    } else if (isFutureDay) {
+      statusClass = 'pill-confirmed';
+      statusLabel = '● Confirmado';
+    } else if (isToday) {
+      const now = new Date();
+      const currentM = now.getHours() * 60 + now.getMinutes();
+      const parseMin = (s) => {
+        if (!s) return 0;
+        const p = s.split(':');
+        return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
+      };
+      const sM = parseMin(startT);
+      let eM = parseMin(endT);
+      if (eM <= sM) eM += 24 * 60;
+      if (currentM >= sM && currentM <= (eM + (extraMin || 0))) {
+        statusClass = 'pill-playing';
+        statusLabel = '● Em andamento';
+      }
+    } else if (st === 'live' || st === 'playing' || st === 'in_progress') {
+      statusClass = 'pill-playing';
+      statusLabel = '● Em andamento';
     }
 
     const price = Number(m.total_price || m.price || 100).toFixed(2).replace('.', ',');
@@ -5702,11 +5780,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     const matchTimer = (typeof window.calcMatchTimer === 'function') 
-      ? window.calcMatchTimer(startT, endT, extraMin, st) 
+      ? window.calcMatchTimer(startT, endT, extraMin, st, mDate) 
       : { percent: 0, label: 'Início automático às ' + startT, counter: durStr, fillClass: '', badgeClass: '' };
 
+    const showNextUpcomingBadge = isNextUpcoming && isToday;
+
     return `
-      <article class="booking-card ${isNextUpcoming ? 'is-next-upcoming' : ''}" id="card-${m.id}" style="${isNextUpcoming ? 'border: 2px solid #10b981 !important; box-shadow: 0 4px 16px -2px rgba(16, 185, 129, 0.18) !important;' : ''}">
+      <article class="booking-card ${showNextUpcomingBadge ? 'is-next-upcoming' : ''}" id="card-${m.id}" style="${showNextUpcomingBadge ? 'border: 2px solid #10b981 !important; box-shadow: 0 4px 16px -2px rgba(16, 185, 129, 0.18) !important;' : ''}">
         <div class="booking-main-grid">
           
           <!-- Bloco Lateral de Horário (Menta) -->
@@ -5719,7 +5799,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <!-- Informações Centrais -->
           <div class="min-w-0">
             <div class="booking-chips">
-              ${isNextUpcoming ? `
+              ${showNextUpcomingBadge ? `
               <span class="pill-chip" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important; color: #ffffff !important; font-weight: 900 !important; border: 1px solid #059669 !important; box-shadow: 0 2px 6px rgba(16,185,129,0.35) !important; display: inline-flex !important; align-items: center !important; gap: 4px !important;">
                 <span style="display:inline-block; width:6px; height:6px; border-radius:9999px; background:#a7f3d0;"></span>
                 ⚡ Próximo Jogo da Hora
@@ -5776,9 +5856,9 @@ document.addEventListener('DOMContentLoaded', () => {
                   ✓ Finalizada · Bola Recebida
                 </span>
               ` : `
-                <button type="button" class="booking-finish-red-btn" onclick="openFinishGame('${m.id}')" title="Encerrar aula/jogo e receber a bola" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; color: #ffffff !important; border: 1px solid #b91c1c !important; border-radius: 12px !important; padding: 9px 15px !important; font-size: 12px !important; font-weight: 900 !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important; box-shadow: 0 3px 8px rgba(220,38,38,0.35) !important;">
+                <button type="button" class="booking-finish-red-btn" onclick="openFinishGame('${m.id}')" title="Encerrar aula/jogo e receber a bola" style="${isFutureDay ? 'background: #1e293b !important; border: 1px solid #334155 !important; box-shadow: 0 2px 4px rgba(15,23,42,0.15) !important;' : 'background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; border: 1px solid #b91c1c !important; box-shadow: 0 3px 8px rgba(220,38,38,0.35) !important;'} color: #ffffff !important; border-radius: 12px !important; padding: 9px 15px !important; font-size: 12px !important; font-weight: 900 !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important;">
                   <span class="btn-ball-icon" style="font-size: 15px; line-height: 1;">⚽</span>
-                  <span>Finalizar / Receber Bola</span>
+                  <span>${isFutureDay ? 'Concluir Jogo' : 'Finalizar / Receber Bola'}</span>
                 </button>
               `}
             </div>
@@ -5791,7 +5871,27 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="booking-presence-text text-xs text-slate-500 font-medium">
             Status: <strong class="text-slate-800 font-bold">${
               st === 'finished' ? '✓ Finalizada · Bola recebida' : 
-              (st === 'cancelled' ? 'Cancelada' : '🟢 Em andamento (Início automático)')
+              (st === 'cancelled' ? 'Cancelada' : 
+                (isFutureDay ? '🔵 Confirmado · Aguardando data do jogo' : 
+                  (isPastDay ? '⚠️ Data anterior · Pendente de finalização' : 
+                    ((() => {
+                      const now = new Date();
+                      const curM = now.getHours() * 60 + now.getMinutes();
+                      const parseMin = (s) => {
+                        if (!s) return 0;
+                        const p = s.split(':');
+                        return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
+                      };
+                      const sM = parseMin(startT);
+                      let eM = parseMin(endT);
+                      if (eM <= sM) eM += 24 * 60;
+                      if (curM < sM) return '🔵 Confirmado · Início automático às ' + startT;
+                      if (curM <= (eM + (extraMin || 0))) return '🟢 Em andamento (Início automático)';
+                      return '🔴 Tempo limite atingido (Aguardando fechamento)';
+                    })())
+                  )
+                )
+              )
             }</strong>
           </div>
           <button type="button" class="booking-detail-toggle booking-toggle-btn" onclick="toggleDetails('${m.id}')">
@@ -6004,16 +6104,15 @@ document.addEventListener('DOMContentLoaded', () => {
       countEl.textContent = matches.length + (matches.length === 1 ? ' partida listada' : ' partidas listadas');
     }
 
-    // Atualiza KPIs do topo com base no dia atual (Dia 3)
-    if (dateStr === '2026-11-03') {
-      const allDayMatches = getMatchesForDate(dateStr);
-      const topRevenue = allDayMatches.reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
-      const kpiRev = document.querySelector('.kpi-value-revenue');
-      const kpiGames = document.querySelector('.kpi-value-games');
-      if (kpiRev) kpiRev.textContent = 'R$ ' + topRevenue.toFixed(2).replace('.', ',');
-      if (kpiGames) kpiGames.textContent = allDayMatches.length + ' partidas';
-    }
-
+    // Atualiza KPIs do topo com base no dia atual (Hoje / Adaptação dinâmica ao virar o dia)
+    const currentToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
+    const allTodayMatches = getMatchesForDate(currentToday);
+    const topRevenue = allTodayMatches.reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
+    const kpiRev = document.querySelector('.kpi-value-revenue');
+    const kpiGames = document.querySelector('.kpi-value-games');
+    if (kpiRev) kpiRev.textContent = 'R$ ' + topRevenue.toFixed(2).replace('.', ',');
+    if (kpiGames) kpiGames.textContent = allTodayMatches.length + ' partidas';
+    
     if (!container) return;
 
     if (matches.length === 0) {
@@ -6872,6 +6971,19 @@ document.addEventListener('DOMContentLoaded', () => {
       window.autoCalculateDirectBookingPrice();
     }
   };
+
+  
+  // Atualização periódica em tempo real para os cronômetros do dia atual e virada de dia
+  if (!window.__arenaFeedAutoInterval) {
+    window.__arenaFeedAutoInterval = setInterval(() => {
+      const panel = document.getElementById('panel-movement');
+      if (panel && !panel.classList.contains('hidden') && panel.style.display !== 'none') {
+        if (typeof window.renderMovementMatches === 'function') {
+          window.renderMovementMatches();
+        }
+      }
+    }, 30000);
+  }
 
   function initAdminGames() {
     // Configura botões de dias na barra de 21 dias com onclick
