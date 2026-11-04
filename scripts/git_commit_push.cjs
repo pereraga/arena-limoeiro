@@ -5,7 +5,7 @@ try {
   execSync('git add public/ scripts/', { stdio: 'inherit' });
 
   console.log('Running git commit...');
-  execSync('git commit -m "feat: padronizar layout operacional de todos os cartoes de jogos com novo design, controles operacionais e timeline"', { stdio: 'inherit' });
+  execSync('git commit -m "feat: integracao whatsapp qr code e envio de otp na aba api para confirmacao de conta de clientes novos"', { stdio: 'inherit' });
 
   console.log('Running git push...');
   execSync('git push origin main', { stdio: 'inherit' });
