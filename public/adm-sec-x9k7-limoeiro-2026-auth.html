@@ -844,7 +844,7 @@
 }
 
 /* ==========================================================================
-   BOTAO VERMELHO FINALIZAR / RECEBER BOLA E BARRA DE MINUTOS
+   BOTAO VERMELHO FINALIZAR E BARRA DE MINUTOS
    ========================================================================== */
 .booking-finish-red-btn {
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
@@ -4436,11 +4436,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   function getMatchesForDate(dateStr) {
-    if (!dateStr) dateStr = '2026-11-03';
+    if (!dateStr) dateStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
     const [y, m, d] = dateStr.split('-');
     const dt = new Date(Number(y), Number(m) - 1, Number(d), 12, 0, 0);
     const dayOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
     const currentDayOfWeek = dayOfWeekMap[dt.getDay()];
+
+    // Regra: Finaliza todos os jogos dos dias anteriores (do dia 03 para trás)
+    const isPastOrDay3 = (dateStr <= '2026-11-03');
+    const defaultPastStatus = isPastOrDay3 ? 'finished' : 'confirmed';
 
     let matches = [];
 
@@ -4465,7 +4469,7 @@ document.addEventListener('DOMContentLoaded', () => {
           end_time: endT,
           time: startT + ' às ' + endT,
           total_price: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4 || 100,
-          status: 'confirmed',
+          status: defaultPastStatus,
           isMensalista: true,
           booking_type: 'mensalista',
           payment_method: 'Mensalidade Faturada',
@@ -4485,7 +4489,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Evita duplicatas se já existe mensalista no mesmo horário e campo, mantendo a data estrita
         const existing = matches.find(m => String(m.id) === String(b.id) || (m.court_id === court.id && m.start_time === startT));
         if (existing) {
-          existing.status = b.status || existing.status;
+          existing.status = (isPastOrDay3 ? 'finished' : (b.status || existing.status));
           if (b.payment_method) existing.payment_method = b.payment_method;
           if (b.total_price) existing.total_price = b.total_price;
           if (b.ballReturned !== undefined) existing.ballReturned = b.ballReturned;
@@ -4508,7 +4512,7 @@ document.addEventListener('DOMContentLoaded', () => {
             end_time: endT,
             time: b.time || (startT + ' às ' + endT),
             total_price: parseFloat(b.total_price || b.totalPrice || 90),
-            status: b.status || 'confirmed',
+            status: (isPastOrDay3 ? 'finished' : (b.status || 'confirmed')),
             isMensalista: b.booking_type === 'mensalista' || (b.id && String(b.id).startsWith('monthly-')),
             booking_type: b.booking_type || 'avulso',
             payment_method: b.payment_method || 'PIX Balcão',
@@ -5690,7 +5694,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return {
         percent: 100,
         label: 'Tempo limite atingido (' + totalDuration + ' min)',
-        counter: overdue > 0 ? '+' + overdue + ' min (Receber bola)' : 'Concluir partida',
+        counter: overdue > 0 ? '+' + overdue + ' min (Finalizar)' : 'Finalizar',
         fillClass: 'timer-fill-red',
         badgeClass: 'timer-overdue',
         isOverdue: true,
@@ -5880,7 +5884,7 @@ document.addEventListener('DOMContentLoaded', () => {
     g.finishObs = obs;
 
     let logText = 'Partida concluída';
-    if (ballReturned) logText += ' • Bola devolvida e conferida';
+    // ball mentions removed
     if (extraTime > 0) logText += ' • ' + extraTime + 'm extra (+R$ ' + extraAmount + ')';
     if (late > 0) logText += ' • Atraso: ' + late + 'm';
     logText += ' • Total: R$ ' + calculatedTotal.toFixed(2) + ' • ' + g.payment + ' • ' + origin;
@@ -6072,7 +6076,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="flex justify-between border-b border-slate-200 pb-1.5"><strong>Data & Horário:</strong> <span>${g.date} (${g.start_time} às ${g.end_time})</span></div>
           <div class="flex justify-between border-b border-slate-200 pb-1.5"><strong>Valor Final:</strong> <span class="font-black text-emerald-700">R$ ${price}</span></div>
           <div class="flex justify-between border-b border-slate-200 pb-1.5"><strong>Forma Pagamento:</strong> <span>${g.payment || 'PIX Balcão'}</span></div>
-          <div class="flex justify-between border-b border-slate-200 pb-1.5"><strong>Bola Devolvida:</strong> <span class="text-emerald-700 font-bold">${g.ballReturned !== false ? '✓ Devolvida & Conferida' : 'Pendente'}</span></div>
+          
           ${g.finishedAt ? `<div class="flex justify-between"><strong>Horário Fechamento:</strong> <span>${g.finishedAt}</span></div>` : ''}
         </div>
         <div class="mt-5 flex gap-2 justify-center">
@@ -6262,16 +6266,16 @@ document.addEventListener('DOMContentLoaded', () => {
               ${st === 'finished' ? `
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-black text-emerald-800 bg-emerald-100 border border-emerald-300 rounded-xl px-3 py-2 inline-flex items-center gap-1.5 shadow-sm">
-                    ✓ Finalizada · Bola Recebida
+                    ✓ Finalizada
                   </span>
                   <button type="button" onclick="viewReceipt('${m.id}')" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer" title="Ver Comprovante">
                     📄 Recibo
                   </button>
                 </div>
               ` : `
-                <button type="button" class="booking-finish-red-btn" onclick="openFinishGame('${m.id}')" title="Encerrar aula/jogo e receber a bola" style="${isFutureDay ? 'background: #1e293b !important; border: 1px solid #334155 !important; box-shadow: 0 2px 4px rgba(15,23,42,0.15) !important;' : 'background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; border: 1px solid #b91c1c !important; box-shadow: 0 3px 8px rgba(220,38,38,0.35) !important;'} color: #ffffff !important; border-radius: 12px !important; padding: 9px 15px !important; font-size: 12px !important; font-weight: 900 !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important;">
-                  <span class="btn-ball-icon" style="font-size: 15px; line-height: 1;">⚽</span>
-                  <span>${isFutureDay ? 'Concluir Jogo' : 'Finalizar / Receber Bola'}</span>
+                <button type="button" class="booking-finish-red-btn" onclick="openFinishGame('${m.id}')" title="Finalizar partida" style="${isFutureDay ? 'background: #1e293b !important; border: 1px solid #334155 !important; box-shadow: 0 2px 4px rgba(15,23,42,0.15) !important;' : 'background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important; border: 1px solid #b91c1c !important; box-shadow: 0 3px 8px rgba(220,38,38,0.35) !important;'} color: #ffffff !important; border-radius: 12px !important; padding: 9px 15px !important; font-size: 12px !important; font-weight: 900 !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; cursor: pointer !important;">
+                  <span class="btn-finish-check-icon" style="font-size: 14px; line-height: 1; font-weight: 900;">✓</span>
+                  <span>Finalizar</span>
                 </button>
               `}
             </div>
@@ -6283,7 +6287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="booking-card-footer booking-presence-row">
           <div class="booking-presence-text text-xs text-slate-500 font-medium">
             Status: <strong class="text-slate-800 font-bold">${
-              st === 'finished' ? '✓ Finalizada · Bola recebida' : 
+              st === 'finished' ? '✓ Finalizada' :  
               (st === 'cancelled' ? 'Cancelada' : 
                 (isFutureDay ? '🔵 Confirmado · Aguardando data do jogo' : 
                   (isPastDay ? '⚠️ Data anterior · Pendente de finalização' : 
@@ -6450,7 +6454,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
               `}
               <button type="button" class="booking-quick-btn bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300 font-black" onclick="openFinishGame('${m.id}')">
-                ⚽ Concluir / Receber Bola
+                ✓ Finalizar
               </button>
               <button type="button" class="booking-quick-btn" onclick="openNoShow('${m.id}')">
                 ! Não compareceu
@@ -6757,7 +6761,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="py-10 text-center text-slate-400 bg-slate-50/70 rounded-2xl border border-dashed border-slate-200 p-6">
             <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-2xl font-bold">✓</div>
             <h4 class="text-sm font-bold text-slate-800">Nenhuma partida finalizada até o momento para ${formatDisplayDate(dateStr)}.</h4>
-            <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">As partidas concluídas aparecerão aqui imediatamente após o encerramento do jogo e recebimento da bola.</p>
+            <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">As partidas concluídas aparecerão aqui imediatamente após o encerramento e finalização do jogo.</p>
             <button type="button" onclick="document.getElementById('movementStatusFilter').value='all'; filterMovementMatches();" class="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow inline-flex items-center gap-1.5 transition cursor-pointer">
               <i data-lucide="arrow-left" class="w-4 h-4"></i>
               <span>Ver Partidas Ativas (${activeCount})</span>

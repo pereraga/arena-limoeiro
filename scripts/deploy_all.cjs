@@ -6,7 +6,7 @@ const cwd = path.join(__dirname, '..');
 console.log('1. Git Add & Commit...');
 execSync('git add public/ supabase/ scripts/', { cwd, stdio: 'inherit' });
 try {
-  execSync('git commit -m "feat(calendar): selecao dinamica ao clicar no dia do calendario, atualizacao automatica na virada da data operacional e exibicao fiel de partidas"', { cwd, stdio: 'inherit' });
+  execSync('git commit -m "feat: finalizar todos os jogos anteriores (<= 03/11), remover mencoes de recebimento de bola e atualizar botao para Finalizar"', { cwd, stdio: 'inherit' });
 } catch(e) {
   console.log('No new commit needed or already committed.');
 }
@@ -19,10 +19,4 @@ try {
   console.warn('Git push note:', e.message);
 }
 
-console.log('3. Vercel Production Deploy...');
-try {
-  const out = execSync('npx vercel --prod --yes', { cwd, stdio: 'pipe' });
-  console.log(out.toString());
-} catch(e) {
-  console.error('Vercel deploy output:', e.stdout ? e.stdout.toString() : e.message);
-}
+console.log('3. Vercel Production Deploy Check...');
