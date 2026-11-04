@@ -4759,17 +4759,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Funções de ação rápida
   window.toggleDetails = function(id) {
-    const el = document.getElementById('details-' + id);
+    if (!window.__openDetailsIds) window.__openDetailsIds = new Set();
+    const strId = String(id);
+    const el = document.getElementById('details-' + strId);
+    const arrowEl = document.getElementById('arrow-details-' + strId);
     if (el) {
-      if (el.style.display === 'none' || el.classList.contains('hidden')) {
+      const isHidden = (el.style.display === 'none' || el.classList.contains('hidden'));
+      if (isHidden) {
         el.style.display = 'block';
         el.classList.remove('hidden');
+        window.__openDetailsIds.add(strId);
+        if (arrowEl) arrowEl.textContent = '▴';
       } else {
         el.style.display = 'none';
         el.classList.add('hidden');
+        window.__openDetailsIds.delete(strId);
+        if (arrowEl) arrowEl.textContent = '▾';
       }
     }
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
   };
 
   window.markArrived = function(id) {
@@ -6102,7 +6112,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Renderizador Oficial do Card de Partida (IDÊNTICO À FOTO FORNECIDA PELO USUÁRIO)
+  window.renderMatchCardHtml = renderMatchCardHtml;
   function renderMatchCardHtml(m, isNextUpcoming) {
+    const isPanelOpen = !!(window.__openDetailsIds && window.__openDetailsIds.has(String(m.id)));
     const court = getCourtById(m.court_id || m.courtId);
     const startT = m.start_time || m.start || (m.time ? m.time.split(' ')[0] : '18:00');
     const endT = m.end_time || m.end || (m.time && m.time.includes('às') ? m.time.split('às')[1].trim() : '19:00');
@@ -6317,12 +6329,12 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <button type="button" class="booking-detail-toggle booking-toggle-btn" onclick="toggleDetails('${m.id}')">
             <span>Detalhes e ações</span>
-            <span>▾</span>
+            <span id="arrow-details-${m.id}">${isPanelOpen ? '▴' : '▾'}</span>
           </button>
         </div>
 
-        <!-- Seção Expansível -->
-        <div class="booking-expanded-panel hidden" id="details-${m.id}" style="display:none;">
+        <!-- Seção Expansível (Preserva estado aberto durante sincronizações) -->
+        <div class="booking-expanded-panel ${isPanelOpen ? '' : 'hidden'}" id="details-${m.id}" style="${isPanelOpen ? 'display:block;' : 'display:none;'}">
           <div class="booking-detail-grid">
             <div class="booking-detail-item">
               <small>Campo / Modalidade</small>
@@ -6766,6 +6778,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (kpiLive) kpiLive.innerHTML = topLiveCount + ' <span class="text-xs font-semibold text-slate-400">em quadra</span>';
     
     if (!container) return;
+    if (!window.__openDetailsIds) window.__openDetailsIds = new Set();
+    // Garante persistência dos painéis de detalhes que estejam abertos no DOM
+    container.querySelectorAll('.booking-expanded-panel').forEach(p => {
+      if (p.style.display !== 'none' && !p.classList.contains('hidden')) {
+        const pid = p.id.replace('details-', '');
+        if (pid) window.__openDetailsIds.add(String(pid));
+      }
+    });
 
     if (matches.length === 0) {
       if (statusFilter === 'finished') {

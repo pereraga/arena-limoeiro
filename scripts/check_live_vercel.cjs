@@ -8,11 +8,7 @@ https.get(url, (res) => {
   res.on('end', () => {
     console.log('Status code:', res.statusCode);
     console.log('Body length:', body.length);
-    console.log('Contains Finalizar button text:', body.includes('<span>Finalizar</span>'));
-    console.log('Contains isPastOrDay3:', body.includes('isPastOrDay3'));
-    console.log('Contains any "Receber bola":', body.includes('Receber bola'));
-    console.log('Contains any "Bola Recebida":', body.includes('Bola Recebida'));
-    console.log('Contains any "Bola Devolvida":', body.includes('Bola Devolvida'));
+    console.log('Contains Pronto para iniciar:', body.includes('Pronto para iniciar'));
   });
 }).on('error', (e) => {
   console.error('Fetch error:', e.message);
