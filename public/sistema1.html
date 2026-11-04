@@ -4174,13 +4174,26 @@ document.addEventListener('DOMContentLoaded', () => {
           if (b && b.id) bMap.set(String(b.id), b);
         });
 
+        const finishedSlots = new Set();
+        (window.adminGameState.bookings || []).forEach(b => {
+          if (b && b.status === 'finished') {
+            const cId = (typeof getCourtById === 'function') ? getCourtById(b.court_id || b.courtId).id : (b.court_id || '');
+            finishedSlots.add(b.date + '_' + cId + '_' + b.start_time);
+          }
+        });
+
         cloudBookings.forEach(cb => {
           if (!cb || !cb.id) return;
+          const cId = (typeof getCourtById === 'function') ? getCourtById(cb.court_id || cb.courtId).id : (cb.court_id || '');
+          const slotKey = cb.date + '_' + cId + '_' + cb.start_time;
           const existing = bMap.get(String(cb.id));
+
+          if ((existing && existing.status === 'finished') || finishedSlots.has(slotKey)) {
+            cb.status = 'finished';
+          }
+
           if (existing) {
-            // Preserva estado finalizado se já concluído na sessão
-            if (existing.status === 'finished') cb.status = 'finished';
-            bMap.set(String(cb.id), { ...existing, ...cb });
+            bMap.set(String(cb.id), { ...existing, ...cb, status: cb.status });
           } else {
             bMap.set(String(cb.id), cb);
           }
@@ -5632,6 +5645,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const now = new Date();
     const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
 
+    // 1. Marca g como concluído
     g.status = 'finished';
     g.attendance = 'Finalizada';
     g.ballReturned = ballReturned;
@@ -5654,65 +5668,82 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addMatchLog(g, 'Jogo concluído & Fechamento', logText);
 
-    // ☁️ Envia a finalização imediatamente para os 2 Bancos de Dados na Nuvem
+    // 2. Localiza todas as referências cruzadas vinculadas ao mesmo slot/quadra
+    const relatedIds = new Set([String(id), String(g.id)]);
+    const targetCourt = (typeof getCourtById === 'function') ? getCourtById(g.court_id || g.courtId).id : g.court_id;
+
+    (window.adminGameState.bookings || []).forEach(other => {
+      if (!other) return;
+      const otherCourt = (typeof getCourtById === 'function') ? getCourtById(other.court_id || other.courtId).id : other.court_id;
+      const matchesSlot = (other.date === g.date && other.start_time === g.start_time && otherCourt === targetCourt);
+      const matchesCustomer = (other.customer_name === g.customer_name && other.date === g.date);
+      if (matchesSlot || matchesCustomer || String(other.id) === String(id) || String(other.id) === String(g.id)) {
+        other.status = 'finished';
+        other.attendance = 'Finalizada';
+        other.ballReturned = ballReturned;
+        other.finishedAt = timeStr;
+        other.total_price = calculatedTotal;
+        relatedIds.add(String(other.id));
+      }
+    });
+
+    // 3. Efeito visual imediato: remove do DOM todos os cards associados instantaneamente
+    relatedIds.forEach(rId => {
+      const el = document.getElementById('card-' + rId);
+      if (el) {
+        el.style.display = 'none';
+        el.remove();
+      }
+    });
+
+    // 4. Salva no localStorage local
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+    } catch(e) {}
+
+    // 5. ☁️ Envia a finalização imediatamente para os 2 Bancos de Dados na Nuvem (Dual-Write)
     if (typeof window.syncBookingToCloud === 'function') {
       window.syncBookingToCloud(g, 'upsert');
-    }
-
-    saveAdminGameState();
-    closeArenaModal('arenaFinishModal');
-
-    // Limpeza preventiva: marca outros registros idênticos daquele mesmo horário como finalizados
-    if (g.date && g.start_time) {
-      (window.adminGameState.bookings || []).forEach(other => {
-        if (other && other.date === g.date && other.start_time === g.start_time && other.id !== g.id) {
-          other.status = 'finished';
+      relatedIds.forEach(rId => {
+        if (rId !== String(g.id)) {
+          const relB = (window.adminGameState.bookings || []).find(b => String(b.id) === rId);
+          if (relB) window.syncBookingToCloud(relB, 'upsert');
         }
       });
     }
 
-    // Efeito visual imediato: o jogo concluído some da janela instantaneamente
-    const cardEl = document.getElementById('card-' + id);
-    if (cardEl) {
-      cardEl.style.transition = 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
-      cardEl.style.opacity = '0';
-      cardEl.style.transform = 'scale(0.96) translateY(-8px)';
-      cardEl.style.maxHeight = '0';
-      cardEl.style.margin = '0';
-      cardEl.style.padding = '0';
-      cardEl.style.overflow = 'hidden';
-    }
+    closeArenaModal('arenaFinishModal');
 
-    setTimeout(() => {
-      if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
-      if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
+    // 6. Atualiza a tela operacional imediatamente: o jogo concluído some da lista
+    if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+    if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
 
-      // Identifica e exibe imediatamente o próximo jogo da hora agendado
-      const dateStr = window.adminGameState.selectedDate || '2026-11-03';
-      const activeList = (typeof window.getMatchesForDate === 'function')
-        ? window.getMatchesForDate(dateStr).filter(m => m.status !== 'finished')
-        : [];
+    // 7. Mostra e destaca o Próximo Jogo da Hora
+    const dateStr = window.adminGameState.selectedDate || '2026-11-03';
+    const activeList = (typeof window.getMatchesForDate === 'function')
+      ? window.getMatchesForDate(dateStr).filter(m => m.status !== 'finished')
+      : [];
 
-      if (activeList.length > 0) {
-        const next = activeList[0];
-        const nextName = next.customer_name || next.name || 'Próxima Equipe';
-        const nextTime = next.start_time || '';
-        const nextCourt = next.court_name || 'Quadra';
-        arenaToast('✓ Jogo concluído! Próximo jogo: ' + nextName + ' às ' + nextTime + ' (' + nextCourt + ')');
+    if (activeList.length > 0) {
+      const next = activeList[0];
+      const nextName = next.customer_name || next.name || 'Próxima Equipe';
+      const nextTime = next.start_time || '';
+      const nextCourt = next.court_name || 'Quadra';
+      arenaToast('✓ Jogo concluído! Próximo jogo da hora: ' + nextName + ' às ' + nextTime + ' (' + nextCourt + ')');
 
-        const nextEl = document.getElementById('card-' + next.id);
-        if (nextEl) {
-          nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          nextEl.style.transition = 'box-shadow 0.4s ease';
-          nextEl.style.boxShadow = '0 0 0 3px #10b981, 0 10px 25px -5px rgba(16, 185, 129, 0.35)';
-          setTimeout(() => {
-            nextEl.style.boxShadow = '';
-          }, 3500);
-        }
-      } else {
-        arenaToast('✓ Partida finalizada com sucesso! Todos os jogos deste período foram concluídos.');
+      const nextEl = document.getElementById('card-' + next.id);
+      if (nextEl) {
+        nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        nextEl.style.transition = 'box-shadow 0.4s ease';
+        nextEl.style.boxShadow = '0 0 0 3px #10b981, 0 10px 25px -5px rgba(16, 185, 129, 0.35)';
+        setTimeout(() => {
+          if (nextEl) nextEl.style.boxShadow = '';
+        }, 4000);
       }
-    }, 280);
+    } else {
+      arenaToast('✓ Partida finalizada com sucesso! Todos os jogos de hoje foram concluídos.');
+    }
   };
 
   window.closeArenaModal = function(id) {
