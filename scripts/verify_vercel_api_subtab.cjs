@@ -9,10 +9,10 @@ setTimeout(() => {
     res.on('end', () => {
       console.log('Status code:', res.statusCode);
       console.log('Body length:', body.length);
-      console.log('Contains directBookingSlotsGrid:', body.includes('directBookingSlotsGrid'));
-      console.log('Contains renderBalcaoTimeSlots:', body.includes('renderBalcaoTimeSlots'));
-      console.log('Contains undoLastBalcaoTimeSlot:', body.includes('undoLastBalcaoTimeSlot'));
-      console.log('Contains resetDirectBookingTimeSlots:', body.includes('resetDirectBookingTimeSlots'));
+      console.log('Contains balcaoScheduledGamesCard:', body.includes('balcaoScheduledGamesCard'));
+      console.log('Contains balcaoHideOccupiedToggle:', body.includes('balcaoHideOccupiedToggle'));
+      console.log('Contains balcaoNextGameAlert:', body.includes('balcaoNextGameAlert'));
+      console.log('Contains findFirstAvailableSlot:', body.includes('findFirstAvailableSlot'));
     });
   }).on('error', err => {
     console.error('Error fetching Vercel:', err.message);
