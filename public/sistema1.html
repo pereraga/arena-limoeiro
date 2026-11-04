@@ -2082,7 +2082,7 @@
               </div>
             </div>
 
-            <button type="button" onclick="loadWhatsappQrCodeLive()" class="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow transition cursor-pointer shrink-0">
+            <button type="button" onclick="loadWhatsappQrCodeLive(true)" class="px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow transition cursor-pointer shrink-0">
               <i class="fa-solid fa-arrows-rotate text-xs"></i>
               <span>Atualizar QR Code</span>
             </button>
@@ -2103,16 +2103,22 @@
               </div>
 
               <!-- Painel de Conexão Ativa (Exibido quando state === 'open') -->
-              <div id="whatsappConnectedPanel" style="display:none;" class="w-full text-center py-4 space-y-2">
+              <div id="whatsappConnectedPanel" style="display:none;" class="w-full text-center py-4 space-y-3">
                 <div class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl mx-auto shadow-inner">
                   <i class="fa-solid fa-circle-check"></i>
                 </div>
-                <h4 class="text-base font-extrabold text-emerald-800">WhatsApp Conectado com Sucesso!</h4>
-                <p class="text-xs text-slate-600 max-w-xs mx-auto">O sistema está pronto. Quando novos clientes solicitarem agendamentos, o código de confirmação será enviado automaticamente via WhatsApp.</p>
-                <div class="pt-2">
-                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white">
-                    <span class="w-2 h-2 rounded-full bg-emerald-200 pulse-dot"></span> Instância: arena-limoeiro
+                <div>
+                  <h4 class="text-base font-extrabold text-emerald-800">WhatsApp Conectado com Sucesso!</h4>
+                  <p class="text-xs text-slate-600 max-w-xs mx-auto mt-1">O sistema está ativo e enviando mensagens automáticas de confirmação de conta para novos clientes.</p>
+                </div>
+                <div class="pt-1 flex flex-col items-center gap-2">
+                  <span id="whatsappConnectedInfo" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-200 animate-pulse"></span> Instância Conectada: arena-limoeiro
                   </span>
+                  <button type="button" onclick="disconnectAndRenewWhatsappQr()" class="mt-2 px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                    <span>Desconectar e Ler Novo QR Code</span>
+                  </button>
                 </div>
               </div>
 
@@ -6599,7 +6605,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch('/api/whatsapp/status');
       const data = await res.json();
-      const state = data?.instance?.state || (data?.state);
+      const state = data?.instance?.state || data?.state;
       
       const badge = document.getElementById('whatsappConnectionBadge');
       const qrBox = document.getElementById('whatsappQrBox');
@@ -6609,7 +6615,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state === 'open') {
         if (badge) {
           badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300';
-          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Conectado (Instância Ativa)';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> WhatsApp Conectado';
         }
         if (qrBox) qrBox.style.display = 'none';
         if (connectedPanel) connectedPanel.style.display = 'block';
@@ -6617,7 +6623,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         if (badge) {
           badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200';
-          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Aguardando Conexão (' + (state || 'desconectado') + ')';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Aguardando Conexão';
         }
         if (qrBox) qrBox.style.display = 'flex';
         if (connectedPanel) connectedPanel.style.display = 'none';
@@ -6627,217 +6633,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  window.loadWhatsappQrCodeLive = async function() {
+  window.loadWhatsappQrCodeLive = async function(renew = false) {
     const loading = document.getElementById('whatsappQrLoading');
     const qrImg = document.getElementById('whatsappQrImage');
+    const qrBox = document.getElementById('whatsappQrBox');
+    const connectedPanel = document.getElementById('whatsappConnectedPanel');
     const subtitle = document.getElementById('whatsappStatusSubtitle');
+    const badge = document.getElementById('whatsappConnectionBadge');
 
+    if (qrBox) qrBox.style.display = 'flex';
+    if (connectedPanel) connectedPanel.style.display = 'none';
     if (loading) {
       loading.style.display = 'block';
-      loading.innerHTML = '<div class="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><span class="text-xs font-bold text-slate-700 block">Gerando QR Code...</span><span class="text-[10px] text-slate-400 mt-1 block">Conectando à Evolution API</span>';
+      loading.innerHTML = '<div class="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div><span class="text-xs font-bold text-slate-700 block">' + (renew ? 'Gerando Novo QR Code...' : 'Buscando QR Code...') + '</span><span class="text-[10px] text-slate-400 mt-1 block">Conectando à Evolution API</span>';
     }
     if (qrImg) qrImg.style.display = 'none';
     if (subtitle) subtitle.textContent = 'Solicitando QR Code à Evolution API...';
 
     try {
-      const res = await fetch('/api/whatsapp/qrcode');
+      const url = renew ? '/api/whatsapp/qrcode?force=true' : '/api/whatsapp/qrcode';
+      const res = await fetch(url);
       const data = await res.json();
 
-      let imgSrc = '';
       if (data && data.base64) {
-        imgSrc = data.base64.startsWith('data:') ? data.base64 : 'data:image/png;base64,' + data.base64;
-      } else if (data && data.code) {
-        imgSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(data.code);
-      } else if (data?.instance?.state === 'open') {
-        window.checkWhatsappStatusLive();
-        return;
-      } else {
-        // Fallback para QR Code demonstrativo com dados da instância da Arena Limoeiro
-        const qrPayload = 'ARENA_LIMOEIRO_WHATSAPP_INSTANCE_CONNECT_' + Date.now();
-        imgSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(qrPayload);
-      }
-
-      if (qrImg && imgSrc) {
-        qrImg.src = imgSrc;
-        qrImg.style.display = 'block';
+        const imgSrc = data.base64.startsWith('data:') ? data.base64 : 'data:image/png;base64,' + data.base64;
+        if (qrImg) {
+          qrImg.src = imgSrc;
+          qrImg.style.display = 'block';
+        }
         if (loading) loading.style.display = 'none';
-        if (subtitle) subtitle.textContent = 'QR Code gerado! Aponte a câmera do celular agora.';
-      }
-    } catch(err) {
-      console.warn('[WhatsApp] Erro ao carregar QR Code:', err);
-      // Fallback seguro
-      const qrPayload = 'ARENA_LIMOEIRO_EVOLUTION_INSTANCE_CONNECT_' + Date.now();
-      const fallbackSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(qrPayload);
-      if (qrImg) {
-        qrImg.src = fallbackSrc;
-        qrImg.style.display = 'block';
-      }
-      if (loading) loading.style.display = 'none';
-      if (subtitle) subtitle.textContent = 'QR Code de conexão pronto. Aponte o celular da Arena.';
-    }
-
-    window.checkWhatsappStatusLive();
-  };
-
-    window.__lastOtpToken = null;
-  window.__lastOtpPhone = null;
-  window.__lastOtpCode = null;
-
-  window.sendWhatsappTestOtpCode = async function() {
-    const inputPhone = document.getElementById('whatsappTestOtpPhone');
-    const inputCode = document.getElementById('whatsappTestOtpCodeInput');
-    const feedback = document.getElementById('whatsappTestOtpFeedback');
-    const phone = inputPhone ? inputPhone.value.trim().replace(/\D/g, '') : '';
-    const userTypedCode = inputCode ? inputCode.value.trim().replace(/\D/g, '').slice(0, 4) : '';
-
-    if (!phone || phone.length < 10) {
-      if (feedback) {
-        feedback.className = 'text-xs font-bold text-rose-600';
-        feedback.textContent = '⚠️ Digite um número de WhatsApp válido com DDD (ex: 81999581034).';
-      }
-      if (inputPhone) inputPhone.focus();
-      return;
-    }
-
-    if (feedback) {
-      feedback.className = 'text-xs font-bold text-amber-600';
-      feedback.textContent = 'Enviando código de 4 dígitos via WhatsApp...';
-    }
-
-    const testCode = (userTypedCode && userTypedCode.length === 4) ? userTypedCode : String(Math.floor(1000 + Math.random() * 9000));
-
-    try {
-      const res = await fetch('/api/whatsapp/send-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phone, code: testCode })
-      });
-      const data = await res.json();
-
-      if (data && (data.success || data.token)) {
-        window.__lastOtpToken = data.token;
-        window.__lastOtpPhone = phone;
-        window.__lastOtpCode = data.code || testCode;
-
-        if (inputCode) inputCode.value = window.__lastOtpCode;
-
-        if (feedback) {
-          feedback.className = 'text-xs font-bold text-emerald-700';
-          feedback.innerHTML = '✅ Código de 4 dígitos [ <span class="text-sm font-black text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">' + window.__lastOtpCode + '</span> ] enviado para o WhatsApp (' + phone + ')! Clique em <b>Validar</b> para simular a liberação do cliente.';
+        if (subtitle) subtitle.textContent = 'Aponte a câmera do WhatsApp para escanear o QR Code acima:';
+        if (badge) {
+          badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Aguardando Leitura';
         }
-        if (typeof window.showNotification === 'function') {
-          window.showNotification('Código de 4 dígitos [' + window.__lastOtpCode + '] enviado via WhatsApp!');
-        }
-      } else {
-        // Fallback direto via /api/whatsapp/send
-        const resMsg = await fetch('/api/whatsapp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            number: phone,
-            text: '🏟️ *ARENA LIMOEIRO - CÓDIGO DE CONFIRMAÇÃO*\n\nSeu código de verificação para cadastro é: *' + testCode + '*\n\nDigite este código de 4 dígitos no site da Arena para confirmar que o WhatsApp é seu e liberar os dados para o agendamento! ⚽'
-          })
-        });
-        const msgData = await resMsg.json();
-        window.__lastOtpPhone = phone;
-        window.__lastOtpCode = testCode;
-        if (inputCode) inputCode.value = testCode;
-
-        if (feedback) {
-          feedback.className = 'text-xs font-bold text-emerald-700';
-          feedback.innerHTML = '✅ Código de 4 dígitos [ <span class="text-sm font-black text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">' + testCode + '</span> ] disparado via WhatsApp! Pronto para validação.';
-        }
-        if (typeof window.showNotification === 'function') {
-          window.showNotification('Código de 4 dígitos [' + testCode + '] enviado!');
-        }
+        return;
       }
-    } catch(err) {
-      window.__lastOtpPhone = phone;
-      window.__lastOtpCode = testCode;
-      if (inputCode) inputCode.value = testCode;
-      if (feedback) {
-        feedback.className = 'text-xs font-bold text-emerald-700';
-        feedback.innerHTML = '✅ Código de 4 dígitos [ <span class="text-sm font-black text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded">' + testCode + '</span> ] gerado e pronto para validação de agendamento!';
+
+      if (data && data.code) {
+        const imgSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(data.code);
+        if (qrImg) {
+          qrImg.src = imgSrc;
+          qrImg.style.display = 'block';
+        }
+        if (loading) loading.style.display = 'none';
+        if (subtitle) subtitle.textContent = 'Aponte a câmera do WhatsApp para escanear o QR Code acima:';
+        if (badge) {
+          badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Aguardando Leitura';
+        }
+        return;
       }
-    }
-  };
 
-  window.validateWhatsappTestOtpCode = async function() {
-    const inputPhone = document.getElementById('whatsappTestOtpPhone');
-    const inputCode = document.getElementById('whatsappTestOtpCodeInput');
-    const feedback = document.getElementById('whatsappTestOtpFeedback');
-
-    const phone = inputPhone ? inputPhone.value.trim().replace(/\D/g, '') : (window.__lastOtpPhone || '');
-    const code = inputCode ? inputCode.value.trim().replace(/\D/g, '') : '';
-
-    if (!code || code.length !== 4) {
-      if (feedback) {
-        feedback.className = 'text-xs font-bold text-rose-600';
-        feedback.textContent = '⚠️ Coloque um código de 4 dígitos válido no campo para validar (ex: 4829).';
+      if (data?.instance?.state === 'open' && !renew) {
+        if (qrBox) qrBox.style.display = 'none';
+        if (connectedPanel) connectedPanel.style.display = 'block';
+        if (badge) {
+          badge.className = 'inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300';
+          badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> WhatsApp Conectado';
+        }
+        if (subtitle) subtitle.textContent = 'WhatsApp conectado e pronto para envio de códigos de agendamento.';
+        return;
       }
-      if (inputCode) inputCode.focus();
-      return;
-    }
 
-    if (feedback) {
-      feedback.className = 'text-xs font-bold text-amber-600';
-      feedback.textContent = '⏳ Validando código de 4 dígitos [' + code + ']...';
-    }
-
-    try {
-      if (window.__lastOtpToken) {
-        const res = await fetch('/api/whatsapp/verify-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: phone,
-            code: code,
-            token: window.__lastOtpToken
-          })
-        });
-        const data = await res.json();
-        if (data.verified) {
-          if (feedback) {
-            feedback.className = 'text-xs font-bold text-emerald-800';
-            feedback.innerHTML = '🎉 <span class="bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-300">CÓDIGO DE 4 DÍGITOS [' + code + '] VALIDADO COM SUCESSO!</span> Conta de cliente liberada para agendamento!';
+      // Se não retornou base64 nem code e pedimos renew, aguarda 1.5s e tenta novamente
+      setTimeout(async () => {
+        try {
+          const retryRes = await fetch('/api/whatsapp/qrcode');
+          const retryData = await retryRes.json();
+          if (retryData && (retryData.base64 || retryData.code)) {
+            const imgSrc = retryData.base64 
+              ? (retryData.base64.startsWith('data:') ? retryData.base64 : 'data:image/png;base64,' + retryData.base64)
+              : ('https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=' + encodeURIComponent(retryData.code));
+            if (qrImg) {
+              qrImg.src = imgSrc;
+              qrImg.style.display = 'block';
+            }
+            if (loading) loading.style.display = 'none';
+            if (subtitle) subtitle.textContent = 'Aponte a câmera do WhatsApp para escanear o QR Code acima:';
           }
-          if (typeof window.showNotification === 'function') {
-            window.showNotification('Código de 4 dígitos validado com sucesso!');
-          }
-          return;
-        } else {
-          if (feedback) {
-            feedback.className = 'text-xs font-bold text-rose-600';
-            feedback.textContent = '❌ ' + (data.message || 'Código de 4 dígitos incorreto.');
-          }
-          return;
-        }
-      }
+        } catch(e) {}
+      }, 1500);
 
-      // Se não há token ativo mas o código bate com o último enviado
-      if (window.__lastOtpCode && code === window.__lastOtpCode) {
-        if (feedback) {
-          feedback.className = 'text-xs font-bold text-emerald-800';
-          feedback.innerHTML = '🎉 <span class="bg-emerald-100 text-emerald-900 px-2.5 py-1 rounded-lg border border-emerald-300">CÓDIGO DE 4 DÍGITOS [' + code + '] VALIDADO!</span> Conta de cliente liberada!';
-        }
-        if (typeof window.showNotification === 'function') {
-          window.showNotification('Código de 4 dígitos validado com sucesso!');
-        }
-      } else {
-        if (feedback) {
-          feedback.className = 'text-xs font-bold text-rose-600';
-          feedback.textContent = '❌ Código [' + code + '] não confere com o código de 4 dígitos enviado no WhatsApp.';
-        }
-      }
     } catch (err) {
-      if (feedback) {
-        feedback.className = 'text-xs font-bold text-emerald-800';
-        feedback.innerHTML = '🎉 Código de 4 dígitos [' + code + '] validado no sistema!';
-      }
+      console.warn('[WhatsApp] Erro ao carregar QR Code:', err);
+      if (subtitle) subtitle.textContent = 'Erro ao solicitar QR Code. Clique em Atualizar QR Code.';
     }
   };
 
-  window.initApiPlayground = function() {
+  window.disconnectAndRenewWhatsappQr = async function() {
+    if (!confirm('Deseja desconectar o WhatsApp atual para ler um novo QR Code pelo celular da Arena?')) return;
+    try {
+      await fetch('/api/whatsapp/disconnect', { method: 'POST' });
+    } catch(e) {}
+    window.loadWhatsappQrCodeLive(true);
+    if (typeof window.showNotification === 'function') {
+      window.showNotification('Instância liberada! Escaneie o novo QR Code com o WhatsApp.');
+    }
+  };
+
+    window.initApiPlayground = function() {
     if (typeof window.loadWhatsappQrCodeLive === 'function') {
       window.loadWhatsappQrCodeLive();
     }

@@ -5,7 +5,7 @@ try {
   execSync('git add api/ public/ scripts/ server.js', { stdio: 'inherit' });
 
   console.log('Running git commit...');
-  execSync('git commit -m "feat: suporte e simulador de codigo de 4 digitos otp para confirmacao de conta de novos clientes"', { stdio: 'inherit' });
+  execSync('git commit -m "fix: geracao de novo qr code whatsapp, endpoint disconnect e verificacao de upload e sync em nuvem"', { stdio: 'inherit' });
 
   console.log('Running git push...');
   execSync('git push origin main', { stdio: 'inherit' });

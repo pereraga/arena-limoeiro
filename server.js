@@ -660,6 +660,20 @@ app.post('/api/whatsapp/check-number', async (req, res) => {
   }
 });
 
+// Desconectar instância WhatsApp da Evolution API para ler novo QR Code
+app.post('/api/whatsapp/disconnect', async (req, res) => {
+  try {
+    const response = await fetch(`${EVOLUTION_API_URL}/instance/logout/${EVOLUTION_INSTANCE}`, {
+      method: 'DELETE',
+      headers: { 'apikey': EVOLUTION_API_KEY }
+    });
+    const data = await response.json().catch(() => ({ status: 'SUCCESS' }));
+    return res.status(200).json({ success: true, message: 'WhatsApp desconectado com sucesso.', data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Envio de código OTP de 4 dígitos via WhatsApp para validação de número real
 const OTP_SECRET = process.env.OTP_SECRET || 'ArenaLimoeiroSecretOTPKey2026';
 
