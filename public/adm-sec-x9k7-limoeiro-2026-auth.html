@@ -3684,29 +3684,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
 
       
-            <!-- SELEÇÃO RÁPIDA DE DURAÇÃO -->
-      <div class="sm:col-span-3 flex items-center justify-between p-2.5 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl">
-        <span class="text-[11px] font-black text-emerald-900 uppercase flex items-center gap-1.5">
-          <i data-lucide="clock" class="w-3.5 h-3.5 text-emerald-600"></i>
-          <span>Duração Rápida:</span>
-        </span>
-        <div class="flex items-center gap-1.5 flex-wrap">
-          <button type="button" onclick="setDirectBookingDuration(0.5)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
-            30 min
-          </button>
-          <button type="button" onclick="setDirectBookingDuration(1)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
-            1 hora
-          </button>
-          <button type="button" onclick="setDirectBookingDuration(1.5)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
-            1h 30min
-          </button>
-          <button type="button" onclick="setDirectBookingDuration(2)" class="px-2.5 py-1 text-xs font-black bg-white hover:bg-emerald-600 hover:text-white text-emerald-800 border border-emerald-200 rounded-lg shadow-xs transition cursor-pointer">
-            2 horas
-          </button>
-        </div>
-      </div>
-
-      <!-- JANELAS SEPARADAS DE HORÁRIOS (SLOTS DE 30 EM 30 MINUTOS) -->
+            <!-- JANELAS SEPARADAS DE HORÁRIOS (SLOTS DE 30 EM 30 MINUTOS) -->
       <div class="space-y-3 p-3.5 bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs">
         
         <!-- Cabeçalho da Grade de Slots + Filtro de Ocultar Ocupados -->
