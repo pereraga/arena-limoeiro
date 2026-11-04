@@ -333,6 +333,24 @@ const initialProducts = [
 
 const initialMonthlyMembers = [
   {
+    "id": "mensal-1793115878805",
+    "team_name": "Ariadnes",
+    "responsible_name": "Ariadnes",
+    "phone": "81999992609",
+    "customer_id": "cust-1793115878784",
+    "court_id": "court-futsal-1788963178368",
+    "day_of_week": "terca",
+    "day_of_week_label": "Toda terca-feira",
+    "time": "16:00",
+    "start_time": "16:00",
+    "end_time": "18:00",
+    "monthly_price": 1600,
+    "status": "active",
+    "start_month": null,
+    "observation": "[CPF: 000.000.000-00] | [Emergência: 81999992609] (Contratado para 6 mês/meses)",
+    "created_at": "2026-10-27T19:37:15.853+00:00"
+  },
+  {
     "id": "mensal-1791846828641",
     "team_name": "Jajá",
     "responsible_name": "Jajá",
@@ -1038,6 +1056,25 @@ const initialMonthlyMembers = [
 
 const initialBookings = [
   {
+    "id": "ARENA-3294",
+    "court_id": "court-futsal-1788963178368",
+    "customer_id": "cust-1793115878784",
+    "date": "2026-11-03",
+    "start_time": "16:00",
+    "end_time": "18:00",
+    "time": "16:00 às 18:00",
+    "duration": 120,
+    "customer_name": "Ariadnes",
+    "customer_phone": "81999992609",
+    "total_price": 400,
+    "status": "confirmed",
+    "booking_type": "mensalista",
+    "payment_method": "pago_balcao",
+    "product_cart": {},
+    "observation": "[CPF: 000.000.000-00] | [Emergência: 81999992609] (Jogo 3/24 - Mensalista)",
+    "created_at": "2026-10-27T19:37:16.116+00:00"
+  },
+  {
     "id": "ARENA-2913",
     "court_id": "court-society-1",
     "customer_id": "cust-1792437534892",
@@ -1067,7 +1104,7 @@ const initialBookings = [
     "duration": 90,
     "customer_name": "Aline",
     "customer_phone": "8199246308",
-    "total_price": 150,
+    "total_price": 400,
     "status": "confirmed",
     "booking_type": "mensalista",
     "payment_method": "pago_balcao",
@@ -1086,7 +1123,7 @@ const initialBookings = [
     "duration": 90,
     "customer_name": "Genilson",
     "customer_phone": "819996643172",
-    "total_price": 140,
+    "total_price": 600,
     "status": "confirmed",
     "booking_type": "mensalista",
     "payment_method": "pago_balcao",
@@ -1105,7 +1142,7 @@ const initialBookings = [
     "duration": 90,
     "customer_name": "Zé Luiz",
     "customer_phone": "81988776655",
-    "total_price": 160,
+    "total_price": 500,
     "status": "confirmed",
     "booking_type": "avulso",
     "payment_method": "PIX Balcão",
