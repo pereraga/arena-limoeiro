@@ -1349,16 +1349,18 @@
       <!-- 🟢 FEED / TABELA DE PARTIDAS DO DIA SELECIONADO (MOVIMENTAÇÃO)           -->
       <!-- ========================================================================= -->
       <!-- Barra de Filtros por Quadra e Status -->
-      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4 overflow-hidden mt-6">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-3 w-full md:w-auto min-w-0">
+      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4 mt-6">
+        
+        <!-- Filtros em Grade Responsiva (Nunca quebra em telas menores) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full xl:w-auto min-w-0 flex-1">
           
           <!-- Filtro Quadra -->
-          <div class="flex items-center gap-2 w-full sm:w-auto min-w-0">
-            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center min-w-[70px]">
-              <i data-lucide="filter" class="w-4 h-4 text-emerald-600 mr-1 flex-shrink-0"></i> Quadra:
+          <div class="flex items-center gap-2 w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
+            <span class="text-[11px] sm:text-xs font-black uppercase text-slate-700 shrink-0 flex items-center gap-1 min-w-[65px]">
+              <i data-lucide="filter" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600"></i> Quadra:
             </span>
-            <div class="relative flex-1 min-w-0 max-w-full">
-              <select id="movementCourtFilter" onchange="filterMovementMatches()" class="w-full min-w-0 p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-sm">
+            <div class="relative flex-1 min-w-[130px]">
+              <select id="movementCourtFilter" onchange="filterMovementMatches()" class="w-full py-1.5 sm:py-2 pl-2 pr-7 border-0 rounded-lg text-xs font-bold text-slate-800 bg-transparent focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer">
                 <option value="all">🏟️ Todas as Quadras</option>
                 <option value="fut5">FUT 5 – SOCCER 5</option>
                 <option value="fut6">FUT 6 – SOCCER 6</option>
@@ -1367,42 +1369,43 @@
                 <option value="areia">AREIA – BEACH SPORTS</option>
                 <option value="society">SOCIETY – ARENA CENTRAL</option>
               </select>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
           </div>
 
           <!-- Filtro Status -->
-          <div class="flex items-center gap-2 w-full sm:w-auto min-w-0">
-            <span class="text-xs font-black uppercase text-slate-700 flex-shrink-0 flex items-center min-w-[70px]">
-              <i data-lucide="activity" class="w-4 h-4 text-emerald-600 mr-1 flex-shrink-0"></i> Status:
+          <div class="flex items-center gap-2 w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
+            <span class="text-[11px] sm:text-xs font-black uppercase text-slate-700 shrink-0 flex items-center gap-1 min-w-[65px]">
+              <i data-lucide="activity" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600"></i> Status:
             </span>
-            <div class="relative flex-1 min-w-0 max-w-full">
-              <select id="movementStatusFilter" onchange="filterMovementMatches()" class="w-full min-w-0 p-2.5 pr-8 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer shadow-sm">
+            <div class="relative flex-1 min-w-[130px]">
+              <select id="movementStatusFilter" onchange="filterMovementMatches()" class="w-full py-1.5 sm:py-2 pl-2 pr-7 border-0 rounded-lg text-xs font-bold text-slate-800 bg-transparent focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer">
                 <option value="all">Partidas Ativas (Ocultar Finalizadas)</option>
                 <option value="live">🟢 Ao Vivo / Em Andamento</option>
                 <option value="confirmed">🔵 Confirmados / Próximos</option>
                 <option value="finished">✅ Finalizados / Concluídos</option>
                 <option value="everything">👁 Exibir Todas (Com Finalizadas)</option>
               </select>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
           </div>
 
         </div>
 
-        <div class="w-full md:w-auto flex flex-col sm:flex-row gap-2 items-stretch md:items-end justify-center flex-shrink-0">
-          <button onclick="openDirectBookingModal()" class="w-full sm:w-auto justify-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-sm flex items-center space-x-1.5 transition-all text-center cursor-pointer">
-            <i data-lucide="plus-circle" class="w-4 h-4 flex-shrink-0"></i>
+        <!-- Botões de Ação Direta (Totalmente Responsivos) -->
+        <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center justify-start sm:justify-end w-full xl:w-auto shrink-0">
+          <button onclick="openDirectBookingModal()" class="flex-1 sm:flex-none justify-center px-3.5 sm:px-4 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-xs flex items-center gap-1.5 transition-all text-center cursor-pointer whitespace-nowrap">
+            <i data-lucide="plus-circle" class="w-4 h-4 shrink-0"></i>
             <span>⚡ Nova Reserva Balcão</span>
           </button>
-          <div class="flex items-center gap-2 w-full sm:w-auto">
-            <button onclick="exportMovementDailyPDF()" class="flex-1 sm:flex-none justify-center px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all text-center cursor-pointer" title="Exportar jogos do dia detalhado para PDF">
-              <i data-lucide="file-text" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-              <span>📄 Relatório do Dia (PDF)</span>
+          <div class="flex items-center gap-2 w-full sm:w-auto flex-1 sm:flex-none">
+            <button onclick="exportMovementDailyPDF()" class="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-all text-center cursor-pointer whitespace-nowrap" title="Exportar jogos do dia detalhado para PDF">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+              <span>Relatório PDF</span>
             </button>
-            <button onclick="exportMovementDailyExcel()" class="flex-1 sm:flex-none justify-center px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-all text-center cursor-pointer" title="Exportar jogos do dia detalhado para Excel / CSV">
-              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
-              <span>📊 Excel (Dia)</span>
+            <button onclick="exportMovementDailyExcel()" class="flex-1 sm:flex-none justify-center px-3 py-2 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-all text-center cursor-pointer whitespace-nowrap" title="Exportar jogos do dia detalhado para Excel / CSV">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+              <span>Excel</span>
             </button>
           </div>
         </div>
@@ -1410,15 +1413,15 @@
 
       <!-- Feed / Tabela de Partidas -->
       <div class="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm mt-6">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5 pb-4 border-b border-slate-100">
-          <div>
-            <h3 class="text-base sm:text-lg font-black text-slate-900 flex items-center">
-              <i data-lucide="list-ordered" class="w-5 h-5 text-emerald-600 mr-2"></i>
-              <span id="movementFeedTitle">Partidas Programadas para Terça-feira, 03 de Novembro de 2026</span>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4 sm:mb-5 pb-3 sm:pb-4 border-b border-slate-100">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm sm:text-base md:text-lg font-black text-slate-900 flex items-center gap-2 flex-wrap">
+              <i data-lucide="list-ordered" class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0"></i>
+              <span id="movementFeedTitle" class="break-words">Partidas Programadas para Terça-feira, 03 de Novembro de 2026</span>
             </h3>
-            <p class="text-xs text-slate-500 mt-0.5">Acompanhamento ao vivo, cronômetro automático, gestão de atrasos e prevenção de choques</p>
+            <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Acompanhamento ao vivo, cronômetro automático, gestão de atrasos e prevenção de choques</p>
           </div>
-          <span id="movementFeedCount" class="text-xs text-slate-700 bg-slate-100 px-3 py-1 rounded-full font-bold self-start sm:self-center">
+          <span id="movementFeedCount" class="text-xs text-slate-700 bg-slate-100 px-3 py-1 rounded-full font-bold self-start sm:self-center shrink-0">
             0 partidas listadas
           </span>
         </div>
