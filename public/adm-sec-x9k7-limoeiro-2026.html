@@ -3948,9 +3948,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (list.length === 0 && window.ARENA_DEFAULT_DATA && Array.isArray(window.ARENA_DEFAULT_DATA.initialBookings)) {
       list = [...window.ARENA_DEFAULT_DATA.initialBookings];
     }
-    // Higienização automática: remove IDs de teste legados e registros com horário inválido
+    // Higienização automática profunda: remove IDs obsoletos e contaminações entre dias
     const obsoleteIds = new Set(['ARENA-M4066', 'ARENA-M2526', 'ARENA-8673']);
-    list = list.filter(b => !obsoleteIds.has(b.id) && (b.start_time || b.time));
+    list = list.filter(b => {
+      if (!b || !b.id || obsoleteIds.has(b.id)) return false;
+      if (!b.start_time && !b.time) return false;
+      // Higienização estrita: Davi só joga às segundas, quartas, sextas e sábados (nunca na terça 03/11)
+      if ((b.customer_name === 'Davi' || (b.name && b.name.includes('Davi'))) && b.date === '2026-11-03') return false;
+      return true;
+    });
     return list;
   }
 
@@ -4215,6 +4221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   function getMatchesForDate(dateStr) {
+    if (!dateStr) dateStr = '2026-11-03';
     const [y, m, d] = dateStr.split('-');
     const dt = new Date(Number(y), Number(m) - 1, Number(d), 12, 0, 0);
     const dayOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
@@ -4252,7 +4259,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // 2. Reservas diretas da data
+    // 2. Reservas diretas da data (estritamente b.date === dateStr)
     (window.adminGameState.bookings || []).forEach(b => {
       if (!b || b.status === 'cancelled') return;
       if (b.date === dateStr) {
@@ -4260,10 +4267,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const startT = b.start_time || (b.time ? b.time.split(' ')[0] : '19:00');
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
 
-        // Evita duplicatas se já existe mensalista no mesmo horário e campo
+        // Evita duplicatas se já existe mensalista no mesmo horário e campo, mantendo a data estrita
         const existing = matches.find(m => String(m.id) === String(b.id) || (m.court_id === court.id && m.start_time === startT));
         if (existing) {
-          Object.assign(existing, b);
+          existing.status = b.status || existing.status;
+          if (b.payment_method) existing.payment_method = b.payment_method;
+          if (b.total_price) existing.total_price = b.total_price;
+          if (b.ballReturned !== undefined) existing.ballReturned = b.ballReturned;
+          if (b.finishedAt) existing.finishedAt = b.finishedAt;
+          if (b.customer_name) existing.customer_name = b.customer_name;
+          if (b.customer_phone) existing.customer_phone = b.customer_phone;
+          existing.date = dateStr;
         } else {
           matches.push({
             id: b.id,
@@ -4318,9 +4332,9 @@ document.addEventListener('DOMContentLoaded', () => {
           customer_name: 'Aline',
           customer_phone: '(81) 99246-3081',
           customer_cpf: '',
-          start_time: '18:00',
-          end_time: '19:30',
-          time: '18:00 às 19:30',
+          start_time: '18:30',
+          end_time: '20:00',
+          time: '18:30 às 20:00',
           total_price: 150,
           status: 'confirmed',
           isMensalista: true,
@@ -4336,9 +4350,9 @@ document.addEventListener('DOMContentLoaded', () => {
           customer_name: 'Genilson',
           customer_phone: '(81) 99966-4317',
           customer_cpf: '',
-          start_time: '19:30',
-          end_time: '21:00',
-          time: '19:30 às 21:00',
+          start_time: '20:00',
+          end_time: '21:30',
+          time: '20:00 às 21:30',
           total_price: 140,
           status: 'confirmed',
           isMensalista: true,
@@ -4366,9 +4380,23 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
     }
 
+    // FILTRO ESTRITO DE DATA E HIGIENIZAÇÃO:
+    // Garante que TODOS os jogos pertencem rigorosamente a dateStr e exclui contaminações entre dias
+    matches = matches.filter(m => {
+      if (!m) return false;
+      if (m.date !== dateStr) return false;
+      // Impede que mensalista fixo de outro dia apareça (ex: Davi de segunda aparecendo na terça)
+      if (m.observation && m.observation.includes('Horário Fixo Semanal (')) {
+        const expectedObs = 'Horário Fixo Semanal (' + currentDayOfWeek.toUpperCase() + ')';
+        if (m.observation !== expectedObs) return false;
+      }
+      return true;
+    });
+
     matches.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
     return matches;
   }
+  window.getMatchesForDate = getMatchesForDate;
 
   // Renderizador de Card de Partida (Movimentação e Feed)
   // Helper de cálculo de duração
@@ -4386,17 +4414,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // Toast flutuante de feedback
   window.arenaToast = function(msg) {
     const t = document.getElementById('arenaToast');
-    const txt = document.getElementById('arenaToastText');
+    const txt = document.getElementById('arenaToastMsg') || document.getElementById('arenaToastText');
     if (!t) return;
     if (txt) txt.textContent = msg;
-    t.classList.remove('opacity-0', 'translate-y-3', 'pointer-events-none');
+    t.classList.remove('opacity-0', 'translate-y-20', 'translate-y-3', 'pointer-events-none');
     t.classList.add('opacity-100', 'translate-y-0');
     if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
     clearTimeout(window.arenaToastTimer);
     window.arenaToastTimer = setTimeout(() => {
-      t.classList.add('opacity-0', 'translate-y-3', 'pointer-events-none');
+      t.classList.add('opacity-0', 'translate-y-20', 'pointer-events-none');
       t.classList.remove('opacity-100', 'translate-y-0');
-    }, 2800);
+    }, 3200);
   };
 
   // Helper para buscar ou promover um jogo para o estado de bookings
@@ -4410,11 +4438,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const court = getCourtById(m.court_id || m.courtId);
         const startT = m.start_time || m.startTime || m.time || '18:00';
         const endT = m.end_time || m.endTime || (startT.includes(':') ? String(Number(startT.split(':')[0]) + 1).padStart(2, '0') + ':' + startT.split(':')[1] : '19:00');
+        const selDate = window.adminGameState.selectedDate || '2026-11-03';
+        const [sy, smm, sd] = selDate.split('-');
+        const sdt = new Date(Number(sy), Number(smm) - 1, Number(sd), 12, 0, 0);
+        const dayOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+        const currentDayOfWeek = dayOfWeekMap[sdt.getDay()];
+        const mDay = (m.day_of_week || m.dayOfWeek || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
         const promoted = {
           id: String(id),
           court_id: court.id,
           court_name: court.name,
-          date: window.adminGameState.selectedDate || '2026-11-03',
+          date: selDate,
           customer_name: (m.team_name || m.teamName || 'Mensalista') + (m.responsible_name && m.responsible_name !== m.team_name ? ' (' + m.responsible_name + ')' : ''),
           name: (m.team_name || m.teamName || 'Mensalista') + (m.responsible_name && m.responsible_name !== m.team_name ? ' (' + m.responsible_name + ')' : ''),
           customer_phone: m.phone || '(81) 9 9556-2893',
@@ -4433,25 +4468,28 @@ document.addEventListener('DOMContentLoaded', () => {
           type: 'Mensalista',
           payment: 'Pago',
           players: 14,
-          dayFixed: (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase(),
-          observation: 'Horário Fixo Semanal (' + (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase() + ')',
-          note: 'Horário Fixo Semanal (' + (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase() + ')',
+          dayFixed: (m.day_of_week || m.dayOfWeek || currentDayOfWeek).toUpperCase(),
+          observation: 'Horário Fixo Semanal (' + (m.day_of_week || m.dayOfWeek || currentDayOfWeek).toUpperCase() + ')',
+          note: 'Horário Fixo Semanal (' + (m.day_of_week || m.dayOfWeek || currentDayOfWeek).toUpperCase() + ')',
           attendance: 'Aguardando chegada',
           late: 0,
-          log: [{ at: 'Reserva cadastrada', text: 'Horário fixo semanal · ' + (m.day_of_week || m.dayOfWeek || 'terça-feira') }],
+          log: [{ at: 'Reserva cadastrada', text: 'Horário fixo semanal · ' + (m.day_of_week || m.dayOfWeek || currentDayOfWeek) }],
           contract: {
             number: 'AL-MENS-' + m.id,
             type: 'Mensalista',
             start: '2026-10-01',
             end: '2026-12-31',
-            day: (m.day_of_week || m.dayOfWeek || 'TERÇA').toUpperCase(),
+            day: (m.day_of_week || m.dayOfWeek || currentDayOfWeek).toUpperCase(),
             due: '10',
             amount: parseFloat(m.monthly_price || m.monthlyPrice || 0) / 4 || 100,
             signed: 'Assinado',
-            terms: 'Horário fixo semanal às ' + (m.day_of_week || m.dayOfWeek || 'terças-feiras') + '. Comunicar alterações com antecedência.'
+            terms: 'Horário fixo semanal às ' + (m.day_of_week || m.dayOfWeek || currentDayOfWeek) + '. Comunicar alterações com antecedência.'
           }
         };
-        window.adminGameState.bookings.push(promoted);
+        // Só adiciona a bookings se o mensalista for de fato do dia da semana selecionado
+        if (mDay === currentDayOfWeek) {
+          window.adminGameState.bookings.push(promoted);
+        }
         return promoted;
       }
     }
