@@ -140,3 +140,8 @@ CREATE POLICY "bookings_manage_admin" ON public.bookings
     FOR ALL
     TO authenticated
     USING (auth.uid() IS NOT NULL);
+
+-- 10. ÍNDICES DE ALTA PERFORMANCE PARA FILTROS DE STATUS E DATA (FINALIZADOS / AO VIVO)
+CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON public.bookings (date, status);
+CREATE INDEX IF NOT EXISTS idx_bookings_court_date ON public.bookings (court_id, date);
+CREATE INDEX IF NOT EXISTS idx_monthly_members_day ON public.monthly_members (day_of_week, status);

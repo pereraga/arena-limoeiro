@@ -390,3 +390,8 @@ VALUES
   ('mensal-1', 'Pelada dos Amigos da Terça', 'Carlos Eduardo', '(81) 99876-1122', 'cust-1', 'court-society-1', 'terca', 'Toda Terça-feira', '19:00', '19:00', '20:00', 500.00, 'active', 'Setembro/2026', 'Horário fixo semanal'),
   ('mensal-2', 'Galera do Futsal Noturno', 'Matheus Silveira', '(81) 98844-5566', 'cust-2', 'court-gym-1', 'quinta', 'Toda Quinta-feira', '20:00', '20:00', '21:00', 460.00, 'active', 'Setembro/2026', 'Horário fixo semanal')
 ON CONFLICT (id) DO NOTHING;
+
+-- 10. ÍNDICES DE ALTA PERFORMANCE PARA FILTROS DE STATUS E DATA (FINALIZADOS / AO VIVO)
+CREATE INDEX IF NOT EXISTS idx_bookings_date_status ON public.bookings (date, status);
+CREATE INDEX IF NOT EXISTS idx_bookings_court_date ON public.bookings (court_id, date);
+CREATE INDEX IF NOT EXISTS idx_monthly_members_day ON public.monthly_members (day_of_week, status);
