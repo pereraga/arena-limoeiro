@@ -2,10 +2,10 @@ const { execSync } = require('child_process');
 
 try {
   console.log('Running git add...');
-  execSync('git add public/ scripts/', { stdio: 'inherit' });
+  execSync('git add api/ public/ scripts/ server.js', { stdio: 'inherit' });
 
   console.log('Running git commit...');
-  execSync('git commit -m "feat: integracao whatsapp qr code e envio de otp na aba api para confirmacao de conta de clientes novos"', { stdio: 'inherit' });
+  execSync('git commit -m "feat: suporte e simulador de codigo de 4 digitos otp para confirmacao de conta de novos clientes"', { stdio: 'inherit' });
 
   console.log('Running git push...');
   execSync('git push origin main', { stdio: 'inherit' });

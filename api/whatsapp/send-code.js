@@ -68,8 +68,9 @@ export default async function handler(req, res) {
       console.warn('Aviso ao checar número no WhatsApp:', checkErr);
     }
 
-    // 2. Gera código aleatório de 4 dígitos (ex: 4829)
-    const code = String(Math.floor(1000 + Math.random() * 9000));
+    // 2. Gera ou utiliza código de 4 dígitos (ex: 4829)
+    const customCode = body.code ? String(body.code).trim().replace(/\D/g, '').slice(0, 4) : '';
+    const code = (customCode && customCode.length === 4) ? customCode : String(Math.floor(1000 + Math.random() * 9000));
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutos de validade
 
     // Gera token HMAC criptográfico
@@ -82,7 +83,7 @@ export default async function handler(req, res) {
     const msg = 
       `🏟️ *ARENA LIMOEIRO - CÓDIGO DE CONFIRMAÇÃO*\n\n` +
       `Seu código de verificação para cadastro é: *${code}*\n\n` +
-      `Digite este código no site da Arena para confirmar que o WhatsApp é seu e liberar os dados para o agendamento! ⚽`;
+      `Digite este código de 4 dígitos no site da Arena para confirmar que o WhatsApp é seu e liberar os dados para o agendamento! ⚽`;
 
     const sendRes = await fetch(`${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`, {
       method: 'POST',
@@ -102,6 +103,7 @@ export default async function handler(req, res) {
       success: true,
       isReal: true,
       token: token,
+      code: code,
       message: 'Código de 4 dígitos enviado com sucesso para o seu WhatsApp!'
     });
 

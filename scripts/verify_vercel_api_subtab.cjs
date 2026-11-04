@@ -8,10 +8,11 @@ https.get(url, (res) => {
   res.on('end', () => {
     console.log('Status code:', res.statusCode);
     console.log('Body length:', body.length);
-    console.log('Contains btnSubtab-api:', body.includes('btnSubtab-api'));
-    console.log('Contains subtab-content-api:', body.includes('subtab-content-api'));
-    console.log('Contains executeApiPlaygroundRequest:', body.includes('executeApiPlaygroundRequest'));
-    console.log('Contains API base URL display:', body.includes('apiBaseUrlDisplay'));
+    console.log('Contains whatsappQrImage:', body.includes('whatsappQrImage'));
+    console.log('Contains whatsappConnectedPanel:', body.includes('whatsappConnectedPanel'));
+    console.log('Contains loadWhatsappQrCodeLive:', body.includes('loadWhatsappQrCodeLive'));
+    console.log('Contains sendWhatsappTestOtpCode:', body.includes('sendWhatsappTestOtpCode'));
+    console.log('Contains whatsappTestOtpPhone:', body.includes('whatsappTestOtpPhone'));
   });
 }).on('error', err => {
   console.error('Error fetching Vercel:', err.message);
