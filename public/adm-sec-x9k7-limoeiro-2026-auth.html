@@ -3709,20 +3709,6 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- JANELAS SEPARADAS DE HORÁRIOS (SLOTS DE 30 EM 30 MINUTOS) -->
       <div class="space-y-3 p-3.5 bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 border border-emerald-200/80 rounded-2xl shadow-xs">
         
-        <!-- CARD INFORMATIVO: JOGOS JÁ AGENDADOS NESTA QUADRA NO DIA -->
-        <div id="balcaoScheduledGamesCard" class="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-1.5">
-          <div class="flex items-center justify-between">
-            <span class="font-extrabold text-amber-900 uppercase flex items-center gap-1.5 text-[11px]">
-              <i data-lucide="info" class="w-3.5 h-3.5 text-amber-600"></i>
-              <span>Partidas / Clientes Já Agendados Nesta Quadra:</span>
-            </span>
-            <span id="balcaoScheduledGamesCount" class="text-[10px] font-black bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">0 agendados</span>
-          </div>
-          <div id="balcaoScheduledGamesList" class="flex flex-wrap gap-1.5 text-xs">
-            <!-- Injetado dinamicamente: ex: [ 15:30 às 16:30 — Monica ] [ 18:00 às 20:00 — Aline ] -->
-          </div>
-        </div>
-
         <!-- Cabeçalho da Grade de Slots + Filtro de Ocultar Ocupados -->
         <div class="flex items-center justify-between flex-wrap gap-2 pt-1">
           <div class="flex items-center gap-2">
@@ -3782,102 +3768,98 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <!-- SELEÇÃO NUMÉRICA & VALOR TOTAL -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Início *</label>
-          <select id="directBookingStart" onchange="onDirectBookingDropdownChange()" required
-                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-            <option value="06:00">06:00</option>
-            <option value="06:30">06:30</option>
-            <option value="07:00">07:00</option>
-            <option value="07:30">07:30</option>
-            <option value="08:00">08:00</option>
-            <option value="08:30">08:30</option>
-            <option value="09:00">09:00 (Promo)</option>
-            <option value="09:30">09:30 (Promo)</option>
-            <option value="10:00">10:00 (Promo)</option>
-            <option value="10:30">10:30 (Promo)</option>
-            <option value="11:00">11:00 (Promo)</option>
-            <option value="11:30">11:30 (Promo)</option>
-            <option value="12:00">12:00 (Promo)</option>
-            <option value="12:30">12:30 (Promo)</option>
-            <option value="13:00">13:00 (Promo)</option>
-            <option value="13:30">13:30 (Promo)</option>
-            <option value="14:00">14:00 (Promo)</option>
-            <option value="14:30">14:30 (Promo)</option>
-            <option value="15:00">15:00 (Promo)</option>
-            <option value="15:30">15:30 (Promo)</option>
-            <option value="16:00">16:00</option>
-            <option value="16:30">16:30</option>
-            <option value="17:00">17:00</option>
-            <option value="17:30">17:30</option>
-            <option value="18:00">18:00</option>
-            <option value="18:30">18:30</option>
-            <option value="19:00">19:00</option>
-            <option value="19:30">19:30</option>
-            <option value="20:00">20:00</option>
-            <option value="20:30">20:30</option>
-            <option value="21:00">21:00</option>
-            <option value="21:30">21:30</option>
-            <option value="22:00">22:00</option>
-            <option value="22:30">22:30</option>
-            <option value="23:00">23:00</option>
-          </select>
-        </div>
+      <!-- INPUTS DE INÍCIO E FIM (OCULTOS - CONTROLADOS PELAS JANELAS DE 30 MIN) -->
+      <div style="display:none;" aria-hidden="true">
+        <select id="directBookingStart" onchange="onDirectBookingDropdownChange()" required>
+          <option value="06:00">06:00</option>
+          <option value="06:30">06:30</option>
+          <option value="07:00">07:00</option>
+          <option value="07:30">07:30</option>
+          <option value="08:00">08:00</option>
+          <option value="08:30">08:30</option>
+          <option value="09:00">09:00</option>
+          <option value="09:30">09:30</option>
+          <option value="10:00">10:00</option>
+          <option value="10:30">10:30</option>
+          <option value="11:00">11:00</option>
+          <option value="11:30">11:30</option>
+          <option value="12:00">12:00</option>
+          <option value="12:30">12:30</option>
+          <option value="13:00">13:00</option>
+          <option value="13:30">13:30</option>
+          <option value="14:00">14:00</option>
+          <option value="14:30">14:30</option>
+          <option value="15:00">15:00</option>
+          <option value="15:30">15:30</option>
+          <option value="16:00">16:00</option>
+          <option value="16:30">16:30</option>
+          <option value="17:00">17:00</option>
+          <option value="17:30">17:30</option>
+          <option value="18:00">18:00</option>
+          <option value="18:30">18:30</option>
+          <option value="19:00" selected>19:00</option>
+          <option value="19:30">19:30</option>
+          <option value="20:00">20:00</option>
+          <option value="20:30">20:30</option>
+          <option value="21:00">21:00</option>
+          <option value="21:30">21:30</option>
+          <option value="22:00">22:00</option>
+          <option value="22:30">22:30</option>
+          <option value="23:00">23:00</option>
+          <option value="23:30">23:30</option>
+        </select>
 
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Fim *</label>
-          <select id="directBookingEnd" onchange="onDirectBookingDropdownChange()" required
-                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-            <option value="06:30">06:30</option>
-            <option value="07:00">07:00</option>
-            <option value="07:30">07:30</option>
-            <option value="08:00">08:00</option>
-            <option value="08:30">08:30</option>
-            <option value="09:00">09:00</option>
-            <option value="09:30">09:30</option>
-            <option value="10:00">10:00</option>
-            <option value="10:30">10:30</option>
-            <option value="11:00">11:00</option>
-            <option value="11:30">11:30</option>
-            <option value="12:00">12:00</option>
-            <option value="12:30">12:30</option>
-            <option value="13:00">13:00</option>
-            <option value="13:30">13:30</option>
-            <option value="14:00">14:00</option>
-            <option value="14:30">14:30</option>
-            <option value="15:00">15:00</option>
-            <option value="15:30">15:30</option>
-            <option value="16:00">16:00</option>
-            <option value="16:30">16:30</option>
-            <option value="17:00">17:00</option>
-            <option value="17:30">17:30</option>
-            <option value="18:00">18:00</option>
-            <option value="18:30">18:30</option>
-            <option value="19:00">19:00</option>
-            <option value="19:30">19:30</option>
-            <option value="20:00">20:00</option>
-            <option value="20:30">20:30</option>
-            <option value="21:00">21:00</option>
-            <option value="21:30">21:30</option>
-            <option value="22:00">22:00</option>
-            <option value="22:30">22:30</option>
-            <option value="23:00">23:00</option>
-            <option value="23:30">23:30</option>
-            <option value="24:00">24:00</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Total (R$) *</label>
-          <input type="number" id="directBookingPrice" required value="110" step="5" min="0"
-                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-emerald-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
-        </div>
+        <select id="directBookingEnd" onchange="onDirectBookingDropdownChange()" required>
+          <option value="06:30">06:30</option>
+          <option value="07:00">07:00</option>
+          <option value="07:30">07:30</option>
+          <option value="08:00">08:00</option>
+          <option value="08:30">08:30</option>
+          <option value="09:00">09:00</option>
+          <option value="09:30">09:30</option>
+          <option value="10:00">10:00</option>
+          <option value="10:30">10:30</option>
+          <option value="11:00">11:00</option>
+          <option value="11:30">11:30</option>
+          <option value="12:00">12:00</option>
+          <option value="12:30">12:30</option>
+          <option value="13:00">13:00</option>
+          <option value="13:30">13:30</option>
+          <option value="14:00">14:00</option>
+          <option value="14:30">14:30</option>
+          <option value="15:00">15:00</option>
+          <option value="15:30">15:30</option>
+          <option value="16:00">16:00</option>
+          <option value="16:30">16:30</option>
+          <option value="17:00">17:00</option>
+          <option value="17:30">17:30</option>
+          <option value="18:00">18:00</option>
+          <option value="18:30">18:30</option>
+          <option value="19:00">19:00</option>
+          <option value="19:30">19:30</option>
+          <option value="20:00" selected>20:00</option>
+          <option value="20:30">20:30</option>
+          <option value="21:00">21:00</option>
+          <option value="21:30">21:30</option>
+          <option value="22:00">22:00</option>
+          <option value="22:30">22:30</option>
+          <option value="23:00">23:00</option>
+          <option value="23:30">23:30</option>
+          <option value="23:59">23:59</option>
+        </select>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+      <!-- VALOR TOTAL E FORMA DE PAGAMENTO -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor Total (R$) *</label>
+          <div class="relative">
+            <span class="absolute left-3 top-2.5 text-xs font-bold text-slate-400">R$</span>
+            <input type="number" id="directBookingPrice" required value="110" step="5" min="0"
+                   class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-emerald-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+        </div>
+<div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Pagamento</label>
           <select id="directBookingPayment"
                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
@@ -3894,6 +3876,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <input type="text" id="directBookingCpf" placeholder="000.000.000-00"
                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
         </div>
+      
       </div>
 
       <div>
@@ -8745,8 +8728,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const durationHours = (eMin - sMin) / 60;
     const sH = Math.floor(sMin / 60);
 
-    const isPromo = sH >= 9 && sH < 16;
-    const hourlyRate = isPromo ? (court.promo || 50) : (court.normal || 90);
+    const hourlyRate = court.normal || court.price || (court.name && court.name.includes("7") ? 110 : 90);
     priceInput.value = Math.round(hourlyRate * durationHours);
   };
 
