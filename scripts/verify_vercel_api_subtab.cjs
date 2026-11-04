@@ -9,9 +9,10 @@ setTimeout(() => {
     res.on('end', () => {
       console.log('Status code:', res.statusCode);
       console.log('Body length:', body.length);
-      console.log('Contains whatsappTestOtpCodeInput:', body.includes('whatsappTestOtpCodeInput'));
-      console.log('Contains validateWhatsappTestOtpCode:', body.includes('validateWhatsappTestOtpCode'));
-      console.log('Contains 4-digit sample [ 1234 ]:', body.includes('1234'));
+      console.log('Contains directBookingSlotsGrid:', body.includes('directBookingSlotsGrid'));
+      console.log('Contains renderBalcaoTimeSlots:', body.includes('renderBalcaoTimeSlots'));
+      console.log('Contains undoLastBalcaoTimeSlot:', body.includes('undoLastBalcaoTimeSlot'));
+      console.log('Contains resetDirectBookingTimeSlots:', body.includes('resetDirectBookingTimeSlots'));
     });
   }).on('error', err => {
     console.error('Error fetching Vercel:', err.message);
