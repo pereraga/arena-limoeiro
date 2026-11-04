@@ -8,7 +8,8 @@ https.get(url, (res) => {
   res.on('end', () => {
     console.log('Status code:', res.statusCode);
     console.log('Body length:', body.length);
-    console.log('Contains Pronto para iniciar:', body.includes('Pronto para iniciar'));
+    console.log('Contains __openDetailsIds:', body.includes('__openDetailsIds'));
+    console.log('Contains arrow-details:', body.includes('arrow-details-'));
   });
 }).on('error', (e) => {
   console.error('Fetch error:', e.message);
