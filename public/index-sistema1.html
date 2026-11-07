@@ -4756,6 +4756,17 @@ document.addEventListener('DOMContentLoaded', () => {
   window.syncBookingToCloud = async function(booking, action = 'upsert') {
     if (!booking || !booking.id) return;
 
+    // Se for delete, registra na lista de excluídos para imunidade contra ressuscitação
+    if (action === 'delete') {
+      try {
+        const delList = JSON.parse(localStorage.getItem('arena_deleted_bookings') || '[]');
+        if (!delList.includes(String(booking.id))) {
+          delList.push(String(booking.id));
+          localStorage.setItem('arena_deleted_bookings', JSON.stringify(delList));
+        }
+      } catch(e) {}
+    }
+
     const payload = {
       id: String(booking.id),
       court_id: booking.court_id || booking.courtId || 'court-society-1',
@@ -4775,7 +4786,7 @@ document.addEventListener('DOMContentLoaded', () => {
       observation: booking.observation || booking.finishObs || null
     };
 
-    console.log('[ArenaCloud] Dual-Write agendamento:', action, payload.id);
+    console.log('[ArenaCloud] Dual-Write agendamento:', action, payload.id, 'status:', payload.status);
 
     // 1. Gravação no Banco 2 (Ativo & Salvaguarda)
     try {
@@ -4785,6 +4796,18 @@ document.addEventListener('DOMContentLoaded', () => {
           headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
         }).catch(() => {});
       } else {
+        // Envia PATCH direto para garantir persistência de alterações/cancelamento
+        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
+          method: 'PATCH',
+          headers: {
+            apikey: ARENA_CLOUD_DBS.db2Key,
+            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+
+        // Envia também POST com merge-duplicates caso o registro seja novo
         fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings', {
           method: 'POST',
           headers: {
@@ -4806,6 +4829,18 @@ document.addEventListener('DOMContentLoaded', () => {
           headers: { apikey: ARENA_CLOUD_DBS.db1Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key }
         }).catch(() => {});
       } else {
+        // PATCH no DB1
+        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
+          method: 'PATCH',
+          headers: {
+            apikey: ARENA_CLOUD_DBS.db1Key,
+            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+
+        // POST no DB1
         fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings', {
           method: 'POST',
           headers: {
@@ -4815,7 +4850,7 @@ document.addEventListener('DOMContentLoaded', () => {
             Prefer: 'resolution=merge-duplicates'
           },
           body: JSON.stringify(payload)
-        }).catch(() => {}); // Se DB1 estiver em cota (402), não interrompe o fluxo
+        }).catch(() => {});
       }
     } catch(e) {}
 
@@ -4872,12 +4907,19 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(e1) {}
       }
 
-      // Mescla reservas com o estado operacional
+      // Mescla reservas com o estado operacional respeitando alterações e cancelamentos locais
       if (Array.isArray(cloudBookings) && cloudBookings.length > 0) {
         const bMap = new Map();
         (window.adminGameState.bookings || []).forEach(b => {
           if (b && b.id) bMap.set(String(b.id), b);
         });
+
+        // Carrega lista de IDs cancelados e deletados para não permitir reversão
+        let deletedIds = new Set();
+        try {
+          const storedDel = JSON.parse(localStorage.getItem('arena_deleted_bookings') || '[]');
+          if (Array.isArray(storedDel)) deletedIds = new Set(storedDel.map(String));
+        } catch(e) {}
 
         const finishedSlots = new Set();
         (window.adminGameState.bookings || []).forEach(b => {
@@ -4889,18 +4931,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
         cloudBookings.forEach(cb => {
           if (!cb || !cb.id) return;
-          const cId = (typeof getCourtById === 'function') ? getCourtById(cb.court_id || cb.courtId).id : (cb.court_id || '');
-          const slotKey = cb.date + '_' + cId + '_' + cb.start_time;
-          const existing = bMap.get(String(cb.id));
+          const idStr = String(cb.id);
 
-          if ((existing && existing.status === 'finished') || finishedSlots.has(slotKey)) {
-            cb.status = 'finished';
+          // Se a reserva foi excluída pelo admin, ignora qualquer retorno defasado da nuvem
+          if (deletedIds.has(idStr)) {
+            return;
           }
 
+          const cId = (typeof getCourtById === 'function') ? getCourtById(cb.court_id || cb.courtId).id : (cb.court_id || '');
+          const slotKey = cb.date + '_' + cId + '_' + cb.start_time;
+          const existing = bMap.get(idStr);
+
+          // PROTEÇÃO DEFINITIVA CONTRA RESSUSCITAÇÃO DE RESERVA CANCELADA OU FINALIZADA
+          let finalStatus = cb.status || 'confirmed';
           if (existing) {
-            bMap.set(String(cb.id), { ...existing, ...cb, status: cb.status });
+            if (existing.status === 'cancelled') {
+              finalStatus = 'cancelled';
+              // Garante que o banco também esteja atualizado
+              if (cb.status !== 'cancelled' && typeof window.syncBookingToCloud === 'function') {
+                window.syncBookingToCloud(existing, 'upsert');
+              }
+            } else if (existing.status === 'finished' || finishedSlots.has(slotKey)) {
+              finalStatus = 'finished';
+            } else if (existing.status === 'in_progress' || existing.status === 'live') {
+              finalStatus = existing.status;
+            } else if (existing.status === 'pending') {
+              // preserva status local
+              finalStatus = existing.status;
+            }
+            // Preserva também edições locais de data, hora e quadra se foram alteradas
+            bMap.set(idStr, { ...cb, ...existing, status: finalStatus });
           } else {
-            bMap.set(String(cb.id), cb);
+            if (finishedSlots.has(slotKey)) {
+              cb.status = 'finished';
+            }
+            bMap.set(idStr, cb);
           }
         });
 
@@ -5547,14 +5612,24 @@ document.addEventListener('DOMContentLoaded', () => {
     arenaToast('Partida duplicada. Edite data e horário antes de confirmar.');
   };
 
-  window.cancelGame = function(id) {
-    if (!confirm('Deseja cancelar esta reserva? Ela continuará registrada no histórico do dia.')) return;
+window.cancelGame = function(id) {
+    if (!confirm('Deseja realmente cancelar esta partida? O cancelamento ficará registrado no histórico.')) return;
     const g = getGame(id);
     if (!g) return;
+
     g.status = 'cancelled';
-    addMatchLog(g, 'Reserva cancelada', 'Cancelamento manual registrado pela administração.');
+    g.attendance = 'Cancelada';
+    addMatchLog(g, 'Partida cancelada', 'Cancelamento manual registrado pela administração.');
     saveAdminGameState();
-    arenaToast('Partida cancelada.');
+
+    // ☁️ Persistência imediata nos bancos de dados para que a nuvem nunca reverta
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
+
+    renderMovementMatches();
+    renderCadastrosBookingsList();
+    arenaToast('Partida cancelada com sucesso!');
   };
 
   // Editar Jogo
@@ -9068,8 +9143,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.deleteMatchPrompt = function(id) {
     if (!confirm('Deseja realmente cancelar e liberar o horário deste agendamento?')) return;
+    const bookingToDelete = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id)) || { id: id };
     window.adminGameState.bookings = window.adminGameState.bookings.filter(b => String(b.id) !== String(id));
     localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+
+    // ☁️ Deleta imediatamente de ambos os bancos na nuvem e registra imunidade
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(bookingToDelete, 'delete');
+    }
+
     if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
     if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
     alert('Horário liberado com sucesso!');
@@ -9320,6 +9402,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     saveAdminGameState();
+    // ☁️ Envia a edição imediatamente para os Bancos de Dados na Nuvem (Dual-Write)
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
     closeArenaModal('arenaEditModal');
     renderMovementMatches();
     renderCadastrosBookingsList();
@@ -9493,6 +9579,9 @@ document.addEventListener('DOMContentLoaded', () => {
     addMatchLog(g, 'Falta registrada', reason);
 
     saveAdminGameState();
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
     closeArenaModal('arenaNoShowModal');
     renderMovementMatches();
     renderCadastrosBookingsList();
@@ -9525,7 +9614,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // 5. Cancelar Partida
-  window.cancelGame = function(id) {
+window.cancelGame = function(id) {
     if (!confirm('Deseja realmente cancelar esta partida? O cancelamento ficará registrado no histórico.')) return;
     const g = getGame(id);
     if (!g) return;
@@ -9534,9 +9623,15 @@ document.addEventListener('DOMContentLoaded', () => {
     g.attendance = 'Cancelada';
     addMatchLog(g, 'Partida cancelada', 'Cancelamento manual registrado pela administração.');
     saveAdminGameState();
+
+    // ☁️ Persistência imediata nos bancos de dados para que a nuvem nunca reverta
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
+
     renderMovementMatches();
     renderCadastrosBookingsList();
-    arenaToast('Partida cancelada com sucesso.');
+    arenaToast('Partida cancelada com sucesso!');
   };
 
   // 6. Confirmar Chegada / Presença
