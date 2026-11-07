@@ -3762,7 +3762,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        <div id="directBookingSlotsGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-1.5 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
+        <div id="directBookingSlotsGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-1.5 max-h-64 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
           <!-- Slots de 30min injetados aqui -->
         </div>
 
@@ -8586,14 +8586,8 @@ document.addEventListener('DOMContentLoaded', () => {
         startSelect.value = slotTime;
         endSelect.value = formatMinutesToTime(clickedMin + 30);
       } else if (clickedMin > curEndMin) {
-        // Se for muito distante (> 180 min após o fim), inicia novo intervalo
-        if (clickedMin - curEndMin > 180) {
-          startSelect.value = slotTime;
-          endSelect.value = formatMinutesToTime(clickedMin + 30);
-        } else {
-          // Estende o Fim diretamente para o slot clicado
-          endSelect.value = slotTime;
-        }
+        // Estende o Fim diretamente para o slot clicado (3h, 5h ou quantas horas desejar)
+        endSelect.value = slotTime;
       } else if (clickedMin === curEndMin) {
         // Clicou exatamente no botão de Fim
         const duration = curEndMin - curStartMin;

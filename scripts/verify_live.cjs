@@ -1,14 +1,14 @@
-const https = require('https');
+const https = require("https");
 
-const url = 'https://arenalimoeiro.vercel.app/adm-sec-x9k7-limoeiro-2026-auth?adm_token=x9k7_limoeiro_sec2026_auth';
-
-https.get(url, res => {
-  let data = '';
-  res.on('data', chunk => data += chunk);
-  res.on('end', () => {
-    console.log('HTTP Status:', res.statusCode);
-    console.log('Contains strict date filter:', data.includes('FILTRO ESTRITO DE DATA E HIGIENIZAÇÃO'));
-    console.log('Contains Davi sanitization:', data.includes('Davi só joga às segundas'));
-    console.log('Contains arenaToast fix:', data.includes("document.getElementById('arenaToastMsg') || document.getElementById('arenaToastText')"));
+https.get("https://arenalimoeiro.vercel.app/adm-sec-x9k7-limoeiro-2026-auth", (res) => {
+  let data = "";
+  res.on("data", chunk => data += chunk);
+  res.on("end", () => {
+    console.log("Status:", res.statusCode);
+    console.log("Has Duração Rápida:", data.includes("Duração Rápida"));
+    console.log("Has balcaoCalendarStepHelper:", data.includes("balcaoCalendarStepHelper"));
+    console.log("Has __balcaoHasUserInteracted:", data.includes("__balcaoHasUserInteracted"));
   });
-}).on('error', e => console.error(e));
+}).on("error", (err) => {
+  console.error("Request error:", err.message);
+});
