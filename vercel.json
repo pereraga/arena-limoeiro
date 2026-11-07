@@ -110,15 +110,15 @@
     },
     {
       "source": "/adm-sec-x9k7-limoeiro-2026-auth",
-      "destination": "/index-sistema1.html?adm_token=x9k7_limoeiro_sec2026_auth&v=20261107_v7_noblocos_1794066671776"
+      "destination": "/index-sistema1.html?adm_token=x9k7_limoeiro_sec2026_auth&v=20261107_v8_nobadge_1794067084814"
     },
     {
       "source": "/adm-sec-x9k7-limoeiro-2026",
-      "destination": "/index-sistema1.html?adm_token=x9k7_limoeiro_sec2026_auth&v=20261107_v7_noblocos_1794066671776"
+      "destination": "/index-sistema1.html?adm_token=x9k7_limoeiro_sec2026_auth&v=20261107_v8_nobadge_1794067084814"
     },
     {
       "source": "/admin",
-      "destination": "/index-sistema1.html?v=20261107_v7_noblocos_1794066671776"
+      "destination": "/index-sistema1.html?v=20261107_v8_nobadge_1794067084814"
     }
   ],
   "crons": [
