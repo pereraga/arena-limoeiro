@@ -3798,8 +3798,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <!-- INPUTS DE INÍCIO E FIM (OCULTOS - CONTROLADOS PELAS JANELAS DE 30 MIN) -->
-      <div style="display:none;" aria-hidden="true">
+      <!-- SELEÇÃO VISÍVEL E CONFIRMAÇÃO DE HORÁRIO DE INÍCIO E FIM -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl">
+        <div>
+          <label class="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1 flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Horário de Início *
+          </label>
+          <div class="relative">
+            <select id="directBookingStart" onchange="onDirectBookingDropdownChange()" required
+                    class="w-full p-2.5 bg-white border border-emerald-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer shadow-xs">
         <select id="directBookingStart" onchange="onDirectBookingDropdownChange()" required>
           <option value="06:00">06:00</option>
           <option value="06:30">06:30</option>
@@ -3839,7 +3846,15 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="23:30">23:30</option>
         </select>
 
-        <select id="directBookingEnd" onchange="onDirectBookingDropdownChange()" required>
+        </div>
+        </div>
+        <div>
+          <label class="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1 flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-700"></span> Horário de Término *
+          </label>
+          <div class="relative">
+            <select id="directBookingEnd" onchange="onDirectBookingDropdownChange()" required
+                    class="w-full p-2.5 bg-white border border-emerald-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer shadow-xs">
           <option value="06:30">06:30</option>
           <option value="07:00">07:00</option>
           <option value="07:30">07:30</option>
@@ -3876,7 +3891,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="23:00">23:00</option>
           <option value="23:30">23:30</option>
           <option value="23:59">23:59</option>
-        </select>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- VALOR TOTAL E FORMA DE PAGAMENTO -->
@@ -8383,7 +8400,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (isSelected) {
             const isStart = (m === currentStartMin);
             const isEnd = (slotEndMin === currentEndMin);
-            const badgeLabel = isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.');
+            const isSingleSlot = (currentEndMin - currentStartMin === 30);
+            const badgeLabel = isSingleSlot ? 'Início/Fim' : (isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.'));
             btn.className = 'p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75';
             if (badgeSpan) {
               badgeSpan.className = 'balcao-slot-badge text-[9px] uppercase tracking-tighter text-emerald-100 font-bold';
@@ -8479,7 +8497,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (isSelected) {
         const isStart = (m === currentStartMin);
         const isEnd = (slotEndMin === currentEndMin);
-        const badgeLabel = isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.');
+        const isSingleSlot = (currentEndMin - currentStartMin === 30);
+        const badgeLabel = isSingleSlot ? 'Início/Fim' : (isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.'));
         html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Selecionado (' + slotTime + ' às ' + slotNextTime + ') - Toque para alterar ou ajustar" class="p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[9px] uppercase tracking-tighter text-emerald-100 font-bold">' + badgeLabel + '</span>';
@@ -8635,7 +8654,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let curEndMin = parseTimeToMinutes(endSelect.value);
     const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
 
-    // Salva histórico para botão Voltar
     window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
     window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value, state: window.__balcaoClickState });
     if (window.__balcaoSelectionHistory.length > 20) window.__balcaoSelectionHistory.shift();
@@ -8646,29 +8664,38 @@ document.addEventListener('DOMContentLoaded', () => {
       return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
     };
 
-    // Fluxo em 2 passos cristalino e ultra-responsivo:
-    // Se estamos aguardando o clique do fim (awaiting_end):
+    // Lógica inteligente de Início e Término:
+    // Se estamos aguardando o clique do fim:
     if (window.__balcaoClickState === 'awaiting_end') {
       if (clickedMin === curStartMin) {
-        // Clicou novamente no mesmo horário de início: confirma meia hora (ex: 12:00 às 12:30)
-        endSelect.value = formatMinutesToTime(curStartMin + 30);
+        // Clicou no mesmo slot de início -> alterna entre 30min e 1 hora
+        if (curEndMin - curStartMin === 30 && !hasConflict(curStartMin, curStartMin + 60)) {
+          endSelect.value = formatMinutesToTime(curStartMin + 60);
+        } else {
+          endSelect.value = formatMinutesToTime(curStartMin + 30);
+        }
         window.__balcaoClickState = 'range_selected';
       } else if (clickedMin > curStartMin && !hasConflict(curStartMin, clickedMin)) {
-        // Clicou em um horário à frente (ex: 12:30 para fechar 30min ou 13:00 para fechar 1h):
-        // Define o término exatamente no horário clicado!
+        // Clicou no horário de término (ex: início 12:00 -> clicou 12:30 para 30min ou 13:00 para 1h):
+        // Se clicou no bloco imediatamente posterior (12:30), fecha em 12:30 (30min)
+        // Se clicou em 13:00, fecha em 13:00 (1 hora)
         endSelect.value = slotTime;
         window.__balcaoClickState = 'range_selected';
+      } else if (clickedMin === curStartMin + 30 && !hasConflict(curStartMin, curStartMin + 60)) {
+        endSelect.value = formatMinutesToTime(curStartMin + 60);
+        window.__balcaoClickState = 'range_selected';
       } else {
-        // Conflito ou clicou em horário anterior: inicia novo ponto de início imediatamente no horário clicado
+        // Clicou antes ou com conflito: inicia novo início no slot clicado com término de 1h (ou 30min)
         startSelect.value = slotTime;
-        endSelect.value = formatMinutesToTime(clickedMin + 30);
+        const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (clickedMin + 30);
+        endSelect.value = formatMinutesToTime(defEnd);
         window.__balcaoClickState = 'awaiting_end';
       }
     } else {
-      // Estado inicial ou intervalo já selecionado:
-      // 1º clique: define o início no horário clicado de primeira, já deixando 30min preparados
+      // 1º Clique: seleciona o início e já prepara término de 1h (ou 30min se conflito)
       startSelect.value = slotTime;
-      endSelect.value = formatMinutesToTime(clickedMin + 30);
+      const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (clickedMin + 30);
+      endSelect.value = formatMinutesToTime(defEnd);
       window.__balcaoClickState = 'awaiting_end';
     }
 
