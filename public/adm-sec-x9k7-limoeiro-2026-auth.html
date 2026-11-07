@@ -8631,13 +8631,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!startSelect || !endSelect) return;
 
     const clickedMin = parseTimeToMinutes(slotTime);
-    const curStartMin = parseTimeToMinutes(startSelect.value);
-    const curEndMin = parseTimeToMinutes(endSelect.value);
+    let curStartMin = parseTimeToMinutes(startSelect.value);
+    let curEndMin = parseTimeToMinutes(endSelect.value);
     const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
 
-    // Salva estado para botão Voltar
+    // Salva histórico para botão Voltar
     window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
-    window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value });
+    window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value, state: window.__balcaoClickState });
     if (window.__balcaoSelectionHistory.length > 20) window.__balcaoSelectionHistory.shift();
 
     const hasConflict = (fromM, toM) => {
@@ -8646,58 +8646,30 @@ document.addEventListener('DOMContentLoaded', () => {
       return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
     };
 
-    // Caso 1: Clicou no horário que já é o início atual
-    if (clickedMin === curStartMin) {
-      const dur = curEndMin - curStartMin;
-      // Se era 30min, alterna para 1 hora (se livre de conflitos)
-      if (dur === 30) {
-        if (!hasConflict(curStartMin, curStartMin + 60)) {
-          endSelect.value = formatMinutesToTime(curStartMin + 60);
-        }
-      } else {
-        // Se era 1h ou mais, reduz para 30 minutos
+    // Fluxo em 2 passos cristalino e ultra-responsivo:
+    // Se estamos aguardando o clique do fim (awaiting_end):
+    if (window.__balcaoClickState === 'awaiting_end') {
+      if (clickedMin === curStartMin) {
+        // Clicou novamente no mesmo horário de início: confirma meia hora (ex: 12:00 às 12:30)
         endSelect.value = formatMinutesToTime(curStartMin + 30);
-      }
-      window.__balcaoLastClickedSlot = slotTime;
-    }
-    // Caso 2: Clicou em um horário após o início atual
-    else if (clickedMin > curStartMin) {
-      // Se houver conflito entre início e o horário clicado, inicia novo agendamento a partir do slot clicado
-      if (hasConflict(curStartMin, clickedMin)) {
+        window.__balcaoClickState = 'range_selected';
+      } else if (clickedMin > curStartMin && !hasConflict(curStartMin, clickedMin)) {
+        // Clicou em um horário à frente (ex: 12:30 para fechar 30min ou 13:00 para fechar 1h):
+        // Define o término exatamente no horário clicado!
+        endSelect.value = slotTime;
+        window.__balcaoClickState = 'range_selected';
+      } else {
+        // Conflito ou clicou em horário anterior: inicia novo ponto de início imediatamente no horário clicado
         startSelect.value = slotTime;
         endSelect.value = formatMinutesToTime(clickedMin + 30);
-        window.__balcaoLastClickedSlot = slotTime;
-        if (typeof arenaToast === 'function') {
-          arenaToast('Iniciando novo horário às ' + slotTime + ' devido a agendamento intermediário.');
-        }
-      } else {
-        // Se o usuário clicou no mesmo slot de fim pela segunda vez consecutiva, estende mais 30min
-        if (window.__balcaoLastClickedSlot === slotTime && clickedMin === curEndMin) {
-          const nextTarget = curEndMin + 30;
-          if (!hasConflict(curEndMin, nextTarget)) {
-            endSelect.value = formatMinutesToTime(nextTarget);
-          }
-        } else {
-          // Define como horário de término:
-          // Ex: Início 12:00 -> Clica 12:30 -> Fecha 12:00 às 12:30 (meia hora)
-          // Ex: Início 12:00 -> Clica 13:00 -> Fecha 12:00 às 13:00 (1 hora de uso)
-          // Ex: Início 12:00 -> Clica 14:00 -> Fecha 12:00 às 14:00 (2 horas)
-          endSelect.value = slotTime;
-        }
-        window.__balcaoLastClickedSlot = slotTime;
+        window.__balcaoClickState = 'awaiting_end';
       }
-    }
-    // Caso 3: Clicou em um horário anterior ao início atual
-    else {
-      // Se não houver conflito e for próximo, move o início para o horário clicado
-      if (!hasConflict(clickedMin, curStartMin) && (curEndMin - clickedMin <= 4 * 60)) {
-        startSelect.value = slotTime;
-      } else {
-        // Inicia nova seleção a partir do slot clicado (30min)
-        startSelect.value = slotTime;
-        endSelect.value = formatMinutesToTime(clickedMin + 30);
-      }
-      window.__balcaoLastClickedSlot = slotTime;
+    } else {
+      // Estado inicial ou intervalo já selecionado:
+      // 1º clique: define o início no horário clicado de primeira, já deixando 30min preparados
+      startSelect.value = slotTime;
+      endSelect.value = formatMinutesToTime(clickedMin + 30);
+      window.__balcaoClickState = 'awaiting_end';
     }
 
     autoCalculateDirectBookingPrice();
@@ -8831,6 +8803,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     window.openDirectBookingModal = function() {
+    window.__balcaoClickState = null;
     const modal = document.getElementById('directBookingModal');
     if (!modal) return;
     const dateInput = document.getElementById('directBookingDate');
