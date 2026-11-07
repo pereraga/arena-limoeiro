@@ -1,24 +1,19 @@
 const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
+const html = fs.readFileSync('C:/Users/PC/.gemini/antigravity/scratch/arena-booking-system/public/admin.html', 'utf8');
 
-const adminPath = path.join(__dirname, '..', 'public', 'admin.html');
-const content = fs.readFileSync(adminPath, 'utf8');
-
-// Extract all <script> blocks that don't have src
+// Check script tags syntax
 const scriptRegex = /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi;
 let match;
 let count = 0;
-while ((match = scriptRegex.exec(content)) !== null) {
+while ((match = scriptRegex.exec(html)) !== null) {
   count++;
   const code = match[1];
   try {
-    new vm.Script(code);
-    console.log(`Script block #${count} syntax valid.`);
+    new Function(code);
   } catch (err) {
-    console.error(`Syntax error in script block #${count}:`, err.message);
+    console.error(`Syntax error in script tag #${count}:`, err.message);
     process.exit(1);
   }
 }
 
-console.log(`All ${count} script blocks in admin.html are syntactically valid!`);
+console.log(`All ${count} inline script tags parsed without syntax errors!`);
