@@ -3788,7 +3788,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           <div id="balcaoSlotSelectionSummary" class="text-xs font-bold text-emerald-900 bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-300 flex items-center gap-1.5">
             <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Horário: <strong id="summarySelectedTime">19:00 às 20:00</strong> (<span id="summaryDuration">1h</span>)</span>
+            <span>Horário: <strong id="summarySelectedTime">Nenhum horário selecionado</strong> (<span id="summaryDuration">Toque abaixo</span>)</span>
           </div>
         </div>
       </div>
@@ -8386,12 +8386,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const courtId = courtSelect ? courtSelect.value : 'fut7';
     const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04');
-    const currentStart = startSelect ? startSelect.value : '19:00';
-    const currentEnd = endSelect ? endSelect.value : '20:00';
+    const currentStart = startSelect ? startSelect.value : '';
+    const currentEnd = endSelect ? endSelect.value : '';
     const shouldHideOccupied = hideToggle ? hideToggle.checked : true;
 
-    const currentStartMin = parseTimeToMinutes(currentStart);
-    const currentEndMin = parseTimeToMinutes(currentEnd);
+    const hasActiveSelection = (currentStart !== '' && currentEnd !== '');
+    const currentStartMin = hasActiveSelection ? parseTimeToMinutes(currentStart) : -1;
+    const currentEndMin = hasActiveSelection ? parseTimeToMinutes(currentEnd) : -1;
 
     const filterKey = courtId + '_' + dateStr + '_' + (shouldHideOccupied ? '1' : '0');
 
@@ -8402,9 +8403,9 @@ document.addEventListener('DOMContentLoaded', () => {
         slotButtons.forEach(btn => {
           if (btn.disabled) return;
           const m = parseInt(btn.dataset.slotMin, 10);
-          const isStart = (m === currentStartMin);
-          const isEnd = (m === currentEndMin);
-          const isBetween = (m > currentStartMin && m < currentEndMin);
+          const isStart = hasActiveSelection && (m === currentStartMin);
+          const isEnd = hasActiveSelection && (m === currentEndMin);
+          const isBetween = hasActiveSelection && (m > currentStartMin && m < currentEndMin);
           const isSelected = isStart || isEnd || isBetween;
           const badgeSpan = btn.querySelector('.balcao-slot-badge');
 
@@ -8493,9 +8494,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       visibleSlotsCount++;
-      const isStart = (m === currentStartMin);
-      const isEnd = (m === currentEndMin);
-      const isBetween = (m > currentStartMin && m < currentEndMin);
+      const isStart = hasActiveSelection && (m === currentStartMin);
+      const isEnd = hasActiveSelection && (m === currentEndMin);
+      const isBetween = hasActiveSelection && (m > currentStartMin && m < currentEndMin);
       const isSelected = isStart || isEnd || isBetween;
 
       if (isOccupied) {
@@ -8559,9 +8560,10 @@ document.addEventListener('DOMContentLoaded', () => {
       sel.value = val;
     };
 
+    const hasExistingSelection = (startSelect.value !== '' && endSelect.value !== '');
     const clickedMin = parseTimeToMinutes(slotTime);
-    let curStartMin = parseTimeToMinutes(startSelect.value);
-    let curEndMin = parseTimeToMinutes(endSelect.value);
+    let curStartMin = hasExistingSelection ? parseTimeToMinutes(startSelect.value) : -1;
+    let curEndMin = hasExistingSelection ? parseTimeToMinutes(endSelect.value) : -1;
     const courtSelect = document.getElementById('directBookingCourt');
     const dateInput = document.getElementById('directBookingDate');
     const courtId = courtSelect ? courtSelect.value : 'fut7';
@@ -8583,38 +8585,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
     };
 
-    // 1. Primeiro clique após abrir o modal
-    if (!window.__balcaoHasUserInteracted) {
+    // 1. Se NÃO há seleção ativa ainda (início da marcação pelo usuário):
+    if (!hasExistingSelection) {
       window.__balcaoHasUserInteracted = true;
-      // Se clicou além do fim sugerido e perto (até 3h) sem conflito: estende a seleção existente
-      if (clickedMin > curEndMin && (clickedMin - curEndMin <= 180) && !hasConflict(curStartMin, clickedMin)) {
-        forceSelectValue(endSelect, slotTime);
-      }
-      // Se clicou no fim sugerido: se > 30min reduz, se == 30min amplia para 1h
-      else if (clickedMin === curEndMin) {
-        if (curEndMin - curStartMin > 30) {
-          forceSelectValue(endSelect, formatMinutesToTime(curEndMin - 30));
-        } else if (!hasConflict(curEndMin, curEndMin + 30)) {
-          forceSelectValue(endSelect, formatMinutesToTime(curEndMin + 30));
-        }
-      }
-      // Se clicou antes do início sugerido e perto (até 2h): expande para trás
-      else if (clickedMin < curStartMin && (curStartMin - clickedMin <= 120) && !hasConflict(clickedMin, curEndMin)) {
-        forceSelectValue(startSelect, slotTime);
-      }
-      // Caso geral: novo início no slot clicado e fim inteligente
-      else {
-        forceSelectValue(startSelect, slotTime);
-        const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
-        forceSelectValue(endSelect, formatMinutesToTime(defEnd));
-      }
+      forceSelectValue(startSelect, slotTime);
+      const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
+      forceSelectValue(endSelect, formatMinutesToTime(defEnd));
     }
     // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas/blocos: 2h, 3h, 5h+)
     else if (clickedMin > curEndMin) {
       if (!hasConflict(curStartMin, clickedMin)) {
         forceSelectValue(endSelect, slotTime);
       } else {
-        // Conflito no caminho: inicia nova seleção
+        // Conflito no caminho: inicia nova seleção no slot clicado
         forceSelectValue(startSelect, slotTime);
         forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
       }
@@ -8683,16 +8666,15 @@ document.addEventListener('DOMContentLoaded', () => {
   window.resetDirectBookingTimeSlots = function() {
     const startSelect = document.getElementById('directBookingStart');
     const endSelect = document.getElementById('directBookingEnd');
-    if (typeof findFirstAvailableSlot === 'function' && startSelect && endSelect) {
-      const firstFree = findFirstAvailableSlot();
-      startSelect.value = firstFree.start;
-      endSelect.value = firstFree.end;
-      window.__balcaoClickState = null;
-      autoCalculateDirectBookingPrice();
-      renderBalcaoTimeSlots();
-      if (typeof window.showNotification === 'function') {
-        window.showNotification('Horários redefinidos para o primeiro livre!');
-      }
+    if (startSelect) startSelect.value = '';
+    if (endSelect) endSelect.value = '';
+    window.__balcaoHasUserInteracted = false;
+    window.__balcaoSelectionHistory = [];
+    window.__balcaoClickState = null;
+    autoCalculateDirectBookingPrice();
+    renderBalcaoTimeSlots();
+    if (typeof window.showNotification === 'function') {
+      window.showNotification('Seleção de horários limpa! Toque em um horário para iniciar.');
     }
   };
 
@@ -8871,8 +8853,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!startSelect || !endSelect) return;
 
-    const sStr = startSelect.value || '19:00';
-    const eStr = endSelect.value || '20:00';
+    const sStr = startSelect.value || '';
+    const eStr = endSelect.value || '';
+
+    if (!sStr || !eStr) {
+      if (timeEl) timeEl.textContent = 'Nenhum horário selecionado';
+      if (durEl) durEl.textContent = 'Toque em um horário abaixo';
+      if (helperBannerText) {
+        helperBannerText.innerHTML = '👉 Toque no horário de <strong>INÍCIO</strong> desejado para começar a marcação:';
+      }
+      if (helperBadge) helperBadge.textContent = '0 min';
+      return;
+    }
+
     const sMin = parseTimeToMinutes(sStr);
     const eMin = parseTimeToMinutes(eStr);
     let diff = eMin - sMin;
@@ -8918,32 +8911,19 @@ document.addEventListener('DOMContentLoaded', () => {
       dateInput.value = window.adminGameState.selectedDate || '2026-11-04';
     }
 
-    // Inicializa com um horário livre inteligente (1 hora)
-    if (typeof findFirstAvailableSlot === 'function' && startSelect && endSelect) {
-      const free = findFirstAvailableSlot();
-      startSelect.value = free.start;
-      endSelect.value = free.end;
-    }
+    // Modal abre completamente LIMPO: nenhum bloco pré-selecionado pelo sistema
+    if (startSelect) startSelect.value = '';
+    if (endSelect) endSelect.value = '';
 
     autoCalculateDirectBookingPrice();
     if (courtSelect) {
       courtSelect.onchange = function() { 
-        if (typeof findFirstAvailableSlot === 'function' && startSelect && endSelect) {
-          const free = findFirstAvailableSlot();
-          startSelect.value = free.start;
-          endSelect.value = free.end;
-        }
         autoCalculateDirectBookingPrice(); 
         renderBalcaoTimeSlots(); 
       };
     }
     if (dateInput) {
       dateInput.onchange = function() { 
-        if (typeof findFirstAvailableSlot === 'function' && startSelect && endSelect) {
-          const free = findFirstAvailableSlot();
-          startSelect.value = free.start;
-          endSelect.value = free.end;
-        }
         autoCalculateDirectBookingPrice(); 
         renderBalcaoTimeSlots(); 
       };
@@ -8969,11 +8949,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const priceInput = document.getElementById('directBookingPrice');
     if (!courtSelect || !priceInput) return;
 
+    const sStr = startSelect ? startSelect.value : '';
+    const eStr = endSelect ? endSelect.value : '';
+
+    if (!sStr || !eStr) {
+      priceInput.value = '0';
+      return;
+    }
+
     const cId = courtSelect.value;
     const court = ADMIN_COURTS.find(c => c.id === cId) || ADMIN_COURTS[0];
 
-    const sStr = startSelect ? startSelect.value : '19:00';
-    const eStr = endSelect ? endSelect.value : '20:00';
     const sMin = parseTimeToMinutes(sStr);
     let eMin = parseTimeToMinutes(eStr);
     if (eMin <= sMin) eMin = sMin + 30;
@@ -8992,15 +8978,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const phone = document.getElementById('directBookingPhone')?.value.trim();
     const courtId = document.getElementById('directBookingCourt')?.value || 'fut7';
     const date = document.getElementById('directBookingDate')?.value || window.adminGameState.selectedDate || '2026-11-03';
-    const start = document.getElementById('directBookingStart')?.value || '19:00';
-    const end = document.getElementById('directBookingEnd')?.value || '20:00';
-    const price = parseFloat(document.getElementById('directBookingPrice')?.value || 90);
+    const start = document.getElementById('directBookingStart')?.value;
+    const end = document.getElementById('directBookingEnd')?.value;
+    const price = parseFloat(document.getElementById('directBookingPrice')?.value || 0);
     const payment = document.getElementById('directBookingPayment')?.value || 'PIX Balcão';
     const cpf = document.getElementById('directBookingCpf')?.value.trim() || '';
     const obs = document.getElementById('directBookingObs')?.value.trim() || 'Reserva Balcão Direta';
 
     if (!name || !phone) {
       alert('Por favor informe o Nome e Telefone do Titular.');
+      return;
+    }
+
+    if (!start || !end) {
+      alert('Por favor selecione o horário do jogo tocando nos quadrados do calendário.');
       return;
     }
 
