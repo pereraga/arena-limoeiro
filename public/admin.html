@@ -73,6 +73,19 @@
 
   <style>
     body { font-family: 'Inter', sans-serif; }
+    /* OTIMIZAÇÃO CRÍTICA DE CLIQUES E TOQUE INSTANTÂNEO (0MS DELAY) */
+    button, [role="button"], #directBookingSlotsGrid button {
+      touch-action: manipulation !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+    #directBookingSlotsGrid {
+      touch-action: manipulation !important;
+      -webkit-tap-highlight-color: transparent !important;
+    }
+    #directBookingSlotsGrid button {
+      user-select: none !important;
+      -webkit-user-select: none !important;
+    }
     
     /* SUPRESSÃO TOTAL DE SCROLLBAR NATIVO */
     *::-webkit-scrollbar {
@@ -8328,9 +8341,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // =========================================================================
   // GESTÃO DE JANELAS DE HORAS (30 EM 30 MIN) PARA RESERVA DIRETA DE BALCÃO
+  // Otimização de Alta Performance: Atualização in-place sem destruição do DOM (0ms delay)
   window.__balcaoSelectionHistory = [];
 
-  window.renderBalcaoTimeSlots = function() {
+  window.renderBalcaoTimeSlots = function(forceRebuild) {
     const grid = document.getElementById('directBookingSlotsGrid');
     if (!grid) return;
 
@@ -8353,27 +8367,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentStartMin = parseTimeToMinutes(currentStart);
     const currentEndMin = parseTimeToMinutes(currentEnd);
 
-    // Mapeamento da quadra selecionada
-    let dbCourtId = courtId;
-    if (courtId === 'fut5') dbCourtId = 'court-esportes-de-quadra-1788962671043';
-    if (courtId === 'fut6') dbCourtId = 'court-society-2';
-    if (courtId === 'fut7') dbCourtId = 'court-futsal-1788963178368';
-    if (courtId === 'society') dbCourtId = 'court-society-1';
-    if (courtId === 'areia') dbCourtId = 'court-beach-1';
-    if (courtId === 'futmesa') dbCourtId = 'court-futmesa-1';
+    const filterKey = courtId + '_' + dateStr + '_' + (shouldHideOccupied ? '1' : '0');
 
-    // Obter dia da semana para mensalistas
-    const dateObj = new Date(dateStr + 'T12:00:00');
-    const daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
-    const dayOfWeek = daysMap[dateObj.getDay()];
+    // 1. CAMINHO ULTRA-RÁPIDO: Atualização in-place dos botões existentes (0ms delay, sem reconstruir DOM)
+    if (!forceRebuild && grid.dataset.filterKey === filterKey && grid.children.length > 0) {
+      const slotButtons = grid.querySelectorAll('button[data-slot-min]');
+      if (slotButtons.length > 0) {
+        slotButtons.forEach(btn => {
+          if (btn.disabled) return;
+          const m = parseInt(btn.dataset.slotMin, 10);
+          const slotEndMin = m + 30;
+          const isSelected = (m >= currentStartMin && slotEndMin <= currentEndMin);
+          const badgeSpan = btn.querySelector('.balcao-slot-badge');
+
+          if (isSelected) {
+            const isStart = (m === currentStartMin);
+            const isEnd = (slotEndMin === currentEndMin);
+            const badgeLabel = isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.');
+            btn.className = 'p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75';
+            if (badgeSpan) {
+              badgeSpan.className = 'balcao-slot-badge text-[9px] uppercase tracking-tighter text-emerald-100 font-bold';
+              badgeSpan.textContent = badgeLabel;
+            }
+          } else {
+            btn.className = 'p-2 rounded-xl text-[11px] font-bold bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-300 hover:border-emerald-500 cursor-pointer text-center flex flex-col items-center justify-center hover:scale-[1.02] select-none active:scale-95 transition-transform duration-75';
+            if (badgeSpan) {
+              badgeSpan.className = 'balcao-slot-badge text-[9px] uppercase tracking-tighter text-emerald-600 font-semibold';
+              badgeSpan.textContent = 'Livre';
+            }
+          }
+        });
+
+        // Atualiza aviso de próximo jogo se necessário
+        if (nextAlertEl && nextAlertText) {
+          const occupiedRanges = window.getBalcaoOccupiedRanges(courtId, dateStr);
+          const nextGame = occupiedRanges.find(r => r.start > currentStartMin);
+          if (nextGame) {
+            nextAlertEl.style.display = 'flex';
+            nextAlertText.innerHTML = '<div class="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2"><span>⚠️ A partir das <strong>' + nextGame.startStr + '</strong> tem agendamento de <strong>' + nextGame.name + '</strong> (' + nextGame.type + '). Livre livremente até às <strong>' + nextGame.startStr + '</strong>.</span><button type="button" onclick="selectBalcaoUntilNextGame()" class="px-2.5 py-1 bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition shrink-0"><i data-lucide="zap" class="w-3.5 h-3.5 text-amber-300"></i> Preencher até às ' + nextGame.startStr + '</button></div>';
+          } else {
+            nextAlertEl.style.display = 'none';
+          }
+        }
+
+        updateBalcaoSelectionSummary();
+        return;
+      }
+    }
+
+    // 2. CONSTRUÇÃO COMPLETA DA GRADE (Apenas quando a quadra, data ou filtro mudarem)
+    grid.dataset.filterKey = filterKey;
 
     // Checar se a data selecionada é hoje
     const todayStr = window.adminGameState.selectedDate || '2026-11-04';
     const isToday = (dateStr === todayStr);
-
-    // Horário atual aproximado em minutos
-    const now = new Date();
-    const currentRealMinutes = (now.getHours() * 60) + now.getMinutes();
 
     // Coletar intervalos ocupados no dia para esta quadra
     const occupiedRanges = window.getBalcaoOccupiedRanges(courtId, dateStr);
@@ -8395,7 +8442,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Se estiver no dia atual, slots anteriores ao horário de abertura ou no passado
     let html = '';
     let visibleSlotsCount = 0;
 
@@ -8421,27 +8467,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const isSelected = (!isUnavailable && m >= currentStartMin && slotEndMin <= currentEndMin);
 
       if (isOccupied) {
-        html += '<button type="button" disabled title="Ocupado: ' + conflict.name + ' (' + conflict.startStr + ' às ' + conflict.endStr + ')" class="p-2 rounded-xl text-[11px] font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 line-through text-center transition flex flex-col items-center justify-center">';
+        html += '<button type="button" disabled data-slot-min="' + m + '" title="Ocupado: ' + conflict.name + ' (' + conflict.startStr + ' às ' + conflict.endStr + ')" class="p-2 rounded-xl text-[11px] font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 line-through text-center flex flex-col items-center justify-center select-none">';
         html += '<span class="font-bold">' + slotTime + '</span>';
-        html += '<span class="text-[9px] uppercase tracking-tighter truncate max-w-[55px]">' + conflict.name + '</span>';
+        html += '<span class="balcao-slot-badge text-[9px] uppercase tracking-tighter truncate max-w-[55px]">' + conflict.name + '</span>';
         html += '</button>';
       } else if (isPast) {
-        html += '<button type="button" disabled title="Horário já passado" class="p-2 rounded-xl text-[11px] font-semibold bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50 text-center transition flex flex-col items-center justify-center">';
+        html += '<button type="button" disabled data-slot-min="' + m + '" title="Horário já passado" class="p-2 rounded-xl text-[11px] font-semibold bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50 text-center flex flex-col items-center justify-center select-none">';
         html += '<span class="font-bold">' + slotTime + '</span>';
-        html += '<span class="text-[9px] uppercase tracking-tighter">Passado</span>';
+        html += '<span class="balcao-slot-badge text-[9px] uppercase tracking-tighter">Passado</span>';
         html += '</button>';
       } else if (isSelected) {
         const isStart = (m === currentStartMin);
         const isEnd = (slotEndMin === currentEndMin);
         const badgeLabel = isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.');
-        html += '<button type="button" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Selecionado (' + slotTime + ' às ' + slotNextTime + ') - Toque para alterar ou ajustar" class="p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center transition flex flex-col items-center justify-center">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Selecionado (' + slotTime + ' às ' + slotNextTime + ') - Toque para alterar ou ajustar" class="p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
-        html += '<span class="text-[9px] uppercase tracking-tighter text-emerald-100 font-bold">' + badgeLabel + '</span>';
+        html += '<span class="balcao-slot-badge text-[9px] uppercase tracking-tighter text-emerald-100 font-bold">' + badgeLabel + '</span>';
         html += '</button>';
       } else {
-        html += '<button type="button" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ' às ' + slotNextTime + ') - Toque para selecionar" class="p-2 rounded-xl text-[11px] font-bold bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-300 hover:border-emerald-500 cursor-pointer text-center transition flex flex-col items-center justify-center hover:scale-[1.02]">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ' às ' + slotNextTime + ') - Toque para selecionar" class="p-2 rounded-xl text-[11px] font-bold bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-300 hover:border-emerald-500 cursor-pointer text-center flex flex-col items-center justify-center hover:scale-[1.02] select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
-        html += '<span class="text-[9px] uppercase tracking-tighter text-emerald-600 font-semibold">Livre</span>';
+        html += '<span class="balcao-slot-badge text-[9px] uppercase tracking-tighter text-emerald-600 font-semibold">Livre</span>';
         html += '</button>';
       }
     }
@@ -8465,7 +8511,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Atualiza o resumo
     updateBalcaoSelectionSummary();
-    if (window.lucide) lucide.createIcons();
   };
 
   // Helper global para coletar ocupados da quadra/data do modal
