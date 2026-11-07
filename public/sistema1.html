@@ -8548,6 +8548,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const endSelect = document.getElementById('directBookingEnd');
     if (!startSelect || !endSelect) return;
 
+    // Helper: força o valor no select, criando a opção se necessário
+    const forceSelectValue = (sel, val) => {
+      if (!sel || !val) return;
+      let opt = Array.from(sel.options).find(o => o.value === val);
+      if (!opt) {
+        opt = new Option(val, val);
+        sel.add(opt);
+      }
+      sel.value = val;
+    };
+
     const clickedMin = parseTimeToMinutes(slotTime);
     let curStartMin = parseTimeToMinutes(startSelect.value);
     let curEndMin = parseTimeToMinutes(endSelect.value);
@@ -8574,36 +8585,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Primeiro clique: inicia seleção no slot clicado
     if (!window.__balcaoHasUserInteracted) {
-      startSelect.value = slotTime;
+      forceSelectValue(startSelect, slotTime);
       const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
-      endSelect.value = formatMinutesToTime(defEnd);
+      forceSelectValue(endSelect, formatMinutesToTime(defEnd));
       window.__balcaoHasUserInteracted = true;
 
-    // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas)
+    // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas/blocos)
     } else if (clickedMin > curEndMin) {
-      if (!hasConflict(curEndMin, clickedMin)) {
-        endSelect.value = slotTime;
+      if (!hasConflict(curStartMin, clickedMin)) {
+        forceSelectValue(endSelect, slotTime);
       } else {
         // Conflito no caminho: nova seleção
-        startSelect.value = slotTime;
-        endSelect.value = formatMinutesToTime(clickedMin + 30);
+        forceSelectValue(startSelect, slotTime);
+        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
       }
 
     // 3. Clique ANTES do Início atual → EXPANDE para trás (sem limite)
     } else if (clickedMin < curStartMin) {
-      if (!hasConflict(clickedMin, curStartMin)) {
-        startSelect.value = slotTime;
+      if (!hasConflict(clickedMin, curEndMin)) {
+        forceSelectValue(startSelect, slotTime);
       } else {
         // Conflito: nova seleção
-        startSelect.value = slotTime;
-        endSelect.value = formatMinutesToTime(clickedMin + 30);
+        forceSelectValue(startSelect, slotTime);
+        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
       }
 
     // 4. Clique NO slot de Fim exato → REMOVE 30min do final (reduz)
     } else if (clickedMin === curEndMin) {
       const duration = curEndMin - curStartMin;
       if (duration > 30) {
-        endSelect.value = formatMinutesToTime(curEndMin - 30);
+        forceSelectValue(endSelect, formatMinutesToTime(curEndMin - 30));
       }
       // se já é mínimo de 30min, não faz nada
 
@@ -8611,15 +8622,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (clickedMin === curStartMin) {
       const duration = curEndMin - curStartMin;
       if (duration > 30) {
-        startSelect.value = formatMinutesToTime(curStartMin + 30);
+        forceSelectValue(startSelect, formatMinutesToTime(curStartMin + 30));
       }
       // se já é mínimo de 30min, não faz nada
 
-    // 6. Clique em slot INTERMEDIÁRIO (dentro do intervalo) → CORTA o Fim naquele ponto (remove bloco)
+    // 6. Clique em slot INTERMEDIÁRIO (dentro do intervalo) → CORTA o Fim naquele ponto (remove bloco completo)
     } else {
       // curStartMin < clickedMin < curEndMin
       // Reduz a seleção: o novo Fim passa a ser o slot clicado
-      endSelect.value = slotTime;
+      forceSelectValue(endSelect, slotTime);
     }
 
     autoCalculateDirectBookingPrice();
