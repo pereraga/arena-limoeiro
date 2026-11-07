@@ -5168,7 +5168,7 @@ document.addEventListener('DOMContentLoaded', () => {
           status: 'confirmed',
           isMensalista: true,
           booking_type: 'mensalista',
-          payment_method: 'pago_balcao',
+          payment_method: 'Mensal',
           observation: 'Horário Fixo Semanal (TERÇA)'
         },
         {
@@ -5186,7 +5186,7 @@ document.addEventListener('DOMContentLoaded', () => {
           status: 'confirmed',
           isMensalista: true,
           booking_type: 'mensalista',
-          payment_method: 'pago_balcao',
+          payment_method: 'Mensal',
           observation: 'Horário Fixo Semanal (TERÇA)'
         },
         {
@@ -7117,7 +7117,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const price = Number(m.total_price || m.price || 100).toFixed(2).replace('.', ',');
-    const payment = m.payment || (m.payment_method ? (m.payment_method.includes('Pago') || m.payment_method.includes('PIX') ? 'Pago' : m.payment_method) : 'Pago');
+    let rawPay = String(m.payment || m.payment_method || (isMensalista ? 'Mensal' : 'Pago')).trim();
+    if (rawPay === 'pago_balcao' || rawPay === 'pagar_local' || rawPay === 'pos_jogo' || (isMensalista && (rawPay.toLowerCase().includes('balcao') || rawPay.toLowerCase().includes('faturada') || rawPay === 'Pago' || rawPay === 'pago'))) {
+      rawPay = 'Mensal';
+    }
+    const payment = rawPay;
     const playersCount = m.players || 14;
     const observation = m.observation || m.note || (m.dayFixed ? 'Horário Fixo Semanal (' + m.dayFixed + ')' : (isMensalista ? 'Horário Fixo Semanal (QUARTA)' : 'Reserva Confirmada'));
     
@@ -7293,6 +7297,15 @@ document.addEventListener('DOMContentLoaded', () => {
           <!-- Bloco 3: Valor Financeiro e Botão Principal -->
           <div class="lg:col-span-3 flex lg:flex-col items-end justify-between lg:justify-start gap-4">
             <div class="text-right">
+              ${isMensalista ? `
+              <div class="text-[11px] font-black text-purple-700 uppercase tracking-wider">Assinatura Mensal</div>
+              <div id="mainPriceDisplay-${m.id}" class="text-2xl sm:text-3xl font-extrabold text-purple-950 font-heading tracking-tight">Mensalista</div>
+              <div class="flex items-center justify-end gap-1.5 mt-0.5">
+                <span class="inline-flex items-center text-[11px] font-black text-purple-800 bg-purple-50 px-2.5 py-0.5 rounded-lg border border-purple-200">
+                  <i class="fa-solid fa-circle-check text-[10px] mr-1 text-purple-600"></i> Mensal
+                </span>
+              </div>
+              ` : `
               <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Valor Contratado</div>
               <div id="mainPriceDisplay-${m.id}" class="text-3xl font-extrabold text-slate-900 font-heading tracking-tight">R$ ${currentTotalStr}</div>
               <div class="flex items-center justify-end gap-1.5 mt-0.5">
@@ -7300,6 +7313,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   <i class="fa-solid fa-check text-[9px] mr-1 text-emerald-600"></i> ${payment}
                 </span>
               </div>
+              `}
             </div>
 
             <!-- BOTÃO PRINCIPAL VISÍVEL: VERDE PARA INICIAR -> APÓS APERTAR, FICA VERMELHO (FINALIZAR) -->
@@ -7373,9 +7387,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="text-[10px] font-bold uppercase tracking-wider">Status Financeiro</span>
                 <i class="fa-solid fa-receipt text-emerald-600 text-xs"></i>
               </div>
-              <div class="font-bold text-emerald-700 text-sm">${payment} • R$ ${price}</div>
+              <div class="font-bold text-emerald-700 text-sm">${isMensalista ? 'Mensal' : (payment + ' • R$ ' + price)}</div>
               <div class="text-[11px] text-slate-500 mt-0.5 flex items-center justify-between">
-                <span>Sem pendências</span>
+                <span>${isMensalista ? 'Contrato mensal' : 'Sem pendências'}</span>
                 <a href="#" onclick="viewReceipt('${m.id}'); return false;" class="text-emerald-600 font-semibold hover:underline">Ver Recibo</a>
               </div>
             </div>
@@ -7455,13 +7469,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="flex items-center justify-between">
                   <span class="text-[10px] font-bold uppercase text-slate-400">Cálculo Automático / Valor</span>
                   <span id="badge-calc-status-${m.id}" class="text-[10px] font-bold ${extraMin > 0 ? 'text-amber-700 bg-amber-50' : 'text-emerald-700 bg-emerald-50'} px-1.5 py-0.5 rounded">
-                    ${extraMin > 0 ? 'Pendente Extra' : 'Pago'}
+                    ${extraMin > 0 ? 'Pendente Extra' : (isMensalista ? 'Mensal' : 'Pago')}
                   </span>
                 </div>
                 <div>
-                  <div id="status-calc-total-${m.id}" class="text-xl font-extrabold text-slate-900 font-heading">R$ ${currentTotalStr} • ${extraMin > 0 ? 'Pendente Extra' : 'Pago'}</div>
+                  <div id="status-calc-total-${m.id}" class="text-xl font-extrabold text-slate-900 font-heading">${isMensalista ? ('Mensal' + (extraMin > 0 ? ' • Pendente Extra' : '')) : ('R$ ' + currentTotalStr + ' • ' + (extraMin > 0 ? 'Pendente Extra' : 'Pago'))}</div>
                   <div id="status-calc-detail-${m.id}" class="text-[10px] text-slate-500">
-                    ${extraMin > 0 ? `Base R$ ${price} + Extra (${extraMin}m): R$ ${computedExtraAmountStr}` : `Valor contratado: R$ ${price}`}
+                    ${isMensalista ? 'Plano Mensalista (Gestão mensal separada)' : (extraMin > 0 ? `Base R$ ${price} + Extra (${extraMin}m): R$ ${computedExtraAmountStr}` : `Valor contratado: R$ ${price}`)}
                   </div>
                 </div>
               </div>
@@ -7806,7 +7820,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Atualiza KPIs do topo com base no dia atual (Hoje / Faturamento real dinâmico)
     const currentToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
     const allTodayMatches = getMatchesForDate(currentToday);
-    const topRevenue = allTodayMatches.reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
+    // Não contabiliza o valor dos fixos/mensalistas no faturamento diário de jogos avulsos
+    const topRevenue = allTodayMatches.filter(m => !m.isMensalista && m.booking_type !== 'mensalista' && m.type !== 'Mensalista').reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
     const topLiveCount = allTodayMatches.filter(m => window.checkIsMatchLive(m, currentToday)).length;
 
     const kpiRev = document.getElementById('kpiValueRevenue') || document.querySelector('.kpi-value-revenue');
