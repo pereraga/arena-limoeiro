@@ -8878,11 +8878,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (m > 0) durTxt += (h > 0 ? ' ' : '') + m + 'min';
     if (diff === 0) durTxt = '0min';
 
-    const blocksCount = Math.round(diff / 30);
-    const detailTxt = durTxt + ' • ' + blocksCount + (blocksCount === 1 ? ' janela (30min)' : ' janelas (30min)');
-
     if (timeEl) timeEl.textContent = sStr + ' às ' + eStr;
-    if (durEl) durEl.textContent = durTxt + ' (' + blocksCount + ' blocos)';
+    if (durEl) durEl.textContent = durTxt;
 
     if (helperBannerText) {
       if (window.__balcaoClickState === 'awaiting_end') {
