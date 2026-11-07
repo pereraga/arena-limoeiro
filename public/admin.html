@@ -3762,38 +3762,12 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
-        <!-- Atalhos de Duração Rápida -->
-        <div class="flex items-center justify-between flex-wrap gap-1.5 p-2 bg-emerald-50/70 border border-emerald-200/90 rounded-xl">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[11px] font-black text-emerald-950 uppercase tracking-tight flex items-center gap-1">
-              <span>⏱️</span> Duração Rápida:
-            </span>
-            <button type="button" onclick="setBalcaoQuickDuration(30)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-900 font-black text-[11px] border border-emerald-300 shadow-2xs transition cursor-pointer">⚡ 30 min (Meia hora)</button>
-            <button type="button" onclick="setBalcaoQuickDuration(60)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-900 font-black text-[11px] border border-emerald-300 shadow-2xs transition cursor-pointer">⚡ 1 hora</button>
-            <button type="button" onclick="setBalcaoQuickDuration(90)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-900 font-black text-[11px] border border-emerald-300 shadow-2xs transition cursor-pointer">⚡ 1h30</button>
-            <button type="button" onclick="setBalcaoQuickDuration(120)" class="px-2.5 py-1 rounded-lg bg-white hover:bg-emerald-100 text-emerald-900 font-black text-[11px] border border-emerald-300 shadow-2xs transition cursor-pointer">⚡ 2 horas</button>
-            <button type="button" onclick="selectBalcaoUntilNextGame()" class="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-900 font-black text-[11px] border border-sky-300 shadow-2xs transition cursor-pointer">⚡ Até Próximo Jogo</button>
-          </div>
-        </div>
-
-        <!-- Banner de Orientação e Status Interativo -->
-        <div id="balcaoCalendarStepHelper" class="p-2.5 rounded-xl bg-gradient-to-r from-emerald-700 via-emerald-800 to-teal-800 text-white shadow-xs flex items-center justify-between gap-2 text-xs font-bold">
-          <div class="flex items-center gap-2">
-            <span class="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center font-black text-xs shrink-0">📅</span>
-            <span id="balcaoStepHelperText">Clique no horário de <strong>INÍCIO</strong> e depois no horário de <strong>FIM</strong> no calendário.</span>
-          </div>
-          <div class="text-right shrink-0">
-            <span id="balcaoHelperDurationBadge" class="px-2.5 py-1 rounded-md bg-white text-emerald-900 font-black text-[11px] shadow-2xs">1 hora</span>
-          </div>
-        </div>
-
-        <!-- Grade de Janelas de 30 minutos geradas dinamicamente -->
         <div id="directBookingSlotsGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-1.5 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
           <!-- Slots de 30min injetados aqui -->
         </div>
 
         <!-- Alerta de Limite de Horário / Jogo Concorrente -->
-        <div id="balcaoNextGameAlert" style="display:none;" class="p-2.5 bg-sky-50 border border-sky-200 rounded-xl text-xs font-semibold text-sky-900 flex items-center gap-2">
+        <div id="balcaoNextGameAlert" style="display:none !important;" class="hidden">
           <i data-lucide="alert-circle" class="w-4 h-4 text-sky-600 shrink-0"></i>
           <span id="balcaoNextGameAlertText">Atenção: Próximo jogo agendado detectado.</span>
         </div>
@@ -8364,7 +8338,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // GESTÃO DE JANELAS DE HORAS (30 EM 30 MIN) PARA RESERVA DIRETA DE BALCÃO
   // Otimização Completa: Seleção Direta de INÍCIO e FIM pelo Calendário (0ms delay)
   window.__balcaoSelectionHistory = [];
-  window.__balcaoClickState = null; // 'awaiting_end' ou 'complete'
+  window.__balcaoHasUserInteracted = false;
+      window.__balcaoSelectionHistory = []; // 'awaiting_end' ou 'complete'
 
   // Duração rápida por botões de atalho
   window.setBalcaoQuickDuration = function(minutes) {
@@ -8461,17 +8436,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Atualiza aviso de próximo jogo se necessário
-        if (nextAlertEl && nextAlertText) {
-          const occupiedRanges = window.getBalcaoOccupiedRanges(courtId, dateStr);
-          const nextGame = occupiedRanges.find(r => r.start > currentStartMin);
-          if (nextGame) {
-            nextAlertEl.style.display = 'flex';
-            nextAlertText.innerHTML = '<div class="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2"><span>⚠️ A partir das <strong>' + nextGame.startStr + '</strong> tem agendamento de <strong>' + nextGame.name + '</strong> (' + nextGame.type + '). Livre até às <strong>' + nextGame.startStr + '</strong>.</span><button type="button" onclick="selectBalcaoUntilNextGame()" class="px-2.5 py-1 bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition shrink-0"><i data-lucide="zap" class="w-3.5 h-3.5 text-amber-300"></i> Preencher até às ' + nextGame.startStr + '</button></div>';
-          } else {
-            nextAlertEl.style.display = 'none';
-          }
-        }
-
+        if (nextAlertEl) nextAlertEl.style.display = 'none';
         updateBalcaoSelectionSummary();
         return;
       }
@@ -8573,17 +8538,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Checa aviso de próximo jogo após o horário de início selecionado
-    if (nextAlertEl && nextAlertText) {
-      const nextGame = occupiedRanges.find(r => r.start > currentStartMin);
-      if (nextGame) {
-        nextAlertEl.style.display = 'flex';
-        nextAlertText.innerHTML = '<div class="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2"><span>⚠️ A partir das <strong>' + nextGame.startStr + '</strong> tem agendamento de <strong>' + nextGame.name + '</strong> (' + nextGame.type + '). Livre até às <strong>' + nextGame.startStr + '</strong>.</span><button type="button" onclick="selectBalcaoUntilNextGame()" class="px-2.5 py-1 bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition shrink-0"><i data-lucide="zap" class="w-3.5 h-3.5 text-amber-300"></i> Preencher até às ' + nextGame.startStr + '</button></div>';
-      } else {
-        nextAlertEl.style.display = 'none';
-      }
-    }
-
-    updateBalcaoSelectionSummary();
+    if (nextAlertEl) nextAlertEl.style.display = 'none';
+        updateBalcaoSelectionSummary();
   };
 
   // Alterna e define intervalos de horários com precisão pelo calendário
@@ -8595,11 +8551,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const clickedMin = parseTimeToMinutes(slotTime);
     let curStartMin = parseTimeToMinutes(startSelect.value);
     let curEndMin = parseTimeToMinutes(endSelect.value);
-    const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
+    const courtSelect = document.getElementById('directBookingCourt');
+    const dateInput = document.getElementById('directBookingDate');
+    const courtId = courtSelect ? courtSelect.value : 'fut7';
+    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04');
+    const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges(courtId, dateStr) : [];
 
-    // Salva histórico para botão Voltar
+    // Salva histórico para o botão Voltar Seleção
     window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
-    window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value, state: window.__balcaoClickState });
+    window.__balcaoSelectionHistory.push({
+      start: startSelect.value,
+      end: endSelect.value,
+      hasInteracted: window.__balcaoHasUserInteracted
+    });
     if (window.__balcaoSelectionHistory.length > 20) window.__balcaoSelectionHistory.shift();
 
     const hasConflict = (fromM, toM) => {
@@ -8608,55 +8572,59 @@ document.addEventListener('DOMContentLoaded', () => {
       return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
     };
 
-    // Caso 1: Usuário acabou de clicar em um Início e agora clica em um horário posterior para ser o FIM
-    if (window.__balcaoClickState === 'awaiting_end') {
-      if (clickedMin > curStartMin && !hasConflict(curStartMin, clickedMin)) {
-        // Define o FIM exatamente no botão clicado!
-        // Ex: Início 12:00 -> clica 12:30 -> Fim 12:30 (meia hora)
-        // Ex: Início 12:00 -> clica 13:00 -> Fim 13:00 (1 hora)
-        // Ex: Início 12:00 -> clica 14:00 -> Fim 14:00 (2 horas)
-        endSelect.value = slotTime;
-        window.__balcaoClickState = 'complete';
-      } else if (clickedMin === curStartMin) {
-        // Clicou no mesmo slot de início -> alterna entre 30 min e 1 hora
-        const curDiff = curEndMin - curStartMin;
-        if (curDiff === 30 && !hasConflict(curStartMin, curStartMin + 60)) {
-          endSelect.value = formatMinutesToTime(curStartMin + 60);
+    // 1. Primeiro clique do usuário após abrir o modal: define o Início diretamente no slot clicado
+    if (!window.__balcaoHasUserInteracted) {
+      startSelect.value = slotTime;
+      const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
+      endSelect.value = formatMinutesToTime(defEnd);
+      window.__balcaoHasUserInteracted = true;
+    }
+    // 2. Clique posterior ao início atual (clickedMin > curStartMin)
+    else if (clickedMin > curStartMin) {
+      if (hasConflict(curStartMin, clickedMin)) {
+        // Conflito no caminho: inicia nova seleção no slot clicado
+        startSelect.value = slotTime;
+        endSelect.value = formatMinutesToTime(clickedMin + 30);
+      } else if (clickedMin > curEndMin) {
+        // Se for muito distante (> 180 min após o fim), inicia novo intervalo
+        if (clickedMin - curEndMin > 180) {
+          startSelect.value = slotTime;
+          endSelect.value = formatMinutesToTime(clickedMin + 30);
         } else {
-          endSelect.value = formatMinutesToTime(curStartMin + 30);
+          // Estende o Fim diretamente para o slot clicado
+          endSelect.value = slotTime;
         }
-        window.__balcaoClickState = 'complete';
+      } else if (clickedMin === curEndMin) {
+        // Clicou exatamente no botão de Fim
+        const duration = curEndMin - curStartMin;
+        if (duration > 30) {
+          // Reduz/remove 30 minutos (volta 1 slot)
+          endSelect.value = formatMinutesToTime(curEndMin - 30);
+        } else {
+          // Já é meia hora (mínimo) -> mantém confirmado
+          endSelect.value = slotTime;
+        }
       } else {
-        // Clicou em horário anterior ou com conflito -> inicia novo início no slot clicado
-        startSelect.value = slotTime;
-        const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (clickedMin + 30);
-        endSelect.value = formatMinutesToTime(defEnd);
-        window.__balcaoClickState = 'awaiting_end';
-      }
-    } 
-    // Caso 2: Já existia uma seleção completa (ou inicial)
-    else {
-      // Se clicou em um horário posterior ao início atual e sem conflito, ajusta o FIM para o horário clicado
-      if (clickedMin > curStartMin && !hasConflict(curStartMin, clickedMin)) {
+        // Clicou em slot intermediário selecionado (curStartMin < clickedMin < curEndMin): ajusta Fim
         endSelect.value = slotTime;
-        window.__balcaoClickState = 'complete';
-      } 
-      // Se clicou no mesmo botão de início, alterna entre 30min e 1h
-      else if (clickedMin === curStartMin) {
-        const curDiff = curEndMin - curStartMin;
-        if (curDiff === 30 && !hasConflict(curStartMin, curStartMin + 60)) {
-          endSelect.value = formatMinutesToTime(curStartMin + 60);
-        } else {
-          endSelect.value = formatMinutesToTime(curStartMin + 30);
-        }
-        window.__balcaoClickState = 'complete';
-      } 
-      // Caso contrário, inicia nova seleção naquele horário
-      else {
+      }
+    }
+    // 3. Clique exatamente no botão de Início
+    else if (clickedMin === curStartMin) {
+      const duration = curEndMin - curStartMin;
+      if (duration > 30) {
+        endSelect.value = formatMinutesToTime(curStartMin + 30);
+      }
+    }
+    // 4. Clique anterior ao início atual (clickedMin < curStartMin)
+    else {
+      if (curStartMin - clickedMin <= 120 && !hasConflict(clickedMin, curEndMin)) {
+        // Expansão para trás
         startSelect.value = slotTime;
-        const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (clickedMin + 30);
-        endSelect.value = formatMinutesToTime(defEnd);
-        window.__balcaoClickState = 'awaiting_end';
+      } else {
+        // Inicia nova seleção no horário clicado
+        startSelect.value = slotTime;
+        endSelect.value = formatMinutesToTime(clickedMin + 30);
       }
     }
 
@@ -8679,7 +8647,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (startSelect && endSelect && prev) {
       startSelect.value = prev.start;
       endSelect.value = prev.end;
-      window.__balcaoClickState = prev.state || 'complete';
+      window.__balcaoHasUserInteracted = prev.hasInteracted !== undefined ? prev.hasInteracted : true;
       autoCalculateDirectBookingPrice();
       renderBalcaoTimeSlots();
       if (typeof window.showNotification === 'function') {
@@ -9051,6 +9019,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.openDirectBookingModal = function() {
+    window.__balcaoHasUserInteracted = false;
+    window.__balcaoSelectionHistory = [];
     window.__balcaoClickState = null;
     const modal = document.getElementById('directBookingModal');
     if (!modal) return;
