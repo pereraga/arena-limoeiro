@@ -3819,15 +3819,8 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
-      <!-- SELEÇÃO VISÍVEL E CONFIRMAÇÃO DE HORÁRIO DE INÍCIO E FIM -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl">
-        <div>
-          <label class="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1 flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Horário de Início *
-          </label>
-          <div class="relative">
-            <select id="directBookingStart" onchange="onDirectBookingDropdownChange()" required
-                    class="w-full p-2.5 bg-white border border-emerald-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer shadow-xs">
+      <!-- INPUTS DE INÍCIO E FIM (INTERNOS - CONTROLADOS PELO CALENDÁRIO) -->
+      <div style="display:none;" aria-hidden="true">
         <select id="directBookingStart" onchange="onDirectBookingDropdownChange()" required>
           <option value="06:00">06:00</option>
           <option value="06:30">06:30</option>
@@ -3867,15 +3860,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="23:30">23:30</option>
         </select>
 
-        </div>
-        </div>
-        <div>
-          <label class="block text-xs font-black text-slate-700 uppercase tracking-tight mb-1 flex items-center gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-700"></span> Horário de Término *
-          </label>
-          <div class="relative">
-            <select id="directBookingEnd" onchange="onDirectBookingDropdownChange()" required
-                    class="w-full p-2.5 bg-white border border-emerald-300 rounded-xl text-xs font-black text-slate-800 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer shadow-xs">
+        <select id="directBookingEnd" onchange="onDirectBookingDropdownChange()" required>
           <option value="06:30">06:30</option>
           <option value="07:00">07:00</option>
           <option value="07:30">07:30</option>
@@ -3912,9 +3897,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <option value="23:00">23:00</option>
           <option value="23:30">23:30</option>
           <option value="23:59">23:59</option>
-            </select>
-          </div>
-        </div>
+        </select>
       </div>
 
       <!-- VALOR TOTAL E FORMA DE PAGAMENTO -->
