@@ -4202,6 +4202,20 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
+      <!-- Quadra / Espaço Oficial do Contrato -->
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quadra / Campo Oficial *</label>
+        <select id="contractCourt" required
+                class="w-full p-2.5 bg-emerald-50/60 border border-emerald-300 rounded-xl text-xs font-black text-emerald-950 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+          <option value="fut5">FUT 5 – SOCCER 5 (Quadra Society 1)</option>
+          <option value="fut6">FUT 6 – SOCCER 6 (Quadra Society 2)</option>
+          <option value="fut7">FUT 7 – SOCCER 7 (Campo Society Fut 7)</option>
+          <option value="futmesa">FOOT TABLE – FUTMESA (Futmesa & Lazer)</option>
+          <option value="areia">AREIA – BEACH SPORTS (Quadra de Areia)</option>
+          <option value="society">QUADRA SOCIETY (Arena Central)</option>
+        </select>
+      </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Início da Validade</label>
@@ -4726,16 +4740,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Mapeamento preciso de quadras por ID do banco de dados
+  // Mapeamento preciso e oficial de quadras e campos da Arena Limoeiro
   function getCourtById(cId) {
     if (!cId) return ADMIN_COURTS[0];
     const clean = String(cId).toLowerCase();
-    if (clean === 'court-esportes-de-quadra-1788962671043' || clean.includes('fut5')) return ADMIN_COURTS[0];
-    if (clean === 'court-society-2' || clean.includes('fut6')) return ADMIN_COURTS[1];
-    if (clean === 'court-futsal-1788963178368' || clean.includes('fut7')) return ADMIN_COURTS[2];
-    if (clean.includes('futmesa') || clean.includes('foot-table')) return ADMIN_COURTS[3];
-    if (clean === 'court-beach-1' || clean === 'court-beach-2' || clean.includes('areia') || clean.includes('beach')) return ADMIN_COURTS[4];
-    if (clean === 'court-society-1' || clean.includes('society')) return ADMIN_COURTS[5];
+    // 1. FUT 5 (court-society-1)
+    if (clean === 'court-society-1' || clean === 'fut5' || clean.includes('fut 5') || clean.includes('fut5') || clean.includes('soccer 5') || clean.includes('soccer-5')) return ADMIN_COURTS[0];
+    // 2. FUT 6 (court-society-2)
+    if (clean === 'court-society-2' || clean === 'fut6' || clean.includes('fut 6') || clean.includes('fut6') || clean.includes('soccer 6') || clean.includes('soccer-6')) return ADMIN_COURTS[1];
+    // 3. FUT 7 (court-beach-1 - Campo Society Fut 7)
+    if (clean === 'court-beach-1' || clean === 'fut7' || clean.includes('fut 7') || clean.includes('fut7') || clean.includes('soccer 7') || clean.includes('soccer-7')) return ADMIN_COURTS[2];
+    // 4. FUTMESA (court-esportes-de-quadra-1788962671043)
+    if (clean === 'court-esportes-de-quadra-1788962671043' || clean === 'futmesa' || clean.includes('futmesa') || clean.includes('foot-table') || clean.includes('foottable') || clean.includes('esportes-de-quadra')) return ADMIN_COURTS[3];
+    // 5. AREIA (court-beach-2 - Quadra de Areia)
+    if (clean === 'court-beach-2' || clean === 'areia' || clean.includes('areia') || clean.includes('sand court') || clean.includes('beach-2')) return ADMIN_COURTS[4];
+    // 6. QUADRA SOCIETY (court-futsal-1788963178368 - Arena Central)
+    if (clean === 'court-futsal-1788963178368' || clean === 'society' || clean.includes('futsal') || clean.includes('quadra society') || clean.includes('arena central')) return ADMIN_COURTS[5];
     return ADMIN_COURTS.find(c => c.id === cId) || ADMIN_COURTS[0];
   }
 
@@ -5520,190 +5540,7 @@ document.addEventListener('DOMContentLoaded', () => {
     arenaToast('Ausência registrada no histórico.');
   };
 
-  // Contrato
-  window.openContract = function(id) {
-    const g = getGame(id);
-    if (!g) return;
-    const c = g.contract || {};
-    document.getElementById('contractMatchId').value = id;
-    document.getElementById('cNumber').value = c.number || ('AL-' + (g.id || '2026'));
-    document.getElementById('cType').value = c.type || (g.isMensalista ? 'Mensalista' : (g.type || 'Avulso'));
-    document.getElementById('cStart').value = c.start || g.date || '2026-11-03';
-    document.getElementById('cEnd').value = c.end || g.date || '2026-11-03';
-    document.getElementById('cDay').value = c.day || g.dayFixed || 'TERÇA';
-    document.getElementById('cDue').value = c.due || '10';
-    document.getElementById('cAmount').value = c.amount ?? (g.total_price || g.price || 100);
-    document.getElementById('cSigned').value = c.signed || 'Assinado';
-    document.getElementById('cTerms').value = c.terms || 'Horário fixo semanal na Arena Limoeiro. Comunicar alterações com antecedência.';
-    
-    const court = getCourtById(g.court_id || g.courtId);
-    const p = document.getElementById('contractPreviewText');
-    if (p) {
-      p.innerHTML = '<b>Resumo:</b> ' + (g.customer_name || g.name) + ' · ' + (g.type || (g.isMensalista ? 'Mensalista' : 'Avulso')) + ' · ' + court.name + ' · ' + g.date + ' · ' + (g.time || '18:00 às 19:00') + ' · R$ ' + Number(g.total_price || g.price || 100).toFixed(2).replace('.', ',') + '.<br>Preencha os campos para atualizar os termos. Este resumo é administrativo.';
-    }
-    const m = document.getElementById('arenaContractModal');
-    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
-    if (window.lucide) lucide.createIcons();
-  };
 
-  window.saveContract = function(e) {
-    if (e) e.preventDefault();
-    const id = document.getElementById('contractMatchId').value;
-    const g = getGame(id);
-    if (!g) return;
-    g.contract = {
-      number: document.getElementById('cNumber').value.trim(),
-      type: document.getElementById('cType').value,
-      start: document.getElementById('cStart').value,
-      end: document.getElementById('cEnd').value,
-      day: document.getElementById('cDay').value,
-      due: document.getElementById('cDue').value,
-      amount: Number(document.getElementById('cAmount').value || 0),
-      signed: document.getElementById('cSigned').value,
-      terms: document.getElementById('cTerms').value.trim()
-    };
-    g.type = g.contract.type;
-    g.isMensalista = g.contract.type === 'Mensalista';
-    if (g.contract.day) g.dayFixed = g.contract.day;
-    addMatchLog(g, 'Contrato atualizado', 'Termo ' + (g.contract.number || 'sem número') + ' · ' + g.contract.signed);
-    saveAdminGameState();
-    closeArenaModal('arenaContractModal');
-    arenaToast('Contrato / termo atualizado.');
-  };
-
-  window.printContract = function() {
-    const id = document.getElementById('contractMatchId').value;
-    const g = getGame(id);
-    if (!g) return;
-    const c = {
-      number: document.getElementById('cNumber').value,
-      type: document.getElementById('cType').value,
-      start: document.getElementById('cStart').value,
-      end: document.getElementById('cEnd').value,
-      day: document.getElementById('cDay').value,
-      due: document.getElementById('cDue').value,
-      amount: document.getElementById('cAmount').value,
-      signed: document.getElementById('cSigned').value,
-      terms: document.getElementById('cTerms').value
-    };
-    const court = getCourtById(g.court_id || g.courtId);
-    const w = window.open('', '_blank');
-    if (!w) { alert('Habilite popups para imprimir o termo.'); return; }
-    w.document.write('<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Termo ' + (c.number || '') + '</title><style>body{font-family:Arial,sans-serif;max-width:760px;margin:40px auto;line-height:1.6;color:#193327;padding:20px}h1{color:#087a43;margin-bottom:4px}h2{color:#333;font-size:18px;margin-top:0}hr{border:0;border-top:1px solid #ccc;margin:20px 0}.foot{color:#777;font-size:12px}</style></head><body><h1>ARENA LIMOEIRO</h1><h2>Resumo de Reserva / Termo Administrativo</h2><p><b>Nº Termo:</b> ' + (c.number || 'Não informado') + '</p><p><b>Responsável / Titular:</b> ' + (g.customer_name || g.name) + '</p><p><b>WhatsApp / Contato:</b> ' + (g.customer_phone || g.phone || 'Não informado') + '</p><p><b>Espaço / Campo:</b> ' + court.name + '</p><p><b>Data e Horário:</b> ' + g.date + ', ' + (g.time || (g.start_time + ' às ' + g.end_time)) + '</p><p><b>Vínculo:</b> ' + c.type + ' · <b>Dia Fixo:</b> ' + (c.day || 'Não se aplica') + '</p><p><b>Vigência:</b> ' + (c.start || '—') + ' até ' + (c.end || '—') + ' · <b>Dia Vencimento:</b> ' + (c.due || '—') + '</p><p><b>Valor Contratado:</b> R$ ' + Number(c.amount || 0).toFixed(2).replace('.', ',') + '</p><p><b>Status do Documento:</b> ' + c.signed + '</p><p><b>Condições Gerais:</b><br>' + (c.terms || '—') + '</p><hr><p class="foot">Documento para conferência operacional da Arena Limoeiro.</p></body></html>');
-    w.document.close();
-    setTimeout(() => w.print(), 250);
-  };
-
-  // Duplicar e Cancelar
-  window.duplicateGame = function(id) {
-    const g = getGame(id);
-    if (!g) return;
-    const copy = JSON.parse(JSON.stringify(g));
-    copy.id = 'game-' + Date.now();
-    copy.status = 'pending';
-    copy.attendance = 'Aguardando chegada';
-    copy.checkinAt = '';
-    copy.startedAt = '';
-    copy.finishedAt = '';
-    copy.log = [];
-    addMatchLog(copy, 'Partida duplicada', 'Criada a partir de ' + (g.customer_name || g.name) + '; revise data e horário.');
-    window.adminGameState.bookings.unshift(copy);
-    saveAdminGameState();
-    arenaToast('Partida duplicada. Edite data e horário antes de confirmar.');
-  };
-
-window.cancelGame = function(id) {
-    if (!confirm('Deseja realmente cancelar esta partida? O cancelamento ficará registrado no histórico.')) return;
-    const g = getGame(id);
-    if (!g) return;
-
-    g.status = 'cancelled';
-    g.attendance = 'Cancelada';
-    addMatchLog(g, 'Partida cancelada', 'Cancelamento manual registrado pela administração.');
-    saveAdminGameState();
-
-    // ☁️ Persistência imediata nos bancos de dados para que a nuvem nunca reverta
-    if (typeof window.syncBookingToCloud === 'function') {
-      window.syncBookingToCloud(g, 'upsert');
-    }
-
-    renderMovementMatches();
-    renderCadastrosBookingsList();
-    arenaToast('Partida cancelada com sucesso!');
-  };
-
-  // Editar Jogo
-  window.openEditGame = function(id) {
-    const g = getGame(id);
-    if (!g) return;
-    document.getElementById('editMatchId').value = id;
-    document.getElementById('editMatchDate').value = g.date || window.adminGameState.selectedDate || '2026-11-03';
-    
-    const courtSelect = document.getElementById('editMatchCourt');
-    if (courtSelect) {
-      const c = getCourtById(g.court_id || g.courtId);
-      courtSelect.value = c.id;
-    }
-    
-    document.getElementById('editMatchName').value = g.customer_name || g.name || '';
-    document.getElementById('editMatchPhone').value = g.customer_phone || g.phone || '';
-    document.getElementById('editMatchType').value = g.type || (g.isMensalista ? 'Mensalista' : 'Avulso');
-    document.getElementById('editMatchStatus').value = g.status || 'confirmed';
-    document.getElementById('editMatchStart').value = g.start_time || g.start || '18:00';
-    document.getElementById('editMatchEnd').value = g.end_time || g.end || '19:00';
-    document.getElementById('editMatchPrice').value = g.total_price || g.price || 100;
-    document.getElementById('editMatchPayment').value = g.payment || 'Pago';
-    document.getElementById('editMatchPlayers').value = g.players || 14;
-    document.getElementById('editMatchDayFixed').value = g.dayFixed || '';
-    document.getElementById('editMatchNote').value = g.observation || g.note || '';
-    
-    const m = document.getElementById('arenaEditModal');
-    if (m) { m.style.display = 'flex'; m.classList.remove('hidden'); }
-    if (window.lucide) lucide.createIcons();
-  };
-
-  window.saveEditGame = function(e) {
-    if (e) e.preventDefault();
-    const id = document.getElementById('editMatchId').value;
-    const g = getGame(id);
-    if (!g) return;
-    
-    const oldStart = g.start_time || g.start;
-    const oldEnd = g.end_time || g.end;
-    
-    g.date = document.getElementById('editMatchDate').value;
-    g.court_id = document.getElementById('editMatchCourt').value;
-    const court = getCourtById(g.court_id);
-    g.court_name = court.name;
-    g.customer_name = document.getElementById('editMatchName').value.trim();
-    g.name = g.customer_name;
-    g.customer_phone = document.getElementById('editMatchPhone').value.trim();
-    g.phone = g.customer_phone;
-    g.type = document.getElementById('editMatchType').value;
-    g.isMensalista = g.type === 'Mensalista';
-    g.status = document.getElementById('editMatchStatus').value;
-    g.start_time = document.getElementById('editMatchStart').value;
-    g.start = g.start_time;
-    g.end_time = document.getElementById('editMatchEnd').value;
-    g.end = g.end_time;
-    g.time = g.start_time + ' às ' + g.end_time;
-    g.total_price = Number(document.getElementById('editMatchPrice').value || 0);
-    g.price = g.total_price;
-    g.payment = document.getElementById('editMatchPayment').value;
-    g.players = Number(document.getElementById('editMatchPlayers').value || 14);
-    g.dayFixed = document.getElementById('editMatchDayFixed').value;
-    g.observation = document.getElementById('editMatchNote').value.trim();
-    g.note = g.observation;
-    
-    addMatchLog(g, 'Partida editada', 'Dados atualizados (' + oldStart + '–' + oldEnd + ' → ' + g.start + '–' + g.end + ')');
-    saveAdminGameState();
-    // ☁️ Envia a edição imediatamente para os 2 Bancos de Dados na Nuvem
-    if (typeof window.syncBookingToCloud === 'function') {
-      window.syncBookingToCloud(g, 'upsert');
-    }
-    closeArenaModal('arenaEditModal');
-    arenaToast('Partida atualizada com sucesso!');
-  };
 
   // =========================================================================
   // FUNÇÕES DE CONCLUSÃO, CÁLCULO AUTOMÁTICO DE TEMPO EXTRA E ORIGEM
@@ -9419,8 +9256,16 @@ window.cancelGame = function(id) {
 
     if (!g.contract) g.contract = {};
     document.getElementById('contractMatchId').value = id;
-    document.getElementById('contractNumber').value = g.contract.number || 'AL-2026-' + (id.replace(/[^0-9]/g, '').slice(-3) || '042');
+    document.getElementById('contractNumber').value = g.contract.number || 'AL-2026-' + (String(id).replace(/[^0-9]/g, '').slice(-3) || '042');
     document.getElementById('contractType').value = g.contract.type || g.type || 'Mensalista';
+
+    // Determina e preenche com rigor a quadra/campo onde o fixo joga
+    const court = getCourtById(g.court_id || g.courtId);
+    const courtSelect = document.getElementById('contractCourt');
+    if (courtSelect) {
+      courtSelect.value = court.id;
+    }
+
     document.getElementById('contractStart').value = g.contract.start || '2026-01-01';
     document.getElementById('contractEnd').value = g.contract.end || '2026-12-31';
     document.getElementById('contractDayFixed').value = g.contract.dayFixed || g.dayFixed || 'TERÇA';
@@ -9437,7 +9282,7 @@ window.cancelGame = function(id) {
     if (window.lucide) lucide.createIcons();
   };
 
-  // Salvar Contrato
+  // Salvar Contrato com sincronização de Quadra/Campo nos Bancos de Dados
   window.saveContract = function(e) {
     if (e && e.preventDefault) e.preventDefault();
     const id = document.getElementById('contractMatchId').value;
@@ -9455,12 +9300,76 @@ window.cancelGame = function(id) {
     g.contract.status = document.getElementById('contractStatus').value;
     g.contract.terms = document.getElementById('contractTerms').value.trim();
 
-    addMatchLog(g, 'Contrato atualizado', 'Termo ' + g.contract.number + ' salvo com vencimento dia ' + g.contract.dueDay);
+    // Sincroniza a Quadra/Campo selecionada no Contrato
+    const courtSelect = document.getElementById('contractCourt');
+    if (courtSelect && courtSelect.value) {
+      const selectedCourt = getCourtById(courtSelect.value);
+      g.court_id = selectedCourt.id;
+      g.courtId = selectedCourt.id;
+      g.court_name = selectedCourt.name;
+      g.courtName = selectedCourt.name;
+      g.space = selectedCourt.name;
+      g.contract.courtId = selectedCourt.id;
+      g.contract.courtName = selectedCourt.name;
+
+      // Se for mensalista/fixo, atualiza no estado local e nos bancos Supabase
+      if (String(id).startsWith('monthly-') || g.isMensalista) {
+        const rawMonthlyId = String(id).replace('monthly-', '');
+        const member = (window.adminGameState.monthlyMembers || []).find(m => String(m.id) === rawMonthlyId);
+        if (member) {
+          member.court_id = selectedCourt.id;
+          member.courtId = selectedCourt.id;
+          member.court_name = selectedCourt.name;
+        }
+
+        // Mapeamento para o ID do banco se aplicável
+        const dbCourtMapping = {
+          'fut5': 'court-society-1',
+          'fut6': 'court-society-2',
+          'fut7': 'court-beach-1',
+          'futmesa': 'court-esportes-de-quadra-1788962671043',
+          'areia': 'court-beach-2',
+          'society': 'court-futsal-1788963178368'
+        };
+        const dbCourtId = dbCourtMapping[selectedCourt.id] || selectedCourt.id;
+
+        // Persistência assíncrona imediata nos 2 bancos Supabase para monthly_members
+        if (typeof ARENA_CLOUD_DBS !== 'undefined') {
+          [ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db1Url].forEach((dbUrl, idx) => {
+            if (!dbUrl) return;
+            const key = idx === 0 ? ARENA_CLOUD_DBS.db2Key : ARENA_CLOUD_DBS.db1Key;
+            fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(rawMonthlyId), {
+              method: 'PATCH',
+              headers: {
+                'apikey': key,
+                'Authorization': 'Bearer ' + key,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify({
+                court_id: dbCourtId,
+                court_name: selectedCourt.name,
+                updated_at: new Date().toISOString()
+              })
+            }).catch(err => console.warn('[ArenaCloud] Erro sync court mensalista:', err));
+          });
+        }
+      }
+    }
+
+    addMatchLog(g, 'Contrato atualizado', 'Termo ' + g.contract.number + ' · ' + (g.court_name || '') + ' · Venc: dia ' + g.contract.dueDay);
     saveAdminGameState();
+
+    // ☁️ Persistência imediata no agendamento para nunca haver reversão
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(g, 'upsert');
+    }
+
     closeArenaModal('arenaContractModal');
     renderMovementMatches();
     renderCadastrosBookingsList();
-    arenaToast('Contrato do mensalista salvo com sucesso!');
+    if (typeof renderCadastrosMonthlyList === 'function') renderCadastrosMonthlyList();
+    arenaToast('Contrato e quadra do mensalista salvos com sucesso!');
   };
 
   // Imprimir Termo / Contrato
@@ -9506,7 +9415,7 @@ window.cancelGame = function(id) {
           <div class="grid">
             <div class="box"><strong>Responsável / Equipe:</strong> ${g.customer_name || g.name || '---'}</div>
             <div class="box"><strong>WhatsApp / Contato:</strong> ${g.customer_phone || g.phone || '---'}</div>
-            <div class="box"><strong>Quadra / Espaço:</strong> ${g.courtName || g.space || '---'}</div>
+            <div class="box"><strong>Quadra / Espaço:</strong> ${(function() { const ct = getCourtById(g.court_id || g.courtId); return ct ? ct.name : (g.courtName || g.space || '---'); })()}</div>
             <div class="box"><strong>Dia da Semana / Horário:</strong> ${c.dayFixed || g.dayFixed || 'TERÇA'} das ${g.start_time || g.start || '18:00'} às ${g.end_time || g.end || '19:00'}</div>
           </div>
         </div>
