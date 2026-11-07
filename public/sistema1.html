@@ -1450,8 +1450,8 @@
                 <option value="finished">✅ Finalizados / Concluídos</option>
                 <option value="live">🟢 Ao Vivo / Em Andamento</option>
                 <option value="confirmed">🔵 Confirmados / Próximos</option>
-                <option value="everything">👁 Exibir Todas (Com Finalizadas e Canceladas)</option>
-                <option value="cancelled">🚫 Cancelados / Falta de Pagamento</option>
+                <option value="everything">👁 Exibir Todas (Com Finalizadas)</option>
+                <option value="unpaid">⚠️ Pagamento Faltando</option>
               </select>
               <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
@@ -6068,12 +6068,12 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
 
-    if (st === 'cancelled') {
+    if (st === 'unpaid' || st === 'cancelled') {
       return {
         percent: 100,
-        label: 'Cancelado automaticamente • Falta de pagamento',
-        counter: 'Cancelado',
-        fillClass: 'timer-fill-red',
+        label: 'Horário encerrado • Pagamento Faltando',
+        counter: 'Pagamento Faltando',
+        fillClass: 'timer-fill-warn',
         badgeClass: 'timer-overdue',
         isOverdue: false,
         isFuture: false
@@ -6160,6 +6160,59 @@ document.addEventListener('DOMContentLoaded', () => {
         isOverdue: true,
         isFuture: false
       };
+    }
+  };
+
+  
+  // =========================================================================
+  // EFETUAR PAGAMENTO IMEDIATO E CONCLUIR PARTIDA (VOLTA PARA ÁREA DE PAGO)
+  // =========================================================================
+  window.quickPayAndFinishMatch = function(id, customPaymentMethod) {
+    try {
+      const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
+      if (!g) {
+        if (typeof arenaToast === 'function') arenaToast('Agendamento não encontrado.');
+        return;
+      }
+
+      const method = customPaymentMethod || 'PIX';
+      const now = new Date();
+      const timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+      // 1. Atualiza status do jogo para Finalizado e Pago
+      g.status = 'finished';
+      g.attendance = 'Finalizada (Pago)';
+      g.payment = method;
+      g.payment_method = method;
+      g.payment_status = 'pago';
+      g.finishedAt = g.finishedAt || timeStr;
+      g.observation = 'Pagamento efetuado com sucesso via ' + method + ' • Concluído';
+
+      if (typeof window.addMatchLog === 'function') {
+        window.addMatchLog(g, 'Pagamento Efetuado (' + timeStr + ')', 'Pagamento recebido via ' + method + '. Partida concluída e movida para a área de pagos / finalizados.');
+      }
+
+      // 2. Atualiza no localStorage
+      try {
+        localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+        localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+      } catch(e) {}
+
+      // 3. Sincroniza em nuvem (Supabase DB2 e DB1)
+      if (typeof window.syncBookingToCloud === 'function') {
+        window.syncBookingToCloud(g, 'upsert');
+      }
+
+      // 4. Mensagem de sucesso
+      if (typeof arenaToast === 'function') {
+        arenaToast('✓ Pagamento de R$ ' + Number(g.total_price || g.price || 100).toFixed(2).replace('.', ',') + ' efetuado! Partida movida para Finalizados/Pago.');
+      }
+
+      // 5. Atualiza a tela operacional
+      if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+      if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+    } catch(err) {
+      console.error('[QuickPay] Erro ao efetuar pagamento:', err);
     }
   };
 
@@ -6495,15 +6548,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             console.log('[AutoExpire] Mensalista ' + (g.customer_name || g.name) + ' encerrado e registrado para faturamento mensal!');
           } else {
-            // AVULSO: Cancela automaticamente por falta de pagamento / não comparecimento
-            g.status = 'cancelled';
-            g.attendance = 'Cancelado por falta de pagamento';
-            g.payment_status = 'não_pago';
-            g.observation = 'Cancelado automaticamente após o horário - Falta de pagamento';
+            // AVULSO: Registra como Pagamento Faltando após término do horário
+            g.status = 'unpaid';
+            g.attendance = 'Pagamento Faltando';
+            g.payment_status = 'pagamento_faltando';
+            g.observation = 'Horário encerrado • Pagamento Faltando';
+            if (!g.payment || g.payment === 'Pendente') g.payment = 'Pagamento Faltando';
             if (typeof window.addMatchLog === 'function') {
-              window.addMatchLog(g, 'Cancelamento Automático (' + (m.end_time || '') + ')', 'Horário limite excedido sem confirmação de pagamento. Jogo cancelado automaticamente.');
+              window.addMatchLog(g, 'Fim do Horário (' + (m.end_time || '') + ')', 'Horário de jogo encerrado. Pagamento não registrado (Pagamento Faltando).');
             }
-            console.log('[AutoExpire] Jogo avulso ' + (g.customer_name || g.name) + ' cancelado automaticamente por falta de pagamento!');
+            console.log('[AutoExpire] Jogo avulso ' + (g.customer_name || g.name) + ' registrado com Pagamento Faltando!');
           }
 
           if (typeof window.syncBookingToCloud === 'function') {
@@ -7225,14 +7279,13 @@ document.addEventListener('DOMContentLoaded', () => {
       statusInlineDot = isCobrarFinalMes ? 'w-2.5 h-2.5 rounded-full bg-purple-600' : 'w-2.5 h-2.5 rounded-full bg-slate-500';
       statusInlineText = isCobrarFinalMes ? '✓ Jogo Encerrado • Lançado para cobrança no final do mês' : '✓ Partida Finalizada com sucesso';
       statusInlineTextColor = isCobrarFinalMes ? 'text-purple-800 font-bold' : 'text-slate-600';
-    } else if (st === 'cancelled') {
-      const isAutoLackPay = (m.observation && m.observation.includes('Falta de pagamento')) || (m.attendance && m.attendance.includes('falta de pagamento'));
-      statusBadgeClass = 'bg-rose-50 text-rose-700 border border-rose-200';
-      statusIcon = 'fa-ban';
-      statusLabel = isAutoLackPay ? 'Cancelado (Falta de Pagamento)' : 'Cancelado';
-      statusInlineDot = 'w-2.5 h-2.5 rounded-full bg-rose-600';
-      statusInlineText = isAutoLackPay ? 'Partida Cancelada automaticamente • Falta de Pagamento' : 'Partida Cancelada';
-      statusInlineTextColor = 'text-rose-700';
+    } else if (st === 'unpaid' || st === 'cancelled') {
+      statusBadgeClass = 'bg-amber-100 text-amber-900 border border-amber-300 font-extrabold';
+      statusIcon = 'fa-triangle-exclamation';
+      statusLabel = 'Pagamento Faltando';
+      statusInlineDot = 'w-2.5 h-2.5 rounded-full bg-amber-600';
+      statusInlineText = '⚠️ Horário encerrado • Pagamento Faltando';
+      statusInlineTextColor = 'text-amber-800 font-bold';
     } else if (st === 'no-show') {
       statusBadgeClass = 'bg-rose-50 text-rose-700 border border-rose-200';
       statusIcon = 'fa-user-slash';
@@ -7493,11 +7546,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <!-- BOTÃO PRINCIPAL VISÍVEL: VERDE PARA INICIAR -> APÓS APERTAR, FICA VERMELHO (FINALIZAR) -->
             <div class="w-full flex justify-end">
-              ${st === 'cancelled' ? `
-                <div class="flex items-center gap-2">
-                  <span class="px-4 py-2 rounded-xl text-xs font-bold text-rose-800 bg-rose-100 border border-rose-300 shadow-sm inline-flex items-center gap-1.5">
-                    <i class="fa-solid fa-ban text-rose-600"></i> Cancelado (Falta de Pagamento)
+              ${(st === 'unpaid' || st === 'cancelled') ? `
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <span class="px-3 py-1.5 rounded-xl text-xs font-extrabold text-amber-900 bg-amber-100 border border-amber-300 shadow-sm inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-700"></i> Pagamento Faltando
                   </span>
+                  <!-- Botão 1: Efetuar Pagamento Rápido (PIX / Dinheiro) e mover para área de Pago -->
+                  <button type="button" onclick="quickPayAndFinishMatch('${m.id}', 'PIX')" class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-md shadow-emerald-600/30 transition active:scale-95 cursor-pointer inline-flex items-center gap-1.5" title="Efetuar pagamento e mover para área de pago">
+                    <i class="fa-solid fa-circle-check text-xs"></i>
+                    <span>Efetuar Pagamento</span>
+                  </button>
+                  <!-- Botão 2: Opções detalhadas de fechamento / parcelamento -->
+                  <button type="button" onclick="openFinishGame('${m.id}')" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer inline-flex items-center gap-1" title="Outras opções e detalhes de pagamento">
+                    <i class="fa-solid fa-sliders text-slate-500"></i>
+                    <span>Opções</span>
+                  </button>
                 </div>
               ` : (st === 'finished' ? `
                 <div class="flex items-center gap-2">
@@ -7964,9 +8027,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusFilter === 'finished') {
         titleEl.innerHTML = 'Partidas Finalizadas de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Histórico Concluído</span>';
       } else if (statusFilter === 'everything') {
-        titleEl.innerHTML = 'Todas as Partidas (Ativas, Concluídas e Sem Pagamento) de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Geral (' + allMatches.length + ')</span>';
-      } else if (statusFilter === 'cancelled') {
-        titleEl.innerHTML = 'Partidas Canceladas / Falta de Pagamento de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Sem Pagamento</span>';
+        titleEl.innerHTML = 'Todas as Partidas de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Geral (' + allMatches.length + ')</span>';
+      } else if (statusFilter === 'unpaid' || statusFilter === 'cancelled') {
+        titleEl.innerHTML = 'Partidas com Pagamento Faltando em ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full font-bold ml-2">Pagamento Faltando</span>';
       } else if (statusFilter === 'live') {
         titleEl.innerHTML = 'Partidas Ao Vivo / Em Andamento em ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2 animate-pulse">● Na Quadra</span>';
       } else if (statusFilter === 'confirmed') {
@@ -7995,14 +8058,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (statusFilter === 'confirmed') {
       matches = matches.filter(m => m.status !== 'finished' && m.status !== 'cancelled' && !window.checkIsMatchLive(m, dateStr));
     } else if (statusFilter === 'everything') {
-      // Exibe TODAS as partidas do dia (incluindo finalizadas e avulsos cancelados/sem pagamento)
-      // Não remove os cancelados aqui para o usuário conseguir ver o histórico completo
-    } else if (statusFilter === 'cancelled') {
-      // Exibe apenas partidas canceladas / com falta de pagamento
-      matches = matches.filter(m => m.status === 'cancelled' || m.status === 'no-show');
+      // Exibe TODAS as partidas do dia (ativas, finalizadas e com pagamento faltando)
+    } else if (statusFilter === 'unpaid' || statusFilter === 'cancelled') {
+      // Exibe exclusivamente partidas avulsas cujo pagamento está faltando
+      matches = matches.filter(m => m.status === 'unpaid' || m.status === 'cancelled' || m.payment_status === 'pagamento_faltando' || (m.observation && m.observation.includes('Pagamento Faltando')));
     } else {
-      // Padrão (all): Partidas ativas (oculta finalizadas e canceladas)
-      matches = matches.filter(m => m.status !== 'finished' && m.status !== 'cancelled');
+      // Padrão (all): Partidas ativas do momento (oculta finalizadas)
+      matches = matches.filter(m => m.status !== 'finished');
     }
 
     if (countEl) {
