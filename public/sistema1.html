@@ -8583,51 +8583,70 @@ document.addEventListener('DOMContentLoaded', () => {
       return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
     };
 
-    // 1. Primeiro clique: inicia seleção no slot clicado
+    // 1. Primeiro clique após abrir o modal
     if (!window.__balcaoHasUserInteracted) {
-      forceSelectValue(startSelect, slotTime);
-      const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
-      forceSelectValue(endSelect, formatMinutesToTime(defEnd));
       window.__balcaoHasUserInteracted = true;
-
-    // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas/blocos)
-    } else if (clickedMin > curEndMin) {
+      // Se clicou além do fim sugerido e perto (até 3h) sem conflito: estende a seleção existente
+      if (clickedMin > curEndMin && (clickedMin - curEndMin <= 180) && !hasConflict(curStartMin, clickedMin)) {
+        forceSelectValue(endSelect, slotTime);
+      }
+      // Se clicou no fim sugerido: se > 30min reduz, se == 30min amplia para 1h
+      else if (clickedMin === curEndMin) {
+        if (curEndMin - curStartMin > 30) {
+          forceSelectValue(endSelect, formatMinutesToTime(curEndMin - 30));
+        } else if (!hasConflict(curEndMin, curEndMin + 30)) {
+          forceSelectValue(endSelect, formatMinutesToTime(curEndMin + 30));
+        }
+      }
+      // Se clicou antes do início sugerido e perto (até 2h): expande para trás
+      else if (clickedMin < curStartMin && (curStartMin - clickedMin <= 120) && !hasConflict(clickedMin, curEndMin)) {
+        forceSelectValue(startSelect, slotTime);
+      }
+      // Caso geral: novo início no slot clicado e fim inteligente
+      else {
+        forceSelectValue(startSelect, slotTime);
+        const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
+        forceSelectValue(endSelect, formatMinutesToTime(defEnd));
+      }
+    }
+    // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas/blocos: 2h, 3h, 5h+)
+    else if (clickedMin > curEndMin) {
       if (!hasConflict(curStartMin, clickedMin)) {
         forceSelectValue(endSelect, slotTime);
       } else {
-        // Conflito no caminho: nova seleção
+        // Conflito no caminho: inicia nova seleção
         forceSelectValue(startSelect, slotTime);
         forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
       }
-
+    }
     // 3. Clique ANTES do Início atual → EXPANDE para trás (sem limite)
-    } else if (clickedMin < curStartMin) {
+    else if (clickedMin < curStartMin) {
       if (!hasConflict(clickedMin, curEndMin)) {
         forceSelectValue(startSelect, slotTime);
       } else {
-        // Conflito: nova seleção
+        // Conflito: inicia nova seleção
         forceSelectValue(startSelect, slotTime);
         forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
       }
-
-    // 4. Clique NO slot de Fim exato → REMOVE 30min do final (reduz)
-    } else if (clickedMin === curEndMin) {
+    }
+    // 4. Clique NO slot de Fim exato → se > 30min reduz 30min; se já for 30min amplia para 1h
+    else if (clickedMin === curEndMin) {
       const duration = curEndMin - curStartMin;
       if (duration > 30) {
         forceSelectValue(endSelect, formatMinutesToTime(curEndMin - 30));
+      } else if (!hasConflict(curEndMin, curEndMin + 30)) {
+        forceSelectValue(endSelect, formatMinutesToTime(curEndMin + 30));
       }
-      // se já é mínimo de 30min, não faz nada
-
+    }
     // 5. Clique NO slot de Início exato → REMOVE 30min do início (avança o início)
-    } else if (clickedMin === curStartMin) {
+    else if (clickedMin === curStartMin) {
       const duration = curEndMin - curStartMin;
       if (duration > 30) {
         forceSelectValue(startSelect, formatMinutesToTime(curStartMin + 30));
       }
-      // se já é mínimo de 30min, não faz nada
-
+    }
     // 6. Clique em slot INTERMEDIÁRIO (dentro do intervalo) → CORTA o Fim naquele ponto (remove bloco completo)
-    } else {
+    else {
       // curStartMin < clickedMin < curEndMin
       // Reduz a seleção: o novo Fim passa a ser o slot clicado
       forceSelectValue(endSelect, slotTime);
@@ -8674,43 +8693,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof window.showNotification === 'function') {
         window.showNotification('Horários redefinidos para o primeiro livre!');
       }
-    }
-  };
-
-  window.selectBalcaoUntilNextGame = function() {
-    const startSelect = document.getElementById('directBookingStart');
-    const endSelect = document.getElementById('directBookingEnd');
-    if (!startSelect || !endSelect) return;
-
-    const startMin = parseTimeToMinutes(startSelect.value);
-    const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
-
-    const nextGame = occupiedRanges.find(r => r.start > startMin);
-    let targetEndMin = 0;
-    let reason = '';
-
-    if (nextGame) {
-      targetEndMin = nextGame.start;
-      reason = 'até o jogo de ' + nextGame.name;
-    } else {
-      targetEndMin = 23 * 60 + 30; // 23:30
-      reason = 'até o encerramento do dia';
-    }
-
-    if (targetEndMin <= startMin) {
-      if (typeof arenaToast === 'function') {
-        arenaToast('Não há espaço livre adicional após ' + startSelect.value + '.');
-      }
-      return;
-    }
-
-    endSelect.value = formatMinutesToTime(targetEndMin);
-    window.__balcaoClickState = 'complete';
-    autoCalculateDirectBookingPrice();
-    renderBalcaoTimeSlots();
-
-    if (typeof arenaToast === 'function') {
-      arenaToast('Horário preenchido de ' + startSelect.value + ' às ' + formatMinutesToTime(targetEndMin) + ' (' + reason + ')!');
     }
   };
 
@@ -8825,109 +8807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Alterna e define intervalos de horários com precisão
-  window.toggleBalcaoTimeSlot = function(slotTime) {
-    const startSelect = document.getElementById('directBookingStart');
-    const endSelect = document.getElementById('directBookingEnd');
-    if (!startSelect || !endSelect) return;
-
-    const clickedMin = parseTimeToMinutes(slotTime);
-    let curStartMin = parseTimeToMinutes(startSelect.value);
-    let curEndMin = parseTimeToMinutes(endSelect.value);
-    const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
-
-    window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
-    window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value, state: window.__balcaoClickState });
-    if (window.__balcaoSelectionHistory.length > 20) window.__balcaoSelectionHistory.shift();
-
-    const hasConflict = (fromM, toM) => {
-      const s = Math.min(fromM, toM);
-      const e = Math.max(fromM, toM);
-      return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
-    };
-
-    // Lógica inteligente de Início e Término:
-    // Se estamos aguardando o clique do fim:
-    if (window.__balcaoClickState === 'awaiting_end') {
-      if (clickedMin === curStartMin) {
-        // Clicou no mesmo slot de início -> alterna entre 30min e 1 hora
-        if (curEndMin - curStartMin === 30 && !hasConflict(curStartMin, curStartMin + 60)) {
-          endSelect.value = formatMinutesToTime(curStartMin + 60);
-        } else {
-          endSelect.value = formatMinutesToTime(curStartMin + 30);
-        }
-        window.__balcaoClickState = 'range_selected';
-      } else if (clickedMin > curStartMin && !hasConflict(curStartMin, clickedMin)) {
-        // Clicou no horário de término (ex: início 12:00 -> clicou 12:30 para 30min ou 13:00 para 1h):
-        // Se clicou no bloco imediatamente posterior (12:30), fecha em 12:30 (30min)
-        // Se clicou em 13:00, fecha em 13:00 (1 hora)
-        endSelect.value = slotTime;
-        window.__balcaoClickState = 'range_selected';
-      } else if (clickedMin === curStartMin + 30 && !hasConflict(curStartMin, curStartMin + 60)) {
-        endSelect.value = formatMinutesToTime(curStartMin + 60);
-        window.__balcaoClickState = 'range_selected';
-      } else {
-        // Clicou antes ou com conflito: inicia novo início no slot clicado com término de 1h (ou 30min)
-        startSelect.value = slotTime;
-        const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (clickedMin + 30);
-        endSelect.value = formatMinutesToTime(defEnd);
-        window.__balcaoClickState = 'awaiting_end';
-      }
-    } else {
-      // 1º Clique: seleciona o início e já prepara término de 1h (ou 30min se conflito)
-      startSelect.value = slotTime;
-      const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (clickedMin + 30);
-      endSelect.value = formatMinutesToTime(defEnd);
-      window.__balcaoClickState = 'awaiting_end';
-    }
-
-    autoCalculateDirectBookingPrice();
-    renderBalcaoTimeSlots();
-  };
-
-  window.undoLastBalcaoTimeSlot = function() {
-    if (!window.__balcaoSelectionHistory || window.__balcaoSelectionHistory.length === 0) {
-      if (typeof window.showNotification === 'function') {
-        window.showNotification('Nenhuma seleção anterior para voltar.');
-      }
-      return;
-    }
-
-    const prev = window.__balcaoSelectionHistory.pop();
-    const startSelect = document.getElementById('directBookingStart');
-    const endSelect = document.getElementById('directBookingEnd');
-
-    if (startSelect && endSelect && prev) {
-      startSelect.value = prev.start;
-      endSelect.value = prev.end;
-      autoCalculateDirectBookingPrice();
-      renderBalcaoTimeSlots();
-      if (typeof window.showNotification === 'function') {
-        window.showNotification('Seleção de horário anterior restaurada!');
-      }
-    }
-  };
-
-  window.resetDirectBookingTimeSlots = function() {
-    const startSelect = document.getElementById('directBookingStart');
-    const endSelect = document.getElementById('directBookingEnd');
-    if (startSelect && endSelect) {
-      window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
-      window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value });
-      
-      // Encontra o próximo horário livre e define
-      const firstFree = findFirstAvailableSlot();
-      startSelect.value = firstFree.start;
-      endSelect.value = firstFree.end;
-      autoCalculateDirectBookingPrice();
-      renderBalcaoTimeSlots();
-      if (typeof window.showNotification === 'function') {
-        window.showNotification('Horários redefinidos para janela livre.');
-      }
-    }
-  };
-
-  function findFirstAvailableSlot() {
+    function findFirstAvailableSlot() {
     const courtSelect = document.getElementById('directBookingCourt');
     const dateInput = document.getElementById('directBookingDate');
     const courtId = courtSelect ? courtSelect.value : 'fut7';
