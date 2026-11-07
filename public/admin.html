@@ -3742,7 +3742,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <i data-lucide="calendar-check" class="w-3.5 h-3.5"></i>
             </span>
             <div>
-              <span class="text-xs font-black text-slate-800 uppercase tracking-tight block">Janelas de Horas (30 em 30 min):</span>
+              <span class="text-xs font-black text-slate-800 uppercase tracking-tight block flex items-center gap-1.5 flex-wrap"><span>Janelas de Horas (30 em 30 min):</span><span class="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">⚡ Seleção Livre (3h, 5h+)</span></span>
               <span class="text-[10px] text-slate-500 font-medium">Selecione o horário desejado para a nova reserva de balcão.</span>
             </div>
           </div>
@@ -8998,7 +8998,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailTxt = durTxt + ' • ' + blocksCount + (blocksCount === 1 ? ' janela (30min)' : ' janelas (30min)');
 
     if (timeEl) timeEl.textContent = sStr + ' às ' + eStr;
-    if (durEl) durEl.textContent = durTxt;
+    if (durEl) durEl.textContent = durTxt + ' (' + blocksCount + ' blocos)';
 
     if (helperBannerText) {
       if (window.__balcaoClickState === 'awaiting_end') {
