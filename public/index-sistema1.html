@@ -1450,7 +1450,8 @@
                 <option value="finished">✅ Finalizados / Concluídos</option>
                 <option value="live">🟢 Ao Vivo / Em Andamento</option>
                 <option value="confirmed">🔵 Confirmados / Próximos</option>
-                <option value="everything">👁 Exibir Todas (Com Finalizadas)</option>
+                <option value="everything">👁 Exibir Todas (Com Finalizadas e Canceladas)</option>
+                <option value="cancelled">🚫 Cancelados / Falta de Pagamento</option>
               </select>
               <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
             </div>
@@ -5068,7 +5069,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Reservas diretas da data (estritamente b.date === dateStr)
     (window.adminGameState.bookings || []).forEach(b => {
-      if (!b || b.status === 'cancelled') return;
+      if (!b) return;
+      // Permite incluir reservas canceladas/sem pagamento para exibição nos filtros 'everything' e 'cancelled'
       if (b.date === dateStr) {
         // Manutenção de integridade: preserva status original finalizado ou cancelado
         const court = getCourtById(b.court_id || b.courtId);
@@ -6061,6 +6063,18 @@ document.addEventListener('DOMContentLoaded', () => {
         counter: totalDuration + ' min finalizados',
         fillClass: 'timer-fill-finished',
         badgeClass: 'timer-finished',
+        isOverdue: false,
+        isFuture: false
+      };
+    }
+
+    if (st === 'cancelled') {
+      return {
+        percent: 100,
+        label: 'Cancelado automaticamente • Falta de pagamento',
+        counter: 'Cancelado',
+        fillClass: 'timer-fill-red',
+        badgeClass: 'timer-overdue',
         isOverdue: false,
         isFuture: false
       };
@@ -7479,7 +7493,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             <!-- BOTÃO PRINCIPAL VISÍVEL: VERDE PARA INICIAR -> APÓS APERTAR, FICA VERMELHO (FINALIZAR) -->
             <div class="w-full flex justify-end">
-              ${st === 'finished' ? `
+              ${st === 'cancelled' ? `
+                <div class="flex items-center gap-2">
+                  <span class="px-4 py-2 rounded-xl text-xs font-bold text-rose-800 bg-rose-100 border border-rose-300 shadow-sm inline-flex items-center gap-1.5">
+                    <i class="fa-solid fa-ban text-rose-600"></i> Cancelado (Falta de Pagamento)
+                  </span>
+                </div>
+              ` : (st === 'finished' ? `
                 <div class="flex items-center gap-2">
                   <span class="px-4 py-2 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 shadow-sm inline-flex items-center gap-1.5">
                     <i class="fa-solid fa-circle-check text-emerald-600"></i> Finalizada
@@ -7496,7 +7516,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Iniciar jogo na quadra" class="w-full sm:w-auto px-6 py-2.5 rounded-full font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-600 shadow-md shadow-emerald-700/25 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
                   <i class="fa-solid fa-play text-[10px]"></i> ${(isToday && nowTimeMin >= sMinStart && nowTimeMin < (sMinStart + 5)) ? ('Iniciar Jogo (' + ((sMinStart + 5) - nowTimeMin) + 'm p/ auto)') : 'Iniciar Jogo na Quadra'}
                 </button>
-              `)}
+              `))}
             </div>
           </div>
 
@@ -7944,7 +7964,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (statusFilter === 'finished') {
         titleEl.innerHTML = 'Partidas Finalizadas de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Histórico Concluído</span>';
       } else if (statusFilter === 'everything') {
-        titleEl.innerHTML = 'Todas as Partidas (Ativas e Concluídas) de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Geral (' + allMatches.length + ')</span>';
+        titleEl.innerHTML = 'Todas as Partidas (Ativas, Concluídas e Sem Pagamento) de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Geral (' + allMatches.length + ')</span>';
+      } else if (statusFilter === 'cancelled') {
+        titleEl.innerHTML = 'Partidas Canceladas / Falta de Pagamento de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Sem Pagamento</span>';
       } else if (statusFilter === 'live') {
         titleEl.innerHTML = 'Partidas Ao Vivo / Em Andamento em ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2 animate-pulse">● Na Quadra</span>';
       } else if (statusFilter === 'confirmed') {
@@ -7973,8 +7995,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (statusFilter === 'confirmed') {
       matches = matches.filter(m => m.status !== 'finished' && m.status !== 'cancelled' && !window.checkIsMatchLive(m, dateStr));
     } else if (statusFilter === 'everything') {
-      // Exibe todas (com finalizadas)
-      matches = matches.filter(m => m.status !== 'cancelled');
+      // Exibe TODAS as partidas do dia (incluindo finalizadas e avulsos cancelados/sem pagamento)
+      // Não remove os cancelados aqui para o usuário conseguir ver o histórico completo
+    } else if (statusFilter === 'cancelled') {
+      // Exibe apenas partidas canceladas / com falta de pagamento
+      matches = matches.filter(m => m.status === 'cancelled' || m.status === 'no-show');
     } else {
       // Padrão (all): Partidas ativas (oculta finalizadas e canceladas)
       matches = matches.filter(m => m.status !== 'finished' && m.status !== 'cancelled');
