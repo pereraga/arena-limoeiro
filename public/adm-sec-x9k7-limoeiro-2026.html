@@ -5070,10 +5070,7 @@ document.addEventListener('DOMContentLoaded', () => {
     (window.adminGameState.bookings || []).forEach(b => {
       if (!b || b.status === 'cancelled') return;
       if (b.date === dateStr) {
-        if (dateStr === '2026-11-04' && b.status === 'finished') {
-          b.status = 'confirmed';
-          b.observation = 'Pronto para iniciar';
-        }
+        // Manutenção de integridade: preserva status original finalizado ou cancelado
         const court = getCourtById(b.court_id || b.courtId);
         const startT = b.start_time || (b.time ? b.time.split(' ')[0] : '19:00');
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
@@ -6433,6 +6430,88 @@ document.addEventListener('DOMContentLoaded', () => {
   // Se o atendente não apertar "Iniciar Jogo na Quadra", o sistema inicia
   // automaticamente aos 5 minutos decorridos, contando do início exato previsto.
   // =========================================================================
+  
+  // =========================================================================
+  // ENCERRAMENTO / CANCELAMENTO / FATURAMENTO AUTOMÁTICO APÓS O HORÁRIO
+  // Regra do Usuário:
+  // - Se passou do horário final da partida:
+  //   * Avulso: Cancela automaticamente por falta de pagamento / não comparecimento
+  //   * Mensalista / Fixo: Encerra automaticamente e registra cobrança no final do mês
+  // =========================================================================
+  window.checkAndAutoExpireMatches = function() {
+    try {
+      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+      const allTodayMatches = (typeof getMatchesForDate === 'function') ? getMatchesForDate(todayStr) : [];
+      const now = new Date();
+      const curM = now.getHours() * 60 + now.getMinutes();
+
+      const parseMin = s => {
+        if (!s) return 0;
+        const p = s.split(':');
+        return parseInt(p[0], 10) * 60 + parseInt(p[1] || '0', 10);
+      };
+
+      let hasChangedAny = false;
+
+      allTodayMatches.forEach(m => {
+        if (!m || m.status === 'finished' || m.status === 'cancelled') return;
+        const sM = parseMin(m.start_time);
+        let eM = parseMin(m.end_time);
+        if (eM <= sM) eM += 24 * 60;
+        const extraMin = Number(m.extraTime || m.extra_minutes || 0);
+        const limitM = eM + extraMin;
+
+        // Se o horário atual ultrapassou o término da partida
+        if (curM > limitM) {
+          const isMensalista = !!(m.isMensalista || m.type === 'Mensalista' || m.booking_type === 'mensalista' || String(m.id).startsWith('monthly-'));
+          const g = (typeof window.getGame === 'function') ? window.getGame(m.id) : m;
+          if (!g) return;
+
+          if (isMensalista) {
+            // MENSALISTA: Conclui o jogo e registra cobrança para o fechamento mensal
+            g.status = 'finished';
+            g.attendance = 'Finalizado (Fatura Mensal)';
+            g.payment = 'Mensal';
+            g.payment_method = 'Mensal';
+            g.billing_status = 'cobrar_final_mes';
+            g.finishedAt = m.end_time || '17:00';
+            g.observation = 'Encerrado automaticamente após o horário • Cobrar no final do mês';
+            if (typeof window.addMatchLog === 'function') {
+              window.addMatchLog(g, 'Encerramento Automático (' + (m.end_time || '') + ')', 'Partida concluída automaticamente. Presença registrada para faturamento no final do mês.');
+            }
+            console.log('[AutoExpire] Mensalista ' + (g.customer_name || g.name) + ' encerrado e registrado para faturamento mensal!');
+          } else {
+            // AVULSO: Cancela automaticamente por falta de pagamento / não comparecimento
+            g.status = 'cancelled';
+            g.attendance = 'Cancelado por falta de pagamento';
+            g.payment_status = 'não_pago';
+            g.observation = 'Cancelado automaticamente após o horário - Falta de pagamento';
+            if (typeof window.addMatchLog === 'function') {
+              window.addMatchLog(g, 'Cancelamento Automático (' + (m.end_time || '') + ')', 'Horário limite excedido sem confirmação de pagamento. Jogo cancelado automaticamente.');
+            }
+            console.log('[AutoExpire] Jogo avulso ' + (g.customer_name || g.name) + ' cancelado automaticamente por falta de pagamento!');
+          }
+
+          if (typeof window.syncBookingToCloud === 'function') {
+            window.syncBookingToCloud(g, 'upsert');
+          }
+          hasChangedAny = true;
+        }
+      });
+
+      if (hasChangedAny) {
+        try {
+          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+        } catch(e) {}
+        if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
+        if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+        if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+      }
+    } catch(err) {
+      console.warn('[AutoExpire] Erro ao verificar encerramento automático:', err);
+    }
+  };
+
   window.checkAndAutoStartMatches = function() {
     try {
       const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
@@ -7125,18 +7204,20 @@ document.addEventListener('DOMContentLoaded', () => {
     let statusInlineTextColor = 'text-blue-700';
 
     if (st === 'finished') {
-      statusBadgeClass = 'bg-slate-100 text-slate-700 border border-slate-300';
-      statusIcon = 'fa-circle-check';
-      statusLabel = 'Finalizado';
-      statusInlineDot = 'w-2.5 h-2.5 rounded-full bg-slate-500';
-      statusInlineText = '✓ Partida Finalizada com sucesso';
-      statusInlineTextColor = 'text-slate-600';
+      const isCobrarFinalMes = isMensalista || (m.billing_status === 'cobrar_final_mes') || (m.attendance && m.attendance.includes('Fatura Mensal'));
+      statusBadgeClass = isCobrarFinalMes ? 'bg-purple-100 text-purple-800 border border-purple-300' : 'bg-slate-100 text-slate-700 border border-slate-300';
+      statusIcon = isCobrarFinalMes ? 'fa-file-invoice-dollar' : 'fa-circle-check';
+      statusLabel = isCobrarFinalMes ? 'Cobrar no Final do Mês' : 'Finalizado';
+      statusInlineDot = isCobrarFinalMes ? 'w-2.5 h-2.5 rounded-full bg-purple-600' : 'w-2.5 h-2.5 rounded-full bg-slate-500';
+      statusInlineText = isCobrarFinalMes ? '✓ Jogo Encerrado • Lançado para cobrança no final do mês' : '✓ Partida Finalizada com sucesso';
+      statusInlineTextColor = isCobrarFinalMes ? 'text-purple-800 font-bold' : 'text-slate-600';
     } else if (st === 'cancelled') {
+      const isAutoLackPay = (m.observation && m.observation.includes('Falta de pagamento')) || (m.attendance && m.attendance.includes('falta de pagamento'));
       statusBadgeClass = 'bg-rose-50 text-rose-700 border border-rose-200';
       statusIcon = 'fa-ban';
-      statusLabel = 'Cancelado';
+      statusLabel = isAutoLackPay ? 'Cancelado (Falta de Pagamento)' : 'Cancelado';
       statusInlineDot = 'w-2.5 h-2.5 rounded-full bg-rose-600';
-      statusInlineText = 'Partida Cancelada';
+      statusInlineText = isAutoLackPay ? 'Partida Cancelada automaticamente • Falta de Pagamento' : 'Partida Cancelada';
       statusInlineTextColor = 'text-rose-700';
     } else if (st === 'no-show') {
       statusBadgeClass = 'bg-rose-50 text-rose-700 border border-rose-200';
@@ -7835,9 +7916,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const titleEl = document.getElementById('movementFeedTitle');
     const countEl = document.getElementById('movementFeedCount');
 
-    // Auto-início de partidas que atingiram a tolerância de 5 min
+    // Auto-início e auto-encerramento/cancelamento de partidas após o horário
     if (typeof window.checkAndAutoStartMatches === 'function') {
       window.checkAndAutoStartMatches();
+    }
+    if (typeof window.checkAndAutoExpireMatches === 'function') {
+      window.checkAndAutoExpireMatches();
     }
 
     // Recupera TODAS as partidas do dia para estatísticas completas
@@ -9776,9 +9860,12 @@ window.cancelGame = function(id) {
         }
       }
 
-      // 2. Auto-início automático de partidas com tolerância de 5 min
+      // 2. Auto-início e auto-encerramento/cancelamento de partidas
       if (typeof window.checkAndAutoStartMatches === 'function') {
         window.checkAndAutoStartMatches();
+      }
+      if (typeof window.checkAndAutoExpireMatches === 'function') {
+        window.checkAndAutoExpireMatches();
       }
 
       // 3. Sincronização contínua com os bancos de dados na nuvem (já renderiza partidas ao concluir)

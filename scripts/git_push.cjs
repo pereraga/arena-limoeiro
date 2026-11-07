@@ -1,28 +1,13 @@
 const { execSync } = require('child_process');
-const path = require('path');
+const cwd = 'C:/Users/PC/.gemini/antigravity/scratch/arena-booking-system';
 
-const cwd = path.join(__dirname, '..');
-try {
-  console.log('Pushing to origin...');
-  execSync('git push origin main', { cwd, stdio: 'inherit' });
-  console.log('✓ Pushed to origin');
-} catch(e) {
-  console.warn('Origin push note:', e.message);
-}
+console.log('Staging changes...');
+execSync('git add -A', { cwd, stdio: 'inherit' });
 
-try {
-  console.log('Pushing to second remote if any...');
-  const remotes = execSync('git remote', { cwd }).toString().trim().split('\n');
-  console.log('Remotes:', remotes);
-  remotes.forEach(r => {
-    r = r.trim();
-    if (r && r !== 'origin') {
-      try {
-        execSync(`git push ${r} main`, { cwd, stdio: 'inherit' });
-        console.log(`✓ Pushed to ${r}`);
-      } catch(er) {
-        console.warn(`Push to ${r} note:`, er.message);
-      }
-    }
-  });
-} catch(e) {}
+console.log('Committing changes...');
+execSync('git commit -m "feat: auto-expire matches with avulso cancellation and mensalista monthly billing"', { cwd, stdio: 'inherit' });
+
+console.log('Pushing to origin main...');
+execSync('git push origin main', { cwd, stdio: 'inherit' });
+
+console.log('Done!');
