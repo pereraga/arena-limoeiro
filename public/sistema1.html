@@ -3703,6 +3703,10 @@ document.addEventListener('DOMContentLoaded', () => {
               <input type="checkbox" id="balcaoHideOccupiedToggle" onchange="renderBalcaoTimeSlots()" checked class="rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer">
               <span>Ocultar Indisponíveis</span>
             </label>
+            <button type="button" onclick="selectBalcaoUntilNextGame()" title="Preencher horário livre até o próximo jogo agendado no sistema" class="px-2.5 py-1 text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Até Próximo Jogo</span>
+            </button>
             <button type="button" onclick="undoLastBalcaoTimeSlot()" title="Voltar última seleção de horário" class="px-2 py-1 text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition">
               <i data-lucide="undo-2" class="w-3 h-3 text-slate-500"></i>
               <span>Voltar Seleção</span>
@@ -8337,57 +8341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentRealMinutes = (now.getHours() * 60) + now.getMinutes();
 
     // Coletar intervalos ocupados no dia para esta quadra
-    const occupiedRanges = [];
-
-    // 1. Partidas já registradas
-    (window.adminGameState.bookings || []).forEach(b => {
-      const bDate = b.date;
-      const bCourt = b.court_id || b.courtId;
-      const st = (b.status || '').toLowerCase();
-      if (bDate === dateStr && st !== 'cancelled' && (bCourt === dbCourtId || bCourt === courtId)) {
-        const sm = parseTimeToMinutes(b.start_time || (b.time ? b.time.split(' ')[0] : ''));
-        const em = parseTimeToMinutes(b.end_time || (b.time && b.time.includes('às') ? b.time.split('às')[1].trim() : ''));
-        if (em > sm) {
-          occupiedRanges.push({
-            start: sm,
-            end: em,
-            startStr: formatMinutesToTime(sm),
-            endStr: formatMinutesToTime(em),
-            name: b.customer_name || 'Cliente',
-            type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Reserva',
-            status: b.status
-          });
-        }
-      }
-    });
-
-    // 2. Mensalistas fixos deste dia da semana
-    (window.adminGameState.monthlyMembers || []).forEach(m => {
-      const mDay = (m.day_of_week || m.dayOfWeek || '').toLowerCase();
-      const mCourt = m.court_id || m.courtId;
-      const mStatus = (m.status || '').toLowerCase();
-      if (mDay === dayOfWeek && mStatus !== 'inactive' && (mCourt === dbCourtId || mCourt === courtId)) {
-        const sm = parseTimeToMinutes(m.start_time || m.time || '');
-        const em = parseTimeToMinutes(m.end_time || '');
-        const effectiveEnd = em > sm ? em : (sm + 60);
-        // Evita duplicar se já foi adicionado como booking
-        const exists = occupiedRanges.some(r => Math.abs(r.start - sm) < 15);
-        if (!exists) {
-          occupiedRanges.push({
-            start: sm,
-            end: effectiveEnd,
-            startStr: formatMinutesToTime(sm),
-            endStr: formatMinutesToTime(effectiveEnd),
-            name: m.team_name || m.responsible_name || 'Mensalista Fixo',
-            type: 'Mensalista Fixo',
-            status: 'confirmed'
-          });
-        }
-      }
-    });
-
-    // Ordenar ocupados por ordem cronológica
-    occupiedRanges.sort((a, b) => a.start - b.start);
+    const occupiedRanges = window.getBalcaoOccupiedRanges(courtId, dateStr);
 
     // Atualiza o Card Informativo de Jogos Agendados
     if (gamesListEl) {
@@ -8442,9 +8396,12 @@ document.addEventListener('DOMContentLoaded', () => {
         html += '<span class="text-[9px] uppercase tracking-tighter">Passado</span>';
         html += '</button>';
       } else if (isSelected) {
-        html += '<button type="button" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Selecionado (' + slotTime + ' às ' + slotNextTime + ') - Toque para alterar ou voltar" class="p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center transition flex flex-col items-center justify-center">';
+        const isStart = (m === currentStartMin);
+        const isEnd = (slotEndMin === currentEndMin);
+        const badgeLabel = isStart ? 'Início' : (isEnd ? 'Fim' : '✓ Selec.');
+        html += '<button type="button" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Selecionado (' + slotTime + ' às ' + slotNextTime + ') - Toque para alterar ou ajustar" class="p-2 rounded-xl text-[11px] font-black bg-emerald-600 text-white border-2 border-emerald-700 shadow-md transform scale-[1.03] cursor-pointer text-center transition flex flex-col items-center justify-center">';
         html += '<span>' + slotTime + '</span>';
-        html += '<span class="text-[9px] uppercase tracking-tighter text-emerald-100">✓ Selec.</span>';
+        html += '<span class="text-[9px] uppercase tracking-tighter text-emerald-100 font-bold">' + badgeLabel + '</span>';
         html += '</button>';
       } else {
         html += '<button type="button" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ' às ' + slotNextTime + ') - Toque para selecionar" class="p-2 rounded-xl text-[11px] font-bold bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-800 border border-emerald-300 hover:border-emerald-500 cursor-pointer text-center transition flex flex-col items-center justify-center hover:scale-[1.02]">';
@@ -8462,10 +8419,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Checa aviso de próximo jogo após o horário de início selecionado
     if (nextAlertEl && nextAlertText) {
-      const nextGame = occupiedRanges.find(r => r.start >= currentStartMin);
+      const nextGame = occupiedRanges.find(r => r.start > currentStartMin);
       if (nextGame) {
         nextAlertEl.style.display = 'flex';
-        nextAlertText.innerHTML = '⚠️ Atenção: A partir das <strong>' + nextGame.startStr + '</strong> tem jogo agendado de <strong>' + nextGame.name + '</strong> (até às ' + nextGame.endStr + '). Disponível livremente até às ' + nextGame.startStr + '.';
+        nextAlertText.innerHTML = '<div class="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2"><span>⚠️ A partir das <strong>' + nextGame.startStr + '</strong> tem agendamento de <strong>' + nextGame.name + '</strong> (' + nextGame.type + '). Livre livremente até às <strong>' + nextGame.startStr + '</strong>.</span><button type="button" onclick="selectBalcaoUntilNextGame()" class="px-2.5 py-1 bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-[11px] rounded-lg shadow-xs flex items-center gap-1 cursor-pointer transition shrink-0"><i data-lucide="zap" class="w-3.5 h-3.5 text-amber-300"></i> Preencher até às ' + nextGame.startStr + '</button></div>';
       } else {
         nextAlertEl.style.display = 'none';
       }
@@ -8476,6 +8433,118 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) lucide.createIcons();
   };
 
+  // Helper global para coletar ocupados da quadra/data do modal
+  window.getBalcaoOccupiedRanges = function(optCourtId, optDateStr) {
+    const courtSelect = document.getElementById('directBookingCourt');
+    const dateInput = document.getElementById('directBookingDate');
+    const courtId = optCourtId || (courtSelect ? courtSelect.value : 'fut7');
+    const dateStr = optDateStr || (dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04'));
+
+    let dbCourtId = courtId;
+    if (courtId === 'fut5') dbCourtId = 'court-esportes-de-quadra-1788962671043';
+    if (courtId === 'fut6') dbCourtId = 'court-society-2';
+    if (courtId === 'fut7') dbCourtId = 'court-futsal-1788963178368';
+    if (courtId === 'society') dbCourtId = 'court-society-1';
+    if (courtId === 'areia') dbCourtId = 'court-beach-1';
+    if (courtId === 'futmesa') dbCourtId = 'court-futmesa-1';
+
+    const dateObj = new Date(dateStr + 'T12:00:00');
+    const daysMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
+    const dayOfWeek = daysMap[dateObj.getDay()];
+
+    const occupiedRanges = [];
+
+    // 1. Partidas já registradas
+    (window.adminGameState.bookings || []).forEach(b => {
+      const bDate = b.date;
+      const bCourt = b.court_id || b.courtId;
+      const st = (b.status || '').toLowerCase();
+      if (bDate === dateStr && st !== 'cancelled' && (bCourt === dbCourtId || bCourt === courtId)) {
+        const sm = parseTimeToMinutes(b.start_time || (b.time ? b.time.split(' ')[0] : ''));
+        const em = parseTimeToMinutes(b.end_time || (b.time && b.time.includes('às') ? b.time.split('às')[1].trim() : ''));
+        if (em > sm) {
+          occupiedRanges.push({
+            start: sm,
+            end: em,
+            startStr: formatMinutesToTime(sm),
+            endStr: formatMinutesToTime(em),
+            name: b.customer_name || 'Cliente',
+            type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Reserva',
+            status: b.status
+          });
+        }
+      }
+    });
+
+    // 2. Mensalistas fixos deste dia da semana
+    (window.adminGameState.monthlyMembers || []).forEach(m => {
+      const mDay = (m.day_of_week || m.dayOfWeek || '').toLowerCase();
+      const mCourt = m.court_id || m.courtId;
+      const mStatus = (m.status || '').toLowerCase();
+      if (mDay === dayOfWeek && mStatus !== 'inactive' && (mCourt === dbCourtId || mCourt === courtId)) {
+        const sm = parseTimeToMinutes(m.start_time || m.time || '');
+        const em = parseTimeToMinutes(m.end_time || '');
+        const effectiveEnd = em > sm ? em : (sm + 60);
+        const exists = occupiedRanges.some(r => Math.abs(r.start - sm) < 15);
+        if (!exists) {
+          occupiedRanges.push({
+            start: sm,
+            end: effectiveEnd,
+            startStr: formatMinutesToTime(sm),
+            endStr: formatMinutesToTime(effectiveEnd),
+            name: m.team_name || m.responsible_name || 'Mensalista Fixo',
+            type: 'Mensalista Fixo',
+            status: 'confirmed'
+          });
+        }
+      }
+    });
+
+    occupiedRanges.sort((a, b) => a.start - b.start);
+    return occupiedRanges;
+  };
+
+  // Preenche a seleção até o próximo jogo agendado ou fechamento
+  window.selectBalcaoUntilNextGame = function() {
+    const startSelect = document.getElementById('directBookingStart');
+    const endSelect = document.getElementById('directBookingEnd');
+    if (!startSelect || !endSelect) return;
+
+    const curStartMin = parseTimeToMinutes(startSelect.value);
+    const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
+
+    // Encontra o próximo agendamento que começa após o início selecionado
+    const nextGame = occupiedRanges.find(r => r.start > curStartMin);
+
+    window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
+    window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value });
+    if (window.__balcaoSelectionHistory.length > 20) window.__balcaoSelectionHistory.shift();
+
+    let targetEndMin = 23 * 60 + 30; // Fechamento padrão
+    let reason = 'até o fechamento';
+    if (nextGame) {
+      targetEndMin = nextGame.start;
+      reason = 'até às ' + nextGame.startStr + ' (próximo jogo: ' + nextGame.name + ')';
+    }
+
+    if (targetEndMin <= curStartMin) {
+      if (typeof arenaToast === 'function') {
+        arenaToast('Não há mais horários disponíveis após ' + startSelect.value + '.');
+      }
+      return;
+    }
+
+    endSelect.value = formatMinutesToTime(targetEndMin);
+    window.__balcaoLastClickedSlot = formatMinutesToTime(targetEndMin);
+    autoCalculateDirectBookingPrice();
+    renderBalcaoTimeSlots();
+
+    if (typeof arenaToast === 'function') {
+      arenaToast('Horário preenchido de ' + startSelect.value + ' às ' + formatMinutesToTime(targetEndMin) + ' (' + reason + ')!');
+    }
+  };
+
+  // Alterna e define intervalos de horários com precisão
   window.toggleBalcaoTimeSlot = function(slotTime) {
     const startSelect = document.getElementById('directBookingStart');
     const endSelect = document.getElementById('directBookingEnd');
@@ -8484,21 +8553,71 @@ document.addEventListener('DOMContentLoaded', () => {
     const clickedMin = parseTimeToMinutes(slotTime);
     const curStartMin = parseTimeToMinutes(startSelect.value);
     const curEndMin = parseTimeToMinutes(endSelect.value);
+    const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges() : [];
 
     // Salva estado para botão Voltar
     window.__balcaoSelectionHistory = window.__balcaoSelectionHistory || [];
     window.__balcaoSelectionHistory.push({ start: startSelect.value, end: endSelect.value });
     if (window.__balcaoSelectionHistory.length > 20) window.__balcaoSelectionHistory.shift();
 
-    // Se clicar em um horário já selecionado, recua ou desfaz
-    if (clickedMin === curStartMin && curEndMin - curStartMin > 30) {
-      startSelect.value = formatMinutesToTime(curStartMin + 30);
-    } else if (clickedMin === curEndMin - 30 && curEndMin - curStartMin > 30) {
-      endSelect.value = formatMinutesToTime(curEndMin - 30);
-    } else {
-      // Define nova seleção de 1 hora a partir do slot clicado
-      startSelect.value = slotTime;
-      endSelect.value = formatMinutesToTime(clickedMin + 60);
+    const hasConflict = (fromM, toM) => {
+      const s = Math.min(fromM, toM);
+      const e = Math.max(fromM, toM);
+      return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
+    };
+
+    // Caso 1: Clicou no horário que já é o início atual
+    if (clickedMin === curStartMin) {
+      const dur = curEndMin - curStartMin;
+      // Se era 30min, alterna para 1 hora (se livre de conflitos)
+      if (dur === 30) {
+        if (!hasConflict(curStartMin, curStartMin + 60)) {
+          endSelect.value = formatMinutesToTime(curStartMin + 60);
+        }
+      } else {
+        // Se era 1h ou mais, reduz para 30 minutos
+        endSelect.value = formatMinutesToTime(curStartMin + 30);
+      }
+      window.__balcaoLastClickedSlot = slotTime;
+    }
+    // Caso 2: Clicou em um horário após o início atual
+    else if (clickedMin > curStartMin) {
+      // Se houver conflito entre início e o horário clicado, inicia novo agendamento a partir do slot clicado
+      if (hasConflict(curStartMin, clickedMin)) {
+        startSelect.value = slotTime;
+        endSelect.value = formatMinutesToTime(clickedMin + 30);
+        window.__balcaoLastClickedSlot = slotTime;
+        if (typeof arenaToast === 'function') {
+          arenaToast('Iniciando novo horário às ' + slotTime + ' devido a agendamento intermediário.');
+        }
+      } else {
+        // Se o usuário clicou no mesmo slot de fim pela segunda vez consecutiva, estende mais 30min
+        if (window.__balcaoLastClickedSlot === slotTime && clickedMin === curEndMin) {
+          const nextTarget = curEndMin + 30;
+          if (!hasConflict(curEndMin, nextTarget)) {
+            endSelect.value = formatMinutesToTime(nextTarget);
+          }
+        } else {
+          // Define como horário de término:
+          // Ex: Início 12:00 -> Clica 12:30 -> Fecha 12:00 às 12:30 (meia hora)
+          // Ex: Início 12:00 -> Clica 13:00 -> Fecha 12:00 às 13:00 (1 hora de uso)
+          // Ex: Início 12:00 -> Clica 14:00 -> Fecha 12:00 às 14:00 (2 horas)
+          endSelect.value = slotTime;
+        }
+        window.__balcaoLastClickedSlot = slotTime;
+      }
+    }
+    // Caso 3: Clicou em um horário anterior ao início atual
+    else {
+      // Se não houver conflito e for próximo, move o início para o horário clicado
+      if (!hasConflict(clickedMin, curStartMin) && (curEndMin - clickedMin <= 4 * 60)) {
+        startSelect.value = slotTime;
+      } else {
+        // Inicia nova seleção a partir do slot clicado (30min)
+        startSelect.value = slotTime;
+        endSelect.value = formatMinutesToTime(clickedMin + 30);
+      }
+      window.__balcaoLastClickedSlot = slotTime;
     }
 
     autoCalculateDirectBookingPrice();
