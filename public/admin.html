@@ -8572,54 +8572,54 @@ document.addEventListener('DOMContentLoaded', () => {
       return occupiedRanges.some(r => Math.max(s, r.start) < Math.min(e, r.end));
     };
 
-    // 1. Primeiro clique do usuário após abrir o modal: define o Início diretamente no slot clicado
+    // 1. Primeiro clique: inicia seleção no slot clicado
     if (!window.__balcaoHasUserInteracted) {
       startSelect.value = slotTime;
       const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
       endSelect.value = formatMinutesToTime(defEnd);
       window.__balcaoHasUserInteracted = true;
-    }
-    // 2. Clique posterior ao início atual (clickedMin > curStartMin)
-    else if (clickedMin > curStartMin) {
-      if (hasConflict(curStartMin, clickedMin)) {
-        // Conflito no caminho: inicia nova seleção no slot clicado
+
+    // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas)
+    } else if (clickedMin > curEndMin) {
+      if (!hasConflict(curEndMin, clickedMin)) {
+        endSelect.value = slotTime;
+      } else {
+        // Conflito no caminho: nova seleção
         startSelect.value = slotTime;
         endSelect.value = formatMinutesToTime(clickedMin + 30);
-      } else if (clickedMin > curEndMin) {
-        // Estende o Fim diretamente para o slot clicado (3h, 5h ou quantas horas desejar)
-        endSelect.value = slotTime;
-      } else if (clickedMin === curEndMin) {
-        // Clicou exatamente no botão de Fim
-        const duration = curEndMin - curStartMin;
-        if (duration > 30) {
-          // Reduz/remove 30 minutos (volta 1 slot)
-          endSelect.value = formatMinutesToTime(curEndMin - 30);
-        } else {
-          // Já é meia hora (mínimo) -> mantém confirmado
-          endSelect.value = slotTime;
-        }
-      } else {
-        // Clicou em slot intermediário selecionado (curStartMin < clickedMin < curEndMin): ajusta Fim
-        endSelect.value = slotTime;
       }
-    }
-    // 3. Clique exatamente no botão de Início
-    else if (clickedMin === curStartMin) {
+
+    // 3. Clique ANTES do Início atual → EXPANDE para trás (sem limite)
+    } else if (clickedMin < curStartMin) {
+      if (!hasConflict(clickedMin, curStartMin)) {
+        startSelect.value = slotTime;
+      } else {
+        // Conflito: nova seleção
+        startSelect.value = slotTime;
+        endSelect.value = formatMinutesToTime(clickedMin + 30);
+      }
+
+    // 4. Clique NO slot de Fim exato → REMOVE 30min do final (reduz)
+    } else if (clickedMin === curEndMin) {
       const duration = curEndMin - curStartMin;
       if (duration > 30) {
-        endSelect.value = formatMinutesToTime(curStartMin + 30);
+        endSelect.value = formatMinutesToTime(curEndMin - 30);
       }
-    }
-    // 4. Clique anterior ao início atual (clickedMin < curStartMin)
-    else {
-      if (curStartMin - clickedMin <= 120 && !hasConflict(clickedMin, curEndMin)) {
-        // Expansão para trás
-        startSelect.value = slotTime;
-      } else {
-        // Inicia nova seleção no horário clicado
-        startSelect.value = slotTime;
-        endSelect.value = formatMinutesToTime(clickedMin + 30);
+      // se já é mínimo de 30min, não faz nada
+
+    // 5. Clique NO slot de Início exato → REMOVE 30min do início (avança o início)
+    } else if (clickedMin === curStartMin) {
+      const duration = curEndMin - curStartMin;
+      if (duration > 30) {
+        startSelect.value = formatMinutesToTime(curStartMin + 30);
       }
+      // se já é mínimo de 30min, não faz nada
+
+    // 6. Clique em slot INTERMEDIÁRIO (dentro do intervalo) → CORTA o Fim naquele ponto (remove bloco)
+    } else {
+      // curStartMin < clickedMin < curEndMin
+      // Reduz a seleção: o novo Fim passa a ser o slot clicado
+      endSelect.value = slotTime;
     }
 
     autoCalculateDirectBookingPrice();
