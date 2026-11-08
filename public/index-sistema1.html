@@ -5383,13 +5383,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Salva no storage e atualiza ambas as listas de forma instantânea e fluida
   window.saveAdminGameState = function() {
+    if (window.__isSavingAdminState) return;
+    window.__isSavingAdminState = true;
     try {
       localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
       localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
     } catch(e) {}
-    if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
-    if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
-    if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
+    try {
+      if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
+      if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
+      if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
+    } finally {
+      window.__isSavingAdminState = false;
+    }
   };
 
   // Funções de ação rápida
@@ -6570,6 +6576,10 @@ document.addEventListener('DOMContentLoaded', () => {
   //   * Mensalista / Fixo: Encerra automaticamente e registra cobrança no final do mês
   // =========================================================================
   window.checkAndAutoExpireMatches = function() {
+    // Trava de recursão rigorosa para impedir estouro de memória (Out of Memory)
+    if (window.__isAutoExpiring) return;
+    window.__isAutoExpiring = true;
+
     try {
       const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
       const allTodayMatches = (typeof getMatchesForDate === 'function') ? getMatchesForDate(todayStr) : [];
@@ -6585,7 +6595,13 @@ document.addEventListener('DOMContentLoaded', () => {
       let hasChangedAny = false;
 
       allTodayMatches.forEach(m => {
-        if (!m || m.status === 'finished' || m.status === 'cancelled') return;
+        // Pula partidas já finalizadas, canceladas ou que já estão marcadas como pagamento faltando
+        if (!m) return;
+        const st = m.status;
+        if (st === 'finished' || st === 'cancelled' || st === 'unpaid' || m.payment_status === 'pagamento_faltando') return;
+        if (m.attendance && m.attendance.includes('Pagamento Faltando')) return;
+        if (m.observation && m.observation.includes('Pagamento Faltando')) return;
+
         const sM = parseMin(m.start_time);
         let eM = parseMin(m.end_time);
         if (eM <= sM) eM += 24 * 60;
@@ -6634,15 +6650,22 @@ document.addEventListener('DOMContentLoaded', () => {
       if (hasChangedAny) {
         try {
           localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+          localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
         } catch(e) {}
-        if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
+        if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
       }
     } catch(err) {
       console.warn('[AutoExpire] Erro ao verificar encerramento automático:', err);
+    } finally {
+      window.__isAutoExpiring = false;
     }
   };
 
   window.checkAndAutoStartMatches = function() {
+    // Trava de recursão rigorosa para impedir estouro de memória (Out of Memory)
+    if (window.__isAutoStarting) return;
+    window.__isAutoStarting = true;
+
     try {
       const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
       const allTodayMatches = (typeof getMatchesForDate === 'function') ? getMatchesForDate(todayStr) : [];
@@ -6658,14 +6681,16 @@ document.addEventListener('DOMContentLoaded', () => {
       let hasAutoStartedAny = false;
 
       allTodayMatches.forEach(m => {
-        if (!m || m.status === 'finished' || m.status === 'cancelled') return;
+        if (!m) return;
+        const st = m.status;
+        if (st === 'finished' || st === 'cancelled' || st === 'unpaid' || m.payment_status === 'pagamento_faltando') return;
         const sM = parseMin(m.start_time);
         let eM = parseMin(m.end_time);
         if (eM <= sM) eM += 24 * 60;
 
         // Se já passou de 5 minutos do início programado (curM >= sM + 5) e ainda não terminou
         if (curM >= (sM + 5) && curM <= eM) {
-          const isAlreadyLive = (m.status === 'live' || m.status === 'playing' || m.status === 'in_progress');
+          const isAlreadyLive = (st === 'live' || st === 'playing' || st === 'in_progress');
           if (!isAlreadyLive) {
             // Inicia automaticamente o jogo
             const g = (typeof window.getGame === 'function') ? window.getGame(m.id) : m;
@@ -6692,11 +6717,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (hasAutoStartedAny) {
         try {
           localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+          localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
         } catch(e) {}
-        if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
+        if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
       }
     } catch(err) {
       console.warn('[AutoStart] Erro ao verificar auto-início:', err);
+    } finally {
+      window.__isAutoStarting = false;
     }
   };
 
@@ -8065,7 +8093,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function renderMovementMatches() {
-    const dateStr = window.adminGameState.selectedDate || '2026-11-03';
+    // Trava de recursão para evitar re-entrâncias durante a montagem do feed
+    if (window.__isRenderingMovementMatches) return;
+    window.__isRenderingMovementMatches = true;
+
+    try {
+      const dateStr = window.adminGameState.selectedDate || '2026-11-03';
     const container = document.getElementById('movementMatchesListContainer');
     const titleEl = document.getElementById('movementFeedTitle');
     const countEl = document.getElementById('movementFeedCount');
@@ -8238,6 +8271,9 @@ document.addEventListener('DOMContentLoaded', () => {
       window.updateMovementCalendarStrip();
     }
     if (window.lucide) lucide.createIcons();
+    } finally {
+      window.__isRenderingMovementMatches = false;
+    }
   };
   window.renderMovementMatches = renderMovementMatches;
 
