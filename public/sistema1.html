@@ -43,6 +43,29 @@
     })();
   </script>
   <script src="/default-data.js"></script>
+    <script>
+    // Helper oficial de data e formatação disponível no boot antes do primeiro frame
+    window.getSystemToday = function() {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    };
+
+    window.formatDisplayDate = function(dateStr) {
+      if (!dateStr) return '';
+      try {
+        const parts = dateStr.split('-');
+        const dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 12, 0, 0);
+        const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+        return days[dt.getDay()] + ', ' + parts[2] + ' de ' + months[dt.getMonth()] + ' de ' + parts[0];
+      } catch(e) {
+        return dateStr;
+      }
+    };
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1284,7 +1307,7 @@
       <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">JOGOS AGENDADOS</span>
-          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block kpi-value-games" id="kpiValueGames">0 <span class="text-xs font-semibold text-slate-400">partidas</span></span>
+          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block kpi-value-games" id="kpiValueGames"><span class="animate-pulse text-slate-300">...</span></span>
         </div>
         <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
           <i data-lucide="calendar" class="w-6 h-6"></i>
@@ -1293,7 +1316,7 @@
       <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">AO VIVO AGORA</span>
-          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block kpi-value-live" id="kpiValueLive">0 <span class="text-xs font-semibold text-slate-400">em quadra</span></span>
+          <span class="text-2xl sm:text-3xl font-black text-slate-900 mt-1 block kpi-value-live" id="kpiValueLive"><span class="animate-pulse text-slate-300">...</span></span>
         </div>
         <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
           <i data-lucide="play" class="w-6 h-6"></i>
@@ -1302,7 +1325,7 @@
       <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">FATURAMENTO PREVISTO (HOJE)</span>
-          <span class="text-2xl sm:text-3xl font-black text-emerald-700 mt-1 block kpi-value-revenue" id="kpiValueRevenue">R$ 0,00</span>
+          <span class="text-2xl sm:text-3xl font-black text-emerald-700 mt-1 block kpi-value-revenue" id="kpiValueRevenue"><span class="animate-pulse text-emerald-300">...</span></span>
         </div>
         <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
           <i data-lucide="dollar-sign" class="w-6 h-6"></i>
@@ -1316,7 +1339,7 @@
         <div>
           <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
             <i data-lucide="calendar" class="w-4 h-4 text-emerald-600"></i>
-            <span>Partidas: <strong>Novembro de 2026</strong></span>
+            <span>Partidas: <strong id="calendarHeaderMonthStrong">Novembro de 2026</strong></span>
             <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">Ao Vivo</span>
           </h4>
           <p class="text-xs text-slate-400">Navegue pelos dias para ver os jogos, horários, bola rolando e atrasos em tempo real</p>
@@ -1331,106 +1354,82 @@
           <button onclick="window.navigateMovementDay(1)" title="Próximo dia" class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer transition">&gt;</button>
           <button onclick="window.navigateMovementDay(7)" title="Próxima semana" class="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer transition">Mês &gt;</button>
           <span id="calendarHeaderDateDisplay" class="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50 flex items-center gap-1">
-            <span>03 / 11 / 2026</span>
+            <span id="calendarHeaderDateSpan">-- / -- / ----</span>
             <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
           </span>
         </div>
       </div>
 
       <!-- Barra de 21 Dias com badges de jogos -->
-      <div id="movementDaysStrip" class="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-10-29" onclick="selectMovementDay('2026-10-29', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">QUI</span>
-          <span class="text-base font-black text-slate-800 block">29</span>
-          <span class="text-[9px] text-slate-400 block">Out</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">4 jogos</span>
-        </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-10-30" onclick="selectMovementDay('2026-10-30', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">SEX</span>
-          <span class="text-base font-black text-slate-800 block">30</span>
-          <span class="text-[9px] text-slate-400 block">Out</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">9 jogos</span>
-        </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-10-31" onclick="selectMovementDay('2026-10-31', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">SÁB</span>
-          <span class="text-base font-black text-slate-800 block">31</span>
-          <span class="text-[9px] text-slate-400 block">Out</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">6 jogos</span>
-        </div>
-        <!-- DOM 01 -->
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-01" onclick="selectMovementDay('2026-11-01', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">DOM</span>
-          <span class="text-base font-black text-slate-800 block">01</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black inline-block">Sem jogos</span>
-        </div>
-        <!-- SEG 02 -->
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-02" onclick="selectMovementDay('2026-11-02', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">SEG</span>
-          <span class="text-base font-black text-slate-800 block">02</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">12 jogos</span>
-        </div>
-        <!-- DIA ATUAL: TER 03 (HOJE) -->
-        <div class="min-w-[75px] p-2.5 rounded-2xl text-center bg-emerald-700 text-white shadow-lg ring-2 ring-emerald-600 transition cursor-pointer" data-date="2026-11-03" onclick="selectMovementDay('2026-11-03', this)">
-          <span class="text-[10px] uppercase font-bold text-emerald-200 block">TER • HOJE</span>
-          <span class="text-lg font-black text-white block">03</span>
-          <span class="text-[9px] text-emerald-200 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-800 text-white text-[9px] font-black inline-block">5 jogos</span>
-        </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-04" onclick="selectMovementDay('2026-11-04', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">QUA</span>
-          <span class="text-base font-black text-slate-800 block">04</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">8 jogos</span>
-        </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-05" onclick="selectMovementDay('2026-11-05', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">QUI</span>
-          <span class="text-base font-black text-slate-800 block">05</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">7 jogos</span>
-        </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-06" onclick="selectMovementDay('2026-11-06', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">SEX</span>
-          <span class="text-base font-black text-slate-800 block">06</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">9 jogos</span>
-        </div>
-        <div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer" data-date="2026-11-07" onclick="selectMovementDay('2026-11-07', this)">
-          <span class="text-[10px] uppercase font-bold text-slate-400 block">SÁB</span>
-          <span class="text-base font-black text-slate-800 block">07</span>
-          <span class="text-[9px] text-slate-400 block">Nov</span>
-          <span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 text-[9px] font-black inline-block">6 jogos</span>
-        </div>
-      </div>
+      <div id="movementDaysStrip" class="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar"></div>
+      <script>
+        (function() {
+          try {
+            const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : (function() {
+              const now = new Date();
+              return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            })();
+            const [ty, tm, td] = todayStr.split('-').map(Number);
+            const baseDate = new Date(ty, tm - 1, td, 12, 0, 0);
+
+            // 1. Atualiza o mês no cabeçalho
+            const monthsFull = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+            const monthStrong = document.getElementById('calendarHeaderMonthStrong');
+            if (monthStrong) monthStrong.textContent = monthsFull[baseDate.getMonth()] + ' de ' + ty;
+
+            // 2. Atualiza badge da data no cabeçalho (ex: 08 / 11 / 2026)
+            const calSpan = document.getElementById('calendarHeaderDateSpan') || (document.getElementById('calendarHeaderDateDisplay') ? document.getElementById('calendarHeaderDateDisplay').querySelector('span') : null);
+            if (calSpan) calSpan.textContent = String(td).padStart(2, '0') + ' / ' + String(tm).padStart(2, '0') + ' / ' + ty;
+
+            // 3. Atualiza título do feed imediatamente
+            const feedTitle = document.getElementById('movementFeedTitle');
+            if (feedTitle && typeof window.formatDisplayDate === 'function') {
+              feedTitle.textContent = 'Partidas Programadas para ' + window.formatDisplayDate(todayStr);
+            }
+
+            // 4. Renderiza régua de 21 dias dinamicamente no boot antes do primeiro frame
+            const strip = document.getElementById('movementDaysStrip');
+            if (strip) {
+              const dowMap = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+              const monthMap = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+              let html = '';
+              const genDates = [];
+              for (let offset = -3; offset <= 17; offset++) {
+                const curD = new Date(baseDate);
+                curD.setDate(baseDate.getDate() + offset);
+                const cY = curD.getFullYear();
+                const cM = String(curD.getMonth() + 1).padStart(2, '0');
+                const cD = String(curD.getDate()).padStart(2, '0');
+                const dateStr = cY + '-' + cM + '-' + cD;
+                genDates.push(dateStr);
+                const isToday = (dateStr === todayStr);
+                const dow = dowMap[curD.getDay()];
+                const monthLabel = monthMap[curD.getMonth()];
+                const subLabel = isToday ? (dow + ' • HOJE') : dow;
+
+                if (isToday) {
+                  html += '<div class="min-w-[75px] p-2.5 rounded-2xl text-center bg-emerald-700 text-white shadow-lg ring-2 ring-emerald-600 transition cursor-pointer shrink-0" data-date="' + dateStr + '" onclick="window.selectMovementDay && window.selectMovementDay(\'' + dateStr + '\', this)">' +
+                    '<span class="text-[10px] uppercase font-bold text-emerald-200 block">' + subLabel + '</span>' +
+                    '<span class="text-lg font-black text-white block">' + cD + '</span>' +
+                    '<span class="text-[9px] text-emerald-200 block">' + monthLabel + '</span>' +
+                    '<span class="mt-1 px-1.5 py-0.2 rounded-md bg-emerald-800 text-white text-[9px] font-black inline-block">...</span>' +
+                  '</div>';
+                } else {
+                  html += '<div class="min-w-[70px] p-2.5 rounded-2xl border border-slate-200 text-center bg-white hover:border-slate-300 transition cursor-pointer shrink-0" data-date="' + dateStr + '" onclick="window.selectMovementDay && window.selectMovementDay(\'' + dateStr + '\', this)">' +
+                    '<span class="text-[10px] uppercase font-bold text-slate-400 block">' + subLabel + '</span>' +
+                    '<span class="text-base font-black text-slate-800 block">' + cD + '</span>' +
+                    '<span class="text-[9px] text-slate-400 block">' + monthLabel + '</span>' +
+                    '<span class="mt-1 px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600 text-[9px] font-black inline-block">...</span>' +
+                  '</div>';
+                }
+              }
+              strip.innerHTML = html;
+              window.__arenaCalendarDatesList = genDates;
+            }
+          } catch(e) {}
+        })();
+      </script>
     </div>
-      <!-- ========================================================================= -->
-      <!-- 🟢 FEED / TABELA DE PARTIDAS DO DIA SELECIONADO (MOVIMENTAÇÃO)           -->
-      <!-- ========================================================================= -->
-      <!-- Barra de Filtros por Quadra e Status -->
-      <div class="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4 mt-6">
-        
-        <!-- Filtros em Grade Responsiva (Nunca quebra em telas menores) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 w-full xl:w-auto min-w-0 flex-1">
-          
-          <!-- Filtro Quadra -->
-          <div class="flex items-center gap-2 w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
-            <span class="text-[11px] sm:text-xs font-black uppercase text-slate-700 shrink-0 flex items-center gap-1 min-w-[65px]">
-              <i data-lucide="filter" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600"></i> Quadra:
-            </span>
-            <div class="relative flex-1 min-w-[130px]">
-              <select id="movementCourtFilter" onchange="filterMovementMatches()" class="w-full py-1.5 sm:py-2 pl-2 pr-7 border-0 rounded-lg text-xs font-bold text-slate-800 bg-transparent focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer">
-                <option value="all">🏟️ Todas as Quadras</option>
-                <option value="fut5">FUT 5 – SOCCER 5</option>
-                <option value="fut6">FUT 6 – SOCCER 6</option>
-                <option value="fut7">FUT 7 – SOCCER 7</option>
-                <option value="futmesa">FOOT TABLE – FUTMESA</option>
-                <option value="areia">AREIA – BEACH SPORTS</option>
-                <option value="society">SOCIETY – ARENA CENTRAL</option>
-              </select>
-              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
-          </div>
 
           <!-- Filtro Status -->
           <div class="flex items-center gap-2 w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
@@ -1478,17 +1477,30 @@
           <div class="min-w-0 flex-1">
             <h3 class="text-sm sm:text-base md:text-lg font-black text-slate-900 flex items-center gap-2 flex-wrap">
               <i data-lucide="list-ordered" class="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 shrink-0"></i>
-              <span id="movementFeedTitle" class="break-words">Partidas Programadas para Terça-feira, 03 de Novembro de 2026</span>
+              <span id="movementFeedTitle" class="break-words">Partidas Programadas para Hoje</span>
+              <script>
+                (function() {
+                  try {
+                    const feedTitle = document.getElementById('movementFeedTitle');
+                    if (feedTitle && typeof window.formatDisplayDate === 'function' && typeof window.getSystemToday === 'function') {
+                      feedTitle.textContent = 'Partidas Programadas para ' + window.formatDisplayDate(window.getSystemToday());
+                    }
+                  } catch(e) {}
+                })();
+              </script>
             </h3>
             <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Acompanhamento ao vivo, cronômetro automático, gestão de atrasos e prevenção de choques</p>
           </div>
           <span id="movementFeedCount" class="text-xs text-slate-700 bg-slate-100 px-3 py-1 rounded-full font-bold self-start sm:self-center shrink-0">
-            0 partidas listadas
+            <span class="animate-pulse">Sincronizando...</span>
           </span>
         </div>
 
         <div id="movementMatchesListContainer" class="space-y-4">
-          <!-- Renderizado dinamicamente via JS -->
+          <div class="flex flex-col items-center justify-center p-10 text-slate-400 gap-2.5 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+            <div class="w-6 h-6 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin"></div>
+            <span class="text-xs font-semibold text-slate-500">Sincronizando partidas em tempo real...</span>
+          </div>
         </div>
       </div>
 
@@ -3786,7 +3798,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Data do Jogo *</label>
-          <input type="date" id="directBookingDate" required value="2026-11-03"
+          <input type="date" id="directBookingDate" required
                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
         </div>
       </div>
@@ -4749,7 +4761,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bookings: getLoadedBookings(),
     monthlyMembers: getLoadedMonthly(),
     courts: ADMIN_COURTS,
-    selectedDate: (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04',
+    selectedDate: (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'),
     movementFilterCourt: 'all',
     movementFilterStatus: 'all',
     cadastrosFilterCourt: 'all',
@@ -4916,7 +4928,7 @@ document.addEventListener('DOMContentLoaded', () => {
       id: String(booking.id),
       court_id: booking.court_id || booking.courtId || 'court-society-1',
       customer_id: booking.customer_id || null,
-      date: booking.date || window.adminGameState.selectedDate || '2026-11-03',
+      date: booking.date || window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'),
       start_time: booking.start_time || (booking.time ? booking.time.split(' ')[0] : '16:00'),
       end_time: booking.end_time || (booking.time && booking.time.includes('às') ? booking.time.split('às')[1].trim() : '17:00'),
       time: booking.time || ((booking.start_time || '16:00') + ' às ' + (booking.end_time || '17:00')),
@@ -5085,7 +5097,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   function getMatchesForDate(dateStr) {
-    if (!dateStr) dateStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+    if (!dateStr) dateStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     if (!window.__matchesCacheByDate) window.__matchesCacheByDate = new Map();
     if (window.__matchesCacheByDate.has(dateStr)) {
       return window.__matchesCacheByDate.get(dateStr);
@@ -5096,8 +5108,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentDayOfWeek = dayOfWeekMap[dt.getDay()];
 
     // Regra: Finaliza todos os jogos dos dias anteriores (do dia 03 para trás)
-    const isPastOrDay3 = (dateStr <= '2026-11-03' && dateStr !== '2026-11-04');
-    const defaultPastStatus = isPastOrDay3 ? 'finished' : 'confirmed';
+    const sysTodayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08';
+    const isPast = (dateStr < sysTodayStr);
+    const defaultPastStatus = isPast ? 'finished' : 'confirmed';
 
     let matches = [];
 
@@ -5240,7 +5253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const court = getCourtById(m.court_id || m.courtId);
         const startT = m.start_time || m.startTime || m.time || '18:00';
         const endT = m.end_time || m.endTime || (startT.includes(':') ? String(Number(startT.split(':')[0]) + 1).padStart(2, '0') + ':' + startT.split(':')[1] : '19:00');
-        const selDate = window.adminGameState.selectedDate || '2026-11-03';
+        const selDate = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
         const [sy, smm, sd] = selDate.split('-');
         const sdt = new Date(Number(sy), Number(smm) - 1, Number(sd), 12, 0, 0);
         const dayOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
@@ -6066,7 +6079,7 @@ document.addEventListener('DOMContentLoaded', () => {
       };
     }
 
-    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
+    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const mDate = matchDate || todayStr;
 
     // CASO 1: JOGO DE DIA FUTURO (Ainda não é o dia do jogo)
@@ -6438,7 +6451,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
 
     // 7. Mostra e destaca o Próximo Jogo da Hora
-    const dateStr = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04');
+    const dateStr = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'));
     const activeList = (typeof window.getMatchesForDate === 'function')
       ? window.getMatchesForDate(dateStr).filter(m => m.status !== 'finished')
       : [];
@@ -6492,7 +6505,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__isAutoExpiring = true;
 
     try {
-      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
       const allTodayMatches = (typeof getMatchesForDate === 'function') ? getMatchesForDate(todayStr) : [];
       const now = new Date();
       const curM = now.getHours() * 60 + now.getMinutes();
@@ -6575,7 +6588,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__isAutoStarting = true;
 
     try {
-      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
       const allTodayMatches = (typeof getMatchesForDate === 'function') ? getMatchesForDate(todayStr) : [];
       const now = new Date();
       const curM = now.getHours() * 60 + now.getMinutes();
@@ -6637,7 +6650,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.checkIsMatchLive = function(m, todayStr) {
     if (!m || m.status === 'finished' || m.status === 'cancelled') return false;
     if (m.status === 'live' || m.status === 'playing' || m.status === 'in_progress') return true;
-    if (!todayStr) todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
+    if (!todayStr) todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     if (m.date === todayStr) {
       const now = new Date();
       const curM = now.getHours() * 60 + now.getMinutes();
@@ -7220,8 +7233,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const zapText = encodeURIComponent('Olá ' + (m.customer_name || m.name) + '! Confirmamos seu jogo na ' + court.name + ' às ' + startT + ' na Arena Limoeiro.');
     const zapUrl = cleanPhone.length >= 10 ? 'https://wa.me/55' + cleanPhone + '?text=' + zapText : '#';
 
-    const mDate = m.date || (window.adminGameState && window.adminGameState.selectedDate) || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04');
-    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+    const mDate = m.date || (window.adminGameState && window.adminGameState.selectedDate) || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'));
+    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const isFutureDay = mDate > todayStr;
     const isPastDay = mDate < todayStr;
     const isToday = mDate === todayStr;
@@ -7894,14 +7907,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // NAVEGAÇÃO FLUIDA DE DIAS NO CALENDÁRIO (< MÊS, <, >, MÊS >)
   window.navigateMovementDay = function(delta) {
-    const datesList = window.__arenaCalendarDatesList || [
-      '2026-10-29', '2026-10-30', '2026-10-31',
-      '2026-11-01', '2026-11-02', '2026-11-03',
-      '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07',
-      '2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11',
-      '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15',
-      '2026-11-16', '2026-11-17', '2026-11-18'
-    ];
+    if (!window.__arenaCalendarDatesList || window.__arenaCalendarDatesList.length === 0) {
+      if (typeof window.renderMovementCalendarStrip === 'function') window.renderMovementCalendarStrip();
+    }
+    const datesList = window.__arenaCalendarDatesList || [];
     const current = window.adminGameState.selectedDate || window.getSystemToday();
     let idx = datesList.indexOf(current);
     if (idx === -1) {
@@ -7967,7 +7976,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Ao selecionar o dia atual, se o filtro estava em finalizados, reseta para ver os jogos prontos
-    const sysToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+    const sysToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     if (dateStr === sysToday && window.adminGameState.movementFilterStatus === 'finished') {
       window.adminGameState.movementFilterStatus = 'all';
       const statusSelectEl = document.getElementById('movementStatusFilter');
@@ -7995,7 +8004,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.__isRenderingMovementMatches = true;
 
     try {
-      const dateStr = window.adminGameState.selectedDate || '2026-11-03';
+      const dateStr = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const container = document.getElementById('movementMatchesListContainer');
     const titleEl = document.getElementById('movementFeedTitle');
     const countEl = document.getElementById('movementFeedCount');
@@ -8077,7 +8086,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Atualiza KPIs do topo com base no dia atual (Hoje / Faturamento real dinâmico)
-    const currentToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-03';
+    const currentToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const allTodayMatches = getMatchesForDate(currentToday);
     // Não contabiliza o valor dos fixos/mensalistas no faturamento diário de jogos avulsos
     const topRevenue = allTodayMatches.filter(m => !m.isMensalista && m.booking_type !== 'mensalista' && m.type !== 'Mensalista').reduce((acc, cur) => acc + (Number(cur.total_price) || 0), 0);
@@ -8455,7 +8464,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return (a.start_time || '').localeCompare(b.start_time || '');
     });
 
-    const todayStr = '2026-11-03';
+    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08';
     const countToday = all.filter(b => b.date === todayStr && b.status !== 'cancelled').length;
     const countUpcoming = all.filter(b => b.date >= todayStr && b.status !== 'cancelled' && b.status !== 'finished').length;
     const countFinished = all.filter(b => b.status === 'finished').length;
@@ -8574,7 +8583,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextAlertText = document.getElementById('balcaoNextGameAlertText');
 
     const courtId = courtSelect ? courtSelect.value : 'fut7';
-    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04');
+    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'));
     const currentStart = startSelect ? startSelect.value : '';
     const currentEnd = endSelect ? endSelect.value : '';
     const shouldHideOccupied = hideToggle ? hideToggle.checked : true;
@@ -8635,7 +8644,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 2. CONSTRUÇÃO COMPLETA DA GRADE
     grid.dataset.filterKey = filterKey;
 
-    const todayStr = window.adminGameState.selectedDate || '2026-11-04';
+    const todayStr = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const isToday = (dateStr === todayStr);
 
     const now = new Date();
@@ -8756,7 +8765,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const courtSelect = document.getElementById('directBookingCourt');
     const dateInput = document.getElementById('directBookingDate');
     const courtId = courtSelect ? courtSelect.value : 'fut7';
-    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04');
+    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'));
     const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges(courtId, dateStr) : [];
 
     // Salva histórico para o botão Voltar Seleção
@@ -8872,7 +8881,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const courtSelect = document.getElementById('directBookingCourt');
     const dateInput = document.getElementById('directBookingDate');
     const courtId = optCourtId || (courtSelect ? courtSelect.value : 'fut7');
-    const dateStr = optDateStr || (dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04'));
+    const dateStr = optDateStr || (dateInput ? dateInput.value : (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08')));
 
     let dbCourtId = courtId;
     if (courtId === 'fut5') dbCourtId = 'court-esportes-de-quadra-1788962671043';
@@ -8982,7 +8991,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const courtSelect = document.getElementById('directBookingCourt');
     const dateInput = document.getElementById('directBookingDate');
     const courtId = courtSelect ? courtSelect.value : 'fut7';
-    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || '2026-11-04');
+    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'));
 
     let dbCourtId = courtId;
     if (courtId === 'fut5') dbCourtId = 'court-esportes-de-quadra-1788962671043';
@@ -9094,7 +9103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const endSelect = document.getElementById('directBookingEnd');
 
     if (dateInput) {
-      dateInput.value = window.adminGameState.selectedDate || '2026-11-04';
+      dateInput.value = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     }
 
     // Modal abre completamente LIMPO: nenhum bloco pré-selecionado pelo sistema
@@ -9163,7 +9172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = document.getElementById('directBookingName')?.value.trim();
     const phone = document.getElementById('directBookingPhone')?.value.trim();
     const courtId = document.getElementById('directBookingCourt')?.value || 'fut7';
-    const date = document.getElementById('directBookingDate')?.value || window.adminGameState.selectedDate || '2026-11-03';
+    const date = document.getElementById('directBookingDate')?.value || window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const start = document.getElementById('directBookingStart')?.value;
     const end = document.getElementById('directBookingEnd')?.value;
     const price = parseFloat(document.getElementById('directBookingPrice')?.value || 0);
@@ -9275,7 +9284,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.exportMovementDailyExcel = function() {
-    const dateStr = window.adminGameState.selectedDate || '2026-11-03';
+    const dateStr = window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     const matches = getMatchesForDate(dateStr);
     let csv = 'Data;Horario;Quadra;Cliente;Telefone;Valor;Status\n';
     matches.forEach(m => {
@@ -9427,7 +9436,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('editMatchId').value = id;
     document.getElementById('editMatchName').value = g.customer_name || g.name || '';
     document.getElementById('editMatchPhone').value = g.customer_phone || g.phone || '';
-    document.getElementById('editMatchDate').value = g.date || window.adminGameState.selectedDate || '2026-11-03';
+    document.getElementById('editMatchDate').value = g.date || window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     
     const courtSelect = document.getElementById('editMatchCourt');
     if (courtSelect) {
@@ -10004,7 +10013,7 @@ window.cancelGame = function(id) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'arena-limoeiro-backup-' + (window.getSystemToday ? window.getSystemToday() : '2026-11-04') + '.json';
+      a.download = 'arena-limoeiro-backup-' + (window.getSystemToday ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08')) + '.json';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -10021,7 +10030,7 @@ window.cancelGame = function(id) {
 
   window.initAdminGames = initAdminGames;
   function initAdminGames() {
-    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+    const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
     window.__lastKnownSystemDate = todayStr;
 
     // Renderiza a régua de dias dinamicamente centrada no dia de hoje
