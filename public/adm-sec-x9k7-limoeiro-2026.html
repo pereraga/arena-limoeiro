@@ -126,13 +126,13 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 0.45rem;
-      padding: 0.5rem 0.85rem;
+      gap: 0.5rem;
+      padding: 0.55rem 0.95rem;
       border-radius: 9999px !important;
       font-size: 0.8125rem;
       font-weight: 700;
       white-space: nowrap;
-      height: 38px;
+      height: 42px;
       box-sizing: border-box;
       transition: all 0.16s ease-in-out;
       cursor: pointer;
@@ -1553,35 +1553,35 @@
       <!-- SUB-NAVEGAÇÃO INTERNA: QUADRAS & MODALIDADES (ESTILO OFICIAL DA ARENA) -->
       <!-- SUB-NAVEGAÇÃO COMPLETA: GESTÃO DE ESPAÇOS (Quadras, Categorias & Modalidades, Posições dos Jogos, Horários Fixos, Jogos) -->
       <div class="flex items-center justify-center w-full mb-3 px-2">
-        <div class="p-1.5 sm:p-2 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-full max-w-4xl shadow-2xs mx-auto">
-          <!-- Fileira 1: 3 botões (Quadras, Modalidades, Posições) -->
-          <div class="flex items-center justify-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-full">
-            <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-1 sm:!flex-initial sm:!min-w-[140px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
-              <i data-lucide="layout-grid" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-white"></i>
-              <span class="truncate">Quadras</span>
+        <div class="p-2 sm:p-2.5 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-full max-w-4xl shadow-2xs mx-auto">
+          <!-- Fileira 1: 3 botões (Quadras, Modalidades, Posições dos Jogos) -->
+          <div class="flex items-center justify-center gap-2 mb-2 w-full">
+            <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-1 sm:!flex-initial sm:!min-w-[145px] !min-w-0 !h-[42px] px-2 sm:px-4 text-xs font-bold whitespace-nowrap">
+              <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-white"></i>
+              <span class="whitespace-nowrap">Quadras</span>
               <span class="badge-count" id="badgeCourtsCount">6</span>
             </button>
-            <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[160px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
-              <i data-lucide="tag" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700"></i>
-              <span class="truncate">Modalidades</span>
+            <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[170px] !min-w-0 !h-[42px] px-2 sm:px-4 text-xs font-bold whitespace-nowrap">
+              <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
+              <span class="whitespace-nowrap">Modalidades</span>
               <span class="badge-count" id="badgeModalitiesCount">4</span>
             </button>
-            <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[150px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
-              <i data-lucide="map-pin" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700"></i>
-              <span class="truncate">Posições</span>
+            <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[170px] !min-w-0 !h-[42px] px-2 sm:px-4 text-xs font-bold whitespace-nowrap">
+              <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-slate-700"></i>
+              <span class="whitespace-nowrap">Posições dos Jogos</span>
             </button>
           </div>
 
           <!-- Fileira 2: 2 botões (Horários Fixos, Jogos) -->
-          <div class="flex items-center justify-center gap-1.5 sm:gap-2 w-full">
-            <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[160px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
-              <i data-lucide="calendar" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700"></i>
-              <span class="truncate">Horários Fixos</span>
+          <div class="flex items-center justify-center gap-2 w-full">
+            <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[180px] !min-w-0 !h-[42px] px-3 sm:px-5 text-xs font-bold whitespace-nowrap">
+              <i data-lucide="calendar" class="w-4 h-4 shrink-0 text-slate-700"></i>
+              <span class="whitespace-nowrap">Horários Fixos</span>
               <span class="badge-count" id="badgeCourtsMensalistasCount">40</span>
             </button>
-            <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[140px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
-              <span class="text-xs sm:text-sm">⚽</span>
-              <span class="truncate">Jogos</span>
+            <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[150px] !min-w-0 !h-[42px] px-3 sm:px-5 text-xs font-bold whitespace-nowrap">
+              <span class="text-sm">⚽</span>
+              <span class="whitespace-nowrap">Jogos</span>
               <span class="badge-count" id="badgeCourtsJogosCount">0</span>
             </button>
           </div>
