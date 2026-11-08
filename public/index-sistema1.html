@@ -7358,11 +7358,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const price = Number(m.total_price || m.price || 100).toFixed(2).replace('.', ',');
+    const isUnpaid = (st === 'unpaid' || st === 'cancelled' || m.payment_status === 'pagamento_faltando');
     let rawPay = String(m.payment || m.payment_method || (isMensalista ? 'Mensal' : 'Pago')).trim();
     if (rawPay === 'pago_balcao' || rawPay === 'pagar_local' || rawPay === 'pos_jogo' || (isMensalista && (rawPay.toLowerCase().includes('balcao') || rawPay.toLowerCase().includes('faturada') || rawPay === 'Pago' || rawPay === 'pago'))) {
       rawPay = 'Mensal';
     }
+    // CORREÇÃO CRÍTICA: Se a partida está com Pagamento Faltando, NUNCA exibir "pago" ou selo verde de pago
+    if (isUnpaid) {
+      rawPay = 'Pagamento Faltando';
+    }
     const payment = rawPay;
+
+    // Badges dinâmicos de pagamento para evitar inconsistência de selo verde em jogo não pago
+    const payBadgeClass = isUnpaid 
+      ? 'text-amber-800 bg-amber-100 border border-amber-300 font-extrabold'
+      : (isMensalista ? 'text-purple-800 bg-purple-50 border border-purple-200 font-black' : 'text-emerald-700 bg-emerald-50 border border-emerald-200 font-bold');
+    const payBadgeIcon = isUnpaid 
+      ? '<i class="fa-solid fa-triangle-exclamation text-[9px] mr-1 text-amber-700"></i>'
+      : '<i class="fa-solid fa-check text-[9px] mr-1 text-emerald-600"></i>';
+    const payMetaIcon = isUnpaid
+      ? '<i class="fa-solid fa-triangle-exclamation text-amber-600"></i>'
+      : '<i class="fa-solid fa-circle-check text-emerald-600"></i>';
+    const payMetaClass = isUnpaid ? 'text-amber-800 font-bold' : 'text-emerald-700 font-semibold';
     const playersCount = m.players || 14;
     const observation = m.observation || m.note || (m.dayFixed ? 'Horário Fixo Semanal (' + m.dayFixed + ')' : (isMensalista ? 'Horário Fixo Semanal (QUARTA)' : 'Reserva Confirmada'));
     
@@ -7497,8 +7514,8 @@ document.addEventListener('DOMContentLoaded', () => {
                   <i class="fa-solid fa-users text-slate-400"></i> ${playersCount} jogadores previstos
                 </span>
 
-                <span class="flex items-center gap-1.5 font-semibold text-emerald-700">
-                  <i class="fa-solid fa-circle-check text-emerald-600"></i> ${payment}
+                <span class="flex items-center gap-1.5 ${payMetaClass}">
+                  ${payMetaIcon} ${payment}
                 </span>
               </div>
             </div>
@@ -7550,8 +7567,8 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Valor Contratado</div>
               <div id="mainPriceDisplay-${m.id}" class="text-3xl font-extrabold text-slate-900 font-heading tracking-tight">R$ ${currentTotalStr}</div>
               <div class="flex items-center justify-end gap-1.5 mt-0.5">
-                <span class="inline-flex items-center text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  <i class="fa-solid fa-check text-[9px] mr-1 text-emerald-600"></i> ${payment}
+                <span class="inline-flex items-center text-[11px] px-2 py-0.5 rounded ${payBadgeClass}">
+                  ${payBadgeIcon} ${payment}
                 </span>
               </div>
               `}
@@ -7644,9 +7661,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="text-[10px] font-bold uppercase tracking-wider">Status Financeiro</span>
                 <i class="fa-solid fa-receipt text-emerald-600 text-xs"></i>
               </div>
-              <div class="font-bold text-emerald-700 text-sm">${isMensalista ? 'Mensal' : (payment + ' • R$ ' + price)}</div>
+              <div class="font-bold ${isUnpaid ? 'text-amber-800' : 'text-emerald-700'} text-sm">${isMensalista ? 'Mensal' : (payment + ' • R$ ' + price)}</div>
               <div class="text-[11px] text-slate-500 mt-0.5 flex items-center justify-between">
-                <span>${isMensalista ? 'Contrato mensal' : 'Sem pendências'}</span>
+                <span>${isMensalista ? 'Contrato mensal' : (isUnpaid ? 'Pagamento pendente' : 'Sem pendências')}</span>
                 <a href="#" onclick="viewReceipt('${m.id}'); return false;" class="text-emerald-600 font-semibold hover:underline">Ver Recibo</a>
               </div>
             </div>
