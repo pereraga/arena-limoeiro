@@ -4316,13 +4316,13 @@ document.addEventListener('DOMContentLoaded', () => {
     <form onsubmit="applyNoShow(event)" class="p-5 sm:p-6 space-y-4">
       <input type="hidden" id="noShowMatchId">
 
-      <div class="p-3 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 font-medium">
-        Você está prestes a marcar esta partida como <strong class="font-black text-red-950">Não compareceu</strong>. O histórico da partida registrará a ocorrência de falta.
+      <div class="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-900 font-medium">
+        Ao confirmar que o responsável da partida <strong class="font-black text-rose-950">não veio / faltou</strong>, este jogo será <strong>removido permanentemente do banco de dados</strong> e a quadra/horário será imediatamente liberada.
       </div>
 
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo / Justificativa da Falta</label>
-        <textarea id="noShowReason" rows="3" required placeholder="Ex.: Equipe não apareceu e não atendeu as tentativas de contato via WhatsApp."
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo / Justificativa da Ausência *</label>
+        <textarea id="noShowReason" rows="3" required placeholder="Ex.: O responsável não compareceu no horário e não atendeu as tentativas de contato."
                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-red-500 focus:outline-none"></textarea>
       </div>
 
@@ -4331,8 +4331,8 @@ document.addEventListener('DOMContentLoaded', () => {
           Voltar
         </button>
         <button type="submit" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-black shadow-md flex items-center gap-1.5 transition cursor-pointer">
-          <i data-lucide="alert-circle" class="w-4 h-4"></i>
-          <span>Confirmar Falta</span>
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          <span>Confirmar e Remover do Banco</span>
         </button>
       </div>
     </form>
@@ -5526,17 +5526,32 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) lucide.createIcons();
   };
 
-  window.applyNoShow = function() {
+  window.applyNoShow = function(e) {
+    if (e && e.preventDefault) e.preventDefault();
     const id = document.getElementById('noShowMatchId').value;
-    const g = getGame(id);
-    if (!g) return;
-    g.status = 'no-show';
-    g.attendance = 'Não compareceu';
-    const reason = document.getElementById('noShowReasonInput').value.trim();
-    addMatchLog(g, 'Não compareceu', reason || 'Ausência registrada pela administração.');
-    saveAdminGameState();
+    const reason = (document.getElementById('noShowReason')?.value || document.getElementById('noShowReasonInput')?.value || '').trim() || 'Responsável não compareceu';
+    
+    // Remove completamente do estado local
+    const bookingToDelete = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id)) || { id: id, observation: reason };
+    window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => String(b.id) !== String(id));
+    
+    // Atualiza o localStorage local
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+    } catch(err) {}
+
+    // ☁️ Exclui do Supabase (DB1 e DB2) com garantia de imunidade contra ressuscitação
+    if (typeof window.syncBookingToCloud === 'function') {
+      window.syncBookingToCloud(bookingToDelete, 'delete');
+    }
+
     closeArenaModal('arenaNoShowModal');
-    arenaToast('Ausência registrada no histórico.');
+    if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+    if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+    if (typeof arenaToast === 'function') {
+      arenaToast('✓ Ausência confirmada. O jogo foi excluído e sumiu do banco de dados!');
+    }
   };
 
 
@@ -7552,6 +7567,11 @@ document.addEventListener('DOMContentLoaded', () => {
                   <span class="px-3 py-1.5 rounded-xl text-xs font-extrabold text-amber-900 bg-amber-100 border border-amber-300 shadow-sm inline-flex items-center gap-1.5">
                     <i class="fa-solid fa-triangle-exclamation text-amber-700"></i> Pagamento Faltando
                   </span>
+                  <!-- Botão de Não Compareceu / Falta: Abre modal de justificativa e apaga o jogo do banco -->
+                  <button type="button" onclick="openNoShow('${m.id}')" class="px-3.5 py-2 rounded-full font-bold text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer" title="Responsável não compareceu (remover do sistema)">
+                    <i class="fa-solid fa-user-xmark text-xs text-rose-600"></i>
+                    <span>Não Compareceu</span>
+                  </button>
                   <!-- Botão de Pagamento: Abre a janela padrão para escolher a forma (PIX, Dinheiro, Cartão, Dividido) e concluir -->
                   <button type="button" id="btn-pay-action-${m.id}" onclick="openFinishGame('${m.id}')" class="px-5 py-2.5 rounded-full font-black text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer" title="Abrir janela para escolher a forma de pagamento e concluir partida">
                     <i class="fa-solid fa-hand-holding-dollar text-sm"></i>
@@ -9742,26 +9762,33 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) lucide.createIcons();
   };
 
-  // Confirmar Falta / Não Compareceu
+  // Confirmar Falta / Não Compareceu: Faz o jogo sumir completamente do banco de dados
   window.applyNoShow = function(e) {
     if (e && e.preventDefault) e.preventDefault();
     const id = document.getElementById('noShowMatchId').value;
-    const g = getGame(id);
-    if (!g) return;
+    const reason = (document.getElementById('noShowReason')?.value || document.getElementById('noShowReasonInput')?.value || '').trim() || 'Responsável não compareceu';
 
-    const reason = document.getElementById('noShowReason').value.trim() || 'Equipe não compareceu';
-    g.attendance = 'Não compareceu';
-    g.status = 'cancelled';
-    addMatchLog(g, 'Falta registrada', reason);
+    // Remove do estado local
+    const bookingToDelete = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id)) || { id: id, observation: reason };
+    window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => String(b.id) !== String(id));
 
-    saveAdminGameState();
+    // Persiste no localStorage
+    try {
+      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+    } catch(err) {}
+
+    // ☁️ Exclui imediatamente do Supabase DB1 e DB2 na nuvem (DELETE oficial)
     if (typeof window.syncBookingToCloud === 'function') {
-      window.syncBookingToCloud(g, 'upsert');
+      window.syncBookingToCloud(bookingToDelete, 'delete');
     }
+
     closeArenaModal('arenaNoShowModal');
-    renderMovementMatches();
-    renderCadastrosBookingsList();
-    arenaToast('Falta registrada no histórico da partida.');
+    if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+    if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+    if (typeof arenaToast === 'function') {
+      arenaToast('✓ Ausência confirmada. O jogo foi excluído e sumiu do banco de dados!');
+    }
   };
 
   // 4. Duplicar Partida
