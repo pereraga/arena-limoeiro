@@ -1250,13 +1250,6 @@
           <span class="badge-count">6</span>
         </button>
 
-        <!-- Aba 3: Modalidades -->
-        <button onclick="showAdminTab('modalities')" id="btnTab-modalities" class="tab-btn tab-inactive">
-          <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
-          <span>Modalidades</span>
-          <span class="badge-count">4</span>
-        </button>
-
         <!-- Aba 5: Cadastros & Ajustes -->
         <button onclick="showAdminTab('cadastros')" id="btnTab-cadastros" class="tab-btn tab-inactive">
           <i data-lucide="sliders" class="w-4 h-4 shrink-0 text-slate-700"></i>
@@ -1501,10 +1494,26 @@
 
     </section>
 
-    <!-- 🟢 PAINEL 2: QUADRAS -->
-    <!-- 🟢 PAINEL 2: QUADRAS (MONITOR DE QUADRAS OFICIAL) -->
+    <!-- 🟢 PAINEL 2: QUADRAS & MODALIDADES -->
     <section id="panel-courts" class="space-y-6 hidden">
-      <div class="crumb"><span>Início</span><span>›</span><b>Quadras</b></div>
+
+      <!-- SUB-NAVEGAÇÃO INTERNA: QUADRAS & MODALIDADES (ESTILO OFICIAL DA ARENA) -->
+      <div class="flex items-center gap-2 mb-2 p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-fit max-w-full shadow-2xs">
+        <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-initial" style="min-width: 140px; height: 38px;">
+          <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-white"></i>
+          <span>Quadras</span>
+          <span class="badge-count" id="badgeCourtsCount">6</span>
+        </button>
+        <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-initial" style="min-width: 145px; height: 38px;">
+          <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
+          <span>Modalidades</span>
+          <span class="badge-count" id="badgeModalitiesCount">4</span>
+        </button>
+      </div>
+
+      <!-- SUB-ABA 1: MONITOR DE QUADRAS -->
+      <div id="courtsSubtab-quadras" class="space-y-6">
+        <div class="crumb"><span>Início</span><span>›</span><b>Quadras</b></div>
 
       <section class="intro">
         <div>
@@ -1607,14 +1616,12 @@
           </div>
         </article>
       </section>
+        <p class="footer-note">Arena Limoeiro • Painel de demonstração para gestão de quadras</p>
+      </div>
 
-      <p class="footer-note">Arena Limoeiro • Painel de demonstração para gestão de quadras</p>
-    </section>
-
-    <!-- 🟢 PAINEL 3: MODALIDADES -->
-    <section id="panel-modalities" class="space-y-6 hidden">
-
-      <!-- ========================================================================= -->
+      <!-- SUB-ABA 2: CATEGORIAS & MODALIDADES -->
+      <div id="courtsSubtab-modalidades" class="space-y-6 hidden">
+        <!-- ========================================================================= -->
       <!-- ABA MODALIDADES & ESPAÇOS: DESIGN MODERNO INTEGRADO DO HTML DO CLIENTE   -->
       <!-- ========================================================================= -->
       <div class="crumb text-xs text-slate-500 mb-2">Painel administrativo / <b>Modalidades</b> / Categorias e Espaços</div>
@@ -1701,9 +1708,10 @@
       <div class="footer-note">
         <b>Observação:</b> as alterações realizadas ficam salvas no armazenamento local deste dispositivo para testes operacionais imediatos sem alterar o banco de dados de produção.
       </div>
+      </div>
 
-    </div>
     </section>
+
 
     <!-- 🟢 PAINEL 5: CADASTROS & AJUSTES -->
     <section id="panel-cadastros" class="space-y-6 hidden">
@@ -2690,9 +2698,60 @@ print(resp.json())</code></pre>
   <!-- 6. JAVASCRIPT DE NAVEGAÇÃO E INTERATIVIDADE DO PAINEL           -->
   <!-- ============================================================== -->
   <script>
-    const tabsList = ['movement', 'courts', 'modalities', 'cadastros', 'reports', 'backup'];
+    const tabsList = ['movement', 'courts', 'cadastros', 'reports', 'backup'];
+
+    window.switchCourtsSubTab = function(sub) {
+      const btnQuadras = document.getElementById('btnCourtsSub-quadras');
+      const btnModalidades = document.getElementById('btnCourtsSub-modalidades');
+      const contentQuadras = document.getElementById('courtsSubtab-quadras');
+      const contentModalidades = document.getElementById('courtsSubtab-modalidades');
+
+      if (sub === 'modalidades') {
+        if (btnModalidades) {
+          btnModalidades.className = 'tab-btn tab-active !flex-initial';
+          const icon = btnModalidades.querySelector('i');
+          if (icon) icon.className = 'w-4 h-4 shrink-0 text-white';
+        }
+        if (btnQuadras) {
+          btnQuadras.className = 'tab-btn tab-inactive !flex-initial';
+          const icon = btnQuadras.querySelector('i');
+          if (icon) icon.className = 'w-4 h-4 shrink-0 text-slate-700';
+        }
+        if (contentQuadras) contentQuadras.classList.add('hidden');
+        if (contentModalidades) {
+          contentModalidades.classList.remove('hidden');
+          if (typeof renderSpacesGrid === 'function') renderSpacesGrid();
+        }
+      } else {
+        if (btnQuadras) {
+          btnQuadras.className = 'tab-btn tab-active !flex-initial';
+          const icon = btnQuadras.querySelector('i');
+          if (icon) icon.className = 'w-4 h-4 shrink-0 text-white';
+        }
+        if (btnModalidades) {
+          btnModalidades.className = 'tab-btn tab-inactive !flex-initial';
+          const icon = btnModalidades.querySelector('i');
+          if (icon) icon.className = 'w-4 h-4 shrink-0 text-slate-700';
+        }
+        if (contentModalidades) contentModalidades.classList.add('hidden');
+        if (contentQuadras) {
+          contentQuadras.classList.remove('hidden');
+          if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
+        }
+      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    };
 
     function showAdminTab(targetTab) {
+      if (targetTab === 'modalities') {
+        showAdminTab('courts');
+        if (typeof window.switchCourtsSubTab === 'function') {
+          window.switchCourtsSubTab('modalidades');
+        }
+        return;
+      }
       tabsList.forEach(t => {
         const btn = document.getElementById('btnTab-' + t);
         const panel = document.getElementById('panel-' + t);
@@ -2709,7 +2768,7 @@ print(resp.json())</code></pre>
         }
       });
       lucide.createIcons();
-      if (typeof renderSpacesGrid === 'function' && (targetTab === 'modalities' || targetTab === 'cadastros')) renderSpacesGrid();
+      if (typeof renderSpacesGrid === 'function' && targetTab === 'cadastros') renderSpacesGrid();
       if (typeof renderCourtsMonitor === 'function' && targetTab === 'courts') renderCourtsMonitor();
     }
 
