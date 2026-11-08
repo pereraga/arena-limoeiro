@@ -1706,7 +1706,7 @@
       <section class="space-grid" id="spaceGridSpaces" aria-live="polite"></section>
 
       <div class="footer-note">
-        <b>Observação:</b> as alterações realizadas ficam salvas no armazenamento local deste dispositivo para testes operacionais imediatos sem alterar o banco de dados de produção.
+        <b>Conexão Nuvem Ativa:</b> todas as alterações são salvas e sincronizadas em tempo real diretamente nos Bancos de Dados Supabase (DB1 e DB2).
       </div>
       </div>
 
@@ -4703,6 +4703,13 @@ document.addEventListener('DOMContentLoaded', () => {
 <script>
 (function() {
   'use strict';
+  // 100% BANCO DE DADOS NA NUVEM: Limpa qualquer resquício de agendamentos locais antigos
+  try {
+    localStorage.removeItem('arena_local_bookings');
+    localStorage.removeItem('arena-limoeiro-games-prototype-v2');
+    localStorage.removeItem('arena_deleted_bookings');
+    localStorage.removeItem('arena_monthly_members');
+  } catch(e) {}
 
   // 1. Definições de Quadras
   const ADMIN_COURTS = [
@@ -4715,28 +4722,10 @@ document.addEventListener('DOMContentLoaded', () => {
   ];
 
   // 2. Carregamento de Bookings e MonthlyMembers
+  // 100% Cloud Database: O banco de dados na nuvem (Supabase DB1 e DB2) é a fonte de verdade absoluta
   function getLoadedBookings() {
-    let list = [];
-    try {
-      const stored = localStorage.getItem('arena_local_bookings');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
-      }
-    } catch(e) {}
-    if (list.length === 0 && window.ARENA_DEFAULT_DATA && Array.isArray(window.ARENA_DEFAULT_DATA.initialBookings)) {
-      list = [...window.ARENA_DEFAULT_DATA.initialBookings];
-    }
-    // Higienização automática profunda: remove IDs obsoletos e contaminações entre dias
-    const obsoleteIds = new Set(['ARENA-M4066', 'ARENA-M2526', 'ARENA-8673']);
-    list = list.filter(b => {
-      if (!b || !b.id || obsoleteIds.has(b.id)) return false;
-      if (!b.start_time && !b.time) return false;
-      // Higienização estrita: Davi só joga às segundas, quartas, sextas e sábados (nunca na terça 03/11)
-      if ((b.customer_name === 'Davi' || (b.name && b.name.includes('Davi'))) && b.date === '2026-11-03') return false;
-      return true;
-    });
-    return list;
+    // Não carrega nada do localStorage local para evitar fantasmas ou dados dessincronizados
+    return [];
   }
 
   function getLoadedMonthly() {
@@ -4897,8 +4886,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // 4. Salva o localStorage limpo (evita ressuscitação ao recarregar a página)
       try {
         if (window.adminGameState && window.adminGameState.bookings) {
-          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-          localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+          
+          
         }
       } catch(eLocal) {}
 
@@ -4918,15 +4907,9 @@ document.addEventListener('DOMContentLoaded', () => {
   window.syncBookingToCloud = function(booking, action = 'upsert') {
     if (!booking || !booking.id) return;
 
-    // Se for delete, registra na lista de excluídos para imunidade contra ressuscitação
+    // Exclusão definitiva executada diretamente nos Bancos de Dados na Nuvem (Supabase DB1 e DB2)
     if (action === 'delete') {
-      try {
-        const delList = JSON.parse(localStorage.getItem('arena_deleted_bookings') || '[]');
-        if (!delList.includes(String(booking.id))) {
-          delList.push(String(booking.id));
-          localStorage.setItem('arena_deleted_bookings', JSON.stringify(delList));
-        }
-      } catch(e) {}
+      console.log('[ArenaCloud] Excluindo permanentemente do banco de dados:', booking.id);
     }
 
     const payload = {
@@ -5064,84 +5047,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const [cloudBookings, cloudMembers] = await Promise.all([bookingsPromise, membersPromise]);
       let stateChanged = false;
 
-      // Mescla reservas com o estado operacional respeitando alterações e cancelamentos locais
-      if (Array.isArray(cloudBookings) && cloudBookings.length > 0) {
-        const bMap = new Map();
-        (window.adminGameState.bookings || []).forEach(b => {
-          if (b && b.id) bMap.set(String(b.id), b);
-        });
-
-        // Carrega lista de IDs cancelados e deletados para não permitir reversão
-        let deletedIds = new Set();
-        try {
-          const storedDel = JSON.parse(localStorage.getItem('arena_deleted_bookings') || '[]');
-          if (Array.isArray(storedDel)) deletedIds = new Set(storedDel.map(String));
-        } catch(e) {}
-
-        const finishedSlots = new Set();
-        (window.adminGameState.bookings || []).forEach(b => {
-          if (b && b.status === 'finished') {
-            const cId = (typeof getCourtById === 'function') ? getCourtById(b.court_id || b.courtId).id : (b.court_id || '');
-            finishedSlots.add(b.date + '_' + cId + '_' + b.start_time);
-          }
-        });
-
-        cloudBookings.forEach(cb => {
-          if (!cb || !cb.id) return;
-          const idStr = String(cb.id);
-
-          if (deletedIds.has(idStr)) return;
-
-          const cId = (typeof getCourtById === 'function') ? getCourtById(cb.court_id || cb.courtId).id : (cb.court_id || '');
-          const slotKey = cb.date + '_' + cId + '_' + cb.start_time;
-          const existing = bMap.get(idStr);
-
-          let finalStatus = cb.status || 'confirmed';
-          if (existing) {
-            if (existing.status === 'cancelled') {
-              finalStatus = 'cancelled';
-              if (cb.status !== 'cancelled' && typeof window.syncBookingToCloud === 'function') {
-                window.syncBookingToCloud(existing, 'upsert');
-              }
-            } else if (existing.status === 'finished' || finishedSlots.has(slotKey)) {
-              finalStatus = 'finished';
-            } else if (existing.status === 'in_progress' || existing.status === 'live') {
-              finalStatus = existing.status;
-            } else if (existing.status === 'pending') {
-              finalStatus = existing.status;
-            }
-            bMap.set(idStr, { ...cb, ...existing, status: finalStatus });
-          } else {
-            if (finishedSlots.has(slotKey)) {
-              cb.status = 'finished';
-            }
-            bMap.set(idStr, cb);
-            stateChanged = true;
-          }
-        });
-
-        const newBookings = Array.from(bMap.values());
-        const newSig = newBookings.length + '_' + newBookings.slice(0, 15).map(b => b.id + ':' + b.status + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
+      // 100% VINCULADO AO BANCO DE DADOS NA NUVEM: A nuvem é a fonte de verdade absoluta e em tempo real.
+      // Se um registro foi excluído no banco, ele NÃO existe mais e NUNCA é ressuscitado.
+      if (Array.isArray(cloudBookings)) {
+        const newSig = cloudBookings.length + '_' + cloudBookings.slice(0, 20).map(b => b.id + ':' + b.status + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
         if (newSig !== window.__lastBookingsSig) {
           window.__lastBookingsSig = newSig;
           stateChanged = true;
-          window.adminGameState.bookings = newBookings;
-          try {
-            localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-          } catch(e) {}
+          window.adminGameState.bookings = cloudBookings;
         }
       }
 
-      // 2. Atualiza mensalistas
-      if (Array.isArray(cloudMembers) && cloudMembers.length > 0) {
+      // 2. Atualiza mensalistas diretamente do banco de dados na nuvem
+      if (Array.isArray(cloudMembers)) {
         const memSig = cloudMembers.length + '_' + cloudMembers.map(m => m.id).join(',');
         if (memSig !== window.__lastMembersSig) {
           window.__lastMembersSig = memSig;
           stateChanged = true;
           window.adminGameState.monthlyMembers = cloudMembers;
-          try {
-            localStorage.setItem('arena_monthly_members', JSON.stringify(cloudMembers));
-          } catch(e) {}
         }
       }
 
@@ -5385,10 +5308,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.saveAdminGameState = function() {
     if (window.__isSavingAdminState) return;
     window.__isSavingAdminState = true;
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-    } catch(e) {}
+    
     try {
       if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
       if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
@@ -5590,10 +5510,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => String(b.id) !== String(id));
     
     // Atualiza o localStorage local
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-    } catch(err) {}
+    
 
     // ☁️ Exclui do Supabase (DB1 e DB2) com garantia de imunidade contra ressuscitação
     if (typeof window.syncBookingToCloud === 'function') {
@@ -6262,10 +6179,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // 2. Atualiza no localStorage
-      try {
-        localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-        localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-      } catch(e) {}
+      
 
       // 3. Sincroniza em nuvem (Supabase DB2 e DB1)
       if (typeof window.syncBookingToCloud === 'function') {
@@ -6504,10 +6418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 4. Salva no localStorage local
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-    } catch(e) {}
+    
 
     // 5. ☁️ Envia a finalização imediatamente para os 2 Bancos de Dados na Nuvem (Dual-Write)
     if (typeof window.syncBookingToCloud === 'function') {
@@ -6648,10 +6559,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (hasChangedAny) {
-        try {
-          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-          localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-        } catch(e) {}
+        
         if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
       }
     } catch(err) {
@@ -6715,10 +6623,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       if (hasAutoStartedAny) {
-        try {
-          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-          localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-        } catch(e) {}
+        
         if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
       }
     } catch(err) {
@@ -6756,9 +6661,7 @@ document.addEventListener('DOMContentLoaded', () => {
     g.status = 'live';
     g.attendance = 'Presença confirmada';
     addMatchLog(g, 'Início manual na quadra', 'Atendente deu início à partida.');
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-    } catch(e) {}
+    
     if (typeof window.syncBookingToCloud === 'function') {
       window.syncBookingToCloud(g, 'upsert');
     }
@@ -6777,9 +6680,7 @@ document.addEventListener('DOMContentLoaded', () => {
     g.ballReturned = false;
     delete g.finishedAt;
     addMatchLog(g, 'Partida reaberta', 'A partida foi reaberta pelo gestor no painel.');
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-    } catch(e) {}
+    
     if (typeof window.syncBookingToCloud === 'function') {
       window.syncBookingToCloud(g, 'upsert');
     }
@@ -6797,9 +6698,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hourlyRate = court && court.normal ? court.normal : 100;
     g.extraAmount = Math.round((g.extraTime / 60) * hourlyRate);
     addMatchLog(g, 'Tempo extra adicionado', '+' + minutes + ' min adicionados (Total extra: ' + g.extraTime + ' min)');
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-    } catch(e) {}
+    
     if (typeof window.syncBookingToCloud === 'function') {
       window.syncBookingToCloud(g, 'upsert');
     }
@@ -7296,9 +7195,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.title = "Finalizar partida";
       }
 
-      try {
-        localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-      } catch(e) {}
+      
       if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
       if (typeof window.syncBookingToCloud === 'function') window.syncBookingToCloud(g, 'upsert');
       if (typeof window.showNotification === 'function') {
@@ -9319,9 +9216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.adminGameState.bookings.unshift(newBooking);
 
     // 2. Salva em localStorage
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-    } catch(err) {}
+    
 
     // 3. Envia para os 2 Bancos de Dados na Nuvem (Dual-Write)
     if (typeof window.syncBookingToCloud === 'function') {
@@ -9351,7 +9246,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const booking = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id));
     if (booking) {
       booking.status = (booking.status === 'live' || booking.status === 'in_progress') ? 'finished' : 'live';
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+      
       renderMovementMatches();
       renderCadastrosBookingsList();
       alert('Status do jogo atualizado para: ' + (booking.status === 'live' ? '🟢 Em Andamento' : '✅ Finalizado'));
@@ -9362,7 +9257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!confirm('Deseja realmente cancelar e liberar o horário deste agendamento?')) return;
     const bookingToDelete = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id)) || { id: id };
     window.adminGameState.bookings = window.adminGameState.bookings.filter(b => String(b.id) !== String(id));
-    localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+    
 
     // ☁️ Deleta imediatamente de ambos os bancos na nuvem e registra imunidade
     if (typeof window.syncBookingToCloud === 'function') {
@@ -9866,10 +9761,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => String(b.id) !== String(id));
 
     // Persiste no localStorage
-    try {
-      localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-      localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
-    } catch(err) {}
+    
 
     // ☁️ Exclui imediatamente do Supabase DB1 e DB2 na nuvem (DELETE oficial)
     if (typeof window.syncBookingToCloud === 'function') {
