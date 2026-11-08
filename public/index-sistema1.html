@@ -4773,6 +4773,88 @@ document.addEventListener('DOMContentLoaded', () => {
     syncEndpoint: '/api/sync'
   };
 
+  // ============================================================================
+  // 🗑️ EXPURGO AUTOMÁTICO DE DADOS ANTIGOS (LIBERAÇÃO 100% DE ESPAÇO NO SUPABASE)
+  // Exclui do DB1 e DB2 todas as partidas com data anterior a 4 dias do dia atual
+  // Ex: se hoje é dia 08, datas <= dia 04 são totalmente deletadas do banco e do cliente
+  // ============================================================================
+  window.purgeExpiredCloudBookings = async function() {
+    try {
+      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08';
+      const [ty, tm, td] = todayStr.split('-').map(Number);
+      const cutoffDateObj = new Date(ty, tm - 1, td - 4, 12, 0, 0);
+      const cY = cutoffDateObj.getFullYear();
+      const cM = String(cutoffDateObj.getMonth() + 1).padStart(2, '0');
+      const cD = String(cutoffDateObj.getDate()).padStart(2, '0');
+      const cutoffDate = `${cY}-${cM}-${cD}`;
+
+      console.log(`[ArenaPurge] Executando expurgo de dados antigos: Hoje=${todayStr}, Limite de Corte (<= 4 dias)=${cutoffDate}`);
+
+      // 1. Exclui do Banco 2 (Ativo / Salvaguarda) via Supabase REST DELETE em lote
+      try {
+        const delRes2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?date=lte.' + cutoffDate, {
+          method: 'DELETE',
+          headers: {
+            apikey: ARENA_CLOUD_DBS.db2Key,
+            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key
+          }
+        });
+        if (delRes2.ok) {
+          console.log(`[ArenaPurge] Sucesso no DB2: Jogos <= ${cutoffDate} deletados permanentemente.`);
+        }
+      } catch(e2) {
+        console.warn('[ArenaPurge] Erro ao deletar no DB2:', e2);
+      }
+
+      // 2. Exclui do Banco 1 (Principal) via Supabase REST DELETE em lote
+      try {
+        const delRes1 = await fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?date=lte.' + cutoffDate, {
+          method: 'DELETE',
+          headers: {
+            apikey: ARENA_CLOUD_DBS.db1Key,
+            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key
+          }
+        });
+        if (delRes1.ok) {
+          console.log(`[ArenaPurge] Sucesso no DB1: Jogos <= ${cutoffDate} deletados permanentemente.`);
+        }
+      } catch(e1) {
+        console.warn('[ArenaPurge] Erro ao deletar no DB1:', e1);
+      }
+
+      // 3. Higieniza estado operacional na memória do cliente
+      if (window.adminGameState && Array.isArray(window.adminGameState.bookings)) {
+        const initialCount = window.adminGameState.bookings.length;
+        window.adminGameState.bookings = window.adminGameState.bookings.filter(b => {
+          if (!b || !b.date) return false;
+          return b.date > cutoffDate;
+        });
+        const removed = initialCount - window.adminGameState.bookings.length;
+        if (removed > 0) {
+          console.log(`[ArenaPurge] ${removed} reservas antigas removidas da memória local.`);
+        }
+      }
+
+      // 4. Salva o localStorage limpo (evita ressuscitação ao recarregar a página)
+      try {
+        if (window.adminGameState && window.adminGameState.bookings) {
+          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+          localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
+        }
+      } catch(eLocal) {}
+
+      // 5. Marca timestamp/data da última execução do expurgo
+      window.__lastPurgeExecutionDate = todayStr;
+
+      // 6. Atualiza as telas e contadores visuais
+      if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+      if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+      if (typeof window.updateMovementCalendarStrip === 'function') window.updateMovementCalendarStrip();
+    } catch(err) {
+      console.error('[ArenaPurge] Erro no expurgo:', err);
+    }
+  };
+
   // Toda e qualquer atualização no sistema é enviada em Dual-Write para ambos os bancos
   window.syncBookingToCloud = async function(booking, action = 'upsert') {
     if (!booking || !booking.id) return;
@@ -4897,6 +4979,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Puxa agendamentos e mensalistas dos Bancos de Dados na Nuvem
   window.pullDataFromCloudDatabases = async function() {
+    // Executa expurgo diário preventivo antes de puxar dados (libera espaço e evita baixar registros mortos)
+    try {
+      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '';
+      if (todayStr && window.__lastPurgeExecutionDate !== todayStr && typeof window.purgeExpiredCloudBookings === 'function') {
+        await window.purgeExpiredCloudBookings();
+      }
+    } catch(pErr) {}
     try {
       console.log('[ArenaCloud] Puxando dados dos 2 Bancos de Dados...');
       let cloudBookings = null;
@@ -5114,99 +5203,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Fallback garantido para terça-feira 03/11/2026 com os 5 jogos oficiais completos
-    if (matches.length === 0 && (dateStr === '2026-11-03' || dateStr.endsWith('-11-03'))) {
-      matches = [
-        {
-          id: 'ARENA-2913',
-          court_id: 'court-society-1',
-          court_name: 'SOCIETY - ARENA CENTRAL',
-          date: '2026-11-03',
-          customer_name: 'Esc Ariadnes',
-          customer_phone: '(81) 99556-2693',
-          customer_cpf: '000.000.000-00',
-          start_time: '16:00',
-          end_time: '18:00',
-          time: '16:00 às 18:00',
-          total_price: 500,
-          status: 'confirmed',
-          isMensalista: true,
-          booking_type: 'mensalista',
-          payment_method: 'Mensalidade Faturada',
-          observation: 'Horário Fixo Semanal (TERÇA)'
-        },
-        {
-          id: 'ARENA-3294',
-          court_id: 'court-futsal-1788963178368',
-          court_name: 'FUT 5 - SOCCER 5',
-          date: '2026-11-03',
-          customer_name: 'Ariadnes',
-          customer_phone: '(81) 99999-2609',
-          customer_cpf: '000.000.000-00',
-          start_time: '16:00',
-          end_time: '18:00',
-          time: '16:00 às 18:00',
-          total_price: 400,
-          status: 'confirmed',
-          isMensalista: true,
-          booking_type: 'mensalista',
-          payment_method: 'Mensalidade Faturada',
-          observation: 'Horário Fixo Semanal (TERÇA)'
-        },
-        {
-          id: 'ARENA-3251',
-          court_id: 'court-futsal-1788963178368',
-          court_name: 'QUADRA SOCIETY',
-          date: '2026-11-03',
-          customer_name: 'Aline',
-          customer_phone: '(81) 99246-3081',
-          customer_cpf: '',
-          start_time: '18:30',
-          end_time: '20:00',
-          time: '18:30 às 20:00',
-          total_price: 400,
-          status: 'confirmed',
-          isMensalista: true,
-          booking_type: 'mensalista',
-          payment_method: 'Mensal',
-          observation: 'Horário Fixo Semanal (TERÇA)'
-        },
-        {
-          id: 'ARENA-GENILSON-1103',
-          court_id: 'court-society-2',
-          court_name: 'FUT 6 - SOCCER 6',
-          date: '2026-11-03',
-          customer_name: 'Genilson',
-          customer_phone: '(81) 99966-4317',
-          customer_cpf: '',
-          start_time: '20:00',
-          end_time: '21:30',
-          time: '20:00 às 21:30',
-          total_price: 600,
-          status: 'confirmed',
-          isMensalista: true,
-          booking_type: 'mensalista',
-          payment_method: 'Mensal',
-          observation: 'Horário Fixo Semanal (TERÇA)'
-        },
-        {
-          id: 'ARENA-ZELUIZ-1103',
-          court_id: 'court-beach-1',
-          court_name: 'FUT 7 - SOCCER 7',
-          date: '2026-11-03',
-          customer_name: 'Zé Luiz',
-          customer_phone: '(81) 98877-6655',
-          customer_cpf: '',
-          start_time: '21:00',
-          end_time: '22:30',
-          time: '21:00 às 22:30',
-          total_price: 500,
-          status: 'confirmed',
-          booking_type: 'avulso',
-          payment_method: 'PIX Balcão',
-          observation: 'Reserva Avulsa Noturna'
-        }
-      ];
-    }
+    // Bloco de fallback de 03/11/2026 removido para respeitar o expurgo definitivo de dados antigos
 
     // FILTRO ESTRITO DE DATA E HIGIENIZAÇÃO:
     // Garante que TODOS os jogos pertencem rigorosamente a dateStr e exclui contaminações entre dias
@@ -9951,6 +9948,14 @@ window.cancelGame = function(id) {
   // Loop ativo e resiliente de sincronização a cada 7 segundos (dual-cloud polling & virada de dia)
   // Otimizado: suspende o loop quando a aba estiver em segundo plano (document.hidden) e reativa no foco
   if (!window.__arenaFeedAutoInterval) {
+    // Checagem de expurgo contínuo a cada virada de dia ou ciclo
+    try {
+      const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '';
+      if (todayStr && window.__lastPurgeExecutionDate !== todayStr && typeof window.purgeExpiredCloudBookings === 'function') {
+        window.purgeExpiredCloudBookings();
+      }
+    } catch(eP) {}
+
     window.__arenaFeedAutoInterval = setInterval(() => {
       if (document.hidden) return; // Economia profunda de CPU e bateria
 
@@ -10050,6 +10055,11 @@ window.cancelGame = function(id) {
 
     // Inicia subscrição Realtime instantânea
     setupArenaRealtimeSync();
+
+    // Expurgo automático de agendamentos com mais de 4 dias para liberar espaço permanente no Supabase
+    if (typeof window.purgeExpiredCloudBookings === 'function') {
+      window.purgeExpiredCloudBookings();
+    }
 
     // Sincroniza em segundo plano com os 2 Bancos de Dados na Nuvem (Dual-Cloud)
     if (typeof window.pullDataFromCloudDatabases === 'function') {
