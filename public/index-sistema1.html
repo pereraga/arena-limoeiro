@@ -2198,24 +2198,61 @@
       </div>
     </div>
 
-    <!-- SUB-ABA: CLIENTES CADASTRADOS -->
+    <!-- SUB-ABA: CLIENTES CADASTRADOS (PAINEL ADMINISTRATIVO) -->
     <div id="subtab-content-clientes" class="space-y-6">
-      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+      <div class="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-7 shadow-xs">
+        
+        <!-- Cabeçalho da Seção Base de Clientes -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
           <div>
-            <div class="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Base de Clientes</div>
-            <h3 class="text-xl font-black text-slate-900">Clientes & Contatos</h3>
-            <p class="text-xs text-slate-500">Histórico de atletas e responsáveis cadastrados no sistema</p>
+            <span class="text-[11px] font-bold tracking-wider text-[#00a859] uppercase block mb-0.5">Base de Clientes</span>
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Clientes & Contatos</h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Histórico de atletas, mensalistas dos campos e responsáveis cadastrados no sistema</p>
           </div>
-          <span id="badgeTotalClientesCount" class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 text-xs font-black">Carregando clientes...</span>
+
+          <div class="flex flex-wrap items-center gap-2.5">
+            <span id="badgeTotalClientesCount" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
+              Carregando clientes...
+            </span>
+            <button type="button" onclick="window.abrirModalNovoCliente()" class="inline-flex items-center gap-1.5 bg-[#042f1e] hover:bg-[#07442c] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xs transition cursor-pointer">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5 text-[#00d672]"></i>
+              <span>Novo Cliente</span>
+            </button>
+          </div>
         </div>
-        <div class="relative">
-          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-          <input type="text" id="clientesSearchInput" oninput="renderCadastrosClientes()" placeholder="Filtrar cliente por nome, telefone ou CPF..." class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-hidden">
+
+        <!-- Barra de Busca e Filtros Rápidos -->
+        <div class="flex flex-col lg:flex-row gap-3 mb-6">
+          <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input 
+              type="text" 
+              id="clientesSearchInput" 
+              oninput="window.renderCadastrosClientes()"
+              placeholder="Filtrar cliente por nome, telefone ou CPF..." 
+              class="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:bg-white transition"
+            />
+          </div>
+
+          <!-- Filtros por Categoria / Status -->
+          <div class="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+            <button type="button" onclick="window.setFiltroCategoriaClientes('todos')" data-filtro-cliente="todos" class="filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white transition cursor-pointer whitespace-nowrap">
+              Todos
+            </button>
+            <button type="button" onclick="window.setFiltroCategoriaClientes('Mensalista')" data-filtro-cliente="Mensalista" class="filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition cursor-pointer whitespace-nowrap">
+              Mensalistas
+            </button>
+            <button type="button" onclick="window.setFiltroCategoriaClientes('Avulso')" data-filtro-cliente="Avulso" class="filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition cursor-pointer whitespace-nowrap">
+              Avulsos
+            </button>
+          </div>
         </div>
-        <div id="clientesTableContainer" class="overflow-x-auto rounded-2xl border border-slate-100">
-          <!-- Tabela de clientes -->
+
+        <!-- Tabela Responsiva de Clientes -->
+        <div id="clientesTableContainer" class="overflow-x-auto rounded-xl border border-slate-100">
+          <!-- Tabela de clientes renderizada dinamicamente -->
         </div>
+
       </div>
     </div>
 
@@ -4192,6 +4229,201 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 <!-- ========================================================================= -->
+<!-- MODAL DE GERENCIAMENTO / AJUSTE DE CLIENTE & CONTATO (PADRÃO ARENA)      -->
+<!-- ========================================================================= -->
+<div id="modalGerenciarCliente" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-xl w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+    
+    <!-- Cabeçalho do Modal -->
+    <div class="bg-[#042f1e] text-white p-5 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div id="modalGerenciarAvatar" class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-[#00d672] font-black text-base">
+          D
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 id="modalGerenciarTitulo" class="text-base font-black tracking-tight uppercase text-white">Gerenciar Cliente</h3>
+            <span id="modalGerenciarBadgeCat" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+              Mensalista
+            </span>
+          </div>
+          <p class="text-xs text-emerald-300 font-medium">Ajuste de cadastro, contatos, categoria e horários fixos</p>
+        </div>
+      </div>
+      <button type="button" onclick="window.fecharModalGerenciarCliente()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <!-- Formulário do Modal -->
+    <form onsubmit="window.handleSalvarClienteModal(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+      <input type="hidden" id="modalGerenciarId" />
+      <input type="hidden" id="modalGerenciarOrigem" />
+      <input type="hidden" id="modalGerenciarMonthlyId" />
+
+      <!-- Bloco 1: Dados Pessoais / Cadastrais -->
+      <div>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+          <i data-lucide="user-cog" class="w-3.5 h-3.5 text-slate-500"></i>
+          <span>Dados Cadastrais & Contatos</span>
+        </h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
+            <input type="text" id="modalGerenciarNome" required
+                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
+            <input type="tel" id="modalGerenciarTelefone" required placeholder="(81) 98765-4321"
+                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CPF (Documento)</label>
+            <input type="text" id="modalGerenciarCpf" placeholder="000.000.000-00"
+                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Partidas Realizadas</label>
+            <input type="number" id="modalGerenciarPartidas" readonly disabled
+                   class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 cursor-not-allowed">
+          </div>
+        </div>
+      </div>
+
+      <!-- Bloco 2: Categoria (Mensalista ou Avulso) -->
+      <div class="pt-2 border-t border-slate-100">
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria do Cliente</label>
+        <select id="modalGerenciarCategoria" onchange="window.toggleModalGerenciarCamposMensalista()"
+                class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+          <option value="Mensalista">Mensalista (Horário Fixo em Contrato)</option>
+          <option value="Avulso">Avulso (Pagamento por Partida / Balcão)</option>
+        </select>
+      </div>
+
+      <!-- Bloco 3: Configuração Específica de Mensalista -->
+      <div id="modalGerenciarBoxMensalista" class="p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+            Contrato de Horário Fixo / Mensalidade
+          </span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+            Ativo
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Valor da Mensalidade (R$)</label>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-purple-400">R$</span>
+              <input type="number" id="modalGerenciarValorMensal" step="0.01" placeholder="280.00"
+                     class="w-full pl-9 pr-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Dia da Semana Fixo</label>
+            <select id="modalGerenciarDiaSemana"
+                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
+              <option value="segunda">Segunda-feira</option>
+              <option value="terca">Terça-feira</option>
+              <option value="quarta">Quarta-feira</option>
+              <option value="quinta">Quinta-feira</option>
+              <option value="sexta">Sexta-feira</option>
+              <option value="sabado">Sábado</option>
+              <option value="domingo">Domingo</option>
+            </select>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Horário & Quadra Fixa</label>
+            <input type="text" id="modalGerenciarHorarioFixo" placeholder="Ex.: Campo Society 01 - 20:00 às 22:00"
+                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- Rodapé de Ações do Modal -->
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+        <button type="button" onclick="window.handleExcluirClienteModal()" class="px-3.5 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition cursor-pointer flex items-center gap-1.5">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+          <span>Excluir</span>
+        </button>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="window.fecharModalGerenciarCliente()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+            Cancelar
+          </button>
+          <button type="submit" id="btnSalvarClienteModal" class="px-5 py-2 text-xs font-bold text-white bg-[#042f1e] hover:bg-[#07442c] rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4 text-[#00d672]"></i>
+            <span>Salvar Alterações</span>
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL DE CADASTRO DE NOVO CLIENTE (PADRÃO ARENA)                         -->
+<!-- ========================================================================= -->
+<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+    <div class="bg-[#042f1e] text-white p-5 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-[#00d672] font-black">
+          <i data-lucide="user-plus" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-black tracking-tight uppercase text-white">Novo Cliente</h3>
+          <p class="text-xs text-emerald-300 font-medium">Cadastre um atleta ou mensalista na nuvem</p>
+        </div>
+      </div>
+      <button type="button" onclick="window.fecharModalNovoCliente()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+
+    <form onsubmit="window.handleCadastrarNovoCliente(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
+        <input type="text" id="novoClienteNome" required placeholder="Ex.: Lucas Mendes"
+               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
+          <input type="tel" id="novoClienteTelefone" required placeholder="(81) 98765-4321"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CPF (Opcional)</label>
+          <input type="text" id="novoClienteCpf" placeholder="000.000.000-00"
+                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria Inicial</label>
+        <select id="novoClienteCategoria"
+                class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+          <option value="Avulso">Avulso (Cliente Casual)</option>
+          <option value="Mensalista">Mensalista (Horário Fixo)</option>
+        </select>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+        <button type="button" onclick="window.fecharModalNovoCliente()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+          Cancelar
+        </button>
+        <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-[#00a859] hover:bg-[#008f4c] rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5">
+          <i data-lucide="user-check" class="w-4 h-4"></i>
+          <span>Cadastrar Cliente</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
 <!-- MODAL: NOVA RESERVA BALCÃO (DIRETA E SINCRONIZADA EM TODAS AS PLATAFORMAS) -->
 <!-- ========================================================================= -->
 <div id="directBookingModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
@@ -5206,6 +5438,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.adminGameState = {
     bookings: getLoadedBookings(),
     monthlyMembers: getLoadedMonthly(),
+    customers: [],
     courts: ADMIN_COURTS,
     selectedDate: (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'),
     movementFilterCourt: 'all',
@@ -5213,6 +5446,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cadastrosFilterCourt: 'all',
     cadastrosFilterStatus: 'all',
     cadastrosQuery: '',
+    filtroClienteCategoria: 'todos',
     activeCadastrosSubTab: 'clientes'
   };
 
@@ -5502,7 +5736,13 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
       ]).catch(() => null);
 
-      const [cloudBookings, cloudMembers] = await Promise.all([bookingsPromise, membersPromise]);
+      // 3. Concorrência de clientes cadastrados em paralelo
+      const customersPromise = Promise.any([
+        fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db2Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject()),
+        fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
+      ]).catch(() => null);
+
+      const [cloudBookings, cloudMembers, cloudCustomers] = await Promise.all([bookingsPromise, membersPromise, customersPromise]);
       let stateChanged = false;
 
       // 100% VINCULADO AO BANCO DE DADOS NA NUVEM: A nuvem é a fonte de verdade absoluta e em tempo real.
@@ -5526,6 +5766,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
+      // 3. Atualiza clientes cadastrados na nuvem
+      if (Array.isArray(cloudCustomers)) {
+        const custSig = cloudCustomers.length + '_' + cloudCustomers.map(c => c.id + ':' + (c.name || '')).join(',');
+        if (custSig !== window.__lastCustomersSig) {
+          window.__lastCustomersSig = custSig;
+          stateChanged = true;
+          window.adminGameState.customers = cloudCustomers;
+        }
+      }
+
       window.__lastPullSuccessTs = Date.now();
 
       // Só re-renderiza se houve alteração REAL nos dados!
@@ -5533,6 +5783,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
         if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
         if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+        if (typeof window.renderCadastrosClientes === 'function') window.renderCadastrosClientes();
       }
     } catch(err) {
       console.warn('[ArenaCloud] Erro geral na sincronização rápida:', err);
@@ -8773,67 +9024,154 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.lucide) lucide.createIcons();
   };
 
+  // =========================================================================
+  // GESTÃO COMPLETA DE CLIENTES & CONTATOS (FRONT-END + BACK-END SUPABASE)
+  // =========================================================================
+  window.setFiltroCategoriaClientes = function(cat) {
+    window.adminGameState.filtroClienteCategoria = cat;
+    document.querySelectorAll('.filtro-cliente-btn').forEach(btn => {
+      if (btn.dataset.filtroCliente === cat) {
+        btn.className = 'filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white transition cursor-pointer whitespace-nowrap';
+      } else {
+        btn.className = 'filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition cursor-pointer whitespace-nowrap';
+      }
+    });
+    window.renderCadastrosClientes();
+  };
+
+  window.obterListaAgregadaClientes = function() {
+    const clientMap = new Map();
+
+    // 1. Clientes com reservas registradas (bookings)
+    (window.adminGameState.bookings || []).forEach(b => {
+      const name = (b.customer_name || b.customerName || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          id: b.customer_id || ('cust-' + encodeURIComponent(key)),
+          name: name,
+          phone: b.customer_phone || b.customerPhone || '',
+          cpf: b.customer_cpf || b.customerCpf || '',
+          type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Avulso',
+          matches: 0,
+          monthlyPrice: null,
+          monthlyDay: '',
+          horarioFixo: '',
+          monthlyId: null,
+          origem: 'booking'
+        });
+      }
+      const c = clientMap.get(key);
+      c.matches++;
+      if (b.booking_type === 'mensalista') c.type = 'Mensalista';
+      if (!c.phone && (b.customer_phone || b.customerPhone)) c.phone = b.customer_phone || b.customerPhone;
+    });
+
+    // 2. Mensalistas com contrato fixo (monthly_members)
+    (window.adminGameState.monthlyMembers || []).forEach(m => {
+      const name = (m.responsible_name || m.team_name || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          id: m.customer_id || ('cust-' + encodeURIComponent(key)),
+          name: name,
+          phone: m.phone || '',
+          cpf: m.cpf || '',
+          type: 'Mensalista',
+          matches: 4,
+          monthlyPrice: parseFloat(m.monthly_price || m.monthlyPrice || 0) || 280,
+          monthlyDay: m.day_of_week || 'segunda',
+          horarioFixo: (m.day_of_week_label || ('Toda ' + (m.day_of_week || 'semana'))) + ' - ' + (m.start_time || m.time || '18:00') + ' às ' + (m.end_time || '20:00'),
+          monthlyId: m.id,
+          origem: 'monthly'
+        });
+      } else {
+        const c = clientMap.get(key);
+        c.type = 'Mensalista';
+        if (!c.phone && m.phone) c.phone = m.phone;
+        if (!c.cpf && m.cpf) c.cpf = m.cpf;
+        c.monthlyPrice = parseFloat(m.monthly_price || m.monthlyPrice || 0) || 280;
+        c.monthlyDay = m.day_of_week || 'segunda';
+        c.horarioFixo = (m.day_of_week_label || ('Toda ' + (m.day_of_week || 'semana'))) + ' - ' + (m.start_time || m.time || '18:00') + ' às ' + (m.end_time || '20:00');
+        c.monthlyId = m.id;
+      }
+    });
+
+    // 3. Clientes cadastrados na tabela oficial Supabase `customers`
+    (window.adminGameState.customers || []).forEach(cust => {
+      const name = (cust.name || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          id: cust.id,
+          name: name,
+          phone: cust.phone || '',
+          cpf: cust.document || '',
+          type: 'Avulso',
+          matches: 0,
+          monthlyPrice: null,
+          monthlyDay: '',
+          horarioFixo: '',
+          monthlyId: null,
+          origem: 'customer'
+        });
+      } else {
+        const c = clientMap.get(key);
+        c.id = cust.id;
+        if (cust.document && !c.cpf) c.cpf = cust.document;
+        if (cust.phone && !c.phone) c.phone = cust.phone;
+      }
+    });
+
+    return Array.from(clientMap.values());
+  };
+
   window.renderCadastrosClientes = function() {
     const container = document.getElementById('clientesTableContainer');
     const badge = document.getElementById('badgeTotalClientesCount');
     const searchInput = document.getElementById('clientesSearchInput');
     if (!container) return;
 
-    const clientMap = new Map();
-    (window.adminGameState.bookings || []).forEach(b => {
-      const name = b.customer_name || b.customerName;
-      if (name && !clientMap.has(name)) {
-        clientMap.set(name, {
-          name: name,
-          phone: b.customer_phone || b.customerPhone || '',
-          cpf: b.customer_cpf || b.customerCpf || '',
-          type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Avulso',
-          count: 1
-        });
-      } else if (name) {
-        clientMap.get(name).count++;
-      }
-    });
-
-    (window.adminGameState.monthlyMembers || []).forEach(m => {
-      const name = m.responsible_name || m.team_name;
-      if (name && !clientMap.has(name)) {
-        clientMap.set(name, {
-          name: name,
-          phone: m.phone || '',
-          cpf: m.cpf || '',
-          type: 'Mensalista',
-          count: 4
-        });
-      }
-    });
-
-    const clients = Array.from(clientMap.values());
+    const clients = window.obterListaAgregadaClientes();
     if (badge) badge.textContent = clients.length + ' clientes cadastrados';
 
     const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const catFiltro = window.adminGameState.filtroClienteCategoria || 'todos';
+
     const filtered = clients.filter(c => {
+      if (catFiltro === 'Mensalista' && c.type !== 'Mensalista') return false;
+      if (catFiltro === 'Avulso' && c.type !== 'Avulso') return false;
+
       if (!q) return true;
-      return c.name.toLowerCase().includes(q) || c.phone.replace(/\D/g, '').includes(q) || c.cpf.replace(/\D/g, '').includes(q);
+      const matchNome = c.name.toLowerCase().includes(q);
+      const matchTel = c.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) || c.phone.toLowerCase().includes(q);
+      const matchCpf = (c.cpf || '').replace(/\D/g, '').includes(q.replace(/\D/g, '')) || (c.cpf || '').toLowerCase().includes(q);
+      return matchNome || matchTel || matchCpf;
     });
 
     if (filtered.length === 0) {
       container.innerHTML = `
         <div class="p-8 text-center bg-slate-50 rounded-2xl">
-          <p class="text-xs font-bold text-slate-500">Nenhum cliente encontrado.</p>
+          <i data-lucide="users" class="w-8 h-8 mx-auto text-slate-300 mb-2"></i>
+          <p class="text-xs font-bold text-slate-500">Nenhum cliente encontrado para os critérios informados.</p>
         </div>`;
+      if (window.lucide) lucide.createIcons();
       return;
     }
 
     let html = `
       <table class="w-full text-left text-xs border-collapse">
         <thead>
-          <tr class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] border-b border-slate-100">
-            <th class="p-3">Nome do Cliente</th>
-            <th class="p-3">Telefone / WhatsApp</th>
-            <th class="p-3">CPF</th>
-            <th class="p-3">Categoria</th>
-            <th class="p-3">Partidas</th>
+          <tr class="bg-slate-50 text-slate-400 font-bold uppercase text-[11px] border-b border-slate-100">
+            <th class="py-3.5 px-4">Nome do Cliente</th>
+            <th class="py-3.5 px-4">Telefone / WhatsApp</th>
+            <th class="py-3.5 px-4">CPF</th>
+            <th class="py-3.5 px-4">Categoria</th>
+            <th class="py-3.5 px-4">Partidas</th>
+            <th class="py-3.5 px-4 text-right">Ações</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100 font-medium text-slate-700">`;
@@ -8841,23 +9179,347 @@ document.addEventListener('DOMContentLoaded', () => {
     filtered.forEach(c => {
       const phoneClean = (c.phone || '').replace(/\D/g, '');
       const waLink = phoneClean ? ('https://wa.me/55' + phoneClean) : '#';
+      const isMensalista = (c.type === 'Mensalista');
+      const badgeCategoria = isMensalista
+        ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">Mensalista</span>`
+        : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Avulso</span>`;
+
+      const safeName = encodeURIComponent(c.name);
+
       html += `
-        <tr class="hover:bg-slate-50/60 transition">
-          <td class="p-3 font-bold text-slate-900">${c.name}</td>
-          <td class="p-3 font-mono">
-            ${c.phone ? formatPhone(c.phone) : 'Sem telefone'}
-            ${phoneClean ? ('<a href="' + waLink + '" target="_blank" class="ml-2 text-emerald-600 hover:text-emerald-700 font-bold inline-flex items-center gap-0.5">💬 WhatsApp</a>') : ''}
+        <tr class="hover:bg-slate-50/80 transition group">
+          <td class="py-3.5 px-4 font-bold text-slate-900">
+            <div>${c.name}</div>
+            ${isMensalista && c.horarioFixo ? `<div class="text-[10px] text-slate-400 font-normal mt-0.5">${c.horarioFixo}</div>` : ''}
           </td>
-          <td class="p-3 text-slate-500 font-mono">${c.cpf ? formatCPF(c.cpf) : 'Não informado'}</td>
-          <td class="p-3">
-            <span class="px-2 py-0.5 rounded-md ${c.type === 'Mensalista' ? 'bg-purple-50 text-purple-800' : 'bg-slate-100 text-slate-700'} font-bold text-[10px]">${c.type}</span>
+          <td class="py-3.5 px-4">
+            <div class="flex items-center gap-2 text-slate-600">
+              <span class="font-mono">${c.phone ? formatPhone(c.phone) : 'Sem telefone'}</span>
+              ${phoneClean ? (`
+                <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-[11px] font-bold text-[#00a859] hover:text-[#008f4c] hover:underline">
+                  <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                  <span>WhatsApp</span>
+                </a>
+              `) : ''}
+            </div>
           </td>
-          <td class="p-3 font-bold text-slate-900">${c.count} partidas</td>
+          <td class="py-3.5 px-4 text-slate-400 font-mono">${c.cpf ? formatCPF(c.cpf) : 'Não informado'}</td>
+          <td class="py-3.5 px-4">
+            ${badgeCategoria}
+          </td>
+          <td class="py-3.5 px-4 font-bold text-slate-900">
+            ${c.matches} ${c.matches === 1 ? 'partida' : 'partidas'}
+          </td>
+          <td class="py-3.5 px-4 text-right">
+            <button type="button" onclick="window.abrirModalGerenciarCliente('${safeName}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-[#042f1e] text-slate-700 hover:text-white border border-slate-200/80 hover:border-[#042f1e] transition cursor-pointer">
+              <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+              <span>Gerenciar</span>
+            </button>
+          </td>
         </tr>`;
     });
 
     html += `</tbody></table>`;
     container.innerHTML = html;
+    if (window.lucide) lucide.createIcons();
+  };
+
+  // =========================================================================
+  // CONTROLADOR DO MODAL DE GERENCIAMENTO (CLIENTES & CONTATOS)
+  // =========================================================================
+  window.abrirModalGerenciarCliente = function(encodedName) {
+    const rawName = decodeURIComponent(encodedName);
+    const clients = window.obterListaAgregadaClientes();
+    const cliente = clients.find(c => c.name.toLowerCase() === rawName.toLowerCase());
+    if (!cliente) return;
+
+    const modal = document.getElementById('modalGerenciarCliente');
+    if (!modal) return;
+
+    document.getElementById('modalGerenciarId').value = cliente.id || '';
+    document.getElementById('modalGerenciarOrigem').value = cliente.origem || 'customer';
+    document.getElementById('modalGerenciarMonthlyId').value = cliente.monthlyId || '';
+    document.getElementById('modalGerenciarNome').value = cliente.name;
+    document.getElementById('modalGerenciarTelefone').value = cliente.phone;
+    document.getElementById('modalGerenciarCpf').value = cliente.cpf || '';
+    document.getElementById('modalGerenciarPartidas').value = cliente.matches;
+    document.getElementById('modalGerenciarTitulo').textContent = cliente.name;
+    document.getElementById('modalGerenciarAvatar').textContent = cliente.name.charAt(0).toUpperCase();
+
+    const catSelect = document.getElementById('modalGerenciarCategoria');
+    catSelect.value = cliente.type === 'Mensalista' ? 'Mensalista' : 'Avulso';
+
+    document.getElementById('modalGerenciarValorMensal').value = cliente.monthlyPrice || '280.00';
+    document.getElementById('modalGerenciarDiaSemana').value = cliente.monthlyDay || 'segunda';
+    document.getElementById('modalGerenciarHorarioFixo').value = cliente.horarioFixo || '';
+
+    window.toggleModalGerenciarCamposMensalista();
+
+    modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.fecharModalGerenciarCliente = function() {
+    const modal = document.getElementById('modalGerenciarCliente');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.toggleModalGerenciarCamposMensalista = function() {
+    const cat = document.getElementById('modalGerenciarCategoria').value;
+    const box = document.getElementById('modalGerenciarBoxMensalista');
+    const badge = document.getElementById('modalGerenciarBadgeCat');
+    if (cat === 'Mensalista') {
+      if (box) box.classList.remove('hidden');
+      if (badge) {
+        badge.textContent = 'Mensalista';
+        badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800';
+      }
+    } else {
+      if (box) box.classList.add('hidden');
+      if (badge) {
+        badge.textContent = 'Avulso';
+        badge.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700';
+      }
+    }
+  };
+
+  // Salvar alterações e sincronizar com Supabase DB1 + DB2
+  window.handleSalvarClienteModal = async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSalvarClienteModal');
+    if (btn) btn.disabled = true;
+
+    try {
+      const id = document.getElementById('modalGerenciarId').value || ('cust-' + Date.now());
+      const nome = document.getElementById('modalGerenciarNome').value.trim();
+      const telefone = document.getElementById('modalGerenciarTelefone').value.trim();
+      const cpf = document.getElementById('modalGerenciarCpf').value.trim();
+      const categoria = document.getElementById('modalGerenciarCategoria').value;
+      const monthlyId = document.getElementById('modalGerenciarMonthlyId').value;
+      const valorMensal = parseFloat(document.getElementById('modalGerenciarValorMensal').value) || 280;
+      const diaSemana = document.getElementById('modalGerenciarDiaSemana').value;
+      const horarioFixo = document.getElementById('modalGerenciarHorarioFixo').value.trim();
+
+      // 1. Atualizar ou Criar registro na tabela `customers` (Dual-Write nos 2 bancos)
+      const customerPayload = {
+        id: id,
+        name: nome,
+        phone: telefone,
+        document: cpf,
+        notes: 'Atualizado via Painel Administrativo em ' + new Date().toLocaleDateString('pt-BR')
+      };
+
+      const syncCustomerToDb = async (dbUrl, dbKey) => {
+        try {
+          const res = await fetch(dbUrl + '/rest/v1/customers', {
+            method: 'POST',
+            headers: {
+              apikey: dbKey,
+              Authorization: 'Bearer ' + dbKey,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates,return=minimal'
+            },
+            body: JSON.stringify(customerPayload)
+          });
+          if (!res.ok) {
+            await fetch(dbUrl + '/rest/v1/customers?id=eq.' + encodeURIComponent(id), {
+              method: 'PATCH',
+              headers: {
+                apikey: dbKey,
+                Authorization: 'Bearer ' + dbKey,
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal'
+              },
+              body: JSON.stringify(customerPayload)
+            });
+          }
+        } catch(err) {
+          console.warn('[ArenaCloud] Erro sync customer:', err);
+        }
+      };
+
+      // 2. Se for Mensalista, sincronizar contrato em `monthly_members`
+      const syncMonthlyToDb = async (dbUrl, dbKey) => {
+        if (categoria === 'Mensalista') {
+          const mId = monthlyId || ('mensal-' + Date.now());
+          const monthlyPayload = {
+            id: mId,
+            customer_id: id,
+            responsible_name: nome,
+            team_name: nome,
+            phone: telefone,
+            monthly_price: valorMensal,
+            day_of_week: diaSemana,
+            day_of_week_label: 'Toda ' + diaSemana + '-feira',
+            status: 'active',
+            observation: horarioFixo ? ('[Horário: ' + horarioFixo + '] | [CPF: ' + cpf + ']') : ('[CPF: ' + cpf + ']')
+          };
+
+          try {
+            const res = await fetch(dbUrl + '/rest/v1/monthly_members', {
+              method: 'POST',
+              headers: {
+                apikey: dbKey,
+                Authorization: 'Bearer ' + dbKey,
+                'Content-Type': 'application/json',
+                Prefer: 'resolution=merge-duplicates,return=minimal'
+              },
+              body: JSON.stringify(monthlyPayload)
+            });
+            if (!res.ok) {
+              await fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(mId), {
+                method: 'PATCH',
+                headers: {
+                  apikey: dbKey,
+                  Authorization: 'Bearer ' + dbKey,
+                  'Content-Type': 'application/json',
+                  Prefer: 'return=minimal'
+                },
+                body: JSON.stringify(monthlyPayload)
+              });
+            }
+          } catch(err) {}
+        } else if (monthlyId) {
+          // Se foi rebaixado para Avulso, inativa contrato de mensalista
+          try {
+            await fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(monthlyId), {
+              method: 'PATCH',
+              headers: {
+                apikey: dbKey,
+                Authorization: 'Bearer ' + dbKey,
+                'Content-Type': 'application/json',
+                Prefer: 'return=minimal'
+              },
+              body: JSON.stringify({ status: 'inactive' })
+            });
+          } catch(err) {}
+        }
+      };
+
+      // Dispara Dual-Write para Supabase DB1 + DB2
+      await Promise.allSettled([
+        syncCustomerToDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        syncCustomerToDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
+        syncMonthlyToDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        syncMonthlyToDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+      ]);
+
+      // Atualiza estado local em memória
+      const existingCust = (window.adminGameState.customers || []).find(c => c.id === id);
+      if (existingCust) {
+        existingCust.name = nome;
+        existingCust.phone = telefone;
+        existingCust.document = cpf;
+      } else {
+        window.adminGameState.customers.push(customerPayload);
+      }
+
+      window.fecharModalGerenciarCliente();
+      window.renderCadastrosClientes();
+      if (typeof window.mostrarToast === 'function') {
+        window.mostrarToast('✓ Cliente "' + nome + '" atualizado com sucesso no banco de dados na nuvem!');
+      }
+    } catch(err) {
+      console.error('[ArenaCloud] Falha ao salvar cliente:', err);
+      alert('Erro ao sincronizar com o banco de dados. Tente novamente.');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // Excluir cliente
+  window.handleExcluirClienteModal = async function() {
+    const nome = document.getElementById('modalGerenciarNome').value;
+    const id = document.getElementById('modalGerenciarId').value;
+    if (!confirm('Deseja realmente remover o cliente "' + nome + '"?')) return;
+
+    try {
+      const deleteDb = async (dbUrl, dbKey) => {
+        if (!id) return;
+        try {
+          await fetch(dbUrl + '/rest/v1/customers?id=eq.' + encodeURIComponent(id), {
+            method: 'DELETE',
+            headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+          });
+        } catch(e) {}
+      };
+
+      await Promise.allSettled([
+        deleteDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        deleteDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+      ]);
+
+      window.adminGameState.customers = (window.adminGameState.customers || []).filter(c => c.id !== id);
+      window.fecharModalGerenciarCliente();
+      window.renderCadastrosClientes();
+      if (typeof window.mostrarToast === 'function') {
+        window.mostrarToast('Cliente removido com sucesso.');
+      }
+    } catch(e) {
+      alert('Erro ao excluir cliente.');
+    }
+  };
+
+  // =========================================================================
+  // CONTROLADOR DO MODAL DE NOVO CLIENTE
+  // =========================================================================
+  window.abrirModalNovoCliente = function() {
+    const modal = document.getElementById('modalNovoClienteArena');
+    if (!modal) return;
+    document.getElementById('novoClienteNome').value = '';
+    document.getElementById('novoClienteTelefone').value = '';
+    document.getElementById('novoClienteCpf').value = '';
+    document.getElementById('novoClienteCategoria').value = 'Avulso';
+    modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.fecharModalNovoCliente = function() {
+    const modal = document.getElementById('modalNovoClienteArena');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window.handleCadastrarNovoCliente = async function(e) {
+    e.preventDefault();
+    const nome = document.getElementById('novoClienteNome').value.trim();
+    const telefone = document.getElementById('novoClienteTelefone').value.trim();
+    const cpf = document.getElementById('novoClienteCpf').value.trim();
+    const categoria = document.getElementById('novoClienteCategoria').value;
+
+    const newCust = {
+      id: 'cust-' + Date.now(),
+      name: nome,
+      phone: telefone,
+      document: cpf,
+      notes: 'Cadastrado via Painel Administrativo em ' + new Date().toLocaleDateString('pt-BR')
+    };
+
+    const insertDb = async (dbUrl, dbKey) => {
+      try {
+        await fetch(dbUrl + '/rest/v1/customers', {
+          method: 'POST',
+          headers: {
+            apikey: dbKey,
+            Authorization: 'Bearer ' + dbKey,
+            'Content-Type': 'application/json',
+            Prefer: 'return=minimal'
+          },
+          body: JSON.stringify(newCust)
+        });
+      } catch(err) {}
+    };
+
+    await Promise.allSettled([
+      insertDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+      insertDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+    ]);
+
+    window.adminGameState.customers.unshift(newCust);
+    window.fecharModalNovoCliente();
+    window.renderCadastrosClientes();
+    if (typeof window.mostrarToast === 'function') {
+      window.mostrarToast('✓ Novo cliente "' + nome + '" cadastrado com sucesso!');
+    }
   };
 
   window.testSupabaseLatency = async function() {
