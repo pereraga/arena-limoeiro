@@ -1551,16 +1551,31 @@
     <section id="panel-courts" class="space-y-6 hidden">
 
       <!-- SUB-NAVEGAÇÃO INTERNA: QUADRAS & MODALIDADES (ESTILO OFICIAL DA ARENA) -->
-      <div class="flex items-center gap-2 mb-2 p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-fit max-w-full shadow-2xs">
-        <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-initial" style="min-width: 140px; height: 38px;">
+      <!-- SUB-NAVEGAÇÃO COMPLETA: GESTÃO DE ESPAÇOS (Quadras, Categorias & Modalidades, Posições dos Jogos, Horários Fixos, Jogos) -->
+      <div class="flex items-center gap-2 mb-2 p-1.5 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-full overflow-x-auto scrollbar-none shadow-2xs flex-nowrap">
+        <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-initial shrink-0" style="min-width: 135px; height: 38px;">
           <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-white"></i>
           <span>Quadras</span>
           <span class="badge-count" id="badgeCourtsCount">6</span>
         </button>
-        <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-initial" style="min-width: 145px; height: 38px;">
+        <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 190px; height: 38px;">
           <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
-          <span>Modalidades</span>
+          <span>Categorias & Modalidades</span>
           <span class="badge-count" id="badgeModalitiesCount">4</span>
+        </button>
+        <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 165px; height: 38px;">
+          <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-slate-700"></i>
+          <span>Posições dos Jogos</span>
+        </button>
+        <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 160px; height: 38px;">
+          <i data-lucide="calendar" class="w-4 h-4 shrink-0 text-slate-700"></i>
+          <span>Horários Fixos</span>
+          <span class="badge-count" id="badgeCourtsMensalistasCount">40</span>
+        </button>
+        <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 135px; height: 38px;">
+          <span class="text-sm">⚽</span>
+          <span>Jogos</span>
+          <span class="badge-count" id="badgeCourtsJogosCount">0</span>
         </button>
       </div>
 
@@ -1761,6 +1776,145 @@
       <div class="footer-note">
         <b>Conexão Nuvem Ativa:</b> todas as alterações são salvas e sincronizadas em tempo real diretamente nos Bancos de Dados Supabase (DB1 e DB2).
       </div>
+      </div>
+
+      <!-- SUB-ABA 3: POSIÇÕES DOS JOGOS (ORDENAÇÃO E VISUALIZAÇÃO DOS ESPAÇOS) -->
+      <div id="courtsSubtab-posicoes" class="space-y-6 hidden">
+        <div class="crumb"><span>Início</span><span>›</span><span>Gestão de Espaços</span><span>›</span><b>Posições dos Jogos</b></div>
+
+        <section class="intro">
+          <div>
+            <p class="eyebrow">Organização e Grid Visual</p>
+            <h1>Posições dos Jogos & Quadras</h1>
+            <p>Ajuste a ordem de exibição das quadras na grade de horários, no monitor ao vivo e no aplicativo do cliente.</p>
+          </div>
+          <div class="intro-actions">
+            <button class="btn btn-primary" type="button" onclick="saveCourtPositions()">💾 Salvar nova ordenação</button>
+          </div>
+        </section>
+
+        <!-- Grade interativa de posições -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 class="text-base font-black text-slate-900">Ordem de Exibição das Quadras</h3>
+              <p class="text-xs text-slate-500">Suba ou desça as posições para reordenar a sequência no agendamento e nas colunas da Arena.</p>
+            </div>
+            <span class="px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-black" id="badgePositionsCount">6 quadras ativas</span>
+          </div>
+
+          <div id="courtPositionsListContainer" class="space-y-2.5 pt-2">
+            <!-- Renderizado dinamicamente via renderCourtPositions() -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-ABA 4: HORÁRIOS FIXOS & MENSALISTAS -->
+      <div id="courtsSubtab-mensalistas" class="space-y-6 hidden">
+        <div class="crumb"><span>Início</span><span>›</span><span>Gestão de Espaços</span><span>›</span><b>Horários Fixos</b></div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <div class="text-[10px] font-black uppercase text-emerald-600 tracking-wider">Gestão de Mensalistas & Contratos</div>
+              <h3 class="text-xl font-black text-slate-900">Horários Fixos (Mensalistas)</h3>
+              <p class="text-xs text-slate-500">Grade reservada semanalmente com garantia de horário e renovação recorrente.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="badgeCourtsTotalMensalistas" class="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-black">40 horários fixos</span>
+              <button onclick="openDirectBookingModal()" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow transition cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Novo Mensalista</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              <input type="text" id="courtsMensalistasSearchInput" oninput="renderCourtsMensalistasTable()" placeholder="Buscar por responsável, equipe, telefone ou quadra..." class="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-emerald-600 focus:outline-hidden">
+            </div>
+            <select id="courtsMensalistasDayFilter" onchange="renderCourtsMensalistasTable()" class="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 bg-white">
+              <option value="all">📅 Todos os Dias da Semana</option>
+              <option value="segunda">Segunda-feira</option>
+              <option value="terca">Terça-feira</option>
+              <option value="quarta">Quarta-feira</option>
+              <option value="quinta">Quinta-feira</option>
+              <option value="sexta">Sexta-feira</option>
+              <option value="sabado">Sábado</option>
+              <option value="domingo">Domingo</option>
+            </select>
+          </div>
+
+          <div id="courtsMensalistasTableContainer" class="overflow-x-auto rounded-2xl border border-slate-100">
+            <!-- Tabela renderizada dinamicamente -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB-ABA 5: JOGOS & AGENDAMENTOS -->
+      <div id="courtsSubtab-jogos" class="space-y-6 hidden">
+        <div class="crumb"><span>Início</span><span>›</span><span>Gestão de Espaços</span><span>›</span><b>Jogos</b></div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-center space-x-3.5">
+              <div class="w-12 h-12 rounded-2xl bg-emerald-700 text-white flex items-center justify-center shadow-md shrink-0">
+                <i data-lucide="calendar-check" class="w-6 h-6 text-emerald-300"></i>
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Gestão de Jogos</span>
+                  <span id="courtsJogosTotalBadge" class="bg-slate-100 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded-full">0 partidas registradas</span>
+                </div>
+                <h3 class="text-xl font-black text-slate-900 mt-1">Todos os Agendamentos & Jogos Marcados</h3>
+                <p class="text-xs text-slate-500">Visualize todas as reservas da arena nos espaços, pesquise por cliente ou quadra.</p>
+              </div>
+            </div>
+
+            <div class="w-full sm:w-auto flex items-center justify-center">
+              <button onclick="openDirectBookingModal()" title="Fazer Nova Reserva Direta" class="w-full sm:w-auto justify-center text-center px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow flex items-center space-x-1.5 transition-all cursor-pointer">
+                <i data-lucide="plus" class="w-4 h-4 text-emerald-200 shrink-0"></i>
+                <span>+ Nova Reserva Balcão</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Filtros de Busca e Quadra -->
+          <div class="bg-slate-50/70 rounded-2xl border border-slate-200/80 p-4 mt-6 space-y-3">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+              <div class="relative w-full md:w-96">
+                <input type="text" id="courtsBookingSearchInput" oninput="renderCourtsBookingsTable()" placeholder="Buscar por cliente, telefone, CPF ou quadra..."
+                       class="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-emerald-600 focus:outline-none transition-all">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              </div>
+
+              <div class="flex items-center gap-2 w-full md:w-auto flex-wrap sm:flex-nowrap">
+                <select id="courtsBookingCourtFilter" onchange="renderCourtsBookingsTable()" class="p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+                  <option value="all">🏟️ Todas as Quadras</option>
+                  <option value="fut5">FUT 5 – SOCCER 5</option>
+                  <option value="fut6">FUT 6 – SOCCER 6</option>
+                  <option value="fut7">FUT 7 – SOCCER 7</option>
+                  <option value="futmesa">FOOT TABLE – FUTMESA</option>
+                  <option value="areia">AREIA – BEACH SPORTS</option>
+                  <option value="society">SOCIETY – ARENA CENTRAL</option>
+                </select>
+
+                <select id="courtsBookingStatusFilter" onchange="renderCourtsBookingsTable()" class="p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+                  <option value="all">Todos os Status</option>
+                  <option value="upcoming">🔵 Agendados</option>
+                  <option value="live">🟢 Em Andamento</option>
+                  <option value="finished">✅ Finalizados</option>
+                  <option value="cancelled">❌ Cancelados</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="courtsBookingsListContainer" class="space-y-3 pt-2">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+        </div>
       </div>
 
     </section>
@@ -2754,47 +2908,311 @@ print(resp.json())</code></pre>
     const tabsList = ['movement', 'courts', 'cadastros', 'reports', 'backup'];
 
     window.switchCourtsSubTab = function(sub) {
-      const btnQuadras = document.getElementById('btnCourtsSub-quadras');
-      const btnModalidades = document.getElementById('btnCourtsSub-modalidades');
-      const contentQuadras = document.getElementById('courtsSubtab-quadras');
-      const contentModalidades = document.getElementById('courtsSubtab-modalidades');
+      const subTabs = ['quadras', 'modalidades', 'posicoes', 'mensalistas', 'jogos'];
+      
+      subTabs.forEach(t => {
+        const btn = document.getElementById('btnCourtsSub-' + t);
+        const panel = document.getElementById('courtsSubtab-' + t);
+        
+        if (t === sub) {
+          if (btn) {
+            btn.className = 'tab-btn tab-active !flex-initial shrink-0';
+            const icon = btn.querySelector('i');
+            if (icon) icon.className = 'w-4 h-4 shrink-0 text-white';
+          }
+          if (panel) panel.classList.remove('hidden');
+        } else {
+          if (btn) {
+            btn.className = 'tab-btn tab-inactive !flex-initial shrink-0';
+            const icon = btn.querySelector('i');
+            if (icon) icon.className = 'w-4 h-4 shrink-0 text-slate-700';
+          }
+          if (panel) panel.classList.add('hidden');
+        }
+      });
 
-      if (sub === 'modalidades') {
-        if (btnModalidades) {
-          btnModalidades.className = 'tab-btn tab-active !flex-initial';
-          const icon = btnModalidades.querySelector('i');
-          if (icon) icon.className = 'w-4 h-4 shrink-0 text-white';
-        }
-        if (btnQuadras) {
-          btnQuadras.className = 'tab-btn tab-inactive !flex-initial';
-          const icon = btnQuadras.querySelector('i');
-          if (icon) icon.className = 'w-4 h-4 shrink-0 text-slate-700';
-        }
-        if (contentQuadras) contentQuadras.classList.add('hidden');
-        if (contentModalidades) {
-          contentModalidades.classList.remove('hidden');
-          if (typeof renderSpacesGrid === 'function') renderSpacesGrid();
-        }
-      } else {
-        if (btnQuadras) {
-          btnQuadras.className = 'tab-btn tab-active !flex-initial';
-          const icon = btnQuadras.querySelector('i');
-          if (icon) icon.className = 'w-4 h-4 shrink-0 text-white';
-        }
-        if (btnModalidades) {
-          btnModalidades.className = 'tab-btn tab-inactive !flex-initial';
-          const icon = btnModalidades.querySelector('i');
-          if (icon) icon.className = 'w-4 h-4 shrink-0 text-slate-700';
-        }
-        if (contentModalidades) contentModalidades.classList.add('hidden');
-        if (contentQuadras) {
-          contentQuadras.classList.remove('hidden');
-          if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
-        }
+      // Atualiza badges numéricas
+      const bCourts = document.getElementById('badgeCourtsCount');
+      if (bCourts && window.courtState && window.courtState.courts) bCourts.textContent = window.courtState.courts.length;
+
+      const bMensalistas = document.getElementById('badgeCourtsMensalistasCount');
+      const members = (window.adminGameState && window.adminGameState.monthlyMembers) || [];
+      if (bMensalistas) bMensalistas.textContent = members.length;
+
+      const bJogos = document.getElementById('badgeCourtsJogosCount');
+      const bJogosTotal = document.getElementById('courtsJogosTotalBadge');
+      const bookingsCount = (window.adminGameState && window.adminGameState.bookings) ? window.adminGameState.bookings.length : 0;
+      if (bJogos) bJogos.textContent = bookingsCount;
+      if (bJogosTotal) bJogosTotal.textContent = bookingsCount + ' partidas registradas';
+
+      // Executa lógica específica de cada sub-aba
+      if (sub === 'quadras') {
+        if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
+      } else if (sub === 'modalidades') {
+        if (typeof renderSpacesGrid === 'function') renderSpacesGrid();
+      } else if (sub === 'posicoes') {
+        if (typeof renderCourtPositions === 'function') renderCourtPositions();
+      } else if (sub === 'mensalistas') {
+        if (typeof renderCourtsMensalistasTable === 'function') renderCourtsMensalistasTable();
+      } else if (sub === 'jogos') {
+        if (typeof renderCourtsBookingsTable === 'function') renderCourtsBookingsTable();
       }
+
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
+    };
+
+    // Renderizador e Gerenciador da Sub-aba: Posições dos Jogos
+    window.renderCourtPositions = function() {
+      const container = document.getElementById('courtPositionsListContainer');
+      const badge = document.getElementById('badgePositionsCount');
+      if (!container) return;
+
+      const courts = (window.courtState && window.courtState.courts && window.courtState.courts.length) 
+        ? window.courtState.courts 
+        : ((window.adminGameState && window.adminGameState.courts) ? window.adminGameState.courts : []);
+
+      if (badge) badge.textContent = courts.length + ' quadras ativas';
+
+      if (!courts.length) {
+        container.innerHTML = '<div class="p-6 text-center text-xs text-slate-400">Nenhum espaço cadastrado.</div>';
+        return;
+      }
+
+      container.innerHTML = courts.map((c, idx) => {
+        const isFirst = idx === 0;
+        const isLast = idx === courts.length - 1;
+        const statusLabel = c.status === 'operacional' ? 'Operacional' : (c.status === 'manutencao' ? 'Em Manutenção' : 'Pausada');
+        const statusColor = c.status === 'operacional' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700';
+        const price = c.price || c.rate || c.normal || 100;
+
+        return `
+          <div class="flex items-center justify-between p-3.5 rounded-2xl border border-slate-200/90 bg-white hover:bg-slate-50/70 transition shadow-2xs gap-3">
+            <div class="flex items-center gap-3">
+              <span class="w-8 h-8 rounded-xl bg-slate-900 text-white font-black text-xs flex items-center justify-center shrink-0">
+                #${idx + 1}
+              </span>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h4 class="text-xs font-black text-slate-900">${c.name}</h4>
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold ${statusColor}">${statusLabel}</span>
+                </div>
+                <div class="text-[11px] text-slate-500 font-medium">
+                  ${c.type || c.categoryLabel || 'Quadra'} • R$ ${price}/hora
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="moveCourtPosition(${idx}, -1)" ${isFirst ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:bg-slate-200 cursor-pointer"'} class="p-2 rounded-xl bg-slate-100 text-slate-700 transition" title="Subir posição">
+                <i data-lucide="chevron-up" class="w-4 h-4"></i>
+              </button>
+              <button type="button" onclick="moveCourtPosition(${idx}, 1)" ${isLast ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:bg-slate-200 cursor-pointer"'} class="p-2 rounded-xl bg-slate-100 text-slate-700 transition" title="Descer posição">
+                <i data-lucide="chevron-down" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    };
+
+    window.moveCourtPosition = function(index, dir) {
+      if (!window.courtState || !Array.isArray(window.courtState.courts)) return;
+      const arr = window.courtState.courts;
+      const target = index + dir;
+      if (target < 0 || target >= arr.length) return;
+
+      const temp = arr[index];
+      arr[index] = arr[target];
+      arr[target] = temp;
+
+      // Se também existir em adminGameState.courts
+      if (window.adminGameState && Array.isArray(window.adminGameState.courts)) {
+        window.adminGameState.courts = [...arr];
+      }
+
+      renderCourtPositions();
+      if (typeof saveCourtState === 'function') saveCourtState();
+      if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
+    };
+
+    window.saveCourtPositions = function() {
+      if (typeof saveCourtState === 'function') saveCourtState();
+      if (typeof mostrarToast === 'function') {
+        mostrarToast('Posições e ordem dos jogos salvas com sucesso!');
+      } else {
+        alert('Posições e ordem dos jogos salvas com sucesso!');
+      }
+    };
+
+    // Renderizador da Tabela de Horários Fixos (Mensalistas) dentro de Gestão de Espaços
+    window.renderCourtsMensalistasTable = function() {
+      const container = document.getElementById('courtsMensalistasTableContainer');
+      const badge = document.getElementById('badgeCourtsTotalMensalistas');
+      const badgeCount = document.getElementById('badgeCourtsMensalistasCount');
+      const searchInput = document.getElementById('courtsMensalistasSearchInput');
+      const dayFilter = document.getElementById('courtsMensalistasDayFilter');
+
+      if (!container) return;
+
+      const members = (window.adminGameState && window.adminGameState.monthlyMembers) ? window.adminGameState.monthlyMembers : [];
+      if (badge) badge.textContent = members.length + ' mensalistas cadastrados';
+      if (badgeCount) badgeCount.textContent = members.length;
+
+      const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+      const dFilter = dayFilter ? dayFilter.value : 'all';
+
+      let filtered = members.filter(m => {
+        if (!m) return false;
+        if (dFilter !== 'all') {
+          const mDay = (m.day_of_week || m.dayOfWeek || '').toLowerCase();
+          if (!mDay.includes(dFilter)) return false;
+        }
+        if (q) {
+          const team = (m.team_name || m.teamName || '').toLowerCase();
+          const resp = (m.responsible_name || m.responsibleName || '').toLowerCase();
+          const phone = (m.phone || '').replace(/\D/g, '');
+          const court = (typeof getCourtById === 'function') ? getCourtById(m.court_id || m.courtId).name.toLowerCase() : '';
+          return team.includes(q) || resp.includes(q) || phone.includes(q) || court.includes(q);
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center bg-slate-50 rounded-2xl">
+            <i data-lucide="calendar-x" class="w-8 h-8 mx-auto text-slate-300 mb-2"></i>
+            <p class="text-xs font-bold text-slate-500">Nenhum mensalista encontrado para os filtros selecionados.</p>
+          </div>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      let html = `
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-50 text-slate-500 font-black uppercase text-[10px] border-b border-slate-100">
+              <th class="p-3">Equipe / Responsável</th>
+              <th class="p-3">Telefone</th>
+              <th class="p-3">Quadra</th>
+              <th class="p-3">Dia & Horário Fixo</th>
+              <th class="p-3">Mensalidade</th>
+              <th class="p-3">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 font-medium text-slate-700">`;
+
+      filtered.forEach(m => {
+        const court = (typeof getCourtById === 'function') ? getCourtById(m.court_id || m.courtId) : { name: 'Quadra' };
+        const team = m.team_name || m.teamName || 'Mensalista';
+        const resp = m.responsible_name || m.responsibleName || team;
+        const phone = m.phone ? (typeof formatPhone === 'function' ? formatPhone(m.phone) : m.phone) : 'Não informado';
+        const day = m.day_of_week_label || ('Toda ' + (m.day_of_week || 'semana'));
+        const time = (m.start_time || m.time || '18:00') + ' às ' + (m.end_time || '20:00');
+        const price = parseFloat(m.monthly_price || m.monthlyPrice || 0);
+        const priceStr = price > 0 ? ('R$ ' + price.toFixed(2).replace('.', ',')) : 'R$ 0,00';
+
+        html += `
+          <tr class="hover:bg-slate-50/60 transition">
+            <td class="p-3 font-bold text-slate-900">
+              <div>${team}</div>
+              <div class="text-[10px] text-slate-400 font-normal">${resp}</div>
+            </td>
+            <td class="p-3 text-slate-600 font-mono">${phone}</td>
+            <td class="p-3">
+              <span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-bold text-[10px]">${court.name}</span>
+            </td>
+            <td class="p-3 font-semibold">
+              <div>${day}</div>
+              <div class="text-[10px] text-slate-400">${time}</div>
+            </td>
+            <td class="p-3 font-black text-emerald-700">${priceStr}</td>
+            <td class="p-3">
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-100 text-emerald-800">Ativo</span>
+            </td>
+          </tr>`;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    };
+
+    // Renderizador da Tabela de Jogos dentro de Gestão de Espaços
+    window.renderCourtsBookingsTable = function() {
+      const container = document.getElementById('courtsBookingsListContainer');
+      const badge = document.getElementById('courtsJogosTotalBadge');
+      const badgeNav = document.getElementById('badgeCourtsJogosCount');
+      const searchInput = document.getElementById('courtsBookingSearchInput');
+      const courtFilter = document.getElementById('courtsBookingCourtFilter');
+      const statusFilter = document.getElementById('courtsBookingStatusFilter');
+
+      if (!container) return;
+
+      const bookings = (window.adminGameState && Array.isArray(window.adminGameState.bookings)) ? window.adminGameState.bookings : [];
+      if (badge) badge.textContent = bookings.length + ' partidas registradas';
+      if (badgeNav) badgeNav.textContent = bookings.length;
+
+      const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+      const cFilter = courtFilter ? courtFilter.value : 'all';
+      const sFilter = statusFilter ? statusFilter.value : 'all';
+
+      let filtered = bookings.filter(b => {
+        if (!b) return false;
+        if (cFilter !== 'all' && b.court_id !== cFilter && b.courtId !== cFilter) return false;
+        if (sFilter !== 'all' && b.status !== sFilter) return false;
+        if (q) {
+          const client = (b.client_name || b.clientName || '').toLowerCase();
+          const phone = (b.client_phone || b.clientPhone || '').replace(/\D/g, '');
+          const court = (typeof getCourtById === 'function') ? getCourtById(b.court_id || b.courtId).name.toLowerCase() : '';
+          return client.includes(q) || phone.includes(q) || court.includes(q);
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="p-8 text-center bg-white rounded-2xl border border-slate-200">
+            <i data-lucide="calendar-x" class="w-8 h-8 mx-auto text-slate-300 mb-2"></i>
+            <p class="text-xs font-bold text-slate-600">Nenhum agendamento encontrado.</p>
+            <p class="text-[11px] text-slate-400 mt-1">Todas as novas partidas agendadas no sistema aparecerão aqui automaticamente.</p>
+          </div>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = filtered.map(b => {
+        const court = (typeof getCourtById === 'function') ? getCourtById(b.court_id || b.courtId) : { name: 'Quadra' };
+        const client = b.client_name || b.clientName || 'Cliente';
+        const date = b.date || '';
+        const time = (b.start_time || b.startTime || '18:00') + ' às ' + (b.end_time || b.endTime || '19:00');
+        const price = parseFloat(b.price || b.total_price || 0);
+
+        return `
+          <div class="p-3.5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between gap-3 hover:border-slate-300 transition shadow-2xs">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center shrink-0">⚽</div>
+              <div>
+                <h4 class="text-xs font-black text-slate-900">${client}</h4>
+                <div class="text-[11px] text-slate-500 font-medium">
+                  <span class="font-bold text-emerald-800">${court.name}</span> • ${date} (${time})
+                </div>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="text-xs font-black text-emerald-700 block">R$ ${price.toFixed(2).replace('.', ',')}</span>
+              <span class="px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-50 text-blue-700 uppercase">${b.status || 'Confirmado'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (window.lucide) lucide.createIcons();
     };
 
     function showAdminTab(targetTab) {
