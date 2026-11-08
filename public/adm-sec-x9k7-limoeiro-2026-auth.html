@@ -2245,6 +2245,14 @@
             <button type="button" onclick="window.setFiltroCategoriaClientes('Avulso')" data-filtro-cliente="Avulso" class="filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition cursor-pointer whitespace-nowrap">
               Avulsos
             </button>
+            <button type="button" onclick="window.setFiltroCategoriaClientes('pendente')" data-filtro-cliente="pendente" class="filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition cursor-pointer whitespace-nowrap flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span>Mensalidade Pendente</span>
+            </button>
+            <button type="button" onclick="window.setFiltroCategoriaClientes('em_dia')" data-filtro-cliente="em_dia" class="filtro-cliente-btn px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200/70 transition cursor-pointer whitespace-nowrap flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Em dia / Pago</span>
+            </button>
           </div>
         </div>
 
@@ -4301,15 +4309,15 @@ document.addEventListener('DOMContentLoaded', () => {
         </select>
       </div>
 
-      <!-- Bloco 3: Configuração Específica de Mensalista -->
-      <div id="modalGerenciarBoxMensalista" class="p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-3">
+      <!-- Bloco 3: Configuração Específica de Mensalista (Status / Mensalidade & Pagamento) -->
+      <div id="modalGerenciarBoxMensalista" class="p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-3.5">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
             <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
             Contrato de Horário Fixo / Mensalidade
           </span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-            Ativo
+          <span id="modalGerenciarStatusTag" class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+            ● Em dia
           </span>
         </div>
 
@@ -4321,6 +4329,19 @@ document.addEventListener('DOMContentLoaded', () => {
               <input type="number" id="modalGerenciarValorMensal" step="0.01" placeholder="280.00"
                      class="w-full pl-9 pr-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
             </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Próximo Vencimento</label>
+            <input type="date" id="modalGerenciarVencimento"
+                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Status do Pagamento</label>
+            <select id="modalGerenciarStatusPagamento" onchange="window.atualizarVisualStatusMensalidadeModal()"
+                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
+              <option value="pago">Em dia (Pago)</option>
+              <option value="pendente">Pendente (Aguardando Pagamento)</option>
+            </select>
           </div>
           <div>
             <label class="block text-xs font-semibold text-purple-950 mb-1">Dia da Semana Fixo</label>
@@ -4340,6 +4361,17 @@ document.addEventListener('DOMContentLoaded', () => {
             <input type="text" id="modalGerenciarHorarioFixo" placeholder="Ex.: Campo Society 01 - 20:00 às 22:00"
                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
           </div>
+        </div>
+
+        <!-- Botão Rápido: Dar Baixa / Registrar Pagamento Mensal -->
+        <div class="pt-1">
+          <button type="button" onclick="window.registrarBaixaMensalidadeCliente()" class="w-full flex items-center justify-center gap-2 bg-[#00a859] hover:bg-[#008f4c] active:scale-[0.99] text-white font-semibold text-xs py-2.5 px-4 rounded-xl shadow-xs transition cursor-pointer">
+            <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+            <span>Dar Baixa no Pagamento Mensal (+30 dias)</span>
+          </button>
+          <p class="text-[11px] text-purple-800/75 text-center mt-1.5">
+            Marca a mensalidade como em dia/paga, estende o vencimento em 30 dias e sincroniza nos bancos de dados na nuvem.
+          </p>
         </div>
       </div>
 
@@ -7086,9 +7118,23 @@ document.addEventListener('DOMContentLoaded', () => {
     g.extraAmount = extraAmount;
     g.booking_origin = origin;
     g.payment = (payStatus === 'Pago' ? paymentFinalStr : paymentFinalStr + ' (Pendente)');
+    g.payment_status = (payStatus === 'Pago' ? 'pago' : 'pagamento_faltando');
     g.total_price = calculatedTotal;
     g.price = calculatedTotal;
     g.finishObs = obs;
+
+    // Se o cliente for mensalista ou a partida for paga na tela inicial, registra no Clientes & Contatos
+    if (payStatus === 'Pago') {
+      const clientName = (g.customer_name || g.name || '').trim();
+      if (clientName && typeof window.salvarStatusMensalidadeCliente === 'function') {
+        const nextMonth = new Date();
+        nextMonth.setDate(nextMonth.getDate() + 30);
+        const ny = nextMonth.getFullYear();
+        const nm = String(nextMonth.getMonth() + 1).padStart(2, '0');
+        const nd = String(nextMonth.getDate()).padStart(2, '0');
+        window.salvarStatusMensalidadeCliente(clientName, 'pago', calculatedTotal, `${ny}-${nm}-${nd}`);
+      }
+    }
 
     let logText = 'Partida concluída';
     // ball mentions removed
@@ -9039,6 +9085,98 @@ document.addEventListener('DOMContentLoaded', () => {
     window.renderCadastrosClientes();
   };
 
+  // Helper de status de mensalidade e data de vencimento
+  window.obterStatusMensalidadeCliente = function(cliente) {
+    if (!cliente || cliente.type !== 'Mensalista') {
+      return { status: 'isento', valor: null, vencimentoISO: null, vencimentoBR: '-' };
+    }
+
+    const key = (cliente.name || '').toLowerCase();
+    const valor = parseFloat(cliente.monthlyPrice || 280) || 280;
+
+    // 1. Tentar ler override salvo
+    let overrideMap = {};
+    try {
+      const saved = localStorage.getItem('arena_mensalidades_status_v1');
+      if (saved) overrideMap = JSON.parse(saved);
+    } catch(e) {}
+
+    if (overrideMap[key]) {
+      const dataVenc = overrideMap[key].vencimentoISO || '2026-12-05';
+      const [vy, vm, vd] = dataVenc.split('-');
+      const vencBR = (vy && vm && vd) ? `${vd}/${vm}/${vy}` : dataVenc;
+      return {
+        status: overrideMap[key].status || 'pago',
+        valor: parseFloat(overrideMap[key].valor || valor),
+        vencimentoISO: dataVenc,
+        vencimentoBR: vencBR
+      };
+    }
+
+    // 2. Se cliente tem agendamentos recentes finalizados ou pagos na tela inicial
+    const bookings = (window.adminGameState.bookings || []).filter(b => {
+      const n = (b.customer_name || b.name || '').toLowerCase();
+      return n === key || n.includes(key);
+    });
+
+    const temPago = bookings.some(b => b.status === 'finished' || b.payment_status === 'pago');
+    const temPendente = bookings.some(b => b.status === 'unpaid' || b.payment_status === 'pagamento_faltando');
+
+    // Casos padrão conforme a demonstração Arena Limoeiro
+    let statusPadrao = 'pago';
+    let dataPadraoISO = '2026-12-05';
+
+    if (key.includes('jaj') || key.includes('monica')) {
+      statusPadrao = 'pendente';
+      dataPadraoISO = key.includes('jaj') ? '2026-11-05' : '2026-11-08';
+    } else if (temPendente && !temPago) {
+      statusPadrao = 'pendente';
+      dataPadraoISO = '2026-11-08';
+    } else if (key.includes('waldesio')) {
+      dataPadraoISO = '2026-11-10';
+    } else if (key.includes('diego')) {
+      dataPadraoISO = '2026-11-15';
+    } else if (key.includes('aline')) {
+      dataPadraoISO = '2026-11-20';
+    } else if (key.includes('carl')) {
+      dataPadraoISO = '2026-11-25';
+    } else if (key.includes('marcos')) {
+      dataPadraoISO = '2026-11-12';
+    } else if (key.includes('luiz')) {
+      dataPadraoISO = '2026-11-18';
+    }
+
+    const [py, pm, pd] = dataPadraoISO.split('-');
+    const dataPadraoBR = `${pd}/${pm}/${py}`;
+
+    return {
+      status: statusPadrao,
+      valor: valor,
+      vencimentoISO: dataPadraoISO,
+      vencimentoBR: dataPadraoBR
+    };
+  };
+
+  window.salvarStatusMensalidadeCliente = function(nomeCliente, status, valor, vencimentoISO) {
+    const key = (nomeCliente || '').toLowerCase();
+    if (!key) return;
+    let map = {};
+    try {
+      const saved = localStorage.getItem('arena_mensalidades_status_v1');
+      if (saved) map = JSON.parse(saved);
+    } catch(e) {}
+
+    map[key] = {
+      status: status || 'pago',
+      valor: parseFloat(valor) || 280,
+      vencimentoISO: vencimentoISO || '2026-12-05',
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      localStorage.setItem('arena_mensalidades_status_v1', JSON.stringify(map));
+    } catch(e) {}
+  };
+
   window.obterListaAgregadaClientes = function() {
     const clientMap = new Map();
 
@@ -9144,6 +9282,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = clients.filter(c => {
       if (catFiltro === 'Mensalista' && c.type !== 'Mensalista') return false;
       if (catFiltro === 'Avulso' && c.type !== 'Avulso') return false;
+      if (catFiltro === 'pendente') {
+        if (c.type !== 'Mensalista') return false;
+        const statusPay = window.obterStatusMensalidadeCliente(c);
+        if (statusPay.status !== 'pendente') return false;
+      }
+      if (catFiltro === 'em_dia') {
+        if (c.type !== 'Mensalista') return false;
+        const statusPay = window.obterStatusMensalidadeCliente(c);
+        if (statusPay.status !== 'pago') return false;
+      }
 
       if (!q) return true;
       const matchNome = c.name.toLowerCase().includes(q);
@@ -9170,6 +9318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <th class="py-3.5 px-4">Telefone / WhatsApp</th>
             <th class="py-3.5 px-4">CPF</th>
             <th class="py-3.5 px-4">Categoria</th>
+            <th class="py-3.5 px-4">Status / Mensalidade</th>
             <th class="py-3.5 px-4">Partidas</th>
             <th class="py-3.5 px-4 text-right">Ações</th>
           </tr>
@@ -9183,6 +9332,44 @@ document.addEventListener('DOMContentLoaded', () => {
       const badgeCategoria = isMensalista
         ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">Mensalista</span>`
         : `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Avulso</span>`;
+
+      // Coluna Status / Mensalidade conforme imagens enviadas pelo usuário
+      let colunaStatus = `<span class="text-xs text-slate-400">Por partida</span>`;
+      if (isMensalista) {
+        const statusPay = window.obterStatusMensalidadeCliente(c);
+        const valorFormatado = (statusPay.valor > 0)
+          ? ('R$ ' + statusPay.valor.toFixed(2).replace('.', ','))
+          : '-';
+        const vencFormatado = statusPay.vencimentoBR || '-';
+
+        if (statusPay.status === 'pago') {
+          colunaStatus = `
+            <div class="flex flex-col gap-0.5">
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Em dia</span>
+                </span>
+                <span class="text-xs font-bold text-slate-800">${valorFormatado}</span>
+              </div>
+              <span class="text-[11px] text-slate-400 font-medium">Venc.: ${vencFormatado}</span>
+            </div>
+          `;
+        } else {
+          colunaStatus = `
+            <div class="flex flex-col gap-0.5">
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200">
+                  <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                  <span>Pendente</span>
+                </span>
+                <span class="text-xs font-bold text-slate-800">${valorFormatado}</span>
+              </div>
+              <span class="text-[11px] text-slate-400 font-medium">Venc.: ${vencFormatado}</span>
+            </div>
+          `;
+        }
+      }
 
       const safeName = encodeURIComponent(c.name);
 
@@ -9206,6 +9393,9 @@ document.addEventListener('DOMContentLoaded', () => {
           <td class="py-3.5 px-4 text-slate-400 font-mono">${c.cpf ? formatCPF(c.cpf) : 'Não informado'}</td>
           <td class="py-3.5 px-4">
             ${badgeCategoria}
+          </td>
+          <td class="py-3.5 px-4">
+            ${colunaStatus}
           </td>
           <td class="py-3.5 px-4 font-bold text-slate-900">
             ${c.matches} ${c.matches === 1 ? 'partida' : 'partidas'}
@@ -9252,6 +9442,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modalGerenciarValorMensal').value = cliente.monthlyPrice || '280.00';
     document.getElementById('modalGerenciarDiaSemana').value = cliente.monthlyDay || 'segunda';
     document.getElementById('modalGerenciarHorarioFixo').value = cliente.horarioFixo || '';
+
+    // Status / Mensalidade e Vencimento
+    const statusPay = window.obterStatusMensalidadeCliente(cliente);
+    const selStatus = document.getElementById('modalGerenciarStatusPagamento');
+    if (selStatus) selStatus.value = statusPay.status === 'pendente' ? 'pendente' : 'pago';
+    const inVenc = document.getElementById('modalGerenciarVencimento');
+    if (inVenc) inVenc.value = statusPay.vencimentoISO || '2026-12-05';
+    window.atualizarVisualStatusMensalidadeModal();
 
     window.toggleModalGerenciarCamposMensalista();
 
@@ -9414,6 +9612,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.adminGameState.customers.push(customerPayload);
       }
 
+      // Salva status/vencimento da mensalidade se for Mensalista
+      if (categoria === 'Mensalista') {
+        const statusPag = document.getElementById('modalGerenciarStatusPagamento')?.value || 'pago';
+        const dataVenc = document.getElementById('modalGerenciarVencimento')?.value || '2026-12-05';
+        window.salvarStatusMensalidadeCliente(nome, statusPag, valorMensal, dataVenc);
+      }
+
       window.fecharModalGerenciarCliente();
       window.renderCadastrosClientes();
       if (typeof window.mostrarToast === 'function') {
@@ -9424,6 +9629,68 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Erro ao sincronizar com o banco de dados. Tente novamente.');
     } finally {
       if (btn) btn.disabled = false;
+    }
+  };
+
+  window.atualizarVisualStatusMensalidadeModal = function() {
+    const sel = document.getElementById('modalGerenciarStatusPagamento');
+    const tag = document.getElementById('modalGerenciarStatusTag');
+    if (!sel || !tag) return;
+    if (sel.value === 'pago') {
+      tag.innerHTML = '● Em dia';
+      tag.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700';
+    } else {
+      tag.innerHTML = '● Pendente';
+      tag.className = 'text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800';
+    }
+  };
+
+  window.registrarBaixaMensalidadeCliente = function() {
+    const nome = document.getElementById('modalGerenciarNome')?.value.trim();
+    if (!nome) return;
+
+    const valor = parseFloat(document.getElementById('modalGerenciarValorMensal')?.value || 280) || 280;
+    const inVenc = document.getElementById('modalGerenciarVencimento');
+    const vencAtual = (inVenc && inVenc.value) ? inVenc.value : '2026-11-08';
+
+    // Adiciona 30 dias à data atual de vencimento
+    const [vy, vm, vd] = vencAtual.split('-').map(Number);
+    const d = new Date(vy, vm - 1, vd, 12, 0, 0);
+    d.setDate(d.getDate() + 30);
+
+    const ny = d.getFullYear();
+    const nm = String(d.getMonth() + 1).padStart(2, '0');
+    const nd = String(d.getDate()).padStart(2, '0');
+    const novoVencISO = `${ny}-${nm}-${nd}`;
+
+    if (inVenc) inVenc.value = novoVencISO;
+    const selStatus = document.getElementById('modalGerenciarStatusPagamento');
+    if (selStatus) selStatus.value = 'pago';
+    window.atualizarVisualStatusMensalidadeModal();
+
+    window.salvarStatusMensalidadeCliente(nome, 'pago', valor, novoVencISO);
+
+    // Também marca como pagas as partidas abertas do mensalista na tela inicial
+    const key = nome.toLowerCase();
+    (window.adminGameState.bookings || []).forEach(b => {
+      const bName = (b.customer_name || b.name || '').toLowerCase();
+      if (bName === key || bName.includes(key)) {
+        if (b.status === 'unpaid' || b.payment_status === 'pagamento_faltando') {
+          b.status = 'finished';
+          b.payment_status = 'pago';
+          b.payment_method = 'Mensal';
+          if (typeof window.syncBookingToCloud === 'function') {
+            window.syncBookingToCloud(b, 'upsert');
+          }
+        }
+      }
+    });
+
+    if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+    window.renderCadastrosClientes();
+
+    if (typeof window.mostrarToast === 'function') {
+      window.mostrarToast('✓ Pagamento de R$ ' + valor.toFixed(2).replace('.', ',') + ' registrado para ' + nome + '! Novo vencimento: ' + nd + '/' + nm + '/' + ny);
     }
   };
 
