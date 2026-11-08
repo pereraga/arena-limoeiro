@@ -4855,8 +4855,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Toda e qualquer atualização no sistema é enviada em Dual-Write para ambos os bancos
-  window.syncBookingToCloud = async function(booking, action = 'upsert') {
+  // Toda e qualquer atualização no sistema é enviada em Dual-Write para ambos os bancos (Otimizado de alta performance)
+  window.syncBookingToCloud = function(booking, action = 'upsert') {
     if (!booking || !booking.id) return;
 
     // Se for delete, registra na lista de excluídos para imunidade contra ressuscitação
@@ -4889,96 +4889,82 @@ document.addEventListener('DOMContentLoaded', () => {
       observation: booking.observation || booking.finishObs || null
     };
 
-    console.log('[ArenaCloud] Dual-Write agendamento:', action, payload.id, 'status:', payload.status);
+    console.log('[ArenaCloud] Dual-Write ágil:', action, payload.id, 'status:', payload.status);
 
-    // 1. Gravação no Banco 2 (Ativo & Salvaguarda)
-    try {
-      if (action === 'delete') {
-        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
-          method: 'DELETE',
-          headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
-        }).catch(() => {});
-      } else {
-        // Envia PATCH direto para garantir persistência de alterações/cancelamento
-        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
-          method: 'PATCH',
-          headers: {
-            apikey: ARENA_CLOUD_DBS.db2Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        }).catch(() => {});
+    // Execução assíncrona em background para NUNCA travar a interface do usuário ou resposta de botões
+    setTimeout(async () => {
+      const writeCloud = async (dbUrl, dbKey) => {
+        try {
+          if (action === 'delete') {
+            await fetch(dbUrl + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
+              method: 'DELETE',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey, Prefer: 'return=minimal' }
+            });
+          } else {
+            // Upsert atômico em 1 requisição com preferência merge-duplicates
+            const res = await fetch(dbUrl + '/rest/v1/bookings', {
+              method: 'POST',
+              headers: {
+                apikey: dbKey,
+                Authorization: 'Bearer ' + dbKey,
+                'Content-Type': 'application/json',
+                Prefer: 'resolution=merge-duplicates,return=minimal'
+              },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+              await fetch(dbUrl + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
+                method: 'PATCH',
+                headers: {
+                  apikey: dbKey,
+                  Authorization: 'Bearer ' + dbKey,
+                  'Content-Type': 'application/json',
+                  Prefer: 'return=minimal'
+                },
+                body: JSON.stringify(payload)
+              });
+            }
+          }
+        } catch(e) {}
+      };
 
-        // Envia também POST com merge-duplicates caso o registro seja novo
-        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings', {
-          method: 'POST',
-          headers: {
-            apikey: ARENA_CLOUD_DBS.db2Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify(payload)
-        }).catch(err => console.warn('[ArenaCloud] Aviso DB2:', err));
-      }
-    } catch(e) {}
+      // Dispara DB2 e DB1 em paralelo sem bloquear a UI
+      await Promise.allSettled([
+        writeCloud(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        writeCloud(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+      ]);
 
-    // 2. Gravação no Banco 1 (Principal)
-    try {
-      if (action === 'delete') {
-        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
-          method: 'DELETE',
-          headers: { apikey: ARENA_CLOUD_DBS.db1Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key }
-        }).catch(() => {});
-      } else {
-        // PATCH no DB1
-        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?id=eq.' + encodeURIComponent(payload.id), {
-          method: 'PATCH',
-          headers: {
-            apikey: ARENA_CLOUD_DBS.db1Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        }).catch(() => {});
+      // Notificação serverless
+      try {
+        if (window.ArenaCloudSync && typeof window.ArenaCloudSync.push === 'function') {
+          window.ArenaCloudSync.push(action === 'delete' ? 'delete_booking' : 'push_booking', payload).catch(() => {});
+        } else {
+          fetch(ARENA_CLOUD_DBS.syncEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action === 'delete' ? 'delete_booking' : 'push_booking', payload })
+          }).catch(() => {});
+        }
+      } catch(e) {}
+    }, 0);
 
-        // POST no DB1
-        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings', {
-          method: 'POST',
-          headers: {
-            apikey: ARENA_CLOUD_DBS.db1Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key,
-            'Content-Type': 'application/json',
-            Prefer: 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify(payload)
-        }).catch(() => {});
-      }
-    } catch(e) {}
-
-    // 3. Sincronização Serverless Cloud (Notifica APKs e Celulares conectados)
-    try {
-      if (window.ArenaCloudSync && typeof window.ArenaCloudSync.push === 'function') {
-        window.ArenaCloudSync.push(action === 'delete' ? 'delete_booking' : 'push_booking', payload).catch(() => {});
-      } else {
-        fetch(ARENA_CLOUD_DBS.syncEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: action === 'delete' ? 'delete_booking' : 'push_booking', payload })
-        }).catch(() => {});
-      }
-    } catch(e) {}
-
-    // 4. Broadcast local entre abas
+    // Broadcast local instantâneo entre abas
     try {
       const bc = new BroadcastChannel('arena_limoeiro_sync');
       bc.postMessage({ type: 'booking_updated', action, payload });
     } catch(e) {}
   };
 
-  // Puxa agendamentos e mensalistas dos Bancos de Dados na Nuvem
+  // Puxa agendamentos e mensalistas dos Bancos de Dados na Nuvem (Otimizado: paralelo, com debounce e detecção de mudanças)
   window.pullDataFromCloudDatabases = async function() {
+    // Evita sobreposição de puxadas simultâneas
+    if (window.__pullInProgress) return;
+    const nowTs = Date.now();
+    if (window.__lastPullSuccessTs && (nowTs - window.__lastPullSuccessTs < 3000)) {
+      return; // Debounce de 3s para evitar requisições redundantes
+    }
+    window.__pullInProgress = true;
+
     // Executa expurgo diário preventivo antes de puxar dados (libera espaço e evita baixar registros mortos)
     try {
       const todayStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '';
@@ -4986,36 +4972,38 @@ document.addEventListener('DOMContentLoaded', () => {
         await window.purgeExpiredCloudBookings();
       }
     } catch(pErr) {}
+
     try {
-      console.log('[ArenaCloud] Puxando dados dos 2 Bancos de Dados...');
-      let cloudBookings = null;
-      let cloudMembers = null;
-
-      // 1. Tenta carregar reservas do DB2 (Banco 2 Ativo)
-      try {
-        const res2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=*&order=date.asc', {
-          headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
-        });
-        if (res2.ok) {
-          cloudBookings = await res2.json();
-          console.log('[ArenaCloud] Carregados ' + cloudBookings.length + ' agendamentos do Banco 2.');
-        }
-      } catch(e2) {
-        console.warn('[ArenaCloud] Falha no Banco 2, tentando Banco 1:', e2);
-      }
-
-      // Se falhou no DB2, tenta DB1 como fallback
-      if (!cloudBookings || cloudBookings.length === 0) {
+      const fetchFast = async (url, key) => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4500);
         try {
-          const res1 = await fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=*&order=date.asc', {
-            headers: { apikey: ARENA_CLOUD_DBS.db1Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key }
+          const res = await fetch(url, {
+            headers: { apikey: key, Authorization: 'Bearer ' + key, 'Accept': 'application/json' },
+            signal: ctrl.signal
           });
-          if (res1.ok) {
-            cloudBookings = await res1.json();
-            console.log('[ArenaCloud] Carregados ' + cloudBookings.length + ' agendamentos do Banco 1.');
-          }
-        } catch(e1) {}
-      }
+          clearTimeout(timer);
+          if (res.ok) return await res.json();
+        } catch(e) {
+          clearTimeout(timer);
+        }
+        return null;
+      };
+
+      // 1. Concorrência competitiva paralela: DB2 e DB1 buscam ao mesmo tempo; o primeiro a responder é adotado
+      const bookingsPromise = Promise.any([
+        fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db2Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject()),
+        fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
+      ]).catch(() => null);
+
+      // 2. Concorrência de mensalistas em paralelo
+      const membersPromise = Promise.any([
+        fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db2Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject()),
+        fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
+      ]).catch(() => null);
+
+      const [cloudBookings, cloudMembers] = await Promise.all([bookingsPromise, membersPromise]);
+      let stateChanged = false;
 
       // Mescla reservas com o estado operacional respeitando alterações e cancelamentos locais
       if (Array.isArray(cloudBookings) && cloudBookings.length > 0) {
@@ -5043,21 +5031,16 @@ document.addEventListener('DOMContentLoaded', () => {
           if (!cb || !cb.id) return;
           const idStr = String(cb.id);
 
-          // Se a reserva foi excluída pelo admin, ignora qualquer retorno defasado da nuvem
-          if (deletedIds.has(idStr)) {
-            return;
-          }
+          if (deletedIds.has(idStr)) return;
 
           const cId = (typeof getCourtById === 'function') ? getCourtById(cb.court_id || cb.courtId).id : (cb.court_id || '');
           const slotKey = cb.date + '_' + cId + '_' + cb.start_time;
           const existing = bMap.get(idStr);
 
-          // PROTEÇÃO DEFINITIVA CONTRA RESSUSCITAÇÃO DE RESERVA CANCELADA OU FINALIZADA
           let finalStatus = cb.status || 'confirmed';
           if (existing) {
             if (existing.status === 'cancelled') {
               finalStatus = 'cancelled';
-              // Garante que o banco também esteja atualizado
               if (cb.status !== 'cancelled' && typeof window.syncBookingToCloud === 'function') {
                 window.syncBookingToCloud(existing, 'upsert');
               }
@@ -5066,55 +5049,65 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (existing.status === 'in_progress' || existing.status === 'live') {
               finalStatus = existing.status;
             } else if (existing.status === 'pending') {
-              // preserva status local
               finalStatus = existing.status;
             }
-            // Preserva também edições locais de data, hora e quadra se foram alteradas
             bMap.set(idStr, { ...cb, ...existing, status: finalStatus });
           } else {
             if (finishedSlots.has(slotKey)) {
               cb.status = 'finished';
             }
             bMap.set(idStr, cb);
+            stateChanged = true;
           }
         });
 
-        window.adminGameState.bookings = Array.from(bMap.values());
-        try {
-          localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
-        } catch(e) {}
+        const newBookings = Array.from(bMap.values());
+        const newSig = newBookings.length + '_' + newBookings.slice(0, 15).map(b => b.id + ':' + b.status + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
+        if (newSig !== window.__lastBookingsSig) {
+          window.__lastBookingsSig = newSig;
+          stateChanged = true;
+          window.adminGameState.bookings = newBookings;
+          try {
+            localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
+          } catch(e) {}
+        }
       }
 
-      // 2. Carrega mensalistas do Banco 2
-      try {
-        const resM2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', {
-          headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
-        });
-        if (resM2.ok) {
-          cloudMembers = await resM2.json();
-          if (Array.isArray(cloudMembers) && cloudMembers.length > 0) {
-            window.adminGameState.monthlyMembers = cloudMembers;
-            try {
-              localStorage.setItem('arena_monthly_members', JSON.stringify(cloudMembers));
-            } catch(e) {}
-            console.log('[ArenaCloud] Carregados ' + cloudMembers.length + ' mensalistas da nuvem.');
-          }
+      // 2. Atualiza mensalistas
+      if (Array.isArray(cloudMembers) && cloudMembers.length > 0) {
+        const memSig = cloudMembers.length + '_' + cloudMembers.map(m => m.id).join(',');
+        if (memSig !== window.__lastMembersSig) {
+          window.__lastMembersSig = memSig;
+          stateChanged = true;
+          window.adminGameState.monthlyMembers = cloudMembers;
+          try {
+            localStorage.setItem('arena_monthly_members', JSON.stringify(cloudMembers));
+          } catch(e) {}
         }
-      } catch(eM) {}
+      }
 
-      // Atualiza badge de status
-      
+      window.__lastPullSuccessTs = Date.now();
 
-      if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
-      if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+      // Só re-renderiza se houve alteração REAL nos dados!
+      if (stateChanged) {
+        if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
+        if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+        if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
+      }
     } catch(err) {
-      console.warn('[ArenaCloud] Erro geral na sincronização inicial:', err);
+      console.warn('[ArenaCloud] Erro geral na sincronização rápida:', err);
+    } finally {
+      window.__pullInProgress = false;
     }
   };
 
 
   function getMatchesForDate(dateStr) {
     if (!dateStr) dateStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-04';
+    if (!window.__matchesCacheByDate) window.__matchesCacheByDate = new Map();
+    if (window.__matchesCacheByDate.has(dateStr)) {
+      return window.__matchesCacheByDate.get(dateStr);
+    }
     const [y, m, d] = dateStr.split('-');
     const dt = new Date(Number(y), Number(m) - 1, Number(d), 12, 0, 0);
     const dayOfWeekMap = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
@@ -5219,6 +5212,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     matches.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+    if (!window.__matchesCacheByDate) window.__matchesCacheByDate = new Map();
+    window.__matchesCacheByDate.set(dateStr, matches);
     return matches;
   }
   window.getMatchesForDate = getMatchesForDate;
@@ -5327,17 +5322,14 @@ document.addEventListener('DOMContentLoaded', () => {
     g.log.unshift({ at, text });
   };
 
-  // Salva no storage e atualiza ambas as listas
+  // Salva no storage e atualiza ambas as listas de forma instantânea e fluida
   window.saveAdminGameState = function() {
     try {
       localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
       localStorage.setItem('arena-limoeiro-games-prototype-v2', JSON.stringify(window.adminGameState.bookings));
     } catch(e) {}
+    if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
     if (typeof window.renderMovementMatches === "function") window.renderMovementMatches();
-    // ☁️ Puxa dados atualizados dos 2 Bancos de Dados na nuvem imediatamente
-    if (typeof window.pullDataFromCloudDatabases === "function") {
-      window.pullDataFromCloudDatabases();
-    }
     if (typeof window.renderCadastrosBookingsList === "function") window.renderCadastrosBookingsList();
   };
 
@@ -6585,8 +6577,6 @@ document.addEventListener('DOMContentLoaded', () => {
           localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
         } catch(e) {}
         if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
-        if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
-        if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
       }
     } catch(err) {
       console.warn('[AutoExpire] Erro ao verificar encerramento automático:', err);
@@ -6645,8 +6635,6 @@ document.addEventListener('DOMContentLoaded', () => {
           localStorage.setItem('arena_local_bookings', JSON.stringify(window.adminGameState.bookings));
         } catch(e) {}
         if (typeof window.saveAdminGameState === 'function') window.saveAdminGameState();
-        if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
-        if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
       }
     } catch(err) {
       console.warn('[AutoStart] Erro ao verificar auto-início:', err);
@@ -7228,10 +7216,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof window.syncBookingToCloud === 'function') window.syncBookingToCloud(g, 'upsert');
       if (typeof window.showNotification === 'function') {
         window.showNotification("Partida iniciada! O botão mudou para 'Finalizar'.");
-      }
-
-      if (typeof window.renderMovementMatches === 'function') {
-        window.renderMovementMatches();
       }
     }
   };
@@ -8034,6 +8018,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof window.checkAndAutoExpireMatches === 'function') {
       window.checkAndAutoExpireMatches();
     }
+
+    if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
 
     // Recupera TODAS as partidas do dia para estatísticas completas
     const allMatches = getMatchesForDate(dateStr);
@@ -10002,7 +9988,7 @@ window.cancelGame = function(id) {
       if (typeof window.pullDataFromCloudDatabases === 'function') {
         window.pullDataFromCloudDatabases();
       }
-    }, 7000);
+    }, 12000);
 
     // Sincronização instantânea ao reativar a aba
     document.addEventListener('visibilitychange', () => {
