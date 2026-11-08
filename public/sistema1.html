@@ -1552,32 +1552,39 @@
 
       <!-- SUB-NAVEGAÇÃO INTERNA: QUADRAS & MODALIDADES (ESTILO OFICIAL DA ARENA) -->
       <!-- SUB-NAVEGAÇÃO COMPLETA: GESTÃO DE ESPAÇOS (Quadras, Categorias & Modalidades, Posições dos Jogos, Horários Fixos, Jogos) -->
-      <div class="flex items-center justify-center w-full mb-3 px-1">
-        <div class="flex flex-wrap items-center justify-center gap-2 p-1.5 sm:p-2 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-full sm:w-auto max-w-full shadow-2xs mx-auto">
-          <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-initial shrink-0" style="min-width: 125px; height: 38px;">
-            <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-white"></i>
-            <span>Quadras</span>
-            <span class="badge-count" id="badgeCourtsCount">6</span>
-          </button>
-          <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 175px; height: 38px;">
-            <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
-            <span>Categorias & Modalidades</span>
-            <span class="badge-count" id="badgeModalitiesCount">4</span>
-          </button>
-          <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 155px; height: 38px;">
-            <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-slate-700"></i>
-            <span>Posições dos Jogos</span>
-          </button>
-          <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 145px; height: 38px;">
-            <i data-lucide="calendar" class="w-4 h-4 shrink-0 text-slate-700"></i>
-            <span>Horários Fixos</span>
-            <span class="badge-count" id="badgeCourtsMensalistasCount">40</span>
-          </button>
-          <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive !flex-initial shrink-0" style="min-width: 125px; height: 38px;">
-            <span class="text-sm">⚽</span>
-            <span>Jogos</span>
-            <span class="badge-count" id="badgeCourtsJogosCount">0</span>
-          </button>
+      <div class="flex items-center justify-center w-full mb-3 px-2">
+        <div class="p-1.5 sm:p-2 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-full max-w-4xl shadow-2xs mx-auto">
+          <!-- Fileira 1: 3 botões (Quadras, Modalidades, Posições) -->
+          <div class="flex items-center justify-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 w-full">
+            <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !flex-1 sm:!flex-initial sm:!min-w-[140px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
+              <i data-lucide="layout-grid" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-white"></i>
+              <span class="truncate">Quadras</span>
+              <span class="badge-count" id="badgeCourtsCount">6</span>
+            </button>
+            <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[160px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
+              <i data-lucide="tag" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700"></i>
+              <span class="truncate">Modalidades</span>
+              <span class="badge-count" id="badgeModalitiesCount">4</span>
+            </button>
+            <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[150px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700"></i>
+              <span class="truncate">Posições</span>
+            </button>
+          </div>
+
+          <!-- Fileira 2: 2 botões (Horários Fixos, Jogos) -->
+          <div class="flex items-center justify-center gap-1.5 sm:gap-2 w-full">
+            <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[160px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700"></i>
+              <span class="truncate">Horários Fixos</span>
+              <span class="badge-count" id="badgeCourtsMensalistasCount">40</span>
+            </button>
+            <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive !flex-1 sm:!flex-initial sm:!min-w-[140px] !min-w-0 !h-[38px] px-2 sm:px-3 text-[11px] sm:text-xs">
+              <span class="text-xs sm:text-sm">⚽</span>
+              <span class="truncate">Jogos</span>
+              <span class="badge-count" id="badgeCourtsJogosCount">0</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2894,16 +2901,18 @@ print(resp.json())</code></pre>
         
         if (t === sub) {
           if (btn) {
-            btn.className = 'tab-btn tab-active !flex-initial shrink-0';
+            btn.classList.add('tab-active');
+            btn.classList.remove('tab-inactive');
             const icon = btn.querySelector('i');
-            if (icon) icon.className = 'w-4 h-4 shrink-0 text-white';
+            if (icon) icon.className = 'w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-white';
           }
           if (panel) panel.classList.remove('hidden');
         } else {
           if (btn) {
-            btn.className = 'tab-btn tab-inactive !flex-initial shrink-0';
+            btn.classList.add('tab-inactive');
+            btn.classList.remove('tab-active');
             const icon = btn.querySelector('i');
-            if (icon) icon.className = 'w-4 h-4 shrink-0 text-slate-700';
+            if (icon) icon.className = 'w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0 text-slate-700';
           }
           if (panel) panel.classList.add('hidden');
         }
