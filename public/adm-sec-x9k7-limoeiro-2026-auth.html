@@ -6308,7 +6308,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // Status do pagamento
       const paymentStatusSelect = document.getElementById('finishPaymentStatus');
       if (paymentStatusSelect) {
-        paymentStatusSelect.value = (g.payment && g.payment.includes('Pendente')) ? 'Pendente' : 'Pago';
+        // Ao abrir a janela para efetuar pagamento, o status padrão é sempre "Pago" (confirmando a liquidação)
+        paymentStatusSelect.value = 'Pago';
       }
 
       const fObs = document.getElementById('finishMatchObs');
@@ -7547,19 +7548,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <!-- BOTÃO PRINCIPAL VISÍVEL: VERDE PARA INICIAR -> APÓS APERTAR, FICA VERMELHO (FINALIZAR) -->
             <div class="w-full flex justify-end">
               ${(st === 'unpaid' || st === 'cancelled') ? `
-                <div class="flex flex-wrap items-center justify-end gap-2">
+                <div class="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2.5">
                   <span class="px-3 py-1.5 rounded-xl text-xs font-extrabold text-amber-900 bg-amber-100 border border-amber-300 shadow-sm inline-flex items-center gap-1.5">
                     <i class="fa-solid fa-triangle-exclamation text-amber-700"></i> Pagamento Faltando
                   </span>
-                  <!-- Botão 1: Efetuar Pagamento Rápido (PIX / Dinheiro) e mover para área de Pago -->
-                  <button type="button" onclick="quickPayAndFinishMatch('${m.id}', 'PIX')" class="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black rounded-xl shadow-md shadow-emerald-600/30 transition active:scale-95 cursor-pointer inline-flex items-center gap-1.5" title="Efetuar pagamento e mover para área de pago">
-                    <i class="fa-solid fa-circle-check text-xs"></i>
+                  <!-- Botão de Pagamento: Abre a janela padrão para escolher a forma (PIX, Dinheiro, Cartão, Dividido) e concluir -->
+                  <button type="button" id="btn-pay-action-${m.id}" onclick="openFinishGame('${m.id}')" class="px-5 py-2.5 rounded-full font-black text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 cursor-pointer" title="Abrir janela para escolher a forma de pagamento e concluir partida">
+                    <i class="fa-solid fa-hand-holding-dollar text-sm"></i>
                     <span>Efetuar Pagamento</span>
-                  </button>
-                  <!-- Botão 2: Opções detalhadas de fechamento / parcelamento -->
-                  <button type="button" onclick="openFinishGame('${m.id}')" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer inline-flex items-center gap-1" title="Outras opções e detalhes de pagamento">
-                    <i class="fa-solid fa-sliders text-slate-500"></i>
-                    <span>Opções</span>
                   </button>
                 </div>
               ` : (st === 'finished' ? `
