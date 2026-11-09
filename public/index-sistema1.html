@@ -3331,8 +3331,15 @@ print(resp.json())</code></pre>
       }
     }
 
-    function fazerLogout() {
-      if (confirm('Deseja realmente sair da área administrativa?')) {
+    async function fazerLogout() {
+      const confirmado = await window.mostrarConfirmacaoArena({
+        titulo: 'Sair do Sistema',
+        mensagem: 'Deseja realmente encerrar a sessão administrativa e sair?',
+        tipo: 'warning',
+        textoConfirmar: 'Sim, Sair',
+        textoCancelar: 'Permanecer'
+      });
+      if (confirmado) {
         localStorage.removeItem('arena_is_admin');
         window.location.href = '/';
       }
@@ -4213,8 +4220,15 @@ function newCourtBlock(courtId = '') {
   });
 }
 
-function deleteCourtBlock(blockId) {
-  if (confirm('Excluir este bloqueio?')) {
+async function deleteCourtBlock(blockId) {
+  const confirmado = await window.mostrarConfirmacaoArena({
+    titulo: 'Excluir Bloqueio',
+    mensagem: 'Deseja realmente remover este bloqueio de horário?',
+    tipo: 'danger',
+    textoConfirmar: 'Sim, Excluir',
+    textoCancelar: 'Cancelar'
+  });
+  if (confirmado) {
     courtState.blocks = courtState.blocks.filter(x => x.id !== blockId);
     persistCourtState();
     if (typeof showAdminToast === 'function') showAdminToast('Bloqueio removido com sucesso!');
@@ -4404,6 +4418,38 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL DE CONFIRMAÇÃO ELEGANTE & MODERNO (PADRÃO ARENA LIMOEIRO)           -->
+<!-- ========================================================================= -->
+<div id="modalConfirmacaoArena" style="display:none;" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col transform transition-all duration-200 scale-100">
+    <div class="p-6 text-center">
+      <!-- Ícone Dinâmico -->
+      <div id="modalConfirmacaoIconWrap" class="w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-50 text-red-600 border border-red-100 shadow-xs">
+        <i id="modalConfirmacaoIcon" data-lucide="alert-triangle" class="w-7 h-7"></i>
+      </div>
+      
+      <h3 id="modalConfirmacaoTitulo" class="text-base font-black text-slate-900 tracking-tight mb-2">
+        Confirmar Ação
+      </h3>
+      
+      <p id="modalConfirmacaoMensagem" class="text-xs text-slate-600 leading-relaxed font-medium">
+        Tem certeza que deseja prosseguir com esta ação?
+      </p>
+    </div>
+
+    <!-- Botões de Ação -->
+    <div class="p-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2.5">
+      <button type="button" id="btnModalConfirmacaoCancelar" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200/90 shadow-2xs transition active:scale-[0.98] cursor-pointer">
+        Cancelar
+      </button>
+      <button type="button" id="btnModalConfirmacaoConfirmar" class="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5">
+        <span>Confirmar</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -5637,6 +5683,78 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(err) {
       console.error('[ArenaPurge] Erro no expurgo:', err);
     }
+  };
+
+  // ============================================================================
+  // 🌟 MODAL DE CONFIRMAÇÃO MODERNO & ELEGANTE (SUBSTITUI CONFIRM NATIVO)
+  // ============================================================================
+  window.mostrarConfirmacaoArena = function(opcoes = {}) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('modalConfirmacaoArena');
+      if (!modal) {
+        // Fallback caso o elemento não exista
+        const fallback = confirm(opcoes.mensagem || 'Deseja confirmar esta ação?');
+        return resolve(fallback);
+      }
+
+      const tituloEl = document.getElementById('modalConfirmacaoTitulo');
+      const msgEl = document.getElementById('modalConfirmacaoMensagem');
+      const btnConfirmar = document.getElementById('btnModalConfirmacaoConfirmar');
+      const btnCancelar = document.getElementById('btnModalConfirmacaoCancelar');
+      const iconWrap = document.getElementById('modalConfirmacaoIconWrap');
+      const iconEl = document.getElementById('modalConfirmacaoIcon');
+
+      // Título e Mensagem
+      if (tituloEl) tituloEl.textContent = opcoes.titulo || 'Confirmar Ação';
+      if (msgEl) msgEl.innerHTML = opcoes.mensagem || 'Tem certeza que deseja prosseguir com esta ação?';
+
+      // Estilo do tipo (danger, warning, success, info)
+      const tipo = opcoes.tipo || 'danger';
+      if (tipo === 'danger') {
+        if (iconWrap) iconWrap.className = 'w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-50 text-red-600 border border-red-100 shadow-xs';
+        if (iconEl) iconEl.setAttribute('data-lucide', 'trash-2');
+        if (btnConfirmar) {
+          btnConfirmar.className = 'w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5';
+          btnConfirmar.innerHTML = `<span>${opcoes.textoConfirmar || 'Excluir'}</span>`;
+        }
+      } else if (tipo === 'warning') {
+        if (iconWrap) iconWrap.className = 'w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-amber-50 text-amber-600 border border-amber-100 shadow-xs';
+        if (iconEl) iconEl.setAttribute('data-lucide', 'alert-circle');
+        if (btnConfirmar) {
+          btnConfirmar.className = 'w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5';
+          btnConfirmar.innerHTML = `<span>${opcoes.textoConfirmar || 'Confirmar'}</span>`;
+        }
+      } else {
+        if (iconWrap) iconWrap.className = 'w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-emerald-50 text-emerald-600 border border-emerald-100 shadow-xs';
+        if (iconEl) iconEl.setAttribute('data-lucide', 'check-circle-2');
+        if (btnConfirmar) {
+          btnConfirmar.className = 'w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5';
+          btnConfirmar.innerHTML = `<span>${opcoes.textoConfirmar || 'Confirmar'}</span>`;
+        }
+      }
+
+      if (btnCancelar) {
+        btnCancelar.textContent = opcoes.textoCancelar || 'Cancelar';
+      }
+
+      if (window.lucide) lucide.createIcons();
+
+      const fechar = (resultado) => {
+        modal.style.display = 'none';
+        btnConfirmar.onclick = null;
+        btnCancelar.onclick = null;
+        modal.onclick = null;
+        resolve(resultado);
+      };
+
+      btnConfirmar.onclick = () => fechar(true);
+      btnCancelar.onclick = () => fechar(false);
+      modal.onclick = (e) => {
+        if (e.target === modal) fechar(false);
+      };
+
+      modal.style.display = 'flex';
+    });
   };
 
   // Toda e qualquer atualização no sistema é enviada em Dual-Write para ambos os bancos (Otimizado de alta performance)
@@ -7439,10 +7557,17 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMovementMatches();
   };
 
-  window.reopenGame = function(id) {
+  window.reopenGame = async function(id) {
     const g = (typeof window.getGame === 'function') ? window.getGame(id) : ((window.adminGameState.bookings || []).find(b => String(b.id) === String(id)));
     if (!g) return;
-    if (!confirm('Deseja reabrir esta partida e torná-la ativa novamente?')) return;
+    const confirmado = await window.mostrarConfirmacaoArena({
+      titulo: 'Reabrir Partida',
+      mensagem: 'Deseja reabrir esta partida e torná-la ativa novamente?',
+      tipo: 'warning',
+      textoConfirmar: 'Sim, Reabrir',
+      textoCancelar: 'Cancelar'
+    });
+    if (!confirmado) return;
     g.status = 'confirmed';
     g.attendance = 'Aguardando chegada';
     g.ballReturned = false;
@@ -7736,7 +7861,14 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   window.disconnectAndRenewWhatsappQr = async function() {
-    if (!confirm('Deseja desconectar o WhatsApp atual para ler um novo QR Code pelo celular da Arena?')) return;
+    const confirmado = await window.mostrarConfirmacaoArena({
+      titulo: 'Desconectar WhatsApp',
+      mensagem: 'Deseja desconectar o WhatsApp atual para ler um novo QR Code pelo celular da Arena?',
+      tipo: 'warning',
+      textoConfirmar: 'Sim, Desconectar',
+      textoCancelar: 'Cancelar'
+    });
+    if (!confirmado) return;
     try {
       await fetch('/api/whatsapp/disconnect', { method: 'POST' });
     } catch(e) {}
@@ -9757,7 +9889,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const monthlyId = document.getElementById('modalGerenciarMonthlyId').value.trim();
     if (!nome) return;
 
-    if (!confirm('Deseja realmente excluir permanentemente o cliente "' + nome + '" e todo o seu histórico no banco de dados?')) return;
+    const confirmado = await window.mostrarConfirmacaoArena({
+      titulo: 'Excluir Cliente',
+      mensagem: `Deseja realmente excluir permanentemente o cliente <strong class="text-slate-900">"${nome}"</strong> e todos os registros vinculados a ele na nuvem?`,
+      tipo: 'danger',
+      textoConfirmar: 'Sim, Excluir',
+      textoCancelar: 'Cancelar'
+    });
+    if (!confirmado) return;
 
     const btnExcluir = document.querySelector('button[onclick="window.handleExcluirClienteModal()"]');
     if (btnExcluir) btnExcluir.disabled = true;
@@ -10798,9 +10937,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  window.deleteMatchPrompt = function(id) {
-    if (!confirm('Deseja realmente cancelar e liberar o horário deste agendamento?')) return;
+  window.deleteMatchPrompt = async function(id) {
     const bookingToDelete = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id)) || { id: id };
+    const nomeCliente = bookingToDelete.customer_name || bookingToDelete.name || 'este agendamento';
+    const confirmado = await window.mostrarConfirmacaoArena({
+      titulo: 'Cancelar Agendamento',
+      mensagem: `Deseja realmente cancelar e liberar o horário de <strong class="text-slate-900">"${nomeCliente}"</strong>?`,
+      tipo: 'danger',
+      textoConfirmar: 'Sim, Cancelar',
+      textoCancelar: 'Manter'
+    });
+    if (!confirmado) return;
     window.adminGameState.bookings = window.adminGameState.bookings.filter(b => String(b.id) !== String(id));
     
 
@@ -11347,9 +11494,18 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // 5. Cancelar Partida
-window.cancelGame = function(id) {
-    if (!confirm('Deseja realmente cancelar esta partida? O cancelamento ficará registrado no histórico.')) return;
+window.cancelGame = async function(id) {
     const g = getGame(id);
+    if (!g) return;
+    const nomeCliente = g.customer_name || g.name || 'esta partida';
+    const confirmado = await window.mostrarConfirmacaoArena({
+      titulo: 'Cancelar Partida',
+      mensagem: `Deseja realmente cancelar a partida de <strong class="text-slate-900">"${nomeCliente}"</strong>? O cancelamento ficará registrado no histórico.`,
+      tipo: 'danger',
+      textoConfirmar: 'Sim, Cancelar',
+      textoCancelar: 'Manter'
+    });
+    if (!confirmado) return;
     if (!g) return;
 
     g.status = 'cancelled';
