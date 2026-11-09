@@ -4316,7 +4316,7 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
           <div>
             <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
-            <input type="tel" id="modalGerenciarTelefone" required placeholder="(81) 98765-4321"
+            <input type="tel" id="modalGerenciarTelefone" required placeholder="(81) 9.9999-9999"
                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
           </div>
           <div>
@@ -4513,7 +4513,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type="text" 
             id="novoClienteTelefone" 
             required 
-            placeholder="(81) 98765-4321" 
+            placeholder="(81) 9.9999-9999" 
             class="w-full px-4 py-2.5 text-sm bg-[#f1f5f9] border border-slate-200/80 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#009e49]/30 focus:border-[#009e49] transition" 
           />
         </div>
@@ -4766,7 +4766,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
-          <input type="tel" id="directBookingPhone" required placeholder="(81) 98765-4321"
+          <input type="tel" id="directBookingPhone" required placeholder="(81) 9.9999-9999"
                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
         </div>
       </div>
@@ -5761,13 +5761,33 @@ document.addEventListener('DOMContentLoaded', () => {
     activeCadastrosSubTab: 'clientes'
   };
 
-  // Helper de formatação de telefone
+  // Máscara e formatação inteligente de telefone/WhatsApp: (81) 9.9999-9999
+  window.aplicarMascaraTelefone = function(v) {
+    let digits = String(v || '').replace(/\D/g, '');
+    if (digits.length > 11) digits = digits.slice(0, 11);
+    if (digits.length === 0) return '';
+    if (digits.length <= 2) return '(' + digits;
+    if (digits.length === 3) return '(' + digits.slice(0, 2) + ') ' + digits.slice(2);
+    if (digits.length <= 6) return '(' + digits.slice(0, 2) + ') ' + digits.slice(2, 3) + '.' + digits.slice(3);
+    if (digits.length <= 10) return '(' + digits.slice(0, 2) + ') ' + digits.slice(2, 3) + '.' + digits.slice(3, 6) + '-' + digits.slice(6);
+    return '(' + digits.slice(0, 2) + ') ' + digits.slice(2, 3) + '.' + digits.slice(3, 7) + '-' + digits.slice(7);
+  };
+
+  // Máscara e formatação de CPF: 000.000.000-00
+  window.aplicarMascaraCPF = function(v) {
+    let digits = String(v || '').replace(/\D/g, '');
+    if (digits.length > 11) digits = digits.slice(0, 11);
+    if (digits.length === 0) return '';
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return digits.slice(0, 3) + '.' + digits.slice(3);
+    if (digits.length <= 9) return digits.slice(0, 3) + '.' + digits.slice(3, 6) + '.' + digits.slice(6);
+    return digits.slice(0, 3) + '.' + digits.slice(3, 6) + '.' + digits.slice(6, 9) + '-' + digits.slice(9);
+  };
+
+  // Helper de formatação de telefone para exibição
   function formatPhone(phone) {
     if (!phone) return '';
-    const clean = String(phone).replace(/\D/g, '');
-    if (clean.length === 11) return '(' + clean.slice(0, 2) + ') ' + clean.slice(2, 7) + '-' + clean.slice(7);
-    if (clean.length === 10) return '(' + clean.slice(0, 2) + ') ' + clean.slice(2, 6) + '-' + clean.slice(6);
-    return phone;
+    return window.aplicarMascaraTelefone(phone);
   }
 
   // Helper de formatação de CPF
@@ -12350,6 +12370,34 @@ const cancelGame = window.cancelGame = async function(id, evt) {
       window.updateMovementCalendarStrip();
     }
   }
+
+  // Máscaras automáticas em tempo real para campos de Telefone e CPF
+  function initInputMasks() {
+    document.addEventListener('input', function(e) {
+      const target = e.target;
+      if (!target || !target.id) return;
+      
+      const phoneIds = ['novoClienteTelefone', 'directBookingPhone', 'modalGerenciarTelefone', 'editMatchPhone', 'whatsappTestOtpPhone'];
+      if (phoneIds.includes(target.id) || target.type === 'tel' || target.getAttribute('data-mask') === 'phone') {
+        const cursor = target.selectionStart;
+        const oldVal = target.value;
+        const newVal = window.aplicarMascaraTelefone(oldVal);
+        if (oldVal !== newVal) {
+          target.value = newVal;
+        }
+      }
+
+      const cpfIds = ['novoClienteCpf', 'modalGerenciarCpf', 'directBookingCpf'];
+      if (cpfIds.includes(target.id) || target.getAttribute('data-mask') === 'cpf') {
+        const oldVal = target.value;
+        const newVal = window.aplicarMascaraCPF(oldVal);
+        if (oldVal !== newVal) {
+          target.value = newVal;
+        }
+      }
+    }, true);
+  }
+  initInputMasks();
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initAdminGames);
