@@ -9325,6 +9325,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.obterListaAgregadaClientes = function() {
     const clientMap = new Map();
 
+    // Mês atual de referência no sistema (ex: '2026-11')
+    const sysDateStr = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08';
+    const mesAtualPrefixo = sysDateStr.substring(0, 7);
+
     // Ler mapa de ajustes manuais de partidas (contratadas por mês e total de partidas registradas)
     let partidasOverrideMap = {};
     try {
@@ -9332,35 +9336,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (savedPartidas) partidasOverrideMap = JSON.parse(savedPartidas);
     } catch(e) {}
 
-    // 1. Clientes com reservas registradas (bookings)
-    (window.adminGameState.bookings || []).forEach(b => {
-      const name = (b.customer_name || b.customerName || '').trim();
-      if (!name) return;
-      const key = name.toLowerCase();
-      if (!clientMap.has(key)) {
-        clientMap.set(key, {
-          id: b.customer_id || ('cust-' + encodeURIComponent(key)),
-          name: name,
-          phone: b.customer_phone || b.customerPhone || '',
-          cpf: b.customer_cpf || b.customerCpf || '',
-          type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Avulso',
-          matches: 0,
-          partidasContratadas: 4,
-          monthlyPrice: null,
-          monthlyDay: '',
-          horarioFixo: '',
-          monthlyId: null,
-          origem: 'booking'
-        });
-      }
-      const c = clientMap.get(key);
-      c.matches++;
-      if (b.booking_type === 'mensalista') c.type = 'Mensalista';
-      if (!c.phone && (b.customer_phone || b.customerPhone)) c.phone = b.customer_phone || b.customerPhone;
-    });
-
-    // 2. Mensalistas com contrato fixo (monthly_members)
+    // 1. Mensalistas com contrato fixo (monthly_members) - base prioritária
     (window.adminGameState.monthlyMembers || []).forEach(m => {
+      if (!m || m.status === 'inactive') return;
       const name = (m.responsible_name || m.team_name || '').trim();
       if (!name) return;
       const key = name.toLowerCase();
@@ -9371,7 +9349,7 @@ document.addEventListener('DOMContentLoaded', () => {
           phone: m.phone || '',
           cpf: m.cpf || '',
           type: 'Mensalista',
-          matches: 4,
+          matches: 0, // Inicia em 0 e contabiliza estritamente as partidas do mês atual
           partidasContratadas: 4,
           monthlyPrice: parseFloat(m.monthly_price || m.monthlyPrice || 0) || 280,
           monthlyDay: m.day_of_week || 'segunda',
@@ -9388,6 +9366,40 @@ document.addEventListener('DOMContentLoaded', () => {
         c.monthlyDay = m.day_of_week || 'segunda';
         c.horarioFixo = (m.day_of_week_label || ('Toda ' + (m.day_of_week || 'semana'))) + ' - ' + (m.start_time || m.time || '18:00') + ' às ' + (m.end_time || '20:00');
         c.monthlyId = m.id;
+      }
+    });
+
+    // 2. Clientes com reservas registradas (bookings) - contabiliza partidas do mês atual
+    (window.adminGameState.bookings || []).forEach(b => {
+      const name = (b.customer_name || b.customerName || '').trim();
+      if (!name) return;
+      const key = name.toLowerCase();
+      
+      // Contabiliza somente partidas do mês atual (do início do mês até a data)
+      const pertenceAoMesAtual = b.date && b.date.startsWith(mesAtualPrefixo);
+
+      if (!clientMap.has(key)) {
+        clientMap.set(key, {
+          id: b.customer_id || ('cust-' + encodeURIComponent(key)),
+          name: name,
+          phone: b.customer_phone || b.customerPhone || '',
+          cpf: b.customer_cpf || b.customerCpf || '',
+          type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Avulso',
+          matches: pertenceAoMesAtual ? 1 : 0,
+          partidasContratadas: 4,
+          monthlyPrice: null,
+          monthlyDay: '',
+          horarioFixo: '',
+          monthlyId: null,
+          origem: 'booking'
+        });
+      } else {
+        const c = clientMap.get(key);
+        if (pertenceAoMesAtual) {
+          c.matches++;
+        }
+        if (b.booking_type === 'mensalista') c.type = 'Mensalista';
+        if (!c.phone && (b.customer_phone || b.customerPhone)) c.phone = b.customer_phone || b.customerPhone;
       }
     });
 
@@ -9419,7 +9431,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    // 4. Aplicar customizações salvas de partidas registradas e partidas contratadas por mês
+    // 4. Aplicar customizações manuais salvas se existirem
     clientMap.forEach((c, key) => {
       if (partidasOverrideMap[key]) {
         if (typeof partidasOverrideMap[key].matches === 'number') {
@@ -9748,17 +9760,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
           } catch(err) {}
         } else if (monthlyId) {
-          // Se foi rebaixado para Avulso, inativa contrato de mensalista
+          // Se o contrato foi cancelado/mudado para Avulso, remove o vínculo de mensalista e exclui as partidas do contrato
           try {
             await fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(monthlyId), {
-              method: 'PATCH',
-              headers: {
-                apikey: dbKey,
-                Authorization: 'Bearer ' + dbKey,
-                'Content-Type': 'application/json',
-                Prefer: 'return=minimal'
-              },
-              body: JSON.stringify({ status: 'inactive' })
+              method: 'DELETE',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+            });
+            await fetch(dbUrl + '/rest/v1/bookings?customer_name=eq.' + encodeURIComponent(nome) + '&booking_type=eq.mensalista', {
+              method: 'DELETE',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
             });
           } catch(err) {}
         }
