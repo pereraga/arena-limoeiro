@@ -674,24 +674,7 @@ const initialMonthlyMembers = [
     "observation": "[CPF: 000.000.000-00] | [Emergência: 8199246308] | [CPF: 000.000.000-00] [Emergência: 8199246308] (Contratado para 1 mês/meses)",
     "created_at": "2026-10-27T19:37:15.853+00:00"
   },
-  {
-    "id": "mensal-1792439794116",
-    "team_name": "Aline",
-    "responsible_name": "Aline",
-    "phone": "8199246308",
-    "customer_id": "cust-1792439793707",
-    "court_id": "court-futsal-1788963178368",
-    "day_of_week": "segunda",
-    "day_of_week_label": "Toda segunda-feira",
-    "time": "18:30",
-    "start_time": "18:30",
-    "end_time": "20:00",
-    "monthly_price": 1600,
-    "status": "active",
-    "start_month": null,
-    "observation": "[CPF: 000.000.000-00] | [Emergência: 8199246308] | [CPF: 000.000.000-00] [Emergência: 8199246308] (Contratado para 6 mês/meses)",
-    "created_at": "2026-10-27T19:37:15.853+00:00"
-  },
+  
   {
     "id": "mensal-1792439823965",
     "team_name": "Aline",
@@ -908,24 +891,7 @@ const initialMonthlyMembers = [
     "observation": "[CPF: 012.506.934-03] | [Emergência: 81998747021] | [CPF: 012.506.934-03] [Emergência: 81998747021] (Contratado para 6 mês/meses)",
     "created_at": "2026-10-27T19:37:15.853+00:00"
   },
-  {
-    "id": "mensal-1793035235873",
-    "team_name": "Zé Luiz",
-    "responsible_name": "Zé Luiz",
-    "phone": "81 9556-2693",
-    "customer_id": "cust-1793035235845",
-    "court_id": "court-futsal-1788963178368",
-    "day_of_week": "segunda",
-    "day_of_week_label": "Toda segunda-feira",
-    "time": "16:00",
-    "start_time": "16:00",
-    "end_time": "18:30",
-    "monthly_price": 1600,
-    "status": "active",
-    "start_month": null,
-    "observation": "[CPF: 000.000.000-00] | [Emergência: 81 9556-2693] | [CPF: 000.000.000-00] [Emergência: 81 9556-2693] (Contratado para 6 mês/meses)",
-    "created_at": "2026-10-27T19:37:15.853+00:00"
-  },
+  
   {
     "id": "mensal-1793035602182",
     "team_name": "Monica",

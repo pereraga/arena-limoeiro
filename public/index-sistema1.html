@@ -8874,7 +8874,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <i class="fa-solid fa-user-slash text-amber-500"></i> Não compareceu
               </button>
 
-              <button type="button" onclick="cancelGame('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
+              <button type="button" onclick="window.cancelGame('${m.id}', event)" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
                 <i class="fa-solid fa-ban text-rose-500"></i> Cancelar partida
               </button>
             </div>
@@ -11998,7 +11998,8 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // 5. Cancelar Partida
-window.cancelGame = async function(id) {
+const cancelGame = window.cancelGame = async function(id, evt) {
+    if (evt && evt.stopPropagation) evt.stopPropagation();
     let g = (typeof getGame === 'function') ? getGame(id) : null;
     if (!g) {
       g = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id));
@@ -12028,6 +12029,27 @@ window.cancelGame = async function(id) {
 
     // 2. Remover da memória local de bookings
     window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => String(b.id) !== targetId);
+
+    // 2.1 Se for um jogo de mensalista (monthly-*), remover do estado em memória e desativar/excluir o contrato
+    if (targetId.startsWith('monthly-')) {
+      const rawMId = targetId.replace('monthly-', '');
+      window.adminGameState.monthlyMembers = (window.adminGameState.monthlyMembers || []).filter(m => String(m.id) !== rawMId);
+      
+      const deleteMonthlyCloud = async (dbUrl, dbKey) => {
+        try {
+          await fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(rawMId), {
+            method: 'DELETE',
+            headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey, Prefer: 'return=minimal' }
+          });
+        } catch(e) {}
+      };
+      if (window.ARENA_CLOUD_DBS) {
+        Promise.allSettled([
+          deleteMonthlyCloud(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+          deleteMonthlyCloud(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+        ]);
+      }
+    }
 
     // 3. Excluir dos Bancos de Dados Supabase DB1 e DB2
     const deleteFromCloud = async (dbUrl, dbKey) => {
