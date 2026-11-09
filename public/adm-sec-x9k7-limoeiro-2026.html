@@ -9750,36 +9750,137 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  // Excluir cliente
+  // Excluir cliente completamente de todos os registros na nuvem e no sistema
   window.handleExcluirClienteModal = async function() {
-    const nome = document.getElementById('modalGerenciarNome').value;
-    const id = document.getElementById('modalGerenciarId').value;
-    if (!confirm('Deseja realmente remover o cliente "' + nome + '"?')) return;
+    const nome = document.getElementById('modalGerenciarNome').value.trim();
+    const id = document.getElementById('modalGerenciarId').value.trim();
+    const monthlyId = document.getElementById('modalGerenciarMonthlyId').value.trim();
+    if (!nome) return;
+
+    if (!confirm('Deseja realmente excluir permanentemente o cliente "' + nome + '" e todo o seu histórico no banco de dados?')) return;
+
+    const btnExcluir = document.querySelector('button[onclick="window.handleExcluirClienteModal()"]');
+    if (btnExcluir) btnExcluir.disabled = true;
 
     try {
-      const deleteDb = async (dbUrl, dbKey) => {
-        if (!id) return;
+      const keyName = nome.toLowerCase();
+
+      // 1. Excluir da tabela `customers` (por id ou por nome se id for gerado dinamicamente)
+      const deleteCustomer = async (dbUrl, dbKey) => {
         try {
-          await fetch(dbUrl + '/rest/v1/customers?id=eq.' + encodeURIComponent(id), {
+          if (id && !id.startsWith('cust-')) {
+            await fetch(dbUrl + '/rest/v1/customers?id=eq.' + encodeURIComponent(id), {
+              method: 'DELETE',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+            });
+          }
+          await fetch(dbUrl + '/rest/v1/customers?name=eq.' + encodeURIComponent(nome), {
             method: 'DELETE',
             headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
           });
-        } catch(e) {}
+        } catch(e) {
+          console.warn('[ArenaCloud] Erro ao deletar de customers:', e);
+        }
       };
 
+      // 2. Excluir de `monthly_members` (por monthlyId ou por responsible_name / team_name)
+      const deleteMonthly = async (dbUrl, dbKey) => {
+        try {
+          if (monthlyId) {
+            await fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(monthlyId), {
+              method: 'DELETE',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+            });
+          }
+          await fetch(dbUrl + '/rest/v1/monthly_members?responsible_name=eq.' + encodeURIComponent(nome), {
+            method: 'DELETE',
+            headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+          });
+          await fetch(dbUrl + '/rest/v1/monthly_members?team_name=eq.' + encodeURIComponent(nome), {
+            method: 'DELETE',
+            headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+          });
+        } catch(e) {
+          console.warn('[ArenaCloud] Erro ao deletar de monthly_members:', e);
+        }
+      };
+
+      // 3. Excluir ou limpar reservas vinculadas desse cliente em `bookings`
+      const deleteBookings = async (dbUrl, dbKey) => {
+        try {
+          await fetch(dbUrl + '/rest/v1/bookings?customer_name=eq.' + encodeURIComponent(nome), {
+            method: 'DELETE',
+            headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+          });
+          if (id && !id.startsWith('cust-')) {
+            await fetch(dbUrl + '/rest/v1/bookings?customer_id=eq.' + encodeURIComponent(id), {
+              method: 'DELETE',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
+            });
+          }
+        } catch(e) {
+          console.warn('[ArenaCloud] Erro ao deletar de bookings:', e);
+        }
+      };
+
+      // Dispara deleção simultânea no DB1 e DB2
       await Promise.allSettled([
-        deleteDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        deleteDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+        deleteCustomer(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        deleteCustomer(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
+        deleteMonthly(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        deleteMonthly(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
+        deleteBookings(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        deleteBookings(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
       ]);
 
-      window.adminGameState.customers = (window.adminGameState.customers || []).filter(c => c.id !== id);
+      // 4. Limpar do estado em memória
+      window.adminGameState.customers = (window.adminGameState.customers || []).filter(c => {
+        const cNome = (c.name || '').trim().toLowerCase();
+        return c.id !== id && cNome !== keyName;
+      });
+
+      window.adminGameState.monthlyMembers = (window.adminGameState.monthlyMembers || []).filter(m => {
+        const mResp = (m.responsible_name || '').trim().toLowerCase();
+        const mTeam = (m.team_name || '').trim().toLowerCase();
+        return m.id !== monthlyId && mResp !== keyName && mTeam !== keyName;
+      });
+
+      window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => {
+        const bName = (b.customer_name || b.name || '').trim().toLowerCase();
+        return bName !== keyName && (!id || b.customer_id !== id);
+      });
+
+      // 5. Limpar configurações e overrides locais desse cliente
+      try {
+        const savedM = localStorage.getItem('arena_mensalidades_status_v1');
+        if (savedM) {
+          const mapM = JSON.parse(savedM);
+          delete mapM[keyName];
+          localStorage.setItem('arena_mensalidades_status_v1', JSON.stringify(mapM));
+        }
+        const savedP = localStorage.getItem('arena_clientes_partidas_v1');
+        if (savedP) {
+          const mapP = JSON.parse(savedP);
+          delete mapP[keyName];
+          localStorage.setItem('arena_clientes_partidas_v1', JSON.stringify(mapP));
+        }
+      } catch(e) {}
+
+      // 6. Atualizar a UI
       window.fecharModalGerenciarCliente();
       window.renderCadastrosClientes();
-      if (typeof window.mostrarToast === 'function') {
-        window.mostrarToast('Cliente removido com sucesso.');
+      if (typeof window.renderMovementMatches === 'function') {
+        window.renderMovementMatches();
       }
-    } catch(e) {
-      alert('Erro ao excluir cliente.');
+
+      if (typeof window.mostrarToast === 'function') {
+        window.mostrarToast('✓ Cliente "' + nome + '" excluído com sucesso do banco de dados na nuvem!');
+      }
+    } catch(err) {
+      console.error('[ArenaCloud] Erro ao excluir cliente:', err);
+      alert('Erro ao excluir cliente. Tente novamente.');
+    } finally {
+      if (btnExcluir) btnExcluir.disabled = false;
     }
   };
 
