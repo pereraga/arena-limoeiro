@@ -6257,7 +6257,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Evita duplicatas se já existe mensalista no mesmo horário e campo, mantendo a data estrita
         const existing = matches.find(m => String(m.id) === String(b.id) || (m.court_id === court.id && m.start_time === startT));
         if (existing) {
-          existing.status = (isPastOrDay3 ? 'finished' : (b.status || existing.status));
+          existing.status = (isPast ? 'finished' : (b.status || existing.status));
           if (b.payment_method) existing.payment_method = b.payment_method;
           if (b.total_price) existing.total_price = b.total_price;
           if (b.ballReturned !== undefined) existing.ballReturned = b.ballReturned;
@@ -6280,7 +6280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             end_time: endT,
             time: b.time || (startT + ' às ' + endT),
             total_price: parseFloat(b.total_price || b.totalPrice || 90),
-            status: (isPastOrDay3 ? 'finished' : (b.status || 'confirmed')),
+            status: (isPast ? 'finished' : (b.status || 'confirmed')),
             isMensalista: b.booking_type === 'mensalista' || (b.id && String(b.id).startsWith('monthly-')),
             booking_type: b.booking_type || 'avulso',
             payment_method: b.payment_method || 'PIX Balcão',
