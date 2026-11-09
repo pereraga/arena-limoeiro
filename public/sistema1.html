@@ -10943,9 +10943,13 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Alterna e define intervalos de horários com precisão pelo calendário
-  window.toggleBalcaoTimeSlot = function(slotTime) {
+  const toggleBalcaoTimeSlot = window.toggleBalcaoTimeSlot = function(slotTime) {
     const startSelect = document.getElementById('directBookingStart');
     const endSelect = document.getElementById('directBookingEnd');
+    const courtSelect = document.getElementById('directBookingCourt');
+    const dateInput = document.getElementById('directBookingDate');
+    const courtId = courtSelect?.value || '';
+    const dateStr = dateInput?.value || window.adminGameState?.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-09');
     if (!startSelect || !endSelect) return;
 
     // Helper: força o valor no select, criando a opção se necessário
@@ -10965,7 +10969,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Validação estrita: Não permite selecionar horário igual ou anterior ao horário atual hoje
     const nowCheck = new Date();
     const curNowMins = nowCheck.getHours() * 60 + nowCheck.getMinutes();
-    const isTodaySelected = (dateStr === (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08')));
+    const sysToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : (window.adminGameState?.selectedDate || '2026-11-09');
+    const isTodaySelected = (dateStr === sysToday);
     if (isTodaySelected && clickedMin <= curNowMins) {
       if (typeof arenaToast === 'function') {
         arenaToast('Horário ' + slotTime + ' indisponível! Selecione um horário adiantado a partir de agora.');
@@ -10974,10 +10979,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     let curStartMin = hasExistingSelection ? parseTimeToMinutes(startSelect.value) : -1;
     let curEndMin = hasExistingSelection ? parseTimeToMinutes(endSelect.value) : -1;
-    const courtSelect = document.getElementById('directBookingCourt');
-    const dateInput = document.getElementById('directBookingDate');
-    const courtId = courtSelect ? courtSelect.value : 'fut7';
-    const dateStr = dateInput ? dateInput.value : (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'));
     const occupiedRanges = window.getBalcaoOccupiedRanges ? window.getBalcaoOccupiedRanges(courtId, dateStr) : [];
 
     // Salva histórico para o botão Voltar Seleção
