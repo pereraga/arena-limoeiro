@@ -4454,10 +4454,11 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- ========================================================================= -->
-<!-- MODAL DE CADASTRO DE NOVO CLIENTE (PADRÃO ARENA)                         -->
+<!-- MODAL DE CADASTRO DE NOVO CLIENTE (PADRÃO ARENA LIMOEIRO)                 -->
 <!-- ========================================================================= -->
-<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-  <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+  <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[94vh]">
+    <!-- Header -->
     <div class="bg-[#042f1e] text-white p-5 flex items-center justify-between">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-[#00d672] font-black">
@@ -4473,12 +4474,14 @@ document.addEventListener('DOMContentLoaded', () => {
       </button>
     </div>
 
-    <form onsubmit="window.handleCadastrarNovoCliente(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto">
+    <!-- Form -->
+    <form onsubmit="window.handleCadastrarNovoCliente(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs">
       <div>
         <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
         <input type="text" id="novoClienteNome" required placeholder="Ex.: Lucas Mendes"
                class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
       </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
@@ -4491,15 +4494,133 @@ document.addEventListener('DOMContentLoaded', () => {
                  class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
         </div>
       </div>
+
+      <!-- SELEÇÃO DE CATEGORIA INICIAL COM BOTÕES EM CARD (AVULSO / FIXO) -->
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoria Inicial</label>
-        <select id="novoClienteCategoria"
-                class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-          <option value="Avulso">Avulso (Cliente Casual)</option>
-          <option value="Mensalista">Mensalista (Horário Fixo)</option>
-        </select>
+        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Categoria Inicial</label>
+        <div class="bg-slate-100/80 p-1.5 rounded-2xl flex items-center gap-1.5 border border-slate-200/60">
+          <button type="button" id="btnNovoCatAvulso" onclick="window.selecionarCategoriaNovoCliente('Avulso')"
+                  class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-emerald-800 border-2 border-emerald-600 shadow-xs">
+            <i data-lucide="user" class="w-4 h-4 text-emerald-600"></i>
+            <span>Avulso</span>
+          </button>
+          <button type="button" id="btnNovoCatFixo" onclick="window.selecionarCategoriaNovoCliente('Mensalista')"
+                  class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-500 hover:text-slate-800 border-2 border-transparent">
+            <i data-lucide="crown" class="w-4 h-4 text-slate-400"></i>
+            <span>Fixo</span>
+          </button>
+        </div>
+        <input type="hidden" id="novoClienteCategoria" value="Avulso">
       </div>
 
+      <!-- ================================================================= -->
+      <!-- PAINEL 1: PERFIL & CONTROLE DO CLIENTE CASUAL (AVULSO)             -->
+      <!-- ================================================================= -->
+      <div id="boxNovoClienteAvulso" class="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl space-y-3.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+            <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i>
+            Perfil & Controle do Cliente Casual
+          </span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 tracking-wider">
+            SEM MENSALIDADE
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Modalidade Preferida</label>
+            <select id="novoClienteModalidade"
+                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
+              <option value="society" selected>Society / Fut7</option>
+              <option value="fut5">FUT 5 – Soccer 5</option>
+              <option value="fut6">FUT 6 – Soccer 6</option>
+              <option value="areia">Beach Sports / Areia</option>
+              <option value="futmesa">Foot Table / Futmesa</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Observação (Opcional)</label>
+            <input type="text" id="novoClienteObsAvulso" placeholder="Ex.: Goleiro para chamar r..."
+                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          </div>
+        </div>
+      </div>
+
+      <!-- ================================================================= -->
+      <!-- PAINEL 2: CONFIGURAÇÃO DO CONTRATO FIXO (PLANO MENSAL)            -->
+      <!-- ================================================================= -->
+      <div id="boxNovoClienteMensalista" class="hidden p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-3.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+            <i data-lucide="calendar" class="w-4 h-4 text-purple-600"></i>
+            Configuração do Contrato Fixo
+          </span>
+          <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 tracking-wider">
+            PLANO MENSAL
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Dia da Semana *</label>
+            <select id="novoClienteDiaSemana"
+                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
+              <option value="segunda" selected>Segunda-feira</option>
+              <option value="terca">Terça-feira</option>
+              <option value="quarta">Quarta-feira</option>
+              <option value="quinta">Quinta-feira</option>
+              <option value="sexta">Sexta-feira</option>
+              <option value="sabado">Sábado</option>
+              <option value="domingo">Domingo</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Horário Fixo *</label>
+            <div class="relative">
+              <i data-lucide="clock" class="w-4 h-4 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input type="time" id="novoClienteHorarioFixo" value="19:00"
+                     class="w-full pl-9 pr-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-purple-950 mb-1">Campo / Quadra Fixa</label>
+          <select id="novoClienteQuadra"
+                  class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
+            <option value="Campo Society 01" selected>Campo Society 01</option>
+            <option value="Campo Society 02">Campo Society 02</option>
+            <option value="Campo Society Fut 7">Campo Society Fut 7</option>
+            <option value="Quadra de Areia">Quadra de Areia (Beach Sports)</option>
+            <option value="Mesa de Futmesa">Mesa de Futmesa</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Valor da Mensalidade (R$) *</label>
+            <input type="number" id="novoClienteValorMensal" step="0.01" value="280.00" placeholder="280,00"
+                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Data do 1º Vencimento *</label>
+            <input type="date" id="novoClienteVencimento"
+                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-purple-950 mb-1">Situação do Pagamento Inicial</label>
+          <select id="novoClienteSituacaoPagamento"
+                  class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
+            <option value="pendente" selected>Pendente (Cobrar no dia do jogo)</option>
+            <option value="pago">Pago / Em dia (Lançar entrada no caixa)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Botões de Ação -->
       <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
         <button type="button" onclick="window.fecharModalNovoCliente()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
           Cancelar
@@ -10036,62 +10157,183 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   // CONTROLADOR DO MODAL DE NOVO CLIENTE
   // =========================================================================
+  window.selecionarCategoriaNovoCliente = function(cat) {
+    const inputCat = document.getElementById('novoClienteCategoria');
+    const btnAvulso = document.getElementById('btnNovoCatAvulso');
+    const btnFixo = document.getElementById('btnNovoCatFixo');
+    const boxAvulso = document.getElementById('boxNovoClienteAvulso');
+    const boxMensalista = document.getElementById('boxNovoClienteMensalista');
+
+    if (inputCat) inputCat.value = cat;
+
+    if (cat === 'Mensalista') {
+      if (btnFixo) {
+        btnFixo.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-purple-900 border-2 border-purple-600 shadow-xs';
+        const ic = btnFixo.querySelector('i');
+        if (ic) ic.className = 'w-4 h-4 text-purple-600';
+      }
+      if (btnAvulso) {
+        btnAvulso.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-500 hover:text-slate-800 border-2 border-transparent';
+        const ic = btnAvulso.querySelector('i');
+        if (ic) ic.className = 'w-4 h-4 text-slate-400';
+      }
+      if (boxAvulso) boxAvulso.classList.add('hidden');
+      if (boxMensalista) boxMensalista.classList.remove('hidden');
+    } else {
+      if (btnAvulso) {
+        btnAvulso.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-emerald-800 border-2 border-emerald-600 shadow-xs';
+        const ic = btnAvulso.querySelector('i');
+        if (ic) ic.className = 'w-4 h-4 text-emerald-600';
+      }
+      if (btnFixo) {
+        btnFixo.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-500 hover:text-slate-800 border-2 border-transparent';
+        const ic = btnFixo.querySelector('i');
+        if (ic) ic.className = 'w-4 h-4 text-slate-400';
+      }
+      if (boxAvulso) boxAvulso.classList.remove('hidden');
+      if (boxMensalista) boxMensalista.classList.add('hidden');
+    }
+
+    if (window.lucide) lucide.createIcons();
+  };
+
   window.abrirModalNovoCliente = function() {
     const modal = document.getElementById('modalNovoClienteArena');
     if (!modal) return;
     document.getElementById('novoClienteNome').value = '';
     document.getElementById('novoClienteTelefone').value = '';
     document.getElementById('novoClienteCpf').value = '';
-    document.getElementById('novoClienteCategoria').value = 'Avulso';
+
+    const inVenc = document.getElementById('novoClienteVencimento');
+    if (inVenc) inVenc.value = '2026-12-09';
+
+    window.selecionarCategoriaNovoCliente('Avulso');
+
     modal.style.display = 'flex';
     if (window.lucide) lucide.createIcons();
   };
 
   window.fecharModalNovoCliente = function() {
     const modal = document.getElementById('modalNovoClienteArena');
-    if (modal) modal.style.display = 'none';
+    if (!modal) return;
+    modal.style.display = 'none';
   };
 
   window.handleCadastrarNovoCliente = async function(e) {
     e.preventDefault();
-    const nome = document.getElementById('novoClienteNome').value.trim();
-    const telefone = document.getElementById('novoClienteTelefone').value.trim();
-    const cpf = document.getElementById('novoClienteCpf').value.trim();
-    const categoria = document.getElementById('novoClienteCategoria').value;
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = true;
 
-    const newCust = {
-      id: 'cust-' + Date.now(),
-      name: nome,
-      phone: telefone,
-      document: cpf,
-      notes: 'Cadastrado via Painel Administrativo em ' + new Date().toLocaleDateString('pt-BR')
-    };
+    try {
+      const nome = document.getElementById('novoClienteNome').value.trim();
+      const telefone = document.getElementById('novoClienteTelefone').value.trim();
+      const cpf = document.getElementById('novoClienteCpf').value.trim();
+      const categoria = document.getElementById('novoClienteCategoria').value;
+      const custId = 'cust-' + Date.now();
 
-    const insertDb = async (dbUrl, dbKey) => {
-      try {
-        await fetch(dbUrl + '/rest/v1/customers', {
-          method: 'POST',
-          headers: {
-            apikey: dbKey,
-            Authorization: 'Bearer ' + dbKey,
-            'Content-Type': 'application/json',
-            Prefer: 'return=minimal'
-          },
-          body: JSON.stringify(newCust)
-        });
-      } catch(err) {}
-    };
+      let observacao = '';
+      if (categoria === 'Avulso') {
+        const mod = document.getElementById('novoClienteModalidade')?.value || 'society';
+        const obs = document.getElementById('novoClienteObsAvulso')?.value.trim() || '';
+        observacao = '[Modalidade: ' + mod + ']' + (obs ? (' | ' + obs) : '');
+      } else {
+        const quadra = document.getElementById('novoClienteQuadra')?.value || 'Campo Society 01';
+        const horario = document.getElementById('novoClienteHorarioFixo')?.value || '19:00';
+        observacao = '[Horário Fixo: ' + quadra + ' às ' + horario + ']';
+      }
 
-    await Promise.allSettled([
-      insertDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-      insertDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
-    ]);
+      const newCust = {
+        id: custId,
+        name: nome,
+        phone: telefone,
+        document: cpf,
+        notes: observacao || ('Cadastrado via Painel Administrativo em ' + new Date().toLocaleDateString('pt-BR'))
+      };
 
-    window.adminGameState.customers.unshift(newCust);
-    window.fecharModalNovoCliente();
-    window.renderCadastrosClientes();
-    if (typeof window.mostrarToast === 'function') {
-      window.mostrarToast('✓ Novo cliente "' + nome + '" cadastrado com sucesso!');
+      const insertCustomerDb = async (dbUrl, dbKey) => {
+        try {
+          await fetch(dbUrl + '/rest/v1/customers', {
+            method: 'POST',
+            headers: {
+              apikey: dbKey,
+              Authorization: 'Bearer ' + dbKey,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal'
+            },
+            body: JSON.stringify(newCust)
+          });
+        } catch(err) {}
+      };
+
+      let monthlyPayload = null;
+      if (categoria === 'Mensalista') {
+        const diaSemana = document.getElementById('novoClienteDiaSemana')?.value || 'segunda';
+        const horarioFixo = document.getElementById('novoClienteHorarioFixo')?.value || '19:00';
+        const quadra = document.getElementById('novoClienteQuadra')?.value || 'Campo Society 01';
+        const valorMensal = parseFloat(document.getElementById('novoClienteValorMensal')?.value) || 280;
+        const dataVencimento = document.getElementById('novoClienteVencimento')?.value || '2026-12-09';
+        const statusPag = document.getElementById('novoClienteSituacaoPagamento')?.value || 'pendente';
+        const mId = 'mensal-' + Date.now();
+
+        monthlyPayload = {
+          id: mId,
+          customer_id: custId,
+          responsible_name: nome,
+          team_name: nome,
+          phone: telefone,
+          monthly_price: valorMensal,
+          day_of_week: diaSemana,
+          day_of_week_label: 'Toda ' + diaSemana + '-feira',
+          time: horarioFixo,
+          start_time: horarioFixo,
+          end_time: (horarioFixo.includes(':') ? String(Number(horarioFixo.split(':')[0]) + 1).padStart(2, '0') + ':' + horarioFixo.split(':')[1] : '20:00'),
+          status: 'active',
+          observation: '[' + quadra + '] | [CPF: ' + (cpf || 'Não informado') + ']'
+        };
+
+        if (typeof window.salvarStatusMensalidadeCliente === 'function') {
+          window.salvarStatusMensalidadeCliente(nome, statusPag, valorMensal, dataVencimento);
+        }
+      }
+
+      const insertMonthlyDb = async (dbUrl, dbKey) => {
+        if (!monthlyPayload) return;
+        try {
+          await fetch(dbUrl + '/rest/v1/monthly_members', {
+            method: 'POST',
+            headers: {
+              apikey: dbKey,
+              Authorization: 'Bearer ' + dbKey,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal'
+            },
+            body: JSON.stringify(monthlyPayload)
+          });
+        } catch(err) {}
+      };
+
+      await Promise.allSettled([
+        insertCustomerDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        insertCustomerDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
+        insertMonthlyDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        insertMonthlyDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+      ]);
+
+      window.adminGameState.customers.unshift(newCust);
+      if (monthlyPayload) {
+        window.adminGameState.monthlyMembers.unshift(monthlyPayload);
+      }
+
+      window.fecharModalNovoCliente();
+      window.renderCadastrosClientes();
+      if (typeof window.mostrarToast === 'function') {
+        window.mostrarToast('✓ Novo cliente "' + nome + '" cadastrado com sucesso!');
+      }
+    } catch(err) {
+      console.error('[ArenaCloud] Erro ao cadastrar novo cliente:', err);
+      alert('Erro ao salvar novo cliente.');
+    } finally {
+      if (btn) btn.disabled = false;
     }
   };
 
