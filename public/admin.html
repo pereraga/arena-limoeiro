@@ -4456,57 +4456,57 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- ========================================================================= -->
 <!-- MODAL DE CADASTRO DE NOVO CLIENTE (PADRÃO ARENA LIMOEIRO)                 -->
 <!-- ========================================================================= -->
-<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-  <div class="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[94vh]">
+<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
+  <div class="bg-white rounded-3xl max-w-[520px] w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[95vh]">
     <!-- Header -->
-    <div class="bg-[#042f1e] text-white p-5 flex items-center justify-between">
+    <div class="bg-[#042f1e] text-white px-6 py-4 flex items-center justify-between border-b border-emerald-950/40">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-[#00d672] font-black">
           <i data-lucide="user-plus" class="w-5 h-5"></i>
         </div>
         <div>
-          <h3 class="text-base font-black tracking-tight uppercase text-white">Novo Cliente</h3>
+          <h3 class="text-base font-bold tracking-tight text-white">Cadastrar Novo Cliente</h3>
           <p class="text-xs text-emerald-300 font-medium">Cadastre um atleta ou mensalista na nuvem</p>
         </div>
       </div>
-      <button type="button" onclick="window.fecharModalNovoCliente()" class="text-emerald-300 hover:text-white p-1 cursor-pointer">
+      <button type="button" onclick="window.fecharModalNovoCliente()" class="text-emerald-300 hover:text-white p-1 rounded-lg transition cursor-pointer">
         <i data-lucide="x" class="w-6 h-6"></i>
       </button>
     </div>
 
-    <!-- Form -->
+    <!-- Form Body -->
     <form onsubmit="window.handleCadastrarNovoCliente(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs">
       <div>
-        <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nome Completo *</label>
-        <input type="text" id="novoClienteNome" required placeholder="Ex.: Lucas Mendes"
-               class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+        <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Completo *</label>
+        <input type="text" id="novoClienteNome" required placeholder="Ex: Rafael Souza"
+               class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:outline-none transition">
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp / Telefone *</label>
-          <input type="tel" id="novoClienteTelefone" required placeholder="(81) 98765-4321"
-                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Telefone / WhatsApp *</label>
+          <input type="tel" id="novoClienteTelefone" required placeholder="(81) 99999-9999"
+                 class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:outline-none transition">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">CPF (Opcional)</label>
-          <input type="text" id="novoClienteCpf" placeholder="000.000.000-00"
-                 class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">CPF (Opcional)</label>
+          <input type="text" id="novoClienteCpf" placeholder="Não informado"
+                 class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:outline-none transition">
         </div>
       </div>
 
-      <!-- SELEÇÃO DE CATEGORIA INICIAL COM BOTÕES EM CARD (AVULSO / FIXO) -->
+      <!-- SELEÇÃO DE CATEGORIA INICIAL -->
       <div>
-        <label class="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Categoria Inicial</label>
-        <div class="bg-slate-100/80 p-1.5 rounded-2xl flex items-center gap-1.5 border border-slate-200/60">
+        <label class="block text-[11px] font-bold text-slate-800 tracking-wider uppercase mb-1.5">CATEGORIA INICIAL</label>
+        <div class="bg-[#f0f4f8] p-1.5 rounded-2xl flex items-center gap-2 border border-slate-200/80">
           <button type="button" id="btnNovoCatAvulso" onclick="window.selecionarCategoriaNovoCliente('Avulso')"
-                  class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-emerald-800 border-2 border-emerald-600 shadow-xs">
+                  class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-emerald-800 border-2 border-emerald-600 shadow-xs">
             <i data-lucide="user" class="w-4 h-4 text-emerald-600"></i>
             <span>Avulso</span>
           </button>
           <button type="button" id="btnNovoCatFixo" onclick="window.selecionarCategoriaNovoCliente('Mensalista')"
-                  class="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-500 hover:text-slate-800 border-2 border-transparent">
-            <i data-lucide="crown" class="w-4 h-4 text-slate-400"></i>
+                  class="flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-600 hover:text-slate-900 border-2 border-transparent">
+            <i data-lucide="crown" class="w-4 h-4 text-slate-500"></i>
             <span>Fixo</span>
           </button>
         </div>
@@ -4516,33 +4516,36 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- ================================================================= -->
       <!-- PAINEL 1: PERFIL & CONTROLE DO CLIENTE CASUAL (AVULSO)             -->
       <!-- ================================================================= -->
-      <div id="boxNovoClienteAvulso" class="p-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl space-y-3.5">
+      <div id="boxNovoClienteAvulso" class="p-4 bg-[#f8fafc] border border-slate-200/90 rounded-2xl space-y-3.5">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
             <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i>
             Perfil & Controle do Cliente Casual
           </span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 tracking-wider">
+          <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-200/90 text-slate-700 tracking-wider">
             SEM MENSALIDADE
           </span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Modalidade Preferida</label>
-            <select id="novoClienteModalidade"
-                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-              <option value="society" selected>Society / Fut7</option>
-              <option value="fut5">FUT 5 – Soccer 5</option>
-              <option value="fut6">FUT 6 – Soccer 6</option>
-              <option value="areia">Beach Sports / Areia</option>
-              <option value="futmesa">Foot Table / Futmesa</option>
-            </select>
+            <label class="block text-xs font-semibold text-slate-800 mb-1">Modalidade Preferida</label>
+            <div class="relative">
+              <select id="novoClienteModalidade"
+                      class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer pr-8">
+                <option value="society" selected>Society / Fut7</option>
+                <option value="fut5">FUT 5 – Soccer 5</option>
+                <option value="fut6">FUT 6 – Soccer 6</option>
+                <option value="areia">Beach Sports / Areia</option>
+                <option value="futmesa">Foot Table / Futmesa</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Observação (Opcional)</label>
+            <label class="block text-xs font-semibold text-slate-800 mb-1">Observação (Opcional)</label>
             <input type="text" id="novoClienteObsAvulso" placeholder="Ex.: Goleiro para chamar r..."
-                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+                   class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
           </div>
         </div>
       </div>
@@ -4550,7 +4553,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <!-- ================================================================= -->
       <!-- PAINEL 2: CONFIGURAÇÃO DO CONTRATO FIXO (PLANO MENSAL)            -->
       <!-- ================================================================= -->
-      <div id="boxNovoClienteMensalista" class="hidden p-4 bg-purple-50/70 border border-purple-200/80 rounded-2xl space-y-3.5">
+      <div id="boxNovoClienteMensalista" class="hidden p-4 bg-[#faf5ff] border border-purple-200 rounded-2xl space-y-3.5">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
             <i data-lucide="calendar" class="w-4 h-4 text-purple-600"></i>
@@ -4564,68 +4567,77 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-purple-950 mb-1">Dia da Semana *</label>
-            <select id="novoClienteDiaSemana"
-                    class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
-              <option value="segunda" selected>Segunda-feira</option>
-              <option value="terca">Terça-feira</option>
-              <option value="quarta">Quarta-feira</option>
-              <option value="quinta">Quinta-feira</option>
-              <option value="sexta">Sexta-feira</option>
-              <option value="sabado">Sábado</option>
-              <option value="domingo">Domingo</option>
-            </select>
+            <div class="relative">
+              <select id="novoClienteDiaSemana"
+                      class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer pr-8">
+                <option value="segunda" selected>Segunda-feira</option>
+                <option value="terca">Terça-feira</option>
+                <option value="quarta">Quarta-feira</option>
+                <option value="quinta">Quinta-feira</option>
+                <option value="sexta">Sexta-feira</option>
+                <option value="sabado">Sábado</option>
+                <option value="domingo">Domingo</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
           <div>
             <label class="block text-xs font-semibold text-purple-950 mb-1">Horário Fixo *</label>
             <div class="relative">
-              <i data-lucide="clock" class="w-4 h-4 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <i data-lucide="clock" class="w-4 h-4 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               <input type="time" id="novoClienteHorarioFixo" value="19:00"
-                     class="w-full pl-9 pr-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                     class="w-full pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
             </div>
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-purple-950 mb-1">Campo / Quadra Fixa</label>
-          <select id="novoClienteQuadra"
-                  class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
-            <option value="Campo Society 01" selected>Campo Society 01</option>
-            <option value="Campo Society 02">Campo Society 02</option>
-            <option value="Campo Society Fut 7">Campo Society Fut 7</option>
-            <option value="Quadra de Areia">Quadra de Areia (Beach Sports)</option>
-            <option value="Mesa de Futmesa">Mesa de Futmesa</option>
-          </select>
+          <div class="relative">
+            <select id="novoClienteQuadra"
+                    class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer pr-8">
+              <option value="Campo Society 01" selected>Campo Society 01</option>
+              <option value="Campo Society 02">Campo Society 02</option>
+              <option value="Campo Society Fut 7">Campo Society Fut 7</option>
+              <option value="Quadra de Areia">Quadra de Areia (Beach Sports)</option>
+              <option value="Mesa de Futmesa">Mesa de Futmesa</option>
+            </select>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-purple-950 mb-1">Valor da Mensalidade (R$) *</label>
             <input type="number" id="novoClienteValorMensal" step="0.01" value="280.00" placeholder="280,00"
-                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                   class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
           </div>
           <div>
             <label class="block text-xs font-semibold text-purple-950 mb-1">Data do 1º Vencimento *</label>
             <input type="date" id="novoClienteVencimento"
-                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                   class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
           </div>
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-purple-950 mb-1">Situação do Pagamento Inicial</label>
-          <select id="novoClienteSituacaoPagamento"
-                  class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
-            <option value="pendente" selected>Pendente (Cobrar no dia do jogo)</option>
-            <option value="pago">Pago / Em dia (Lançar entrada no caixa)</option>
-          </select>
+          <div class="relative">
+            <select id="novoClienteSituacaoPagamento"
+                    class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer pr-8">
+              <option value="pendente" selected>Pendente (Cobrar no dia do jogo)</option>
+              <option value="pago">Pago / Em dia (Lançar entrada no caixa)</option>
+            </select>
+            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+          </div>
         </div>
       </div>
 
       <!-- Botões de Ação -->
-      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-        <button type="button" onclick="window.fecharModalNovoCliente()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+        <button type="button" onclick="window.fecharModalNovoCliente()" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
           Cancelar
         </button>
-        <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-[#00a859] hover:bg-[#008f4c] rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5">
+        <button type="submit" class="px-5 py-2.5 text-xs font-semibold text-white bg-[#00a859] hover:bg-[#008f4c] rounded-xl shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
           <i data-lucide="user-check" class="w-4 h-4"></i>
           <span>Cadastrar Cliente</span>
         </button>
@@ -4633,7 +4645,6 @@ document.addEventListener('DOMContentLoaded', () => {
     </form>
   </div>
 </div>
-
 <!-- ========================================================================= -->
 <!-- MODAL: NOVA RESERVA BALCÃO (DIRETA E SINCRONIZADA EM TODAS AS PLATAFORMAS) -->
 <!-- ========================================================================= -->
@@ -10168,27 +10179,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (cat === 'Mensalista') {
       if (btnFixo) {
-        btnFixo.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-purple-900 border-2 border-purple-600 shadow-xs';
+        btnFixo.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#7e22ce] border-2 border-[#9333ea] shadow-xs';
         const ic = btnFixo.querySelector('i');
-        if (ic) ic.className = 'w-4 h-4 text-purple-600';
+        if (ic) ic.className = 'w-4 h-4 text-[#9333ea]';
       }
       if (btnAvulso) {
-        btnAvulso.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-500 hover:text-slate-800 border-2 border-transparent';
+        btnAvulso.className = 'flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-600 hover:text-slate-900 border-2 border-transparent';
         const ic = btnAvulso.querySelector('i');
-        if (ic) ic.className = 'w-4 h-4 text-slate-400';
+        if (ic) ic.className = 'w-4 h-4 text-slate-500';
       }
       if (boxAvulso) boxAvulso.classList.add('hidden');
       if (boxMensalista) boxMensalista.classList.remove('hidden');
     } else {
       if (btnAvulso) {
-        btnAvulso.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-emerald-800 border-2 border-emerald-600 shadow-xs';
+        btnAvulso.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#042f1e] border-2 border-[#00a859] shadow-xs';
         const ic = btnAvulso.querySelector('i');
-        if (ic) ic.className = 'w-4 h-4 text-emerald-600';
+        if (ic) ic.className = 'w-4 h-4 text-[#00a859]';
       }
       if (btnFixo) {
-        btnFixo.className = 'flex-1 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-500 hover:text-slate-800 border-2 border-transparent';
+        btnFixo.className = 'flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-600 hover:text-slate-900 border-2 border-transparent';
         const ic = btnFixo.querySelector('i');
-        if (ic) ic.className = 'w-4 h-4 text-slate-400';
+        if (ic) ic.className = 'w-4 h-4 text-slate-500';
       }
       if (boxAvulso) boxAvulso.classList.remove('hidden');
       if (boxMensalista) boxMensalista.classList.add('hidden');
