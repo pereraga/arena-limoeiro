@@ -4298,9 +4298,10 @@ document.addEventListener('DOMContentLoaded', () => {
                    class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Partidas Realizadas</label>
-            <input type="number" id="modalGerenciarPartidas" readonly disabled
-                   class="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 cursor-not-allowed">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Partidas Registradas</label>
+            <input type="number" id="modalGerenciarPartidas" min="0" max="999"
+                   class="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <span class="text-[10px] text-slate-400">Total de partidas registradas no histórico</span>
           </div>
         </div>
       </div>
@@ -4345,9 +4346,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <label class="block text-xs font-semibold text-purple-950 mb-1">Status do Pagamento</label>
             <select id="modalGerenciarStatusPagamento" onchange="window.atualizarVisualStatusMensalidadeModal()"
                     class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer">
-              <option value="pago">Em dia (Pago)</option>
               <option value="pendente">Pendente (Aguardando Pagamento)</option>
+              <option value="pago">Em dia (Pago)</option>
             </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-purple-950 mb-1">Partidas no Mês (Contrato)</label>
+            <input type="number" id="modalGerenciarPartidasContratadas" min="1" max="31" value="4" placeholder="4"
+                   class="w-full px-3 py-2 text-xs font-bold bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
           </div>
           <div>
             <label class="block text-xs font-semibold text-purple-950 mb-1">Dia da Semana Fixo</label>
@@ -9128,16 +9134,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const temPago = bookings.some(b => b.status === 'finished' || b.payment_status === 'pago');
     const temPendente = bookings.some(b => b.status === 'unpaid' || b.payment_status === 'pagamento_faltando');
 
-    // Casos padrão conforme a demonstração Arena Limoeiro
-    let statusPadrao = 'pago';
-    let dataPadraoISO = '2026-12-05';
+    // Casos padrão conforme a solicitação: todos os mensalistas iniciam como PENDENTE por padrão
+    let statusPadrao = 'pendente';
+    let dataPadraoISO = '2026-11-08';
 
-    if (key.includes('jaj') || key.includes('monica')) {
-      statusPadrao = 'pendente';
-      dataPadraoISO = key.includes('jaj') ? '2026-11-05' : '2026-11-08';
-    } else if (temPendente && !temPago) {
-      statusPadrao = 'pendente';
-      dataPadraoISO = '2026-11-08';
+    if (key.includes('jaj')) {
+      dataPadraoISO = '2026-11-05';
     } else if (key.includes('waldesio')) {
       dataPadraoISO = '2026-11-10';
     } else if (key.includes('diego')) {
@@ -9150,6 +9152,11 @@ document.addEventListener('DOMContentLoaded', () => {
       dataPadraoISO = '2026-11-12';
     } else if (key.includes('luiz')) {
       dataPadraoISO = '2026-11-18';
+    } else if (key.includes('monica')) {
+      dataPadraoISO = '2026-11-08';
+    } else if (temPago && !temPendente) {
+      statusPadrao = 'pago';
+      dataPadraoISO = '2026-12-05';
     }
 
     const [py, pm, pd] = dataPadraoISO.split('-');
@@ -9186,6 +9193,13 @@ document.addEventListener('DOMContentLoaded', () => {
   window.obterListaAgregadaClientes = function() {
     const clientMap = new Map();
 
+    // Ler mapa de ajustes manuais de partidas (contratadas por mês e total de partidas registradas)
+    let partidasOverrideMap = {};
+    try {
+      const savedPartidas = localStorage.getItem('arena_clientes_partidas_v1');
+      if (savedPartidas) partidasOverrideMap = JSON.parse(savedPartidas);
+    } catch(e) {}
+
     // 1. Clientes com reservas registradas (bookings)
     (window.adminGameState.bookings || []).forEach(b => {
       const name = (b.customer_name || b.customerName || '').trim();
@@ -9199,6 +9213,7 @@ document.addEventListener('DOMContentLoaded', () => {
           cpf: b.customer_cpf || b.customerCpf || '',
           type: b.booking_type === 'mensalista' ? 'Mensalista' : 'Avulso',
           matches: 0,
+          partidasContratadas: 4,
           monthlyPrice: null,
           monthlyDay: '',
           horarioFixo: '',
@@ -9225,6 +9240,7 @@ document.addEventListener('DOMContentLoaded', () => {
           cpf: m.cpf || '',
           type: 'Mensalista',
           matches: 4,
+          partidasContratadas: 4,
           monthlyPrice: parseFloat(m.monthly_price || m.monthlyPrice || 0) || 280,
           monthlyDay: m.day_of_week || 'segunda',
           horarioFixo: (m.day_of_week_label || ('Toda ' + (m.day_of_week || 'semana'))) + ' - ' + (m.start_time || m.time || '18:00') + ' às ' + (m.end_time || '20:00'),
@@ -9256,6 +9272,7 @@ document.addEventListener('DOMContentLoaded', () => {
           cpf: cust.document || '',
           type: 'Avulso',
           matches: 0,
+          partidasContratadas: 4,
           monthlyPrice: null,
           monthlyDay: '',
           horarioFixo: '',
@@ -9267,6 +9284,18 @@ document.addEventListener('DOMContentLoaded', () => {
         c.id = cust.id;
         if (cust.document && !c.cpf) c.cpf = cust.document;
         if (cust.phone && !c.phone) c.phone = cust.phone;
+      }
+    });
+
+    // 4. Aplicar customizações salvas de partidas registradas e partidas contratadas por mês
+    clientMap.forEach((c, key) => {
+      if (partidasOverrideMap[key]) {
+        if (typeof partidasOverrideMap[key].matches === 'number') {
+          c.matches = partidasOverrideMap[key].matches;
+        }
+        if (typeof partidasOverrideMap[key].partidasContratadas === 'number') {
+          c.partidasContratadas = partidasOverrideMap[key].partidasContratadas;
+        }
       }
     });
 
@@ -9404,7 +9433,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ${colunaStatus}
           </td>
           <td class="py-3.5 px-4 font-bold text-slate-900">
-            ${c.matches} ${c.matches === 1 ? 'partida' : 'partidas'}
+            <div>${c.matches} ${c.matches === 1 ? 'partida' : 'partidas'}</div>
+            ${isMensalista ? `<div class="text-[10px] text-purple-700 font-semibold mt-0.5">${c.partidasContratadas || 4} no mês</div>` : ''}
           </td>
           <td class="py-3.5 px-4 text-right">
             <button type="button" onclick="window.abrirModalGerenciarCliente('${safeName}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-[#042f1e] text-slate-700 hover:text-white border border-slate-200/80 hover:border-[#042f1e] transition cursor-pointer">
@@ -9439,6 +9469,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('modalGerenciarTelefone').value = cliente.phone;
     document.getElementById('modalGerenciarCpf').value = cliente.cpf || '';
     document.getElementById('modalGerenciarPartidas').value = cliente.matches;
+    const inputPartidasMes = document.getElementById('modalGerenciarPartidasContratadas');
+    if (inputPartidasMes) inputPartidasMes.value = cliente.partidasContratadas || 4;
     document.getElementById('modalGerenciarTitulo').textContent = cliente.name;
     document.getElementById('modalGerenciarAvatar').textContent = cliente.name.charAt(0).toUpperCase();
 
@@ -9620,10 +9652,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Salva status/vencimento da mensalidade se for Mensalista
       if (categoria === 'Mensalista') {
-        const statusPag = document.getElementById('modalGerenciarStatusPagamento')?.value || 'pago';
-        const dataVenc = document.getElementById('modalGerenciarVencimento')?.value || '2026-12-05';
+        const statusPag = document.getElementById('modalGerenciarStatusPagamento')?.value || 'pendente';
+        const dataVenc = document.getElementById('modalGerenciarVencimento')?.value || '2026-11-08';
         window.salvarStatusMensalidadeCliente(nome, statusPag, valorMensal, dataVenc);
       }
+
+      // Salva customizações de partidas registradas e partidas contratadas no mês
+      const partidasReg = parseInt(document.getElementById('modalGerenciarPartidas')?.value, 10);
+      const partidasMes = parseInt(document.getElementById('modalGerenciarPartidasContratadas')?.value, 10);
+      try {
+        let pMap = {};
+        const savedP = localStorage.getItem('arena_clientes_partidas_v1');
+        if (savedP) pMap = JSON.parse(savedP);
+        const kName = (nome || '').toLowerCase();
+        if (kName) {
+          pMap[kName] = {
+            matches: isNaN(partidasReg) ? 0 : partidasReg,
+            partidasContratadas: isNaN(partidasMes) ? 4 : partidasMes,
+            updatedAt: new Date().toISOString()
+          };
+          localStorage.setItem('arena_clientes_partidas_v1', JSON.stringify(pMap));
+        }
+      } catch(e) {}
 
       window.fecharModalGerenciarCliente();
       window.renderCadastrosClientes();
