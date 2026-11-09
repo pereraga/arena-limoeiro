@@ -10472,15 +10472,20 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(err) {}
       };
 
-      let monthlyPayload = null;
+            let monthlyPayload = null;
       if (categoria === 'Mensalista') {
-        const diaSemana = document.getElementById('novoClienteDiaSemana')?.value || 'segunda';
+        let diaSemana = document.getElementById('novoClienteDiaSemana')?.value || 'Segunda-feira';
         const horarioFixo = document.getElementById('novoClienteHorarioFixo')?.value || '19:00';
         const quadra = document.getElementById('novoClienteQuadra')?.value || 'Campo Society 01';
         const valorMensal = parseFloat(document.getElementById('novoClienteValorMensal')?.value) || 280;
         const dataVencimento = document.getElementById('novoClienteVencimento')?.value || '2026-12-09';
         const statusPag = document.getElementById('novoClienteSituacaoPagamento')?.value || 'pendente';
         const mId = 'mensal-' + Date.now();
+
+        let dayLabel = diaSemana;
+        if (!dayLabel.toLowerCase().startsWith('toda')) {
+          dayLabel = 'Toda ' + (dayLabel.toLowerCase().includes('-feira') ? dayLabel : (dayLabel + '-feira'));
+        }
 
         monthlyPayload = {
           id: mId,
@@ -10489,8 +10494,8 @@ document.addEventListener('DOMContentLoaded', () => {
           team_name: nome,
           phone: telefone,
           monthly_price: valorMensal,
-          day_of_week: diaSemana,
-          day_of_week_label: 'Toda ' + diaSemana + '-feira',
+          day_of_week: diaSemana.toLowerCase().replace('-feira', ''),
+          day_of_week_label: dayLabel,
           time: horarioFixo,
           start_time: horarioFixo,
           end_time: (horarioFixo.includes(':') ? String(Number(horarioFixo.split(':')[0]) + 1).padStart(2, '0') + ':' + horarioFixo.split(':')[1] : '20:00'),
