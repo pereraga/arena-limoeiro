@@ -6167,23 +6167,20 @@ document.addEventListener('DOMContentLoaded', () => {
         return null;
       };
 
-      // 1. Concorrência competitiva paralela: DB2 e DB1 buscam ao mesmo tempo; o primeiro a responder é adotado
-      const bookingsPromise = Promise.any([
-        fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db2Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject()),
-        fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
-      ]).catch(() => null);
+      // 1. Busca prioritária no DB2 (Banco Principal Completo) com fallback seguro no DB1
+      const bookingsPromise = fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db2Key)
+        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db1Key))
+        .catch(() => null);
 
-      // 2. Concorrência de mensalistas em paralelo
-      const membersPromise = Promise.any([
-        fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db2Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject()),
-        fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
-      ]).catch(() => null);
+      // 2. Busca prioritária de mensalistas no DB2 com fallback no DB1
+      const membersPromise = fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db2Key)
+        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db1Key))
+        .catch(() => null);
 
-      // 3. Concorrência de clientes cadastrados em paralelo
-      const customersPromise = Promise.any([
-        fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db2Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject()),
-        fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db1Key).then(r => (Array.isArray(r) && r.length > 0) ? r : Promise.reject())
-      ]).catch(() => null);
+      // 3. Busca de clientes
+      const customersPromise = fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db2Key)
+        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db1Key))
+        .catch(() => null);
 
       const [cloudBookings, cloudMembers, cloudCustomers] = await Promise.all([bookingsPromise, membersPromise, customersPromise]);
       let stateChanged = false;
@@ -6191,7 +6188,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // 100% VINCULADO AO BANCO DE DADOS NA NUVEM: A nuvem é a fonte de verdade absoluta e em tempo real.
       // Se um registro foi excluído no banco, ele NÃO existe mais e NUNCA é ressuscitado.
       if (Array.isArray(cloudBookings)) {
-        const newSig = cloudBookings.length + '_' + cloudBookings.slice(0, 20).map(b => b.id + ':' + b.status + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
+        const newSig = cloudBookings.length + '_' + cloudBookings.map(b => b.id + ':' + b.status + ':' + (b.date || '') + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
         if (newSig !== window.__lastBookingsSig) {
           window.__lastBookingsSig = newSig;
           stateChanged = true;
@@ -6201,7 +6198,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 2. Atualiza mensalistas diretamente do banco de dados na nuvem
       if (Array.isArray(cloudMembers)) {
-        const memSig = cloudMembers.length + '_' + cloudMembers.map(m => m.id).join(',');
+        const memSig = cloudMembers.length + '_' + cloudMembers.map(m => m.id + ':' + m.status + ':' + (m.day_of_week || '')).join(',');
         if (memSig !== window.__lastMembersSig) {
           window.__lastMembersSig = memSig;
           stateChanged = true;
@@ -6225,6 +6222,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (stateChanged) {
         if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
         if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+        if (typeof window.updateMovementCalendarStrip === 'function') window.updateMovementCalendarStrip();
+        if (typeof window.renderMovementCalendarStrip === 'function') window.renderMovementCalendarStrip();
         if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
         if (typeof window.renderCadastrosClientes === 'function') window.renderCadastrosClientes();
       }
@@ -11635,12 +11634,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const targetTable = isMonthlyId ? 'monthly_members' : 'bookings';
-    Promise.allSettled([
+    await Promise.allSettled([
       dbDelete(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, targetTable, realId),
       dbDelete(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, targetTable, realId),
       dbDelete(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, 'bookings', id),
       dbDelete(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, 'bookings', id)
     ]);
+
+    // Força sincronização imediata na nuvem para propagar aos outros dispositivos
+    window.__lastBookingsSig = null;
+    window.__lastMembersSig = null;
+    if (typeof window.pullDataFromCloudDatabases === 'function') {
+      await window.pullDataFromCloudDatabases();
+    }
 
     // Limpa caches e re-renderiza régua e lista
     if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
@@ -12440,7 +12446,7 @@ const cancelGame = window.cancelGame = async function(id, evt) {
       if (typeof window.pullDataFromCloudDatabases === 'function') {
         window.pullDataFromCloudDatabases();
       }
-    }, 12000);
+    }, 4000);
 
     // Sincronização instantânea ao reativar a aba
     document.addEventListener('visibilitychange', () => {
