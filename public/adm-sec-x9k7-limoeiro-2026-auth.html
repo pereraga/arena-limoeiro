@@ -10771,7 +10771,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentStartMin = hasActiveSelection ? parseTimeToMinutes(currentStart) : -1;
     const currentEndMin = hasActiveSelection ? parseTimeToMinutes(currentEnd) : -1;
 
-    const filterKey = courtId + '_' + dateStr + '_' + (shouldHideOccupied ? '1' : '0');
+    const currentSlot30Block = Math.floor(((new Date()).getHours() * 60 + (new Date()).getMinutes()) / 30);
+    const filterKey = courtId + '_' + dateStr + '_' + (shouldHideOccupied ? '1' : '0') + '_' + currentSlot30Block;
 
     // 1. CAMINHO ULTRA-RÁPIDO: Atualização in-place dos botões existentes (0ms delay)
     if (!forceRebuild && grid.dataset.filterKey === filterKey && grid.children.length > 0) {
@@ -10861,8 +10862,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const conflict = occupiedRanges.find(r => Math.max(m, r.start) < Math.min(slotEndMin, r.end));
       const isOccupied = !!conflict;
       
-      // Checa se o horário já passou hoje
-      const isPast = (isToday && slotEndMin <= currentRealMinutes);
+      // Regra Operacional Estrita: Se o horário atual já passou do início do slot (ex: às 14:00 em diante),
+      // o slot de 14:00 é bloqueado/indisponível. Só libera horários adiantados de meia em meia hora (ex: 14:30 em diante).
+      const isPast = (isToday && m <= currentRealMinutes);
       const isUnavailable = isOccupied || isPast;
 
       // Se o filtro de ocultar indisponíveis estiver ativado, esconde
@@ -10939,6 +10941,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const hasExistingSelection = (startSelect.value !== '' && endSelect.value !== '');
     const clickedMin = parseTimeToMinutes(slotTime);
+
+    // Validação estrita: Não permite selecionar horário igual ou anterior ao horário atual hoje
+    const nowCheck = new Date();
+    const curNowMins = nowCheck.getHours() * 60 + nowCheck.getMinutes();
+    const isTodaySelected = (dateStr === (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08')));
+    if (isTodaySelected && clickedMin <= curNowMins) {
+      if (typeof arenaToast === 'function') {
+        arenaToast('Horário ' + slotTime + ' indisponível! Selecione um horário adiantado a partir de agora.');
+      }
+      return;
+    }
     let curStartMin = hasExistingSelection ? parseTimeToMinutes(startSelect.value) : -1;
     let curEndMin = hasExistingSelection ? parseTimeToMinutes(endSelect.value) : -1;
     const courtSelect = document.getElementById('directBookingCourt');
@@ -11077,10 +11090,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const occupiedRanges = [];
 
     // 1. Partidas já registradas
+    let excluidosBalcao = {};
+    try {
+      const s = localStorage.getItem('arena_jogos_excluidos_v1');
+      if (s) excluidosBalcao = JSON.parse(s);
+    } catch(e) {}
+
     (window.adminGameState.bookings || []).forEach(b => {
       const bDate = b.date;
       const bCourt = b.court_id || b.courtId;
       const st = (b.status || '').toLowerCase();
+      if (b.id && excluidosBalcao[b.id + '_' + dateStr]) return;
       if (bDate === dateStr && st !== 'cancelled' && (bCourt === dbCourtId || bCourt === courtId)) {
         const sm = parseTimeToMinutes(b.start_time || (b.time ? b.time.split(' ')[0] : ''));
         const em = parseTimeToMinutes(b.end_time || (b.time && b.time.includes('às') ? b.time.split('às')[1].trim() : ''));
