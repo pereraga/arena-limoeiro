@@ -2220,9 +2220,13 @@
             <span id="badgeTotalClientesCount" class="inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
               Carregando clientes...
             </span>
-            <button type="button" onclick="window.abrirModalNovoCliente()" class="inline-flex items-center gap-1.5 bg-[#042f1e] hover:bg-[#07442c] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xs transition cursor-pointer">
-              <i data-lucide="user-plus" class="w-3.5 h-3.5 text-[#00d672]"></i>
-              <span>Novo Cliente</span>
+            <button type="button" onclick="window.abrirModalRegras()" class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200 text-xs font-semibold px-3.5 py-2 rounded-full transition cursor-pointer">
+              <i data-lucide="file-cog" class="w-3.5 h-3.5 text-slate-600"></i>
+              <span>Regras Avulso / Fixo</span>
+            </button>
+            <button type="button" onclick="window.abrirModalNovoCliente()" class="inline-flex items-center gap-1.5 bg-[#009e49] hover:bg-[#00863e] text-white text-xs font-semibold px-4 py-2 rounded-full shadow-xs transition cursor-pointer">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+              <span>+ Novo Cliente</span>
             </button>
           </div>
         </div>
@@ -4456,188 +4460,221 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- ========================================================================= -->
 <!-- MODAL DE CADASTRO DE NOVO CLIENTE (PADRÃO ARENA LIMOEIRO)                 -->
 <!-- ========================================================================= -->
-<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
-  <div class="bg-white rounded-3xl max-w-[520px] w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[95vh]">
-    <!-- Header -->
-    <div class="bg-[#042f1e] text-white px-6 py-4 flex items-center justify-between border-b border-emerald-950/40">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-[#00d672] font-black">
-          <i data-lucide="user-plus" class="w-5 h-5"></i>
+<div id="modalNovoClienteArena" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in font-sans">
+  <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden my-auto">
+    
+    <!-- Cabeçalho Verde Escuro (#042f1e) conforme imagem -->
+    <div class="bg-[#042f1e] text-white px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3.5">
+        <div class="w-10 h-10 rounded-full bg-[#0a4a30] border border-emerald-500/30 flex items-center justify-center shrink-0">
+          <i data-lucide="user-plus" class="w-5 h-5 text-[#00d672]"></i>
         </div>
         <div>
-          <h3 class="text-base font-bold tracking-tight text-white">Cadastrar Novo Cliente</h3>
-          <p class="text-xs text-emerald-300 font-medium">Cadastre um atleta ou mensalista na nuvem</p>
+          <h3 class="font-extrabold text-base tracking-tight uppercase text-white leading-tight">NOVO CLIENTE</h3>
+          <p class="text-xs text-[#2dd488] mt-0.5">Cadastre um atleta ou mensalista na nuvem</p>
         </div>
       </div>
-      <button type="button" onclick="window.fecharModalNovoCliente()" class="text-emerald-300 hover:text-white p-1 rounded-lg transition cursor-pointer">
-        <i data-lucide="x" class="w-6 h-6"></i>
+      <button type="button" onclick="window.fecharModalNovoCliente()" class="p-1.5 rounded-lg text-[#2dd488] hover:text-white hover:bg-white/10 transition cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
       </button>
     </div>
 
-    <!-- Form Body -->
-    <form onsubmit="window.handleCadastrarNovoCliente(event)" class="p-5 sm:p-6 space-y-4 overflow-y-auto text-xs">
+    <form onsubmit="window.handleCadastrarNovoCliente(event)" class="p-6 space-y-4">
+      <!-- Nome Completo -->
       <div>
-        <label class="block text-xs font-semibold text-slate-700 mb-1">Nome Completo *</label>
-        <input type="text" id="novoClienteNome" required placeholder="Ex: Rafael Souza"
-               class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:outline-none transition">
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+          NOME COMPLETO <span class="text-red-500">*</span>
+        </label>
+        <input 
+          type="text" 
+          id="novoClienteNome" 
+          required 
+          placeholder="Ex.: Lucas Mendes" 
+          class="w-full px-4 py-2.5 text-sm bg-[#f1f5f9] border border-slate-200/80 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#009e49]/30 focus:border-[#009e49] transition" 
+        />
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <!-- WhatsApp / Telefone & CPF -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Telefone / WhatsApp *</label>
-          <input type="tel" id="novoClienteTelefone" required placeholder="(81) 99999-9999"
-                 class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:outline-none transition">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+            WHATSAPP / TELEFONE <span class="text-red-500">*</span>
+          </label>
+          <input 
+            type="text" 
+            id="novoClienteTelefone" 
+            required 
+            placeholder="(81) 98765-4321" 
+            class="w-full px-4 py-2.5 text-sm bg-[#f1f5f9] border border-slate-200/80 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#009e49]/30 focus:border-[#009e49] transition" 
+          />
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">CPF (Opcional)</label>
-          <input type="text" id="novoClienteCpf" placeholder="Não informado"
-                 class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-[#00a859]/30 focus:border-[#00a859] focus:outline-none transition">
+          <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+            CPF (OPCIONAL)
+          </label>
+          <input 
+            type="text" 
+            id="novoClienteCpf" 
+            placeholder="000.000.000-00" 
+            class="w-full px-4 py-2.5 text-sm bg-[#f1f5f9] border border-slate-200/80 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-[#009e49]/30 focus:border-[#009e49] transition" 
+          />
         </div>
       </div>
 
-      <!-- SELEÇÃO DE CATEGORIA INICIAL -->
+      <!-- Categoria Inicial -->
       <div>
-        <label class="block text-[11px] font-bold text-slate-800 tracking-wider uppercase mb-1.5">CATEGORIA INICIAL</label>
-        <div class="bg-[#f0f4f8] p-1.5 rounded-2xl flex items-center gap-2 border border-slate-200/80">
-          <button type="button" id="btnNovoCatAvulso" onclick="window.selecionarCategoriaNovoCliente('Avulso')"
-                  class="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-emerald-800 border-2 border-emerald-600 shadow-xs">
-            <i data-lucide="user" class="w-4 h-4 text-emerald-600"></i>
+        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-2">
+          CATEGORIA INICIAL
+        </label>
+        <input type="hidden" id="novoClienteCategoria" value="Avulso" />
+        <div class="grid grid-cols-2 gap-3 p-1.5 bg-[#f1f5f9] rounded-2xl border border-slate-200/90 shadow-inner">
+          <button
+            type="button"
+            id="btnNovoCatAvulso"
+            onclick="window.selecionarCategoriaNovoCliente('Avulso')"
+            class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-extrabold transition-all duration-150 cursor-pointer bg-white text-[#042f1e] border-2 border-[#009e49] shadow-[0_3px_0_0_#009e49] active:translate-y-[2px] active:shadow-none"
+          >
+            <i data-lucide="user" class="w-4 h-4 text-[#009e49]"></i>
             <span>Avulso</span>
           </button>
-          <button type="button" id="btnNovoCatFixo" onclick="window.selecionarCategoriaNovoCliente('Mensalista')"
-                  class="flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-600 hover:text-slate-900 border-2 border-transparent">
-            <i data-lucide="crown" class="w-4 h-4 text-slate-500"></i>
+          <button
+            type="button"
+            id="btnNovoCatFixo"
+            onclick="window.selecionarCategoriaNovoCliente('Mensalista')"
+            class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer bg-transparent text-slate-500 border-2 border-transparent hover:text-slate-700 hover:bg-white/60 active:translate-y-[2px]"
+          >
+            <i data-lucide="crown" class="w-4 h-4"></i>
             <span>Fixo</span>
           </button>
         </div>
-        <input type="hidden" id="novoClienteCategoria" value="Avulso">
       </div>
 
-      <!-- ================================================================= -->
-      <!-- PAINEL 1: PERFIL & CONTROLE DO CLIENTE CASUAL (AVULSO)             -->
-      <!-- ================================================================= -->
-      <div id="boxNovoClienteAvulso" class="p-4 bg-[#f8fafc] border border-slate-200/90 rounded-2xl space-y-3.5">
+      <!-- Campos Extras Exclusivos para AVULSO (Cliente Casual) -->
+      <div id="boxNovoClienteAvulso" class="space-y-3.5 bg-slate-50 p-4 rounded-xl border border-slate-200/90">
         <div class="flex items-center justify-between">
           <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-            <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i>
-            Perfil & Controle do Cliente Casual
+            <i data-lucide="clipboard-list" class="w-4 h-4 text-[#009e49]"></i>
+            <span>Perfil & Controle do Cliente Casual</span>
           </span>
-          <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-200/90 text-slate-700 tracking-wider">
-            SEM MENSALIDADE
-          </span>
+          <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-200/80 text-slate-700 whitespace-nowrap">Sem Mensalidade</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
           <div>
-            <label class="block text-xs font-semibold text-slate-800 mb-1">Modalidade Preferida</label>
-            <div class="relative">
-              <select id="novoClienteModalidade"
-                      class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer pr-8">
-                <option value="society" selected>Society / Fut7</option>
-                <option value="fut5">FUT 5 – Soccer 5</option>
-                <option value="fut6">FUT 6 – Soccer 6</option>
-                <option value="areia">Beach Sports / Areia</option>
-                <option value="futmesa">Foot Table / Futmesa</option>
-              </select>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">Modalidade Preferida</label>
+            <select id="novoClienteModalidade" class="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#009e49]">
+              <option value="Society / Fut7">Society / Fut7</option>
+              <option value="Areia (Futevôlei / Beach)">Areia (Futevôlei / Beach)</option>
+              <option value="Futsal / Poliesportiva">Futsal / Poliesportiva</option>
+              <option value="FutMesa">FutMesa</option>
+              <option value="Todas / Misto">Todas / Misto</option>
+            </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-slate-800 mb-1">Observação (Opcional)</label>
-            <input type="text" id="novoClienteObsAvulso" placeholder="Ex.: Goleiro para chamar r..."
-                   class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 placeholder-slate-400 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:outline-none">
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">Observação (Opcional)</label>
+            <input type="text" id="novoClienteObsAvulso" placeholder="Ex.: Goleiro para chamar na terça..." class="w-full px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#009e49]" />
           </div>
         </div>
       </div>
 
-      <!-- ================================================================= -->
-      <!-- PAINEL 2: CONFIGURAÇÃO DO CONTRATO FIXO (PLANO MENSAL)            -->
-      <!-- ================================================================= -->
-      <div id="boxNovoClienteMensalista" class="hidden p-4 bg-[#faf5ff] border border-purple-200 rounded-2xl space-y-3.5">
+      <!-- Campos Extras Exclusivos para MENSALISTA (Cliente Fixo) -->
+      <div id="boxNovoClienteMensalista" class="hidden space-y-3.5 bg-purple-50/80 p-4 rounded-xl border border-purple-200/80">
         <div class="flex items-center justify-between">
-          <span class="text-xs font-bold text-purple-950 flex items-center gap-1.5">
-            <i data-lucide="calendar" class="w-4 h-4 text-purple-600"></i>
-            Configuração do Contrato Fixo
+          <span class="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+            <i data-lucide="calendar-check-2" class="w-4 h-4 text-purple-600"></i>
+            <span>Configuração do Contrato Fixo</span>
           </span>
-          <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 tracking-wider">
-            PLANO MENSAL
-          </span>
+          <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-purple-200/70 text-purple-800">Plano Mensal</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-semibold text-purple-950 mb-1">Dia da Semana *</label>
-            <div class="relative">
-              <select id="novoClienteDiaSemana"
-                      class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer pr-8">
-                <option value="segunda" selected>Segunda-feira</option>
-                <option value="terca">Terça-feira</option>
-                <option value="quarta">Quarta-feira</option>
-                <option value="quinta">Quinta-feira</option>
-                <option value="sexta">Sexta-feira</option>
-                <option value="sabado">Sábado</option>
-                <option value="domingo">Domingo</option>
-              </select>
-              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
+            <label class="block text-[11px] font-bold text-purple-950 mb-1">Dia da Semana *</label>
+            <select id="novoClienteDiaSemana" class="w-full px-3 py-2 text-sm bg-white border border-purple-200 rounded-xl focus:outline-none focus:border-purple-500">
+              <option value="Segunda-feira">Segunda-feira</option>
+              <option value="Terça-feira">Terça-feira</option>
+              <option value="Quarta-feira">Quarta-feira</option>
+              <option value="Quinta-feira">Quinta-feira</option>
+              <option value="Sexta-feira">Sexta-feira</option>
+              <option value="Sábado">Sábado</option>
+              <option value="Domingo">Domingo</option>
+            </select>
           </div>
           <div>
-            <label class="block text-xs font-semibold text-purple-950 mb-1">Horário Fixo *</label>
+            <label for="novoClienteHorarioFixo" class="block text-[11px] font-bold text-purple-950 mb-1">Horário Fixo *</label>
             <div class="relative">
               <i data-lucide="clock" class="w-4 h-4 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-              <input type="time" id="novoClienteHorarioFixo" value="19:00"
-                     class="w-full pl-9 pr-3 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+              <input 
+                type="time" 
+                id="novoClienteHorarioFixo" 
+                class="w-full pl-9 pr-3 py-2 text-sm bg-white border border-purple-200 rounded-xl focus:outline-none focus:border-purple-500" 
+              />
             </div>
           </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-purple-950 mb-1">Campo / Quadra Fixa</label>
-          <div class="relative">
-            <select id="novoClienteQuadra"
-                    class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer pr-8">
-              <option value="Campo Society 01" selected>Campo Society 01</option>
+          <div class="sm:col-span-2">
+            <label class="block text-[11px] font-bold text-purple-950 mb-1">Campo / Quadra Fixa</label>
+            <select id="novoClienteQuadra" class="w-full px-3.5 py-2 text-sm bg-white border border-purple-200 rounded-xl focus:outline-none focus:border-purple-500">
+              <option value="Campo Society 01">Campo Society 01</option>
               <option value="Campo Society 02">Campo Society 02</option>
-              <option value="Campo Society Fut 7">Campo Society Fut 7</option>
-              <option value="Quadra de Areia">Quadra de Areia (Beach Sports)</option>
-              <option value="Mesa de Futmesa">Mesa de Futmesa</option>
+              <option value="Quadra Areia 01">Quadra Areia 01</option>
+              <option value="Quadra Areia 02">Quadra Areia 02</option>
+              <option value="Quadra FutMesa 01">Quadra FutMesa 01</option>
+              <option value="Quadra Poliesportiva">Quadra Poliesportiva</option>
             </select>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-purple-950 mb-1">Valor da Mensalidade (R$) *</label>
-            <input type="number" id="novoClienteValorMensal" step="0.01" value="280.00" placeholder="280,00"
-                   class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
           </div>
           <div>
-            <label class="block text-xs font-semibold text-purple-950 mb-1">Data do 1º Vencimento *</label>
-            <input type="date" id="novoClienteVencimento"
-                   class="w-full px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            <label class="block text-[11px] font-bold text-purple-950 mb-1">Valor da Mensalidade (R$) *</label>
+            <input type="number" id="novoClienteValorMensal" value="280.00" step="0.01" class="w-full px-3.5 py-2 text-sm bg-white border border-purple-200 rounded-xl focus:outline-none focus:border-purple-500" />
           </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-purple-950 mb-1">Situação do Pagamento Inicial</label>
-          <div class="relative">
-            <select id="novoClienteSituacaoPagamento"
-                    class="w-full appearance-none px-3.5 py-2.5 text-xs font-semibold text-slate-800 bg-white border border-purple-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer pr-8">
-              <option value="pendente" selected>Pendente (Cobrar no dia do jogo)</option>
+          <div>
+            <label class="block text-[11px] font-bold text-purple-950 mb-1">Data do 1º Vencimento *</label>
+            <input type="date" id="novoClienteVencimento" class="w-full px-3.5 py-2 text-sm bg-white border border-purple-200 rounded-xl focus:outline-none focus:border-purple-500" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-[11px] font-bold text-purple-950 mb-1">Situação do Pagamento Inicial</label>
+            <select id="novoClienteSituacaoPagamento" class="w-full px-3.5 py-2 text-sm bg-white border border-purple-200 rounded-xl focus:outline-none focus:border-purple-500">
               <option value="pago">Pago / Em dia (Lançar entrada no caixa)</option>
+              <option value="pendente" selected>Pendente (Cobrar no dia do jogo)</option>
             </select>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
           </div>
         </div>
       </div>
 
-      <!-- Botões de Ação -->
-      <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-        <button type="button" onclick="window.fecharModalNovoCliente()" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+      <!-- Quadro Dinâmico & Editável: O que cada categoria vai fazer no sistema -->
+      <div id="boxComportamentoCadastro" class="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <span id="tituloComportamentoCadastro" class="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <i data-lucide="cpu" class="w-3.5 h-3.5 text-[#009e49]"></i>
+            <span>O que o sistema fará (Cliente Avulso):</span>
+          </span>
+          <button type="button" onclick="window.toggleEditarRegraInline()" class="text-[11px] font-semibold text-[#009e49] hover:underline flex items-center gap-1 cursor-pointer">
+            <i data-lucide="pencil" class="w-3 h-3"></i>
+            <span id="btnTextoEditarRegraInline">Personalizar texto</span>
+          </button>
+        </div>
+        
+        <!-- Exibição das ações do sistema -->
+        <p id="textoComportamentoCadastro" class="text-xs text-slate-600 leading-relaxed whitespace-pre-line"></p>
+        
+        <!-- Textarea para o usuário escrever/editar na hora o que cada opção faz -->
+        <div id="editorRegraInlineWrapper" class="hidden space-y-2 pt-1">
+          <textarea id="textareaRegraInline" rows="3" class="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:border-[#009e49]" placeholder="Escreva aqui o que o sistema deve seguir para esta categoria..."></textarea>
+          <div class="flex justify-end gap-1.5">
+            <button type="button" onclick="window.salvarRegraInline()" class="px-3 py-1 bg-[#042f1e] text-white text-[11px] font-semibold rounded-lg hover:bg-[#07442c] cursor-pointer">
+              Salvar descrição da regra
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <hr class="border-slate-100 my-2" />
+
+      <!-- Rodapé do Modal (Cancelar + Botão Verde Cadastrar Cliente) -->
+      <div class="flex items-center justify-end gap-3 pt-1">
+        <button type="button" onclick="window.fecharModalNovoCliente()" class="px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition cursor-pointer">
           Cancelar
         </button>
-        <button type="submit" class="px-5 py-2.5 text-xs font-semibold text-white bg-[#00a859] hover:bg-[#008f4c] rounded-xl shadow-xs transition active:scale-[0.98] cursor-pointer flex items-center gap-1.5">
+        <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold text-white bg-[#009e49] hover:bg-[#00863e] active:scale-[0.99] rounded-xl shadow-sm transition cursor-pointer">
           <i data-lucide="user-check" class="w-4 h-4"></i>
           <span>Cadastrar Cliente</span>
         </button>
@@ -4645,6 +4682,49 @@ document.addEventListener('DOMContentLoaded', () => {
     </form>
   </div>
 </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL CONFIGURADOR DE REGRAS (AVULSO VS FIXO)                         -->
+  <!-- ===================================================================== -->
+  <div id="modalRegrasSistema" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in font-sans">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+      <div class="bg-[#042f1e] text-white px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-[#0a4a30] flex items-center justify-center">
+            <i data-lucide="file-cog" class="w-4 h-4 text-[#00d672]"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-sm sm:text-base uppercase text-white">Regras de Comportamento no Sistema</h3>
+            <p class="text-xs text-[#2dd488]">Defina o que o sistema executa para Avulso e Mensalista</p>
+          </div>
+        </div>
+        <button type="button" onclick="window.fecharModalRegras()" class="p-1 rounded-lg text-emerald-200 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-slate-500"></span>
+            <span>Cliente Avulso (Casual) — O que pede e o que faz no sistema:</span>
+          </label>
+          <textarea id="inputRegraAvulsoGlobal" rows="3" class="w-full p-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:bg-white focus:border-[#009e49]"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-purple-900 mb-1 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-purple-600"></span>
+            <span>Cliente Mensalista (Fixo) — O que pede e o que faz no sistema:</span>
+          </label>
+          <textarea id="inputRegraFixoGlobal" rows="4" class="w-full p-3 text-xs sm:text-sm bg-purple-50/40 border border-purple-200 rounded-xl focus:outline-none focus:bg-white focus:border-purple-500"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" onclick="window.fecharModalRegras()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Cancelar</button>
+          <button type="button" onclick="window.salvarRegrasGlobais()" class="px-5 py-2 text-xs font-bold text-white bg-[#009e49] hover:bg-[#00863e] rounded-xl cursor-pointer">Salvar Regras do Sistema</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
 <!-- ========================================================================= -->
 <!-- MODAL: NOVA RESERVA BALCÃO (DIRETA E SINCRONIZADA EM TODAS AS PLATAFORMAS) -->
 <!-- ========================================================================= -->
@@ -10168,44 +10248,160 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================================
   // CONTROLADOR DO MODAL DE NOVO CLIENTE
   // =========================================================================
+    const STORAGE_KEY_REGRAS_SISTEMA = 'arena_limoeiro_regras_v1';
+  const REGRAS_PADRAO_SISTEMA = {
+    avulso: '• Registra a modalidade preferida e observações internas do atleta.\n• Não bloqueia horários fixos na agenda dos campos.\n• Pagamento avulso por partida ou rateio na portaria.',
+    fixo: '• Exige valor mensal, data de vencimento e campo/horário fixo.\n• Reserva automaticamente o horário recorrente toda semana na agenda.\n• Gera controle de vencimento mensal (+30 dias) e alertas de pagamento.'
+  };
+
+  function obterRegrasSistema() {
+    try {
+      const salvas = localStorage.getItem(STORAGE_KEY_REGRAS_SISTEMA);
+      if (salvas) return JSON.parse(salvas);
+    } catch(e) {}
+    return { ...REGRAS_PADRAO_SISTEMA };
+  }
+
+  function salvarRegrasSistema(regras) {
+    try {
+      localStorage.setItem(STORAGE_KEY_REGRAS_SISTEMA, JSON.stringify(regras));
+    } catch(e) {}
+  }
+
   window.selecionarCategoriaNovoCliente = function(cat) {
     const inputCat = document.getElementById('novoClienteCategoria');
     const btnAvulso = document.getElementById('btnNovoCatAvulso');
     const btnFixo = document.getElementById('btnNovoCatFixo');
     const boxAvulso = document.getElementById('boxNovoClienteAvulso');
     const boxMensalista = document.getElementById('boxNovoClienteMensalista');
+    const boxInfo = document.getElementById('boxComportamentoCadastro');
+    const tituloInfo = document.getElementById('tituloComportamentoCadastro');
+    const textoInfo = document.getElementById('textoComportamentoCadastro');
+    const regras = obterRegrasSistema();
 
     if (inputCat) inputCat.value = cat;
 
+    const editorWrapper = document.getElementById('editorRegraInlineWrapper');
+    if (editorWrapper) editorWrapper.classList.add('hidden');
+
     if (cat === 'Mensalista') {
       if (btnFixo) {
-        btnFixo.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#7e22ce] border-2 border-[#9333ea] shadow-xs';
+        btnFixo.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-extrabold transition-all duration-150 cursor-pointer bg-white text-purple-900 border-2 border-purple-600 shadow-[0_3px_0_0_#9333ea] active:translate-y-[2px] active:shadow-none';
         const ic = btnFixo.querySelector('i');
-        if (ic) ic.className = 'w-4 h-4 text-[#9333ea]';
+        if (ic) ic.className = 'w-4 h-4 text-purple-600';
       }
       if (btnAvulso) {
-        btnAvulso.className = 'flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-600 hover:text-slate-900 border-2 border-transparent';
+        btnAvulso.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer bg-transparent text-slate-500 border-2 border-transparent hover:text-slate-700 hover:bg-white/60 active:translate-y-[2px]';
         const ic = btnAvulso.querySelector('i');
         if (ic) ic.className = 'w-4 h-4 text-slate-500';
       }
       if (boxAvulso) boxAvulso.classList.add('hidden');
       if (boxMensalista) boxMensalista.classList.remove('hidden');
+
+      if (boxInfo) boxInfo.className = 'rounded-xl border border-purple-200 bg-purple-50/50 p-3.5 space-y-2';
+      if (tituloInfo) tituloInfo.innerHTML = '<i data-lucide="crown" class="w-3.5 h-3.5 text-purple-600"></i><span class="text-purple-950 font-bold uppercase">O que o sistema fará (Mensalista / Fixo):</span>';
+      if (textoInfo) textoInfo.textContent = regras.fixo;
     } else {
       if (btnAvulso) {
-        btnAvulso.className = 'flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-white text-[#042f1e] border-2 border-[#00a859] shadow-xs';
+        btnAvulso.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-extrabold transition-all duration-150 cursor-pointer bg-white text-[#042f1e] border-2 border-[#009e49] shadow-[0_3px_0_0_#009e49] active:translate-y-[2px] active:shadow-none';
         const ic = btnAvulso.querySelector('i');
-        if (ic) ic.className = 'w-4 h-4 text-[#00a859]';
+        if (ic) ic.className = 'w-4 h-4 text-[#009e49]';
       }
       if (btnFixo) {
-        btnFixo.className = 'flex-1 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer bg-transparent text-slate-600 hover:text-slate-900 border-2 border-transparent';
+        btnFixo.className = 'flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer bg-transparent text-slate-500 border-2 border-transparent hover:text-slate-700 hover:bg-white/60 active:translate-y-[2px]';
         const ic = btnFixo.querySelector('i');
         if (ic) ic.className = 'w-4 h-4 text-slate-500';
       }
       if (boxAvulso) boxAvulso.classList.remove('hidden');
       if (boxMensalista) boxMensalista.classList.add('hidden');
+
+      if (boxInfo) boxInfo.className = 'rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 space-y-2';
+      if (tituloInfo) tituloInfo.innerHTML = '<i data-lucide="cpu" class="w-3.5 h-3.5 text-[#009e49]"></i><span class="font-bold uppercase">O que o sistema fará (Avulso / Casual):</span>';
+      if (textoInfo) textoInfo.textContent = regras.avulso;
     }
 
     if (window.lucide) lucide.createIcons();
+  };
+
+  window.toggleEditarRegraInline = function() {
+    const wrapper = document.getElementById('editorRegraInlineWrapper');
+    if (!wrapper) return;
+    const cat = document.getElementById('novoClienteCategoria')?.value || 'Avulso';
+    const textarea = document.getElementById('textareaRegraInline');
+    const regras = obterRegrasSistema();
+
+    if (wrapper.classList.contains('hidden')) {
+      if (textarea) textarea.value = cat === 'Mensalista' ? regras.fixo : regras.avulso;
+      wrapper.classList.remove('hidden');
+      if (textarea) textarea.focus();
+    } else {
+      wrapper.classList.add('hidden');
+    }
+  };
+
+  window.salvarRegraInline = function() {
+    const cat = document.getElementById('novoClienteCategoria')?.value || 'Avulso';
+    const textarea = document.getElementById('textareaRegraInline');
+    const novoTexto = textarea ? textarea.value.trim() : '';
+    if (!novoTexto) return;
+
+    const regras = obterRegrasSistema();
+    if (cat === 'Mensalista') {
+      regras.fixo = novoTexto;
+    } else {
+      regras.avulso = novoTexto;
+    }
+    salvarRegrasSistema(regras);
+
+    const textoInfo = document.getElementById('textoComportamentoCadastro');
+    if (textoInfo) textoInfo.textContent = novoTexto;
+    const wrapper = document.getElementById('editorRegraInlineWrapper');
+    if (wrapper) wrapper.classList.add('hidden');
+
+    if (typeof window.mostrarToast === 'function') {
+      window.mostrarToast('Regra do perfil ' + (cat === 'Mensalista' ? 'Fixo' : 'Avulso') + ' atualizada!');
+    }
+  };
+
+  window.abrirModalRegras = function() {
+    const regras = obterRegrasSistema();
+    const inputAvulso = document.getElementById('inputRegraAvulsoGlobal');
+    const inputFixo = document.getElementById('inputRegraFixoGlobal');
+    if (inputAvulso) inputAvulso.value = regras.avulso;
+    if (inputFixo) inputFixo.value = regras.fixo;
+    const modal = document.getElementById('modalRegrasSistema');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (window.lucide) lucide.createIcons();
+  };
+
+  window.fecharModalRegras = function() {
+    const modal = document.getElementById('modalRegrasSistema');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  };
+
+  window.salvarRegrasGlobais = function() {
+    const inputAvulso = document.getElementById('inputRegraAvulsoGlobal');
+    const inputFixo = document.getElementById('inputRegraFixoGlobal');
+    const regras = {
+      avulso: inputAvulso ? (inputAvulso.value.trim() || REGRAS_PADRAO_SISTEMA.avulso) : REGRAS_PADRAO_SISTEMA.avulso,
+      fixo: inputFixo ? (inputFixo.value.trim() || REGRAS_PADRAO_SISTEMA.fixo) : REGRAS_PADRAO_SISTEMA.fixo
+    };
+    salvarRegrasSistema(regras);
+    window.fecharModalRegras();
+
+    const catAtual = document.getElementById('novoClienteCategoria')?.value || 'Avulso';
+    const textoInfo = document.getElementById('textoComportamentoCadastro');
+    if (textoInfo) {
+      textoInfo.textContent = catAtual === 'Mensalista' ? regras.fixo : regras.avulso;
+    }
+
+    if (typeof window.mostrarToast === 'function') {
+      window.mostrarToast('Regras de Avulso e Fixo salvas com sucesso!');
+    }
   };
 
   window.abrirModalNovoCliente = function() {
