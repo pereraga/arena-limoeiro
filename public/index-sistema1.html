@@ -74,6 +74,15 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   
   <script>
+    // Substitui confirm() nativo por modal visual caso seja invocado nativamente
+    window.originalConfirm = window.confirm;
+    window.confirm = function(msg) {
+      if (typeof window.mostrarConfirmacaoArena === "function") {
+        window.mostrarConfirmacaoArena({ titulo: "Confirmação", mensagem: msg, tipo: "danger", textoConfirmar: "Confirmar", textoCancelar: "Cancelar" });
+        return true;
+      }
+      return window.originalConfirm ? window.originalConfirm(msg) : true;
+    };
     try {
       const adminUser = {
         id: "admin-1",
@@ -6266,8 +6275,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // FILTRO ESTRITO DE DATA E HIGIENIZAÇÃO:
     // Garante que TODOS os jogos pertencem rigorosamente a dateStr e exclui contaminações entre dias
+    // Exclusão de partidas canceladas/removidas
+    let excluidosMap = {};
+    try {
+      const savedExcl = localStorage.getItem('arena_jogos_excluidos_v1');
+      if (savedExcl) excluidosMap = JSON.parse(savedExcl);
+    } catch(e) {}
+
     matches = matches.filter(m => {
       if (!m) return false;
+      const exKey = m.id + '_' + dateStr;
+      if (excluidosMap[exKey]) return false;
+      if (m.id && String(m.id).startsWith('monthly-')) {
+        const rawMid = String(m.id).replace('monthly-', '');
+        if (excluidosMap[rawMid + '_' + dateStr]) return false;
+      }
       if (m.date !== dateStr) return false;
       // Impede que mensalista fixo de outro dia apareça (ex: Davi de segunda aparecendo na terça)
       if (m.observation && m.observation.includes('Horário Fixo Semanal (')) {
@@ -9655,7 +9677,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    return Array.from(clientMap.values());
+    let exclCustMap = {};
+    try {
+      const s = localStorage.getItem('arena_clientes_excluidos_v1');
+      if (s) exclCustMap = JSON.parse(s);
+    } catch(e) {}
+
+    const list = Array.from(clientMap.values()).filter(c => {
+      const k = (c.name || '').trim().toLowerCase();
+      return !exclCustMap[k];
+    });
+    return list;
   };
 
   window.renderCadastrosClientes = function() {
@@ -10027,6 +10059,14 @@ document.addEventListener('DOMContentLoaded', () => {
           };
           localStorage.setItem('arena_clientes_partidas_v1', JSON.stringify(pMap));
         }
+      } catch(e) {}
+
+      try {
+        let exclCust = {};
+        const s = localStorage.getItem('arena_clientes_excluidos_v1');
+        if (s) exclCust = JSON.parse(s);
+        exclCust[keyName] = { name: nome, at: new Date().toISOString() };
+        localStorage.setItem('arena_clientes_excluidos_v1', JSON.stringify(exclCust));
       } catch(e) {}
 
       window.fecharModalGerenciarCliente();
@@ -11959,32 +11999,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 5. Cancelar Partida
 window.cancelGame = async function(id) {
-    const g = getGame(id);
-    if (!g) return;
-    const nomeCliente = g.customer_name || g.name || 'esta partida';
+    let g = (typeof getGame === 'function') ? getGame(id) : null;
+    if (!g) {
+      g = (window.adminGameState.bookings || []).find(b => String(b.id) === String(id));
+    }
+    const nomeCliente = (g && (g.customer_name || g.name)) ? (g.customer_name || g.name) : 'esta partida';
     const confirmado = await window.mostrarConfirmacaoArena({
-      titulo: 'Cancelar Partida',
-      mensagem: `Deseja realmente cancelar a partida de <strong class="text-slate-900">"${nomeCliente}"</strong>? O cancelamento ficará registrado no histórico.`,
+      titulo: 'Excluir / Cancelar Partida',
+      mensagem: `Deseja realmente excluir permanentemente a partida de <strong class="text-slate-900">"${nomeCliente}"</strong> e remover este agendamento do banco de dados?`,
       tipo: 'danger',
-      textoConfirmar: 'Sim, Cancelar',
+      textoConfirmar: 'Sim, Excluir Partida',
       textoCancelar: 'Manter'
     });
     if (!confirmado) return;
-    if (!g) return;
 
-    g.status = 'cancelled';
-    g.attendance = 'Cancelada';
-    addMatchLog(g, 'Partida cancelada', 'Cancelamento manual registrado pela administração.');
-    saveAdminGameState();
+    const targetId = String(id);
+    const selDate = (g && g.date) ? g.date : (window.adminGameState.selectedDate || ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-09'));
 
-    // ☁️ Persistência imediata nos bancos de dados para que a nuvem nunca reverta
-    if (typeof window.syncBookingToCloud === 'function') {
-      window.syncBookingToCloud(g, 'upsert');
+    // 1. Registrar na lista de jogos excluídos do dia para impedir que reapareça
+    try {
+      let excluidosMap = {};
+      const savedExcl = localStorage.getItem('arena_jogos_excluidos_v1');
+      if (savedExcl) excluidosMap = JSON.parse(savedExcl);
+      const exKey = targetId + '_' + selDate;
+      excluidosMap[exKey] = { id: targetId, date: selDate, at: new Date().toISOString() };
+      localStorage.setItem('arena_jogos_excluidos_v1', JSON.stringify(excluidosMap));
+    } catch(e) {}
+
+    // 2. Remover da memória local de bookings
+    window.adminGameState.bookings = (window.adminGameState.bookings || []).filter(b => String(b.id) !== targetId);
+
+    // 3. Excluir dos Bancos de Dados Supabase DB1 e DB2
+    const deleteFromCloud = async (dbUrl, dbKey) => {
+      try {
+        await fetch(dbUrl + '/rest/v1/bookings?id=eq.' + encodeURIComponent(targetId), {
+          method: 'DELETE',
+          headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey, Prefer: 'return=minimal' }
+        });
+        if (targetId.startsWith('monthly-')) {
+          const rawMId = targetId.replace('monthly-', '');
+          await fetch(dbUrl + '/rest/v1/bookings?id=eq.' + encodeURIComponent(rawMId), {
+            method: 'DELETE',
+            headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey, Prefer: 'return=minimal' }
+          });
+        }
+      } catch(err) {
+        console.warn('[ArenaCloud] Erro ao excluir agendamento:', err);
+      }
+    };
+
+    if (window.ARENA_CLOUD_DBS) {
+      Promise.allSettled([
+        deleteFromCloud(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
+        deleteFromCloud(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+      ]);
     }
 
-    renderMovementMatches();
-    renderCadastrosBookingsList();
-    arenaToast('Partida cancelada com sucesso!');
+    // 4. Limpar caches de partidas
+    if (window.__matchesCacheByDate) {
+      window.__matchesCacheByDate.clear();
+    }
+    if (typeof saveAdminGameState === 'function') saveAdminGameState();
+
+    // 5. Atualizar imediatamente a tela operacional
+    if (typeof renderMovementMatches === 'function') renderMovementMatches();
+    if (typeof renderCadastrosBookingsList === 'function') renderCadastrosBookingsList();
+    if (typeof updateCalendarBadges === 'function') updateCalendarBadges();
+    if (typeof arenaToast === 'function') {
+      arenaToast('✓ Partida excluída com sucesso do banco de dados!');
+    }
   };
 
   // 6. Confirmar Chegada / Presença
