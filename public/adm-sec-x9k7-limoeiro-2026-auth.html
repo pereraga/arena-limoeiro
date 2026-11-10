@@ -6222,8 +6222,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (stateChanged) {
         if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
         if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
+        // Atualiza apenas os contadores numéricos sem reconstruir o DOM da régua para nunca resetar o scroll da tela
         if (typeof window.updateMovementCalendarStrip === 'function') window.updateMovementCalendarStrip();
-        if (typeof window.renderMovementCalendarStrip === 'function') window.renderMovementCalendarStrip();
         if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
         if (typeof window.renderCadastrosClientes === 'function') window.renderCadastrosClientes();
       }
@@ -7631,7 +7631,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const nextEl = document.getElementById('card-' + next.id);
       if (nextEl) {
-        nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         nextEl.style.transition = 'box-shadow 0.4s ease';
         nextEl.style.boxShadow = '0 0 0 3px #10b981, 0 10px 25px -5px rgba(16, 185, 129, 0.35)';
         setTimeout(() => {
@@ -9046,11 +9045,12 @@ document.addEventListener('DOMContentLoaded', () => {
     strip.innerHTML = html;
     window.__arenaCalendarDatesList = generatedDates;
 
-    // Faz scroll suave até o dia selecionado
+    // Faz scroll suave horizontal seguro DENTRO do container da régua SEM mexer no scroll vertical da página
     setTimeout(() => {
       const activeCard = strip.querySelector(`[data-date="${selectedDate}"]`);
-      if (activeCard && typeof activeCard.scrollIntoView === 'function') {
-        activeCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      if (activeCard) {
+        const targetLeft = activeCard.offsetLeft - (strip.clientWidth / 2) + (activeCard.offsetWidth / 2);
+        strip.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
       }
     }, 50);
   };
@@ -9140,8 +9140,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
-      if (btnEl && typeof btnEl.scrollIntoView === 'function') {
-        btnEl.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      if (btnEl && strip) {
+        const targetLeft = btnEl.offsetLeft - (strip.clientWidth / 2) + (btnEl.offsetWidth / 2);
+        strip.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
       }
     }
 
