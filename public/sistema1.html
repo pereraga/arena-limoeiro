@@ -1504,22 +1504,16 @@
       </script>
     </div>
 
-          <!-- Filtro Status de Partidas -->
-          <div class="flex items-center gap-2 w-full sm:w-auto flex-1 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
-            <span class="text-[11px] sm:text-xs font-black uppercase text-slate-700 shrink-0 flex items-center gap-1 min-w-[65px]">
-              <i data-lucide="activity" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600"></i> Status:
-            </span>
-            <div class="relative flex-1 min-w-[130px]">
-              <select id="movementStatusFilter" onchange="filterMovementMatches()" class="w-full py-1.5 sm:py-2 pl-2 pr-7 border-0 rounded-lg text-xs font-bold text-slate-800 bg-transparent focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer">
-                <option value="all">⚡ Partidas Ativas (Ocultar Finalizadas)</option>
-                <option value="finished">✅ Finalizados / Concluídos</option>
-                <option value="live">🟢 Ao Vivo / Em Andamento</option>
-                <option value="confirmed">🔵 Confirmados / Próximos</option>
-                <option value="everything">👁 Exibir Todas (Com Finalizadas)</option>
-                <option value="unpaid">⚠️ Pagamento Faltando</option>
-              </select>
-              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
+          <!-- Filtro Status de Partidas (Ocultado visualmente conforme solicitação: tudo exibido direto na tela) -->
+          <div style="display:none !important;">
+            <select id="movementStatusFilter" onchange="filterMovementMatches()">
+              <option value="everything" selected>👁 Exibir Todas (Com Finalizadas)</option>
+              <option value="all">⚡ Partidas Ativas (Ocultar Finalizadas)</option>
+              <option value="finished">✅ Finalizados / Concluídos</option>
+              <option value="live">🟢 Ao Vivo / Em Andamento</option>
+              <option value="confirmed">🔵 Confirmados / Próximos</option>
+              <option value="unpaid">⚠️ Pagamento Faltando</option>
+            </select>
           </div>
 
           <!-- Filtro Status / Seletor de Quadras & Campos -->
@@ -6205,7 +6199,7 @@ document.addEventListener('DOMContentLoaded', () => {
     courts: ADMIN_COURTS,
     selectedDate: (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08'),
     movementFilterCourt: 'all',
-    movementFilterStatus: 'all',
+    movementFilterStatus: 'everything',
     cadastrosFilterCourt: 'all',
     cadastrosFilterStatus: 'all',
     cadastrosQuery: '',
@@ -9635,13 +9629,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Ao selecionar o dia atual, se o filtro estava em finalizados, reseta para ver os jogos prontos
-    const sysToday = (typeof window.getSystemToday === 'function') ? window.getSystemToday() : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-08');
-    if (dateStr === sysToday && window.adminGameState.movementFilterStatus === 'finished') {
-      window.adminGameState.movementFilterStatus = 'all';
-      const statusSelectEl = document.getElementById('movementStatusFilter');
-      if (statusSelectEl) statusSelectEl.value = 'all';
-    }
+    // Garante que todas as partidas do dia sejam exibidas na tela
+    window.adminGameState.movementFilterStatus = 'everything';
+    const statusSelectEl = document.getElementById('movementStatusFilter');
+    if (statusSelectEl) statusSelectEl.value = 'everything';
 
     // Renderiza a programação de partidas do dia clicado / selecionado
     if (typeof window.renderMovementMatches === 'function') {
@@ -9692,7 +9683,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.adminGameState.movementFilterCourt = courtFilter;
 
     const statusSelectEl = document.getElementById('movementStatusFilter');
-    const statusFilter = statusSelectEl ? statusSelectEl.value : (window.adminGameState.movementFilterStatus || 'all');
+    const statusFilter = statusSelectEl ? statusSelectEl.value : (window.adminGameState.movementFilterStatus || 'everything');
     window.adminGameState.movementFilterStatus = statusFilter;
 
     // Atualiza o Título do Feed com indicação da Quadra / Espaço e Status
@@ -9702,19 +9693,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cObj = getCourtById(courtFilter);
         courtSuffix = ' • <span class="text-emerald-700 font-black">' + (cObj.name || courtFilter) + '</span>';
       }
-      if (statusFilter === 'finished') {
-        titleEl.innerHTML = 'Partidas Finalizadas de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Histórico Concluído</span>';
-      } else if (statusFilter === 'everything') {
-        titleEl.innerHTML = 'Todas as Partidas de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-slate-100 text-slate-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Geral (' + allMatches.length + ')</span>';
-      } else if (statusFilter === 'unpaid' || statusFilter === 'cancelled') {
-        titleEl.innerHTML = 'Partidas com Pagamento Faltando em ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full font-bold ml-2">Pagamento Faltando</span>';
-      } else if (statusFilter === 'live') {
-        titleEl.innerHTML = 'Partidas Ao Vivo / Em Andamento em ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2 animate-pulse">● Na Quadra</span>';
-      } else if (statusFilter === 'confirmed') {
-        titleEl.innerHTML = 'Próximas Partidas Confirmadas para ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Programadas</span>';
-      } else {
-        titleEl.innerHTML = 'Partidas de ' + formatDisplayDate(dateStr) + courtSuffix;
-      }
+      titleEl.innerHTML = 'Partidas de ' + formatDisplayDate(dateStr) + courtSuffix;
     }
 
     let matches = allMatches;
