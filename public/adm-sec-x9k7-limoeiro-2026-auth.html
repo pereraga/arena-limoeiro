@@ -9247,91 +9247,96 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- SEÇÃO RECOLHÍVEL: DETALHES, AJUSTES DE TEMPO E OUTROS BOTÕES -->
         <div class="booking-expanded-panel ${isPanelOpen ? '' : 'hidden'}" id="details-${m.id}" style="${isPanelOpen ? 'display:block;' : 'display:none;'} margin-top: 1.25rem; padding-top: 1rem;">
           
-          <!-- PAINEL MODULAR DE INFORMAÇÕES BÁSICAS (2 Cards de Resumo) -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5">
+          <!-- GRID UNIFICADA: INFORMAÇÕES BÁSICAS E AJUSTES OPERACIONAIS LADO A LADO NO DESKTOP -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mb-3 sm:mb-4">
             
-            <!-- Card 1: Campo e Modalidade -->
-            <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group">
-              <div class="flex items-center justify-between text-slate-400 mb-1">
-                <span class="text-[10px] font-bold uppercase tracking-wider">Campo / Modalidade</span>
-                <i class="fa-solid fa-futbol text-emerald-600 text-xs"></i>
-              </div>
-              <div class="font-bold text-slate-800 text-sm group-hover:text-emerald-700 transition">${court.name}</div>
-              <div class="text-[11px] text-slate-500 mt-0.5">${court.type || 'Grama Sintética Profissional'}</div>
-            </div>
-
-            <!-- Card 2: Faturamento e Pagamento -->
-            <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group">
-              <div class="flex items-center justify-between text-slate-400 mb-1">
-                <span class="text-[10px] font-bold uppercase tracking-wider">Status Financeiro</span>
-                <i class="fa-solid fa-receipt text-emerald-600 text-xs"></i>
-              </div>
-              <div class="font-bold ${isUnpaid ? 'text-amber-800' : 'text-emerald-700'} text-sm">${isMensalista ? 'Mensal' : (payment + ' • R$ ' + price)}</div>
-              <div class="text-[11px] text-slate-500 mt-0.5 flex items-center justify-between">
-                <span>${isMensalista ? 'Contrato mensal' : (isUnpaid ? 'Pagamento pendente' : 'Sem pendências')}</span>
-                <a href="#" onclick="viewReceipt('${m.id}'); return false;" class="text-emerald-600 font-semibold hover:underline">Ver Recibo</a>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- ZONA DE AJUSTES OPERACIONAIS (COMPACTA, ELEGANTE E ERGONÔMICA NO MOBILE) -->
-          <div class="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50/90 border border-slate-200/90 mb-3 sm:mb-4">
-            <div class="flex items-center justify-between pb-1.5 sm:pb-2.5 mb-2 sm:mb-3 border-b border-slate-200/70">
-              <span class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 sm:gap-2">
-                <i class="fa-solid fa-sliders text-emerald-600 text-[11px] sm:text-xs"></i> Ajustes Operacionais & Tempo
-              </span>
-              <span class="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden xs:inline">Manual e recálculo</span>
-            </div>
-
-            <!-- Grade Responsiva: 2 colunas para Atraso e Horário Extra -->
-            <div class="grid grid-cols-2 gap-2 sm:gap-3">
-              
-              <!-- Bloco A: Tempo de Atraso -->
-              <div class="p-1.5 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 overflow-hidden">
-                <div class="flex items-center justify-between gap-1">
-                  <span class="text-[9.5px] sm:text-[11px] font-bold uppercase text-slate-500 truncate">Atraso</span>
-                  <div class="flex gap-0.5 shrink-0">
-                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 15)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+15m</button>
-                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+30m</button>
+            <!-- Coluna 1: Informações Básicas (Campo / Modalidade e Status Financeiro) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <!-- Card 1: Campo e Modalidade -->
+              <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-slate-400 mb-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Campo / Modalidade</span>
+                    <i class="fa-solid fa-futbol text-emerald-600 text-xs"></i>
                   </div>
+                  <div class="font-bold text-slate-800 text-sm group-hover:text-emerald-700 transition">${court.name}</div>
                 </div>
-                <!-- Seletor de Horário de Chegada com relógio -->
-                <label for="input-arr-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-amber-300 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 w-full gap-1 transition cursor-pointer">
-                  <div class="flex items-center gap-1 text-slate-600 shrink-0 pointer-events-none">
-                    <i class="fa-regular fa-clock text-amber-600 text-xs"></i>
-                    <span class="text-[10px] sm:text-xs font-bold text-slate-500 hidden xxs:inline">Chegada</span>
+                <div class="text-[11px] text-slate-500 mt-0.5">${court.type || 'Grama Sintética Profissional'}</div>
+              </div>
+
+              <!-- Card 2: Faturamento e Pagamento -->
+              <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-slate-400 mb-1">
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Status Financeiro</span>
+                    <i class="fa-solid fa-receipt text-emerald-600 text-xs"></i>
                   </div>
-                  <input type="time" id="input-arr-${m.id}" value="${initialArrTime || startT}" onchange="onGameArrivalInput('${m.id}', this.value)" class="text-xs sm:text-sm font-black text-slate-900 bg-transparent focus:outline-none cursor-pointer w-full text-right outline-none">
-                </label>
-                <div id="status-delay-${m.id}" class="text-[9px] sm:text-[10.5px] font-semibold truncate ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'}">
-                  ${lateMin > 0 ? `Atraso: ${lateMin}m` : `✓ No horário`}
+                  <div class="font-bold ${isUnpaid ? 'text-amber-800' : 'text-emerald-700'} text-sm">${isMensalista ? 'Mensal' : (payment + ' • R$ ' + price)}</div>
+                </div>
+                <div class="text-[11px] text-slate-500 mt-0.5 flex items-center justify-between">
+                  <span>${isMensalista ? 'Contrato mensal' : (isUnpaid ? 'Pagamento pendente' : 'Sem pendências')}</span>
+                  <a href="#" onclick="viewReceipt('${m.id}'); return false;" class="text-emerald-600 font-semibold hover:underline">Ver Recibo</a>
                 </div>
               </div>
+            </div>
 
-              <!-- Bloco B: Horário Extra -->
-              <div class="p-1.5 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 overflow-hidden">
-                <div class="flex items-center justify-between gap-1">
-                  <span class="text-[9.5px] sm:text-[11px] font-bold uppercase text-slate-500 truncate">Extra</span>
-                  <div class="flex gap-0.5 shrink-0">
-                    <button type="button" onclick="quickAddExtraCard('${m.id}', 30)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+30m</button>
-                    <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+1h</button>
-                  </div>
-                </div>
-                <!-- Seletor de Término Estendido com relógio -->
-                <label for="input-extended-end-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 w-full gap-1 transition cursor-pointer">
-                  <div class="flex items-center gap-1 text-slate-600 shrink-0 pointer-events-none">
-                    <i class="fa-regular fa-clock text-emerald-600 text-xs"></i>
-                    <span class="text-[10px] sm:text-xs font-bold text-slate-500 hidden xxs:inline">Término</span>
-                  </div>
-                  <input type="time" id="input-extended-end-${m.id}" value="${initialExtEndTime || endT}" onchange="onGameExtendedEndInput('${m.id}', this.value)" class="text-xs sm:text-sm font-black text-slate-900 bg-transparent focus:outline-none cursor-pointer w-full text-right outline-none">
-                </label>
-                <div id="status-extra-${m.id}" class="text-[9px] sm:text-[10.5px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
-                  ${extraMin > 0 ? `+${extraMin}m (+R$${computedExtraAmountStr})` : 'Sem tempo extra'}
-                </div>
+            <!-- Coluna 2: Zona de Ajustes Operacionais & Tempo -->
+            <div class="p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl bg-slate-50/90 border border-slate-200/90 flex flex-col justify-between">
+              <div class="flex items-center justify-between pb-1.5 sm:pb-2 mb-2 border-b border-slate-200/70">
+                <span class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 sm:gap-2">
+                  <i class="fa-solid fa-sliders text-emerald-600 text-[11px] sm:text-xs"></i> Ajustes Operacionais & Tempo
+                </span>
+                <span class="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden xs:inline">Manual e recálculo</span>
               </div>
 
+              <!-- Grade: 2 colunas para Atraso e Horário Extra -->
+              <div class="grid grid-cols-2 gap-2 sm:gap-2.5">
+                <!-- Bloco A: Tempo de Atraso -->
+                <div class="p-1.5 sm:p-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 overflow-hidden">
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="text-[9.5px] sm:text-[10.5px] font-bold uppercase text-slate-500 truncate">Atraso</span>
+                    <div class="flex gap-0.5 shrink-0">
+                      <button type="button" onclick="quickAddAtrasoCard('${m.id}', 15)" class="text-[8px] sm:text-[9px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+15m</button>
+                      <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[8px] sm:text-[9px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+30m</button>
+                    </div>
+                  </div>
+                  <!-- Seletor de Horário de Chegada com relógio -->
+                  <label for="input-arr-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-amber-300 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 w-full gap-1 transition cursor-pointer">
+                    <div class="flex items-center gap-1 text-slate-600 shrink-0 pointer-events-none">
+                      <i class="fa-regular fa-clock text-amber-600 text-xs"></i>
+                      <span class="text-[10px] sm:text-xs font-bold text-slate-500 hidden xxs:inline">Chegada</span>
+                    </div>
+                    <input type="time" id="input-arr-${m.id}" value="${initialArrTime || startT}" onchange="onGameArrivalInput('${m.id}', this.value)" class="text-xs sm:text-sm font-black text-slate-900 bg-transparent focus:outline-none cursor-pointer w-full text-right outline-none">
+                  </label>
+                  <div id="status-delay-${m.id}" class="text-[9px] sm:text-[10px] font-semibold truncate ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                    ${lateMin > 0 ? `Atraso: ${lateMin}m` : `✓ No horário`}
+                  </div>
+                </div>
+
+                <!-- Bloco B: Horário Extra -->
+                <div class="p-1.5 sm:p-2 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 overflow-hidden">
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="text-[9.5px] sm:text-[10.5px] font-bold uppercase text-slate-500 truncate">Extra</span>
+                    <div class="flex gap-0.5 shrink-0">
+                      <button type="button" onclick="quickAddExtraCard('${m.id}', 30)" class="text-[8px] sm:text-[9px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+30m</button>
+                      <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[8px] sm:text-[9px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+1h</button>
+                    </div>
+                  </div>
+                  <!-- Seletor de Término Estendido com relógio -->
+                  <label for="input-extended-end-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 w-full gap-1 transition cursor-pointer">
+                    <div class="flex items-center gap-1 text-slate-600 shrink-0 pointer-events-none">
+                      <i class="fa-regular fa-clock text-emerald-600 text-xs"></i>
+                      <span class="text-[10px] sm:text-xs font-bold text-slate-500 hidden xxs:inline">Término</span>
+                    </div>
+                    <input type="time" id="input-extended-end-${m.id}" value="${initialExtEndTime || endT}" onchange="onGameExtendedEndInput('${m.id}', this.value)" class="text-xs sm:text-sm font-black text-slate-900 bg-transparent focus:outline-none cursor-pointer w-full text-right outline-none">
+                  </label>
+                  <div id="status-extra-${m.id}" class="text-[9px] sm:text-[10px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
+                    ${extraMin > 0 ? `+${extraMin}m (+R$${computedExtraAmountStr})` : 'Sem tempo extra'}
+                  </div>
+                </div>
+              </div>
             </div>
+
           </div>
 
           <!-- BOTÕES DE GESTÃO SECUNDÁRIA: GRADE 2x2 NO MOBILE, DOIS GRUPOS ALINHADOS NAS PONTAS NO PC (SM+) -->
