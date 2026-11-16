@@ -6915,6 +6915,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const strId = String(id);
     const el = document.getElementById('details-' + strId);
     const arrowEl = document.getElementById('arrow-details-' + strId);
+    const arrowMobEl = document.getElementById('arrow-details-mob-' + strId);
     if (el) {
       const isHidden = (el.style.display === 'none' || el.classList.contains('hidden'));
       if (isHidden) {
@@ -6922,11 +6923,13 @@ document.addEventListener('DOMContentLoaded', () => {
         el.classList.remove('hidden');
         window.__openDetailsIds.add(strId);
         if (arrowEl) arrowEl.textContent = '▴';
+        if (arrowMobEl) arrowMobEl.textContent = '▴';
       } else {
         el.style.display = 'none';
         el.classList.add('hidden');
         window.__openDetailsIds.delete(strId);
         if (arrowEl) arrowEl.textContent = '▾';
+        if (arrowMobEl) arrowMobEl.textContent = '▾';
       }
     }
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -9154,8 +9157,8 @@ document.addEventListener('DOMContentLoaded', () => {
               </div>
             </div>
 
-            <!-- Linha de Status e Toggle Retrátil "Detalhes e ações" -->
-            <div class="flex items-center justify-between pt-1 sm:pt-2">
+            <!-- Linha de Status e Toggle Retrátil "Detalhes e ações" (no desktop fica aqui, no mobile fica junto com o botão principal) -->
+            <div class="hidden sm:flex items-center justify-between pt-1 sm:pt-2">
               <div class="text-[11px] sm:text-xs font-semibold text-slate-700 flex items-center gap-1.5 sm:gap-2 truncate">
                 Status:
                 <span class="inline-flex items-center gap-1 sm:gap-1.5 font-semibold truncate ${statusInlineTextColor}">
@@ -9172,7 +9175,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           </div>
 
-          <!-- Bloco 3: Valor Financeiro e Botão Principal -->
+          <!-- Bloco 3: Valor Financeiro e Botões de Ação -->
           <div class="lg:col-span-3 flex lg:flex-col items-center lg:items-end justify-between lg:justify-start gap-2.5 sm:gap-4 pt-1 sm:pt-0">
             <div class="text-left lg:text-right">
               ${isMensalista ? `
@@ -9194,39 +9197,45 @@ document.addEventListener('DOMContentLoaded', () => {
               `}
             </div>
 
-            <!-- BOTÃO PRINCIPAL VISÍVEL: VERDE PARA INICIAR -> APÓS APERTAR, FICA VERMELHO (FINALIZAR) -->
-            <div class="w-auto lg:w-full flex justify-end">
+            <!-- BOTÕES DE AÇÃO: JUNTOS NO MOBILE (Detalhes e ações + Iniciar Jogo) -->
+            <div class="w-auto lg:w-full flex items-center justify-end gap-1.5">
+              <!-- Botão Detalhes e Ações agrupado no Mobile -->
+              <button type="button" onclick="toggleDetails('${m.id}')" class="flex sm:hidden items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition py-2 px-3 rounded-full active:scale-95 cursor-pointer shrink-0" title="Ver detalhes e ajustes">
+                <span>Detalhes</span>
+                <span id="arrow-details-mob-${m.id}" class="text-[10px] font-bold transition-transform duration-200">${isPanelOpen ? '▴' : '▾'}</span>
+              </button>
+
               ${(st === 'unpaid' || st === 'cancelled') ? `
-                <div class="flex flex-col sm:flex-row items-end sm:items-center justify-end gap-2">
-                  <span class="px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-[11px] sm:text-xs font-extrabold text-amber-900 bg-amber-100 border border-amber-300 shadow-xs inline-flex items-center gap-1.5">
-                    <i class="fa-solid fa-triangle-exclamation text-amber-700"></i> Pagamento Faltando
+                <div class="flex items-center justify-end gap-1.5">
+                  <span class="hidden xs:inline-flex px-2 py-1 rounded-xl text-[10px] font-extrabold text-amber-900 bg-amber-100 border border-amber-300 shadow-xs items-center gap-1">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-700"></i> Falta Pagar
                   </span>
-                  <!-- Botão de Não Compareceu / Falta: Abre modal de justificativa e apaga o jogo do banco -->
-                  <button type="button" onclick="openNoShow('${m.id}')" class="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-full font-bold text-[11px] sm:text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1 cursor-pointer" title="Responsável não compareceu (remover do sistema)">
+                  <!-- Botão de Não Compareceu / Falta -->
+                  <button type="button" onclick="openNoShow('${m.id}')" class="px-2.5 py-2 rounded-full font-bold text-[11px] text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1 cursor-pointer" title="Responsável não compareceu">
                     <i class="fa-solid fa-user-xmark text-xs text-rose-600"></i>
                     <span>Falta</span>
                   </button>
-                  <!-- Botão de Pagamento: Abre a janela padrão para escolher a forma (PIX, Dinheiro, Cartão, Dividido) e concluir -->
-                  <button type="button" id="btn-pay-action-${m.id}" onclick="openFinishGame('${m.id}')" class="px-4 py-2 sm:px-5 sm:py-2.5 rounded-full font-black text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer" title="Abrir janela para escolher a forma de pagamento e concluir partida">
+                  <!-- Botão de Pagamento -->
+                  <button type="button" id="btn-pay-action-${m.id}" onclick="openFinishGame('${m.id}')" class="px-3.5 py-2 rounded-full font-black text-xs text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-md shadow-emerald-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
                     <i class="fa-solid fa-hand-holding-dollar text-xs sm:text-sm"></i>
                     <span>Pagar</span>
                   </button>
                 </div>
               ` : (st === 'finished' ? `
-                <div class="flex items-center gap-1.5 sm:gap-2">
-                  <span class="px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 shadow-xs inline-flex items-center gap-1">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-full text-[11px] sm:text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 shadow-xs inline-flex items-center gap-1">
                     <i class="fa-solid fa-circle-check text-emerald-600"></i> Finalizada
                   </span>
-                  <button type="button" onclick="viewReceipt('${m.id}')" class="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] sm:text-xs font-bold rounded-xl border border-slate-300 transition cursor-pointer inline-flex items-center gap-1" title="Ver Recibo">
+                  <button type="button" onclick="viewReceipt('${m.id}')" class="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] sm:text-xs font-bold rounded-full border border-slate-300 transition cursor-pointer inline-flex items-center gap-1" title="Ver Recibo">
                     <i class="fa-solid fa-receipt text-slate-500"></i> Recibo
                   </button>
                 </div>
               ` : (isLive ? `
-                <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Finalizar partida" class="w-auto px-4 py-2 sm:px-6 sm:py-2.5 rounded-full font-bold text-xs text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 shadow-md shadow-red-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+                <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Finalizar partida" class="px-4 py-2 sm:px-6 sm:py-2.5 rounded-full font-bold text-xs text-white bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 shadow-md shadow-red-600/30 transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shrink-0">
                   <i class="fa-solid fa-check text-[11px]"></i> Finalizar
                 </button>
               ` : `
-                <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Iniciar jogo na quadra" class="w-auto px-4 py-2 sm:px-6 sm:py-2.5 rounded-full font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-600 shadow-md shadow-emerald-700/25 transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+                <button type="button" id="btn-main-action-${m.id}" onclick="handleGameMainAction('${m.id}')" title="Iniciar jogo na quadra" class="px-3.5 py-2 sm:px-6 sm:py-2.5 rounded-full font-bold text-xs text-white bg-emerald-700 hover:bg-emerald-600 shadow-md shadow-emerald-700/25 transition-all duration-300 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer shrink-0">
                   <i class="fa-solid fa-play text-[10px]"></i> ${(isToday && nowTimeMin >= sMinStart && nowTimeMin < (sMinStart + 5)) ? ('Iniciar (' + ((sMinStart + 5) - nowTimeMin) + 'm)') : 'Iniciar Jogo'}
                 </button>
               `))}
