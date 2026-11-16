@@ -6483,6 +6483,33 @@ document.addEventListener('DOMContentLoaded', () => {
               method: 'DELETE',
               headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey, Prefer: 'return=minimal' }
             });
+            // Propaga marcador de exclusão definitiva na nuvem para sincronizar instantaneamente entre Celular e PC
+            const tsPayload = {
+              id: 'tombstone-' + payload.id,
+              court_id: 'court-beach-1',
+              date: payload.date || '2026-11-16',
+              start_time: '00:00',
+              end_time: '00:01',
+              time: '00:00 às 00:01',
+              duration: 1,
+              customer_name: 'DELETED_SYNC',
+              customer_phone: '0000000000',
+              total_price: 0,
+              status: 'cancelled',
+              booking_type: 'avulso',
+              payment_method: 'pix',
+              observation: 'TOMBSTONE:::' + JSON.stringify({ deletedId: payload.id, at: Date.now() })
+            };
+            await fetch(dbUrl + '/rest/v1/bookings', {
+              method: 'POST',
+              headers: {
+                apikey: dbKey,
+                Authorization: 'Bearer ' + dbKey,
+                'Content-Type': 'application/json',
+                Prefer: 'resolution=merge-duplicates,return=minimal'
+              },
+              body: JSON.stringify(tsPayload)
+            });
           } else {
             // Upsert atômico em 1 requisição com preferência merge-duplicates
             const res = await fetch(dbUrl + '/rest/v1/bookings', {
@@ -6624,8 +6651,33 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         });
 
-        // Filtra registros normais de agendamentos para não poluir tabelas ou listas
-        const cleanBookings = cloudBookings.filter(b => b && !String(b.id).startsWith('arena-note-') && !(b.observation && b.observation.startsWith('NOTE_SYNC:::')));
+        // Processa marcadores de exclusão (Tombstones) sincronizados entre dispositivos na nuvem
+        window.__arenaCloudTombstones = window.__arenaCloudTombstones || new Set();
+        window.__arenaCloudMemberTombstones = window.__arenaCloudMemberTombstones || new Set();
+        cloudBookings.forEach(b => {
+          if (!b) return;
+          const isTombstone = String(b.id).startsWith('tombstone-') || (b.observation && b.observation.startsWith('TOMBSTONE:::'));
+          if (isTombstone && b.observation && b.observation.startsWith('TOMBSTONE:::')) {
+            try {
+              if (b.observation.startsWith('TOMBSTONE:::member:::')) {
+                const payload = JSON.parse(b.observation.slice(21));
+                if (payload && payload.deletedId) window.__arenaCloudMemberTombstones.add(String(payload.deletedId));
+              } else {
+                const payload = JSON.parse(b.observation.slice(12));
+                if (payload && payload.deletedId) window.__arenaCloudTombstones.add(String(payload.deletedId));
+              }
+            } catch(e) {}
+          }
+        });
+
+        // Filtra registros normais de agendamentos para não poluir tabelas ou listas (exclui notas, marcadores e itens deletados)
+        const cleanBookings = cloudBookings.filter(b => {
+          if (!b) return false;
+          if (String(b.id).startsWith('arena-note-') || (b.observation && b.observation.startsWith('NOTE_SYNC:::'))) return false;
+          if (String(b.id).startsWith('tombstone-') || (b.observation && b.observation.startsWith('TOMBSTONE:::'))) return false;
+          if (window.__arenaCloudTombstones.has(String(b.id))) return false;
+          return true;
+        });
 
         const newSig = cleanBookings.length + '_' + cleanBookings.map(b => b.id + ':' + b.status + ':' + (b.date || '') + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
         if (newSig !== window.__lastBookingsSig) {
@@ -6635,8 +6687,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      // 2. Atualiza mensalistas diretamente do banco de dados na nuvem
+      // 2. Atualiza mensalistas diretamente do banco de dados na nuvem (removendo mensalistas excluídos via tombstone)
       if (Array.isArray(cloudMembers)) {
+        if (window.__arenaCloudMemberTombstones && window.__arenaCloudMemberTombstones.size > 0) {
+          cloudMembers = cloudMembers.filter(m => m && !window.__arenaCloudMemberTombstones.has(String(m.id)));
+        }
         const memSig = cloudMembers.length + '_' + cloudMembers.map(m => m.id + ':' + m.status + ':' + (m.day_of_week || '')).join(',');
         if (memSig !== window.__lastMembersSig) {
           window.__lastMembersSig = memSig;
@@ -11045,6 +11100,29 @@ document.addEventListener('DOMContentLoaded', () => {
               headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey }
             });
           }
+          if (monthlyId) {
+            const tsItem = {
+              id: 'tombstone-member-' + monthlyId,
+              court_id: 'court-beach-1',
+              date: '2026-11-16',
+              start_time: '00:00',
+              end_time: '00:01',
+              time: '00:00 às 00:01',
+              duration: 1,
+              customer_name: 'DELETED_SYNC',
+              customer_phone: '0000000000',
+              total_price: 0,
+              status: 'cancelled',
+              booking_type: 'avulso',
+              payment_method: 'pix',
+              observation: 'TOMBSTONE:::member:::' + JSON.stringify({ deletedId: monthlyId, at: Date.now() })
+            };
+            await fetch(dbUrl + '/rest/v1/bookings', {
+              method: 'POST',
+              headers: { apikey: dbKey, Authorization: 'Bearer ' + dbKey, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates' },
+              body: JSON.stringify(tsItem)
+            });
+          }
         } catch(e) {
           console.warn('[ArenaCloud] Erro ao deletar de bookings:', e);
         }
@@ -13264,8 +13342,12 @@ const cancelGame = window.cancelGame = async function(id, evt) {
     if (typeof window.renderMovementCalendarStrip === 'function') window.renderMovementCalendarStrip();
     if (typeof renderCadastrosBookingsList === 'function') renderCadastrosBookingsList();
 
-    // 4. Executa EXCLUSÃO REAL E DEFINITIVA nos bancos na nuvem (DB2 e DB1)
+    // 4. Executa EXCLUSÃO REAL E DEFINITIVA nos bancos na nuvem (DB2 e DB1) com marcadores de exclusão distribuídos (Tombstones)
     if (window.ARENA_CLOUD_DBS) {
+      window.__arenaCloudTombstones = window.__arenaCloudTombstones || new Set();
+      window.__arenaCloudTombstones.add(targetId);
+      if (isMonthly) window.__arenaCloudTombstones.add(rawMonthlyId);
+
       const deleteDb = async (dbUrl, dbKey, table, qId) => {
         try {
           await fetch(dbUrl + '/rest/v1/' + table + '?id=eq.' + encodeURIComponent(qId), {
@@ -13275,17 +13357,52 @@ const cancelGame = window.cancelGame = async function(id, evt) {
         } catch(e) {}
       };
 
-      // Exclui em bookings e em monthly_members
+      const sendTombstone = async (dbUrl, dbKey, deletedId, isMember) => {
+        try {
+          const tsItem = {
+            id: 'tombstone-' + deletedId,
+            court_id: 'court-beach-1',
+            date: selDate,
+            start_time: '00:00',
+            end_time: '00:01',
+            time: '00:00 às 00:01',
+            duration: 1,
+            customer_name: 'DELETED_SYNC',
+            customer_phone: '0000000000',
+            total_price: 0,
+            status: 'cancelled',
+            booking_type: 'avulso',
+            payment_method: 'pix',
+            observation: 'TOMBSTONE:::' + (isMember ? 'member:::' : '') + JSON.stringify({ deletedId: deletedId, at: Date.now() })
+          };
+          await fetch(dbUrl + '/rest/v1/bookings', {
+            method: 'POST',
+            headers: {
+              apikey: dbKey,
+              Authorization: 'Bearer ' + dbKey,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates,return=minimal'
+            },
+            body: JSON.stringify(tsItem)
+          });
+        } catch(e) {}
+      };
+
+      // Exclui em bookings e em monthly_members e propaga tombstone para todos os computadores e celulares
       const tasks = [
         deleteDb(cloudDbs.db2Url, cloudDbs.db2Key, 'bookings', targetId),
-        deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', targetId)
+        deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', targetId),
+        sendTombstone(cloudDbs.db2Url, cloudDbs.db2Key, targetId, false),
+        sendTombstone(cloudDbs.db1Url, cloudDbs.db1Key, targetId, false)
       ];
       if (isMonthly) {
         tasks.push(
           deleteDb(cloudDbs.db2Url, cloudDbs.db2Key, 'monthly_members', rawMonthlyId),
           deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'monthly_members', rawMonthlyId),
           deleteDb(cloudDbs.db2Url, cloudDbs.db2Key, 'bookings', rawMonthlyId),
-          deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', rawMonthlyId)
+          deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', rawMonthlyId),
+          sendTombstone(cloudDbs.db2Url, cloudDbs.db2Key, rawMonthlyId, true),
+          sendTombstone(cloudDbs.db1Url, cloudDbs.db1Key, rawMonthlyId, true)
         );
       }
       await Promise.allSettled(tasks);
