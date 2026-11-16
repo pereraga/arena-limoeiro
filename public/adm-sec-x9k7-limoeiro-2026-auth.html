@@ -8855,7 +8855,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const durStr = (typeof calcDuration === 'function') ? calcDuration(startT, endT) : '1h';
 
     const isMensalista = m.isMensalista || m.type === 'Mensalista' || m.booking_type === 'mensalista';
-    const typeLabel = isMensalista ? 'Mensalista VIP' : (m.type || m.booking_type || 'Avulso');
+    const typeLabel = isMensalista ? 'Mensalista' : (m.type || m.booking_type || 'Avulso');
     
     const cleanPhone = (m.customer_phone || m.phone || '').replace(/\D/g, '');
     const phoneDisplay = (typeof formatPhone === 'function') ? formatPhone(m.customer_phone || m.phone) : (m.customer_phone || m.phone || '(81) 9958-1034');
