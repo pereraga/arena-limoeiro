@@ -9284,8 +9284,8 @@ document.addEventListener('DOMContentLoaded', () => {
               <span class="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden xs:inline">Manual e recálculo</span>
             </div>
 
-            <!-- Grade Responsiva: 2 colunas no mobile e 4 em telas grandes -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+            <!-- Grade Responsiva: 2 colunas para Atraso e Horário Extra -->
+            <div class="grid grid-cols-2 gap-2 sm:gap-3">
               
               <!-- Bloco A: Tempo de Atraso -->
               <div class="p-1.5 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 overflow-hidden">
@@ -9329,36 +9329,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div id="status-extra-${m.id}" class="text-[9px] sm:text-[10.5px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
                   ${extraMin > 0 ? `+${extraMin}m (+R$${computedExtraAmountStr})` : 'Sem tempo extra'}
                 </div>
-              </div>
-
-              <!-- Bloco C: Onde foi marcado (Origem) -->
-              <div class="p-1.5 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 flex flex-col justify-between overflow-hidden">
-                <label class="block text-[9.5px] sm:text-[11px] font-bold uppercase text-slate-500 truncate">Origem</label>
-                <select id="select-origin-${m.id}" onchange="onGameOriginChange('${m.id}', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[11px] sm:text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer">
-                  <option value="Mensalista" ${originDisplay.toLowerCase().includes('mensalista') ? 'selected' : ''}>Mensalista</option>
-                  <option value="WhatsApp Oficial" ${originDisplay.toLowerCase().includes('whatsapp') ? 'selected' : ''}>WhatsApp Oficial</option>
-                  <option value="Marcado no Balcão" ${originDisplay.toLowerCase().includes('balcão') ? 'selected' : ''}>Balcão</option>
-                  <option value="Aplicativo / Web" ${originDisplay.toLowerCase().includes('app') || originDisplay.toLowerCase().includes('web') ? 'selected' : ''}>App / Web</option>
-                  <option value="Avulso" ${originDisplay.toLowerCase().includes('avulso') ? 'selected' : ''}>Avulso</option>
-                </select>
-                <div class="text-[9px] sm:text-[10px] text-slate-400 truncate" id="status-origin-${m.id}">${originDisplay}</div>
-              </div>
-
-              <!-- Bloco D: Cálculo Automático e Valor Total -->
-              <div class="p-1.5 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 flex flex-col justify-between overflow-hidden">
-                <div class="flex items-center justify-between gap-1">
-                  <span class="text-[9.5px] sm:text-[11px] font-bold uppercase text-slate-400 truncate">Valor / Recálculo</span>
-                  <span id="badge-calc-status-${m.id}" class="text-[8.5px] sm:text-[9.5px] font-bold ${extraMin > 0 ? 'text-amber-700 bg-amber-50' : 'text-emerald-700 bg-emerald-50'} px-1 py-0.5 sm:px-1.5 rounded shrink-0">
-                    ${extraMin > 0 ? 'Pendente' : (isMensalista ? 'Mensal' : 'Pago')}
-                  </span>
-                </div>
-                <div class="mt-0.5">
-                  <div id="status-calc-total-${m.id}" class="text-xs sm:text-base font-extrabold text-slate-900 font-heading leading-tight">${isMensalista ? ('Mensal' + (extraMin > 0 ? ' • Pendente' : '')) : ('R$ ' + currentTotalStr)}</div>
-                  <div id="status-calc-detail-${m.id}" class="text-[9px] sm:text-[10px] text-slate-400 truncate mt-0.5">
-                    ${isMensalista ? 'Contrato mensal ativo' : (extraMin > 0 ? `Base R$ ${price} + Extra: R$ ${computedExtraAmountStr}` : `Total: R$ ${price}`)}
-                  </div>
-                </div>
-              </div>
               </div>
 
             </div>
