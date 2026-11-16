@@ -7239,6 +7239,7 @@ document.addEventListener('DOMContentLoaded', () => {
     g.extra_minutes = mins;
     g.extended_end = extEnd;
 
+    // Atualizar relógio de término se presente
     const inputExt = document.getElementById('input-extended-end-' + id);
     if (inputExt && document.activeElement !== inputExt) inputExt.value = extEnd;
 
@@ -7336,6 +7337,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const calcVal = document.getElementById('calc-val-' + id);
     if (calcVal) {
       calcVal.textContent = `R$ ${totalCalculatedStr} • ${g.isMensalista ? 'Mensalidade Faturada' : (mins > 0 ? `Base R$ ${basePrice.toFixed(2).replace('.', ',')} + Extra R$ ${extraAmountStr}` : 'Avulso')}`;
+    }
+
+    const calcTotalEl = document.getElementById('status-calc-total-' + id);
+    if (calcTotalEl) {
+      calcTotalEl.textContent = `R$ ${totalCalculatedStr} • ${mins > 0 ? 'Pendente Extra' : 'Pago'}`;
+    }
+    const calcDetailEl = document.getElementById('status-calc-detail-' + id);
+    if (calcDetailEl) {
+      calcDetailEl.textContent = mins > 0 
+        ? `Base R$ ${basePrice.toFixed(2).replace('.', ',')} + Extra (${mins}m): R$ ${extraAmountStr}` 
+        : `Valor contratado: R$ ${basePrice.toFixed(2).replace('.', ',')}`;
+    }
+    const badgeCalc = document.getElementById('badge-calc-status-' + id);
+    if (badgeCalc) {
+      badgeCalc.className = `text-[10px] font-bold ${mins > 0 ? 'text-amber-700 bg-amber-50' : 'text-emerald-700 bg-emerald-50'} px-1.5 py-0.5 rounded`;
+      badgeCalc.textContent = mins > 0 ? 'Pendente Extra' : 'Pago';
+    }
+    const mainPriceEl = document.getElementById('mainPriceDisplay-' + id);
+    if (mainPriceEl) {
+      mainPriceEl.textContent = `R$ ${totalCalculatedStr}`;
     }
 
     if (typeof saveAdminGameState === 'function') saveAdminGameState();
@@ -9003,6 +9024,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentTotalStr = currentTotalNum.toFixed(2).replace('.', ',');
     const computedExtraAmountStr = computedExtraAmount > 0 ? computedExtraAmount.toFixed(2).replace('.', ',') : '0,00';
 
+    const initialArrTime = m.arrival_time || (lateMin > 0 ? (typeof window.calcArrivalFromDelay === 'function' ? window.calcArrivalFromDelay(startT, lateMin) : '') : '');
+    const initialExtEndTime = m.extended_end || (extraMin > 0 ? (typeof window.calcExtendedEndFromExtra === 'function' ? window.calcExtendedEndFromExtra(endT, extraMin) : '') : '');
+
     let originDisplay = m.booking_origin;
     if (!originDisplay) {
       if (isMensalista) originDisplay = 'Mensalista';
@@ -9289,16 +9313,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+30m</button>
                   </div>
                 </div>
-                <div class="flex items-center gap-1">
-                  <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full justify-center">
-                    <input type="number" id="input-delay-h-${m.id}" min="0" max="23" value="${lateH > 0 ? lateH : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-6 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
-                    <span class="text-[10px] text-slate-400 mr-1.5 font-bold">h</span>
-                    <input type="number" id="input-delay-m-${m.id}" min="0" max="59" step="5" value="${lateM > 0 ? lateM : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-8 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
-                    <span class="text-[10px] text-slate-400 font-bold">min</span>
+                <!-- Seletor de Horas/Minutos e Relógio com Time Picker Nativo -->
+                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full gap-1">
+                  <div class="flex items-center">
+                    <input type="number" id="input-delay-h-${m.id}" min="0" max="23" value="${lateH > 0 ? lateH : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-5 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 mr-1 font-bold">h</span>
+                    <input type="number" id="input-delay-m-${m.id}" min="0" max="59" step="5" value="${lateM > 0 ? lateM : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-6 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 font-bold">m</span>
+                  </div>
+                  <div class="h-3.5 w-px bg-slate-200"></div>
+                  <div class="flex items-center gap-1" title="Clique no relógio para selecionar horário de chegada">
+                    <i class="fa-regular fa-clock text-amber-600 text-xs shrink-0"></i>
+                    <input type="time" id="input-arr-${m.id}" value="${initialArrTime}" onchange="onGameArrivalInput('${m.id}', this.value)" class="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer w-[72px]">
                   </div>
                 </div>
                 <div id="status-delay-${m.id}" class="text-[10px] font-semibold truncate ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'}">
-                  ${lateMin > 0 ? `Atraso: ${lateMin}min` : `✓ No horário`}
+                  ${lateMin > 0 ? `Atraso: ${lateMin}min${initialArrTime ? ' (' + initialArrTime + ')' : ''}` : `✓ No horário`}
                 </div>
               </div>
 
@@ -9311,16 +9341,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+1h</button>
                   </div>
                 </div>
-                <div class="flex items-center gap-1">
-                  <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full justify-center">
-                    <input type="number" id="input-extra-h-${m.id}" min="0" max="23" value="${extraH > 0 ? extraH : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-6 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
-                    <span class="text-[10px] text-slate-400 mr-1.5 font-bold">h</span>
-                    <input type="number" id="input-extra-m-${m.id}" min="0" max="59" step="15" value="${extraM > 0 ? extraM : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-8 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
-                    <span class="text-[10px] text-slate-400 font-bold">min</span>
+                <!-- Seletor de Horas/Minutos e Relógio com Time Picker Nativo -->
+                <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full gap-1">
+                  <div class="flex items-center">
+                    <input type="number" id="input-extra-h-${m.id}" min="0" max="23" value="${extraH > 0 ? extraH : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-5 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 mr-1 font-bold">h</span>
+                    <input type="number" id="input-extra-m-${m.id}" min="0" max="59" step="15" value="${extraM > 0 ? extraM : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-6 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 font-bold">m</span>
+                  </div>
+                  <div class="h-3.5 w-px bg-slate-200"></div>
+                  <div class="flex items-center gap-1" title="Clique no relógio para definir término estendido">
+                    <i class="fa-regular fa-clock text-emerald-600 text-xs shrink-0"></i>
+                    <input type="time" id="input-extended-end-${m.id}" value="${initialExtEndTime}" onchange="onGameExtendedEndInput('${m.id}', this.value)" class="text-xs font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer w-[72px]">
                   </div>
                 </div>
                 <div id="status-extra-${m.id}" class="text-[10px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
-                  ${extraMin > 0 ? `+${extraH > 0 ? extraH + 'h ' : ''}${extraM}m (+R$ ${computedExtraAmountStr})` : 'Sem tempo extra'}
+                  ${extraMin > 0 ? `+${extraH > 0 ? extraH + 'h ' : ''}${extraM}m (+R$ ${computedExtraAmountStr})${initialExtEndTime ? ' até ' + initialExtEndTime : ''}` : 'Sem tempo extra'}
                 </div>
               </div>
 
