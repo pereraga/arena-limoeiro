@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <link rel="dns-prefetch" href="https://brmclyukjfijommbxhks.supabase.co">
   <link rel="dns-prefetch" href="https://aukrcnhuyultkjqsgvea.supabase.co">
@@ -44,6 +44,15 @@
   </script>
   <script src="/default-data.js"></script>
     <script>
+    // Definição Global dos Bancos na Nuvem (Dual-Cloud DB1 e DB2)
+    window.ARENA_CLOUD_DBS = {
+      db1Url: 'https://brmclyukjfijommbxhks.supabase.co',
+      db1Key: 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+      db2Url: 'https://aukrcnhuyultkjqsgvea.supabase.co',
+      db2Key: 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi',
+      syncEndpoint: '/api/sync'
+    };
+
     // Helper oficial de data e formatação disponível no boot antes do primeiro frame
     window.getSystemToday = function() {
       const now = new Date();
@@ -105,6 +114,20 @@
 
   <style>
     body { font-family: 'Inter', sans-serif; }
+
+    /* PREVENÇÃO TOTAL DE ZOOM INDESEJADO NO MOBILE */
+    html, body {
+      touch-action: pan-x pan-y;
+      -webkit-text-size-adjust: 100%;
+    }
+    input, select, textarea {
+      font-size: 16px !important; /* Previne zoom automático do Safari/iOS ao focar no campo */
+    }
+    @media (min-width: 640px) {
+      input, select, textarea {
+        font-size: inherit !important;
+      }
+    }
     /* OTIMIZAÇÃO CRÍTICA DE CLIQUES E TOQUE INSTANTÂNEO (0MS DELAY) */
     button, [role="button"], #directBookingSlotsGrid button {
       touch-action: manipulation !important;
@@ -147,7 +170,7 @@
       cursor: pointer;
       user-select: none;
       flex: 1 1 auto;
-      min-width: 120px;
+      min-width: max-content;
     }
     
     .tab-active {
@@ -1481,8 +1504,8 @@
       </script>
     </div>
 
-          <!-- Filtro Status -->
-          <div class="flex items-center gap-2 w-full bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
+          <!-- Filtro Status de Partidas -->
+          <div class="flex items-center gap-2 w-full sm:w-auto flex-1 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
             <span class="text-[11px] sm:text-xs font-black uppercase text-slate-700 shrink-0 flex items-center gap-1 min-w-[65px]">
               <i data-lucide="activity" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600"></i> Status:
             </span>
@@ -1496,6 +1519,52 @@
                 <option value="unpaid">⚠️ Pagamento Faltando</option>
               </select>
               <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+          </div>
+
+          <!-- Filtro Status / Seletor de Quadras & Campos -->
+          <div class="flex items-center gap-2 w-full sm:w-auto flex-1 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 sm:py-1.5 transition shadow-2xs">
+            <span class="text-[11px] sm:text-xs font-black uppercase text-slate-700 shrink-0 flex items-center gap-1 min-w-[65px]">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600"></i> Espaço:
+            </span>
+            <div class="relative flex-1 min-w-[140px]">
+              <select id="movementCourtFilter" onchange="filterMovementMatches()" class="w-full py-1.5 sm:py-2 pl-2 pr-7 border-0 rounded-lg text-xs font-bold text-slate-800 bg-transparent focus:ring-2 focus:ring-emerald-600 truncate appearance-none cursor-pointer">
+                <option value="all">🏟️ Todas as Quadras e Campos</option>
+                <option value="fut5">⚽ FUT 5 – SOCCER 5</option>
+                <option value="fut6">⚽ FUT 6 – SOCCER 6</option>
+                <option value="fut7">⚽ FUT 7 – SOCCER 7</option>
+                <option value="futmesa">🎯 FOOT TABLE – FUTMESA</option>
+                <option value="areia">🏖️ AREIA – BEACH SPORTS</option>
+                <option value="society">🏟️ QUADRA – ARENA CENTRAL</option>
+              </select>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400 absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+          </div>
+
+          <!-- Pílulas Rápidas de Quadras (Rolagem Horizontal para Mobile/Desktop) -->
+          <div class="w-full pt-1">
+            <div id="movementCourtPillsContainer" class="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar select-none text-xs">
+              <button type="button" onclick="selectMovementCourtPill('all')" data-court-pill="all" class="court-pill-btn active-court-pill shrink-0 px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 bg-emerald-700 text-white border border-emerald-800 cursor-pointer">
+                <span>🏟️ Todos</span>
+              </button>
+              <button type="button" onclick="selectMovementCourtPill('fut5')" data-court-pill="fut5" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+                <span>⚽ FUT 5</span>
+              </button>
+              <button type="button" onclick="selectMovementCourtPill('fut6')" data-court-pill="fut6" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+                <span>⚽ FUT 6</span>
+              </button>
+              <button type="button" onclick="selectMovementCourtPill('fut7')" data-court-pill="fut7" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+                <span>⚽ FUT 7</span>
+              </button>
+              <button type="button" onclick="selectMovementCourtPill('futmesa')" data-court-pill="futmesa" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+                <span>🎯 FUTMESA</span>
+              </button>
+              <button type="button" onclick="selectMovementCourtPill('areia')" data-court-pill="areia" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+                <span>🏖️ AREIA</span>
+              </button>
+              <button type="button" onclick="selectMovementCourtPill('society')" data-court-pill="society" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+                <span>🏟️ QUADRA</span>
+              </button>
             </div>
           </div>
 
@@ -1560,44 +1629,40 @@
     <section id="panel-courts" class="space-y-6 hidden">
 
       <!-- SUB-NAVEGAÇÃO INTERNA: QUADRAS & MODALIDADES (ESTILO OFICIAL DA ARENA) -->
-      <!-- SUB-NAVEGAÇÃO COMPLETA: GESTÃO DE ESPAÇOS (Quadras, Categorias & Modalidades, Posições dos Jogos, Horários Fixos, Jogos) -->
-      <div class="flex items-center justify-center w-full mb-3 px-2">
-        <div class="p-2 sm:p-2.5 rounded-2xl bg-slate-100/80 border border-slate-200/90 w-full max-w-5xl shadow-2xs mx-auto">
-          <!-- Grade Flexível: Em computadores/desktops (md e acima) fica em 1 fileira só linha reta (5 botões juntos) -->
-          <!-- Em celulares pequenos (abaixo de md), divide em 2 fileiras organizadas -->
-          <div class="flex flex-wrap md:flex-nowrap items-center justify-center gap-2 w-full">
+      <!-- SUB-NAVEGAÇÃO COMPLETA: GESTÃO DE ESPAÇOS (Grade em 2 ou 3 fileiras no Mobile para fácil clique, 1 linha no Desktop) -->
+      <div class="w-full mb-4 px-1 sm:px-2">
+        <div class="p-2 sm:p-2.5 rounded-2xl bg-slate-100/90 border border-slate-200 w-full max-w-5xl shadow-2xs mx-auto">
+          <!-- Grade Responsiva: 2 colunas em telas pequenas (mobile), 3 colunas em telas médias e 5 colunas em desktop -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
             
-            <!-- Fileira 1 (Mobile) / Botões 1, 2, 3 (Desktop) -->
-            <div class="flex items-center justify-center gap-2 w-full md:w-auto md:contents">
-              <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active flex-1 md:flex-initial md:min-w-[130px] !h-[42px] px-3 sm:px-4 text-xs font-bold whitespace-nowrap">
-                <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-white"></i>
-                <span>Quadras</span>
-                <span class="badge-count shrink-0" id="badgeCourtsCount">6</span>
-              </button>
-              <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive flex-1 md:flex-initial md:min-w-[150px] !h-[42px] px-3 sm:px-4 text-xs font-bold whitespace-nowrap">
-                <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
-                <span>Modalidades</span>
-                <span class="badge-count shrink-0" id="badgeModalitiesCount">4</span>
-              </button>
-              <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive flex-1 md:flex-initial md:min-w-[165px] !h-[42px] px-3 sm:px-4 text-xs font-bold whitespace-nowrap">
-                <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-slate-700"></i>
-                <span>Posições dos Jogos</span>
-              </button>
-            </div>
+            <button type="button" id="btnCourtsSub-quadras" onclick="switchCourtsSubTab('quadras')" class="tab-btn tab-active !w-full !min-w-0 !h-[44px] px-2.5 sm:px-3 text-xs font-bold truncate">
+              <i data-lucide="layout-grid" class="w-4 h-4 shrink-0 text-white"></i>
+              <span class="truncate">Quadras</span>
+              <span class="badge-count shrink-0" id="badgeCourtsCount">6</span>
+            </button>
 
-            <!-- Fileira 2 (Mobile) / Botões 4, 5 (Desktop na mesma linha) -->
-            <div class="flex items-center justify-center gap-2 w-full md:w-auto md:contents">
-              <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive flex-1 md:flex-initial md:min-w-[155px] !h-[42px] px-3 sm:px-4 text-xs font-bold whitespace-nowrap">
-                <i data-lucide="calendar" class="w-4 h-4 shrink-0 text-slate-700"></i>
-                <span>Horários Fixos</span>
-                <span class="badge-count shrink-0" id="badgeCourtsMensalistasCount">40</span>
-              </button>
-              <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive flex-1 md:flex-initial md:min-w-[125px] !h-[42px] px-3 sm:px-4 text-xs font-bold whitespace-nowrap">
-                <span class="text-sm shrink-0">⚽</span>
-                <span>Jogos</span>
-                <span class="badge-count shrink-0" id="badgeCourtsJogosCount">0</span>
-              </button>
-            </div>
+            <button type="button" id="btnCourtsSub-modalidades" onclick="switchCourtsSubTab('modalidades')" class="tab-btn tab-inactive !w-full !min-w-0 !h-[44px] px-2.5 sm:px-3 text-xs font-bold truncate">
+              <i data-lucide="tag" class="w-4 h-4 shrink-0 text-slate-700"></i>
+              <span class="truncate">Modalidades</span>
+              <span class="badge-count shrink-0" id="badgeModalitiesCount">4</span>
+            </button>
+
+            <button type="button" id="btnCourtsSub-posicoes" onclick="switchCourtsSubTab('posicoes')" class="tab-btn tab-inactive !w-full !min-w-0 !h-[44px] px-2.5 sm:px-3 text-xs font-bold truncate col-span-2 sm:col-span-1">
+              <i data-lucide="map-pin" class="w-4 h-4 shrink-0 text-slate-700"></i>
+              <span class="truncate">Posições dos Jogos</span>
+            </button>
+
+            <button type="button" id="btnCourtsSub-mensalistas" onclick="switchCourtsSubTab('mensalistas')" class="tab-btn tab-inactive !w-full !min-w-0 !h-[44px] px-2.5 sm:px-3 text-xs font-bold truncate">
+              <i data-lucide="calendar" class="w-4 h-4 shrink-0 text-slate-700"></i>
+              <span class="truncate">Horários Fixos</span>
+              <span class="badge-count shrink-0" id="badgeCourtsMensalistasCount">40</span>
+            </button>
+
+            <button type="button" id="btnCourtsSub-jogos" onclick="switchCourtsSubTab('jogos')" class="tab-btn tab-inactive !w-full !min-w-0 !h-[44px] px-2.5 sm:px-3 text-xs font-bold truncate">
+              <span class="text-sm shrink-0">⚽</span>
+              <span class="truncate">Jogos</span>
+              <span class="badge-count shrink-0" id="badgeCourtsJogosCount">0</span>
+            </button>
 
           </div>
         </div>
@@ -3292,6 +3357,7 @@ print(resp.json())</code></pre>
       lucide.createIcons();
       if (typeof renderCadastrosClientes === 'function' && targetTab === 'cadastros') renderCadastrosClientes();
       if (typeof renderCourtsMonitor === 'function' && targetTab === 'courts') renderCourtsMonitor();
+      if (typeof window.syncMovementCourtPillsAndFilter === 'function') window.syncMovementCourtPillsAndFilter();
     }
 
     try {
@@ -3860,14 +3926,39 @@ print(resp.json())</code></pre>
 /* ========================================================================= */
 /* MONITOR DE QUADRAS - ARENA LIMOEIRO                                      */
 /* ========================================================================= */
+const cloudDbs = window.ARENA_CLOUD_DBS || {
+  db1Url: 'https://brmclyukjfijommbxhks.supabase.co',
+  db1Key: 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+  db2Url: 'https://aukrcnhuyultkjqsgvea.supabase.co',
+  db2Key: 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi'
+};
 const courtInitialData = [
  {id:'fut5',name:'FUT 5 – SOCCER 5',type:'Quadra poliesportiva',floor:'Grama sintética monofilamento premium',capacity:'10 a 12 jogadores',price:90,promo:50,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'},
  {id:'fut6',name:'FUT 6 – SOCCER 6',type:'Quadra poliesportiva',floor:'Grama sintética europeia 50 mm',capacity:'12 a 14 jogadores',price:100,promo:60,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'},
  {id:'fut7',name:'FUT 7 – SOCCER 7',type:'Quadra poliesportiva',floor:'Grama sintética FIFA Quality Pro',capacity:'14 a 20 jogadores',price:110,promo:70,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'},
  {id:'futmesa',name:'FOOT TABLE – FUTMESA',type:'Área de jogos e lazer',floor:'Mesa oficial curva com superfície antirreflexo',capacity:'2 a 4 jogadores',price:35,promo:25,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'},
  {id:'areia',name:'AREIA – BEACH SPORTS',type:'Quadra de areia tratada',floor:'Areia fina lavada especial para futevôlei/beach tennis',capacity:'4 a 8 jogadores',price:60,promo:40,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'},
- {id:'society',name:'SOCIETY – ARENA CENTRAL',type:'Campo society oficial',floor:'Grama sintética bicomponente com amortecimento',capacity:'14 a 18 jogadores',price:120,promo:80,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'}
+ {id:'society',name:'QUADRA – ARENA CENTRAL',type:'Campo society oficial',floor:'Grama sintética bicomponente com amortecimento',capacity:'14 a 18 jogadores',price:120,promo:80,promoStart:'09:00',promoEnd:'16:00',hours:'06:00 às 22:00',status:'operacional'}
 ];
+
+
+  const COURT_TO_DB_ID = {
+    'fut5': 'court-society-1',
+    'fut6': 'court-society-2',
+    'fut7': 'court-beach-1',
+    'futmesa': 'court-esportes-de-quadra-1788962671043',
+    'areia': 'court-beach-2',
+    'society': 'court-futsal-1788963178368'
+  };
+
+  const DB_TO_COURT_ID = {
+    'court-society-1': 'fut5',
+    'court-society-2': 'fut6',
+    'court-beach-1': 'fut7',
+    'court-esportes-de-quadra-1788962671043': 'futmesa',
+    'court-beach-2': 'areia',
+    'court-futsal-1788963178368': 'society'
+  };
 
 const COURT_STORAGE_KEY = 'arena_limoeiro_quadras_demo_v2';
 function loadCourtState() {
@@ -3886,86 +3977,269 @@ function loadCourtState() {
 
 let courtState = loadCourtState();
 
+// Puxa imediatamente os dados da nuvem no boot
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    if (typeof window.pullCourtsFromCloud === 'function') {
+      window.pullCourtsFromCloud();
+    }
+  }, 50);
+
+  // Ouve atualizações de outras abas/dispositivos
+  try {
+    const bcCourts = new BroadcastChannel('arena_limoeiro_sync');
+    bcCourts.addEventListener('message', ev => {
+      if (ev && ev.data && ev.data.type === 'courts_updated' && Array.isArray(ev.data.courts)) {
+        courtState.courts = ev.data.courts;
+        try { localStorage.setItem(COURT_STORAGE_KEY, JSON.stringify(courtState)); } catch(e) {}
+        if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
+        if (typeof window.syncDirectBookingCourtOptions === 'function') window.syncDirectBookingCourtOptions();
+        if (typeof autoCalculateDirectBookingPrice === 'function') autoCalculateDirectBookingPrice();
+        if (typeof renderBalcaoTimeSlots === 'function') renderBalcaoTimeSlots();
+      }
+    });
+  } catch(e) {}
+}
+
 window.pullCourtsFromCloud = async function() {
   try {
-    console.log('[ArenaCloud] Sincronizando quadras com o banco de dados...');
-    const res = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/courts?select=*&order=order_index.asc', {
-      headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
-    });
-    if (res.ok) {
-      const cloudCourts = await res.json();
-      if (Array.isArray(cloudCourts) && cloudCourts.length > 0) {
-        cloudCourts.forEach(cc => {
-          const existing = courtState.courts.find(c => c.id === cc.id);
-          if (existing) {
-            existing.name = cc.name || existing.name;
-            existing.cat = cc.category || existing.cat;
-            existing.rate = cc.base_price_per_hour || existing.rate;
-            existing.status = cc.observation || existing.status || 'operacional';
-            existing.image = cc.image || existing.image;
-          } else {
-            courtState.courts.push({
-              id: cc.id,
-              name: cc.name,
-              cat: cc.category || 'poliesportiva',
-              rate: cc.base_price_per_hour || 100,
-              status: cc.observation || 'operacional',
-              image: cc.image || ''
-            });
+    console.log('[ArenaCloud] Sincronizando quadras com o banco de dados em tempo real...');
+    
+    // Consulta em paralelo o Supabase DB2 e o endpoint redundante /api/sync
+    const pDb2 = fetch(cloudDbs.db2Url + '/rest/v1/courts?select=*&order=order_index.asc', {
+      headers: { apikey: cloudDbs.db2Key, Authorization: 'Bearer ' + cloudDbs.db2Key }
+    }).then(r => r.ok ? r.json() : null).catch(() => null);
+
+    const pSync = fetch('/api/sync')
+      .then(r => r.ok ? r.json() : null).catch(() => null);
+
+    const [cloudCourts, syncRes] = await Promise.all([pDb2, pSync]);
+    const syncCourts = syncRes?.data?.courts;
+    const syncMap = new Map();
+    if (Array.isArray(syncCourts)) {
+      syncCourts.forEach(sc => {
+        if (sc && sc.id) syncMap.set(sc.id, sc);
+        if (sc && sc.dbId) syncMap.set(sc.dbId, sc);
+      });
+    }
+
+    if (Array.isArray(cloudCourts) && cloudCourts.length > 0) {
+      cloudCourts.forEach(cc => {
+        // Resolve o ID local canônico
+        const localId = DB_TO_COURT_ID[cc.id] || cc.id;
+        const existing = courtState.courts.find(c => c.id === localId || c.id === cc.id);
+        const syncMatch = syncMap.get(cc.id) || syncMap.get(localId);
+
+        // Prevalência de nome atualizado no Gist/Sync redundante ou Supabase
+        const bestName = (syncMatch && syncMatch.name) ? syncMatch.name : (cc.name || '');
+        const priceNum = parseFloat(syncMatch?.base_price_per_hour || syncMatch?.price || cc.base_price_per_hour) || 100;
+        const promoNum = parseFloat(cc.specs?.discount_price_per_hour) || parseFloat(cc.promo) || Math.round(priceNum * 0.6);
+        const pStart = cc.specs?.discount_start_time || '09:00';
+        const pEnd = cc.specs?.discount_end_time || '16:00';
+        const hOpen = cc.specs?.opening_time || '06:00';
+        const hClose = cc.specs?.closing_time || '22:00';
+        const cap = cc.specs?.capacity || '10 a 14 jogadores';
+        const fl = cc.specs?.surface || cc.specs?.type || 'Grama Sintética';
+
+        if (existing) {
+          const isRecentlyEdited = existing.__lastEditTs && (Date.now() - existing.__lastEditTs < 20000);
+          if (!isRecentlyEdited) {
+            existing.name = bestName || existing.name;
           }
-        });
-        try {
-          localStorage.setItem(COURT_STORAGE_KEY, JSON.stringify(courtState));
-        } catch(e) {}
-        if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
-      }
+          existing.price = priceNum;
+          existing.promo = promoNum;
+          existing.promoStart = pStart;
+          existing.promoEnd = pEnd;
+          existing.hours = hOpen + ' às ' + hClose;
+          existing.capacity = cap;
+          existing.floor = fl;
+          existing.status = (cc.observation && cc.observation.toLowerCase().includes('manuten')) ? 'manutencao' : (existing.status || 'operacional');
+          existing.image = cc.image || existing.image;
+        } else {
+          courtState.courts.push({
+            id: localId,
+            name: bestName || cc.name,
+            type: cc.category_label || cc.category || 'Quadra poliesportiva',
+            floor: fl,
+            capacity: cap,
+            price: priceNum,
+            promo: promoNum,
+            promoStart: pStart,
+            promoEnd: pEnd,
+            hours: hOpen + ' às ' + hClose,
+            status: 'operacional',
+            image: cc.image || ''
+          });
+        }
+
+        // Atualiza também ADMIN_COURTS e adminGameState.courts
+        if (typeof ADMIN_COURTS !== 'undefined' && Array.isArray(ADMIN_COURTS)) {
+          const admC = ADMIN_COURTS.find(c => c.id === localId || c.id === cc.id);
+          if (admC) {
+            const isRecentlyEdited = existing && existing.__lastEditTs && (Date.now() - existing.__lastEditTs < 20000);
+            if (!isRecentlyEdited) {
+              admC.name = bestName || cc.name || admC.name;
+            }
+            admC.normal = priceNum;
+            admC.price = priceNum;
+            admC.promo = promoNum;
+          }
+        }
+      });
+
+      try {
+        localStorage.setItem(COURT_STORAGE_KEY, JSON.stringify(courtState));
+      } catch(e) {}
+
+      if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
+      if (typeof window.syncDirectBookingCourtOptions === 'function') window.syncDirectBookingCourtOptions();
+      if (typeof window.syncMovementCourtPillsAndFilter === 'function') window.syncMovementCourtPillsAndFilter();
+      if (typeof autoCalculateDirectBookingPrice === 'function') autoCalculateDirectBookingPrice();
+      if (typeof renderBalcaoTimeSlots === 'function') renderBalcaoTimeSlots();
     }
   } catch(e) {
     console.warn('[ArenaCloud] Erro ao sincronizar quadras:', e);
   }
 };
 
-function persistCourtState() {
+async function persistCourtState(specificCourtId) {
   try {
     localStorage.setItem(COURT_STORAGE_KEY, JSON.stringify(courtState));
   } catch(e) {}
+
+  // Sincroniza em memória ADMIN_COURTS e adminGameState.courts
+  if (Array.isArray(courtState.courts)) {
+    courtState.courts.forEach(c => {
+      const pVal = parseFloat(c.price || 100);
+      if (typeof ADMIN_COURTS !== 'undefined' && Array.isArray(ADMIN_COURTS)) {
+        const adm = ADMIN_COURTS.find(x => x.id === c.id || (typeof COURT_TO_DB_ID !== 'undefined' && COURT_TO_DB_ID[x.id] === c.id));
+        if (adm) {
+          adm.name = c.name || adm.name;
+          adm.normal = pVal;
+          adm.price = pVal;
+          adm.promo = parseFloat(c.promo || adm.promo || 0);
+        }
+      }
+      if (window.adminGameState && Array.isArray(window.adminGameState.courts)) {
+        const agc = window.adminGameState.courts.find(x => x.id === c.id || (typeof COURT_TO_DB_ID !== 'undefined' && COURT_TO_DB_ID[x.id] === c.id));
+        if (agc) {
+          agc.name = c.name || agc.name;
+          agc.normal = pVal;
+          agc.price = pVal;
+          agc.promo = parseFloat(c.promo || agc.promo || 0);
+        }
+      }
+    });
+  }
+
   renderCourtsMonitor();
 
-  // Dual-Write em tempo real para os 2 Bancos de Dados na Nuvem (DB1 e DB2)
-  if (window.ARENA_CLOUD_DBS && Array.isArray(courtState.courts)) {
-    courtState.courts.forEach(async (c) => {
-      try {
-        const payload = {
-          id: c.id,
-          name: c.name,
-          category: c.cat || 'poliesportiva',
-          base_price_per_hour: parseFloat(c.rate || 100),
-          image: c.image || null,
-          observation: c.status || 'operacional'
-        };
-        fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/courts', {
-          method: 'POST',
-          headers: {
-            apikey: ARENA_CLOUD_DBS.db2Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key,
-            'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
-          },
-          body: JSON.stringify(payload)
-        }).catch(() => {});
+  // Sincroniza imediatamente com a área de Reserva de Balcão e cálculos
+  if (typeof window.syncDirectBookingCourtOptions === 'function') {
+    window.syncDirectBookingCourtOptions();
+  }
+  if (typeof window.syncMovementCourtPillsAndFilter === 'function') {
+    window.syncMovementCourtPillsAndFilter();
+  }
+  if (typeof autoCalculateDirectBookingPrice === 'function') {
+    autoCalculateDirectBookingPrice();
+  }
+  if (typeof renderBalcaoTimeSlots === 'function') {
+    renderBalcaoTimeSlots();
+  }
+  if (typeof renderMatches === 'function') {
+    renderMatches();
+  }
 
-        fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/courts', {
-          method: 'POST',
+  // Broadcast instantâneo para outras abas abertas no navegador
+  try {
+    const bc = new BroadcastChannel('arena_limoeiro_sync');
+    bc.postMessage({ type: 'courts_updated', courts: courtState.courts });
+  } catch(e) {}
+
+  const cloudDbs = window.ARENA_CLOUD_DBS || {
+    db1Url: 'https://brmclyukjfijommbxhks.supabase.co',
+    db1Key: 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+    db2Url: 'https://aukrcnhuyultkjqsgvea.supabase.co',
+    db2Key: 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi'
+  };
+
+  // Dual-Write em tempo real para os 2 Bancos de Dados na Nuvem (DB1 e DB2)
+  if (Array.isArray(courtState.courts)) {
+    const listToSync = specificCourtId 
+      ? courtState.courts.filter(c => c.id === specificCourtId)
+      : courtState.courts;
+
+    for (const c of listToSync) {
+      try {
+        const dbId = (typeof COURT_TO_DB_ID !== 'undefined' && COURT_TO_DB_ID[c.id]) ? COURT_TO_DB_ID[c.id] : c.id;
+        const [openH, closeH] = (c.hours || '06:00 às 22:00').split(' às ');
+        const payload = {
+          name: c.name,
+          base_price_per_hour: parseFloat(c.price || 100),
+          observation: c.status || 'operacional',
+          specs: {
+            surface: c.floor || 'Grama Sintética',
+            capacity: c.capacity || '10 a 14 jogadores',
+            opening_time: openH || '06:00',
+            closing_time: closeH || '22:00',
+            discount_price_per_hour: parseFloat(c.promo || 0),
+            discount_start_time: c.promoStart || '09:00',
+            discount_end_time: c.promoEnd || '16:00'
+          }
+        };
+
+        // Envia em paralelo com headers corretos e captura retorno
+        const p1 = fetch(cloudDbs.db2Url + '/rest/v1/courts?id=eq.' + encodeURIComponent(dbId), {
+          method: 'PATCH',
           headers: {
-            apikey: ARENA_CLOUD_DBS.db1Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key,
+            apikey: cloudDbs.db2Key,
+            Authorization: 'Bearer ' + cloudDbs.db2Key,
             'Content-Type': 'application/json',
-            'Prefer': 'resolution=merge-duplicates'
+            'Prefer': 'return=representation'
           },
           body: JSON.stringify(payload)
-        }).catch(() => {});
-      } catch(e) {}
-    });
+        }).catch(err => console.warn('[ArenaCloud] DB2 patch error:', err));
+
+        const p2 = fetch(cloudDbs.db1Url + '/rest/v1/courts?id=eq.' + encodeURIComponent(dbId), {
+          method: 'PATCH',
+          headers: {
+            apikey: cloudDbs.db1Key,
+            Authorization: 'Bearer ' + cloudDbs.db1Key,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify(payload)
+        }).catch(err => console.warn('[ArenaCloud] DB1 patch error:', err));
+
+        await Promise.all([p1, p2]);
+
+        // Envia também para a API Serverless /api/sync com Service Role e Gist redundante
+        try {
+          fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update_court',
+              payload: {
+                id: c.id,
+                dbId: dbId,
+                name: c.name,
+                price: parseFloat(c.price || 100),
+                base_price_per_hour: parseFloat(c.price || 100),
+                status: c.status || 'operacional',
+                observation: c.status || 'operacional',
+                specs: payload.specs
+              }
+            })
+          }).catch(() => {});
+        } catch(e) {}
+
+        console.log('[ArenaCloud] Quadra ' + dbId + ' atualizada na nuvem com sucesso!');
+      } catch(e) {
+        console.warn('[ArenaCloud] Erro no patch de quadra:', e);
+      }
+    }
   }
 }
 
@@ -4187,11 +4461,12 @@ function editCourtItem(id) {
       promoStart: f.get('promoStart'),
       promoEnd: f.get('promoEnd'),
       hours: f.get('open') + ' às ' + f.get('close'),
-      status: f.get('status')
+      status: f.get('status'),
+      __lastEditTs: Date.now()
     });
-    persistCourtState();
+    persistCourtState(c.id);
     closeCourtModal();
-    if (typeof showAdminToast === 'function') showAdminToast('Dados do espaço atualizados!');
+    if (typeof showAdminToast === 'function') showAdminToast('Dados do espaço atualizados e transmitidos ao banco de dados!');
   });
 }
 
@@ -4228,8 +4503,50 @@ function newCourtBlock(courtId = '') {
     }
     courtState.blocks.push(b);
     persistCourtState();
+
+    // Sincroniza o bloqueio no banco de dados na nuvem (Supabase DB1 e DB2)
+    const dbCourtId = (typeof COURT_TO_DB_ID !== 'undefined' && COURT_TO_DB_ID[b.courtId]) ? COURT_TO_DB_ID[b.courtId] : b.courtId;
+    const blockPayload = {
+      id: b.id,
+      court_id: dbCourtId,
+      customer_name: '⛔ BLOQUEIO: ' + b.type.toUpperCase(),
+      customer_phone: '(81) 9.9999-9999',
+      date: b.date,
+      start_time: b.start,
+      end_time: b.end,
+      time: b.start + ' às ' + b.end,
+      duration: 60,
+      total_price: 0,
+      status: 'blocked',
+      booking_type: 'bloqueio',
+      payment_method: 'Bloqueio Administrativo',
+      observation: 'Bloqueio de Horário (' + b.type + ')' + (b.note ? ' - ' + b.note : ''),
+      created_at: new Date().toISOString()
+    };
+
+    // Adiciona na memória de bookings para travar a grade e o feed imediatamente
+    if (window.adminGameState && Array.isArray(window.adminGameState.bookings)) {
+      window.adminGameState.bookings.unshift(blockPayload);
+    }
+
+    if (window.ARENA_CLOUD_DBS) {
+      [cloudDbs.db2Url, cloudDbs.db1Url].forEach((dbUrl, idx) => {
+        const dbKey = idx === 0 ? cloudDbs.db2Key : cloudDbs.db1Key;
+        fetch(dbUrl + '/rest/v1/bookings', {
+          method: 'POST',
+          headers: {
+            apikey: dbKey,
+            Authorization: 'Bearer ' + dbKey,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify(blockPayload)
+        }).catch(() => {});
+      });
+    }
+
     closeCourtModal();
-    if (typeof showAdminToast === 'function') showAdminToast('Bloqueio agendado com sucesso!');
+    if (typeof showAdminToast === 'function') showAdminToast('Bloqueio agendado e salvo no banco de dados!');
   });
 }
 
@@ -4244,6 +4561,25 @@ async function deleteCourtBlock(blockId) {
   if (confirmado) {
     courtState.blocks = courtState.blocks.filter(x => x.id !== blockId);
     persistCourtState();
+
+    // Remove do banco de dados na nuvem (Supabase DB1 e DB2)
+    if (window.adminGameState && Array.isArray(window.adminGameState.bookings)) {
+      window.adminGameState.bookings = window.adminGameState.bookings.filter(b => b.id !== blockId);
+    }
+
+    if (window.ARENA_CLOUD_DBS) {
+      [cloudDbs.db2Url, cloudDbs.db1Url].forEach((dbUrl, idx) => {
+        const dbKey = idx === 0 ? cloudDbs.db2Key : cloudDbs.db1Key;
+        fetch(dbUrl + '/rest/v1/bookings?id=eq.' + encodeURIComponent(blockId), {
+          method: 'DELETE',
+          headers: {
+            apikey: dbKey,
+            Authorization: 'Bearer ' + dbKey
+          }
+        }).catch(() => {});
+      });
+    }
+
     if (typeof showAdminToast === 'function') showAdminToast('Bloqueio removido com sucesso!');
   }
 }
@@ -4791,7 +5127,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Quadra / Espaço *</label>
-          <select id="directBookingCourt" onchange="autoCalculateDirectBookingPrice()" required
+          <select id="directBookingCourt" required
                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
             <option value="fut5">FUT 5 – SOCCER 5 (R$ 90/h)</option>
             <option value="fut6">FUT 6 – SOCCER 6 (R$ 100/h)</option>
@@ -4840,6 +5176,15 @@ document.addEventListener('DOMContentLoaded', () => {
           </div>
         </div>
 
+        <!-- Lista de Jogos e Mensalistas Agendados nesta Quadra -->
+        <div id="balcaoScheduledGamesContainer" class="p-3 bg-rose-50/90 border border-rose-200 rounded-xl space-y-1.5">
+          <div class="flex items-center justify-between text-xs font-bold text-rose-900">
+            <span class="flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5 text-rose-600"></i> Agendamentos / Fixos nesta Quadra:</span>
+            <span id="balcaoScheduledGamesCount" class="text-[10px] bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full font-black">0 agendados</span>
+          </div>
+          <div id="balcaoScheduledGamesList" class="flex flex-wrap gap-1.5 text-xs"></div>
+        </div>
+
         <div id="directBookingSlotsGrid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 gap-1.5 max-h-64 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
           <!-- Slots de 30min injetados aqui -->
         </div>
@@ -4867,9 +5212,9 @@ document.addEventListener('DOMContentLoaded', () => {
             </span>
           </div>
 
-          <div id="balcaoSlotSelectionSummary" class="text-xs font-bold text-emerald-900 bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-300 flex items-center gap-1.5">
-            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-            <span>Horário: <strong id="summarySelectedTime">Nenhum horário selecionado</strong> (<span id="summaryDuration">Toque abaixo</span>)</span>
+          <div id="balcaoSlotSelectionSummary" class="text-[11px] sm:text-xs font-bold text-emerald-900 bg-emerald-100/90 px-2.5 py-1.5 rounded-lg border border-emerald-300 flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-hidden">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+            <span class="truncate">Horário: <strong id="summarySelectedTime">Nenhum horário selecionado</strong> (<span id="summaryDuration">Toque abaixo</span>)</span>
           </div>
         </div>
       </div>
@@ -4969,11 +5314,11 @@ document.addEventListener('DOMContentLoaded', () => {
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Pagamento</label>
           <select id="directBookingPayment"
                   class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
-            <option value="PIX Balcão" selected>Pago no Balcão (PIX)</option>
+            <option value="Pendente" selected>Pagamento Pendente</option>
+            <option value="PIX Balcão">Pago no Balcão (PIX)</option>
             <option value="Dinheiro Balcão">Pago no Balcão (Dinheiro)</option>
             <option value="Cartão Balcão">Pago no Balcão (Cartão)</option>
             <option value="Pagar pós jogo">Pagar no Fim da Pelada</option>
-            <option value="Pendente">Pagamento Pendente</option>
           </select>
         </div>
 
@@ -5826,7 +6171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     { id: 'fut7', name: 'FUT 7 – SOCCER 7', image: 'https://images.unsplash.com/photo-1575361204480-aadea25e6e68?w=800&auto=format&fit=crop&q=80', categoryLabel: 'Quadra Poliesportiva', normal: 110, promo: 70 },
     { id: 'futmesa', name: 'FOOT TABLE – FUTMESA', image: 'https://images.unsplash.com/photo-1511193311914-0346f16efe90?w=800&auto=format&fit=crop&q=80', categoryLabel: 'Futmesa & Lazer', normal: 35, promo: 25 },
     { id: 'areia', name: 'AREIA – BEACH SPORTS', image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80', categoryLabel: 'Arena Beach', normal: 60, promo: 40 },
-    { id: 'society', name: 'SOCIETY – ARENA CENTRAL', image: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800&auto=format&fit=crop&q=80', categoryLabel: 'Futebol Society', normal: 120, promo: 80 }
+    { id: 'society', name: 'QUADRA – ARENA CENTRAL', image: 'https://images.unsplash.com/photo-1459865264687-595d652de67e?w=800&auto=format&fit=crop&q=80', categoryLabel: 'Futebol Society', normal: 120, promo: 80 }
   ];
 
   // 2. Carregamento de Bookings e MonthlyMembers
@@ -5970,11 +6315,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 1. Exclui do Banco 2 (Ativo / Salvaguarda) via Supabase REST DELETE em lote
       try {
-        const delRes2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?date=lte.' + cutoffDate, {
+        const delRes2 = await fetch(cloudDbs.db2Url + '/rest/v1/bookings?date=lte.' + cutoffDate, {
           method: 'DELETE',
           headers: {
-            apikey: ARENA_CLOUD_DBS.db2Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key
+            apikey: cloudDbs.db2Key,
+            Authorization: 'Bearer ' + cloudDbs.db2Key
           }
         });
         if (delRes2.ok) {
@@ -5986,11 +6331,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // 2. Exclui do Banco 1 (Principal) via Supabase REST DELETE em lote
       try {
-        const delRes1 = await fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?date=lte.' + cutoffDate, {
+        const delRes1 = await fetch(cloudDbs.db1Url + '/rest/v1/bookings?date=lte.' + cutoffDate, {
           method: 'DELETE',
           headers: {
-            apikey: ARENA_CLOUD_DBS.db1Key,
-            Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key
+            apikey: cloudDbs.db1Key,
+            Authorization: 'Bearer ' + cloudDbs.db1Key
           }
         });
         if (delRes1.ok) {
@@ -6174,8 +6519,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Dispara DB2 e DB1 em paralelo sem bloquear a UI
       await Promise.allSettled([
-        writeCloud(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        writeCloud(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+        writeCloud(cloudDbs.db2Url, cloudDbs.db2Key),
+        writeCloud(cloudDbs.db1Url, cloudDbs.db1Key)
       ]);
 
       // Notificação serverless
@@ -6235,18 +6580,18 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       // 1. Busca prioritária no DB2 (Banco Principal Completo) com fallback seguro no DB1
-      const bookingsPromise = fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db2Key)
-        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=*&order=date.asc', ARENA_CLOUD_DBS.db1Key))
+      const bookingsPromise = fetchFast(cloudDbs.db2Url + '/rest/v1/bookings?select=*&order=date.asc', cloudDbs.db2Key)
+        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(cloudDbs.db1Url + '/rest/v1/bookings?select=*&order=date.asc', cloudDbs.db1Key))
         .catch(() => null);
 
       // 2. Busca prioritária de mensalistas no DB2 com fallback no DB1
-      const membersPromise = fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db2Key)
-        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', ARENA_CLOUD_DBS.db1Key))
+      const membersPromise = fetchFast(cloudDbs.db2Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', cloudDbs.db2Key)
+        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(cloudDbs.db1Url + '/rest/v1/monthly_members?select=*&order=day_of_week.asc', cloudDbs.db1Key))
         .catch(() => null);
 
       // 3. Busca de clientes
-      const customersPromise = fetchFast(ARENA_CLOUD_DBS.db2Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db2Key)
-        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(ARENA_CLOUD_DBS.db1Url + '/rest/v1/customers?select=*&order=name.asc', ARENA_CLOUD_DBS.db1Key))
+      const customersPromise = fetchFast(cloudDbs.db2Url + '/rest/v1/customers?select=*&order=name.asc', cloudDbs.db2Key)
+        .then(r => (Array.isArray(r) && r.length > 0) ? r : fetchFast(cloudDbs.db1Url + '/rest/v1/customers?select=*&order=name.asc', cloudDbs.db1Key))
         .catch(() => null);
 
       const [cloudBookings, cloudMembers, cloudCustomers] = await Promise.all([bookingsPromise, membersPromise, customersPromise]);
@@ -6285,11 +6630,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       window.__lastPullSuccessTs = Date.now();
 
-      // Só re-renderiza se houve alteração REAL nos dados!
-      if (stateChanged) {
+      // Re-renderiza se houve alteração real OU se for a primeira carga da página para limpar o spinner
+      if (stateChanged || !window.__hasCompletedFirstPull) {
+        window.__hasCompletedFirstPull = true;
         if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
         if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
-        // Atualiza apenas os contadores numéricos sem reconstruir o DOM da régua para nunca resetar o scroll da tela
         if (typeof window.updateMovementCalendarStrip === 'function') window.updateMovementCalendarStrip();
         if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
         if (typeof window.renderCadastrosClientes === 'function') window.renderCadastrosClientes();
@@ -8622,7 +8967,21 @@ document.addEventListener('DOMContentLoaded', () => {
       : '<i class="fa-solid fa-circle-check text-emerald-600"></i>';
     const payMetaClass = isUnpaid ? 'text-amber-800 font-bold' : 'text-emerald-700 font-semibold';
     const playersCount = m.players || 14;
-    const observation = m.observation || m.note || (m.dayFixed ? 'Horário Fixo Semanal (' + m.dayFixed + ')' : (isMensalista ? 'Horário Fixo Semanal (QUARTA)' : 'Reserva Confirmada'));
+    // Limpeza de metadados técnicos (CPF, Emergência, Contrato, etc.) para exibição limpa no Horário Reservado
+    let rawObs = m.observation || m.note || '';
+    if (rawObs) {
+      // Remove blocos como [CPF: ...], [Emergência: ...], {Jogo ...}, [Horário: ...]
+      rawObs = rawObs
+        .replace(/\[CPF:[^\]]*\]/gi, '')
+        .replace(/\[Emergência:[^\]]*\]/gi, '')
+        .replace(/\[Emergencia:[^\]]*\]/gi, '')
+        .replace(/\{[^}]*\}/gi, '')
+        .replace(/\[Horário:[^\]]*\]/gi, '')
+        .replace(/\[Horario:[^\]]*\]/gi, '')
+        .replace(/\s*\|\s*/g, ' ')
+        .trim();
+    }
+    const observation = rawObs || (m.dayFixed ? 'Horário Fixo Semanal (' + m.dayFixed + ')' : (isMensalista ? 'Horário Fixo Semanal' : 'Reserva Confirmada'));
     
     const attendance = m.attendance || (['live', 'playing', 'in_progress'].includes(st) ? 'Em Quadra' : (st === 'finished' ? 'Finalizado' : (st === 'no-show' ? 'Não compareceu' : 'Aguardando chegada')));
     const attendanceIconColor = ['live', 'playing', 'in_progress'].includes(st) ? 'text-emerald-500' : (st === 'finished' ? 'text-slate-400' : (st === 'no-show' ? 'text-rose-500' : 'text-amber-500'));
@@ -8909,86 +9268,87 @@ document.addEventListener('DOMContentLoaded', () => {
 
           </div>
 
-          <!-- ZONA DE AJUSTES OPERACIONAIS (ATRASO, EXTRA, ORIGEM, CÁLCULO) -->
-          <div class="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200/80 mb-5">
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-200/60">
-              <span class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                <i class="fa-solid fa-sliders text-emerald-600"></i> Painel de Ajustes Operacionais & Tempo
+          <!-- ZONA DE AJUSTES OPERACIONAIS (COMPACTA, ELEGANTE E ERGONÔMICA NO MOBILE) -->
+          <div class="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50/90 border border-slate-200/90 mb-3 sm:mb-4">
+            <div class="flex items-center justify-between pb-1.5 sm:pb-2.5 mb-2 sm:mb-3 border-b border-slate-200/70">
+              <span class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 sm:gap-2">
+                <i class="fa-solid fa-sliders text-emerald-600 text-[11px] sm:text-xs"></i> Ajustes Operacionais & Tempo
               </span>
-              <span class="text-[11px] text-slate-500">Ajustes manuais e recálculo</span>
+              <span class="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden xs:inline">Manual e recálculo</span>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Grade Responsiva Compacta: 2 colunas no mobile, 4 colunas em telas grandes -->
+            <div class="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               
               <!-- Bloco A: Tempo de Atraso -->
-              <div class="space-y-1.5">
-                <label class="block text-[11px] font-bold uppercase text-slate-500">Tempo de Atraso da Equipe</label>
-                <div class="flex items-center gap-1.5">
-                  <div class="flex items-center bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs w-full">
-                    <input type="number" id="input-delay-h-${m.id}" min="0" max="23" value="${lateH > 0 ? lateH : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-8 text-center text-xs font-bold text-slate-800 focus:outline-none">
-                    <span class="text-[11px] text-slate-400 mr-2">h</span>
-                    <input type="number" id="input-delay-m-${m.id}" min="0" max="59" step="5" value="${lateM > 0 ? lateM : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-10 text-center text-xs font-bold text-slate-800 focus:outline-none">
-                    <span class="text-[11px] text-slate-400">min</span>
+              <div class="p-2 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold uppercase text-slate-500 truncate">Atraso da Equipe</label>
+                  <div class="flex gap-1 shrink-0">
+                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 15)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+15m</button>
+                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+30m</button>
                   </div>
                 </div>
-                <div class="flex items-center justify-between pt-0.5">
-                  <div id="status-delay-${m.id}" class="text-[11px] font-semibold ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'} flex items-center gap-1">
-                    ${lateMin > 0 ? `<i class="fa-solid fa-clock text-[10px]"></i> Atraso de ${lateMin}min registrado` : `<i class="fa-solid fa-check text-[10px]"></i> Sem atraso (No horário)`}
+                <div class="flex items-center gap-1">
+                  <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full justify-center">
+                    <input type="number" id="input-delay-h-${m.id}" min="0" max="23" value="${lateH > 0 ? lateH : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-6 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 mr-1.5 font-bold">h</span>
+                    <input type="number" id="input-delay-m-${m.id}" min="0" max="59" step="5" value="${lateM > 0 ? lateM : '0'}" oninput="onGameDelayHMChange('${m.id}')" class="w-8 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 font-bold">min</span>
                   </div>
-                  <div class="flex gap-1">
-                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 15)" class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer">+15m</button>
-                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer">+30m</button>
-                  </div>
+                </div>
+                <div id="status-delay-${m.id}" class="text-[10px] font-semibold truncate ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                  ${lateMin > 0 ? `Atraso: ${lateMin}min` : `✓ No horário`}
                 </div>
               </div>
 
               <!-- Bloco B: Horário Extra -->
-              <div class="space-y-1.5">
-                <label class="block text-[11px] font-bold uppercase text-slate-500">Tempo de Horário Extra</label>
-                <div class="flex items-center gap-1.5">
-                  <div class="flex items-center bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs w-full">
-                    <input type="number" id="input-extra-h-${m.id}" min="0" max="23" value="${extraH > 0 ? extraH : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-8 text-center text-xs font-bold text-slate-800 focus:outline-none">
-                    <span class="text-[11px] text-slate-400 mr-2">h</span>
-                    <input type="number" id="input-extra-m-${m.id}" min="0" max="59" step="15" value="${extraM > 0 ? extraM : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-10 text-center text-xs font-bold text-slate-800 focus:outline-none">
-                    <span class="text-[11px] text-slate-400">min</span>
+              <div class="p-2 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold uppercase text-slate-500 truncate">Horário Extra</label>
+                  <div class="flex gap-1 shrink-0">
+                    <button type="button" onclick="quickAddExtraCard('${m.id}', 30)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+30m</button>
+                    <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+1h</button>
                   </div>
                 </div>
-                <div class="flex items-center justify-between pt-0.5">
-                  <div id="status-extra-${m.id}" class="text-[11px] ${extraMin > 0 ? 'font-bold text-amber-600' : 'text-slate-500'}">
-                    ${extraMin > 0 ? `+${extraH > 0 ? extraH + 'h ' : ''}${extraM}min (+R$ ${computedExtraAmountStr})` : 'Sem tempo extra'}
+                <div class="flex items-center gap-1">
+                  <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full justify-center">
+                    <input type="number" id="input-extra-h-${m.id}" min="0" max="23" value="${extraH > 0 ? extraH : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-6 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 mr-1.5 font-bold">h</span>
+                    <input type="number" id="input-extra-m-${m.id}" min="0" max="59" step="15" value="${extraM > 0 ? extraM : '0'}" oninput="onGameExtraHMChange('${m.id}')" class="w-8 text-center text-xs font-extrabold text-slate-800 bg-transparent focus:outline-none">
+                    <span class="text-[10px] text-slate-400 font-bold">min</span>
                   </div>
-                  <div class="flex gap-1">
-                    <button type="button" onclick="quickAddExtraCard('${m.id}', 30)" class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer">+30m</button>
-                    <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[10px] bg-white border border-slate-200 px-1.5 py-0.5 rounded text-slate-600 hover:bg-slate-100 font-semibold cursor-pointer">+1h</button>
-                  </div>
+                </div>
+                <div id="status-extra-${m.id}" class="text-[10px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
+                  ${extraMin > 0 ? `+${extraH > 0 ? extraH + 'h ' : ''}${extraM}m (+R$ ${computedExtraAmountStr})` : 'Sem tempo extra'}
                 </div>
               </div>
 
               <!-- Bloco C: Onde foi marcado (Origem) -->
-              <div class="space-y-1.5">
-                <label class="block text-[11px] font-bold uppercase text-slate-500">Onde foi marcado (Origem)</label>
-                <select id="select-origin-${m.id}" onchange="onGameOriginChange('${m.id}', this.value)" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500 shadow-2xs cursor-pointer">
+              <div class="p-2 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-1 flex flex-col justify-between">
+                <label class="block text-[10px] font-bold uppercase text-slate-500 truncate">Origem</label>
+                <select id="select-origin-${m.id}" onchange="onGameOriginChange('${m.id}', this.value)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500 cursor-pointer">
                   <option value="Mensalista" ${originDisplay.toLowerCase().includes('mensalista') ? 'selected' : ''}>Mensalista</option>
                   <option value="WhatsApp Oficial" ${originDisplay.toLowerCase().includes('whatsapp') ? 'selected' : ''}>WhatsApp Oficial</option>
-                  <option value="Marcado no Balcão" ${originDisplay.toLowerCase().includes('balcão') ? 'selected' : ''}>Marcado no Balcão</option>
-                  <option value="Aplicativo / Web" ${originDisplay.toLowerCase().includes('app') || originDisplay.toLowerCase().includes('web') ? 'selected' : ''}>Aplicativo / Web</option>
+                  <option value="Marcado no Balcão" ${originDisplay.toLowerCase().includes('balcão') ? 'selected' : ''}>Balcão</option>
+                  <option value="Aplicativo / Web" ${originDisplay.toLowerCase().includes('app') || originDisplay.toLowerCase().includes('web') ? 'selected' : ''}>App / Web</option>
                   <option value="Avulso" ${originDisplay.toLowerCase().includes('avulso') ? 'selected' : ''}>Avulso</option>
                 </select>
-                <div class="text-[11px] text-slate-500" id="status-origin-${m.id}">${originDisplay}</div>
+                <div class="text-[10px] text-slate-400 truncate" id="status-origin-${m.id}">${originDisplay}</div>
               </div>
 
               <!-- Bloco D: Cálculo Automático e Valor Total -->
-              <div class="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs flex flex-col justify-between">
+              <div class="p-2 sm:p-2.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
                 <div class="flex items-center justify-between">
-                  <span class="text-[10px] font-bold uppercase text-slate-400">Cálculo Automático / Valor</span>
-                  <span id="badge-calc-status-${m.id}" class="text-[10px] font-bold ${extraMin > 0 ? 'text-amber-700 bg-amber-50' : 'text-emerald-700 bg-emerald-50'} px-1.5 py-0.5 rounded">
-                    ${extraMin > 0 ? 'Pendente Extra' : (isMensalista ? 'Mensal' : 'Pago')}
+                  <span class="text-[9.5px] font-bold uppercase text-slate-400 truncate">Valor / Recálculo</span>
+                  <span id="badge-calc-status-${m.id}" class="text-[9.5px] font-bold ${extraMin > 0 ? 'text-amber-700 bg-amber-50' : 'text-emerald-700 bg-emerald-50'} px-1.5 py-0.2 rounded shrink-0">
+                    ${extraMin > 0 ? 'Pendente' : (isMensalista ? 'Mensal' : 'Pago')}
                   </span>
                 </div>
                 <div>
-                  <div id="status-calc-total-${m.id}" class="text-xl font-extrabold text-slate-900 font-heading">${isMensalista ? ('Mensal' + (extraMin > 0 ? ' • Pendente Extra' : '')) : ('R$ ' + currentTotalStr + ' • ' + (extraMin > 0 ? 'Pendente Extra' : 'Pago'))}</div>
-                  <div id="status-calc-detail-${m.id}" class="text-[10px] text-slate-500">
-                    ${isMensalista ? 'Plano Mensalista (Gestão mensal separada)' : (extraMin > 0 ? `Base R$ ${price} + Extra (${extraMin}m): R$ ${computedExtraAmountStr}` : `Valor contratado: R$ ${price}`)}
+                  <div id="status-calc-total-${m.id}" class="text-base sm:text-lg font-extrabold text-slate-900 font-heading leading-tight">${isMensalista ? ('Mensal' + (extraMin > 0 ? ' • Pendente' : '')) : ('R$ ' + currentTotalStr)}</div>
+                  <div id="status-calc-detail-${m.id}" class="text-[9.5px] text-slate-400 truncate">
+                    ${isMensalista ? 'Contrato mensal ativo' : (extraMin > 0 ? `Base R$ ${price} + Extra: R$ ${computedExtraAmountStr}` : `Total: R$ ${price}`)}
                   </div>
                 </div>
               </div>
@@ -9265,6 +9625,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function renderMovementMatches() {
+    if (typeof window.syncMovementCourtPillsAndFilter === 'function') window.syncMovementCourtPillsAndFilter();
     // Trava de recursão para evitar re-entrâncias durante a montagem do feed
     if (window.__isRenderingMovementMatches) return;
     window.__isRenderingMovementMatches = true;
@@ -9300,8 +9661,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusFilter = statusSelectEl ? statusSelectEl.value : (window.adminGameState.movementFilterStatus || 'all');
     window.adminGameState.movementFilterStatus = statusFilter;
 
-    // Atualiza o Título do Feed de acordo com o tópico de status selecionado
+    // Atualiza o Título do Feed com indicação da Quadra / Espaço e Status
     if (titleEl) {
+      let courtSuffix = '';
+      if (courtFilter && courtFilter !== 'all') {
+        const cObj = getCourtById(courtFilter);
+        courtSuffix = ' • <span class="text-emerald-700 font-black">' + (cObj.name || courtFilter) + '</span>';
+      }
       if (statusFilter === 'finished') {
         titleEl.innerHTML = 'Partidas Finalizadas de ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Histórico Concluído</span>';
       } else if (statusFilter === 'everything') {
@@ -9313,18 +9679,24 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (statusFilter === 'confirmed') {
         titleEl.innerHTML = 'Próximas Partidas Confirmadas para ' + formatDisplayDate(dateStr) + ' <span class="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-bold ml-2">Programadas</span>';
       } else {
-        titleEl.textContent = 'Partidas Programadas para ' + formatDisplayDate(dateStr);
+        titleEl.innerHTML = 'Partidas de ' + formatDisplayDate(dateStr) + courtSuffix;
       }
     }
 
     let matches = allMatches;
 
-    // 1. Filtro por Quadra
+    // 1. Filtro por Quadra (Casamento abrangente de IDs, canonicals e nomes)
     if (courtFilter && courtFilter !== 'all') {
       const targetCourt = getCourtById(courtFilter);
+      const targetCanonicalId = targetCourt.id; // ex: fut5, fut6, fut7, futmesa, areia, society
+      const dbTargetId = (typeof COURT_TO_DB_ID !== 'undefined' && COURT_TO_DB_ID[targetCanonicalId]) ? COURT_TO_DB_ID[targetCanonicalId] : '';
+
       matches = matches.filter(m => {
-        const mCourt = getCourtById(m.court_id || m.courtId);
-        return mCourt.id === targetCourt.id || m.court_id === courtFilter;
+        if (!m) return false;
+        const rawCourt = String(m.court_id || m.courtId || m.court_name || m.courtName || '').trim();
+        if (rawCourt === courtFilter || rawCourt === targetCanonicalId || rawCourt === dbTargetId) return true;
+        const mCourt = getCourtById(rawCourt);
+        return mCourt && (mCourt.id === targetCanonicalId || mCourt.id === courtFilter);
       });
     }
 
@@ -9449,11 +9821,97 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   window.renderMovementMatches = renderMovementMatches;
 
+  
+  // Função para seleção rápida de quadras por pílulas / botões rolando com ativação touch e clique imediato
+  
+  // Sincroniza dinamicamente as pílulas de quadra e o dropdown da aba Movimentação com os nomes atualizados de Gestão de Espaços
+  window.syncMovementCourtPillsAndFilter = function() {
+    let courtsList = [];
+    if (typeof courtState !== 'undefined' && Array.isArray(courtState.courts) && courtState.courts.length > 0) {
+      courtsList = courtState.courts;
+    } else if (window.courtState && Array.isArray(window.courtState.courts) && window.courtState.courts.length > 0) {
+      courtsList = window.courtState.courts;
+    } else if (typeof ADMIN_COURTS !== 'undefined' && Array.isArray(ADMIN_COURTS)) {
+      courtsList = ADMIN_COURTS;
+    }
+
+    if (!courtsList || courtsList.length === 0) return;
+
+    // Atualiza opções do select movementCourtFilter
+    const courtFilterEl = document.getElementById('movementCourtFilter');
+    if (courtFilterEl && document.activeElement !== courtFilterEl) {
+      courtsList.forEach(c => {
+        const opt = courtFilterEl.querySelector(`option[value="${c.id}"]`);
+        if (opt && c.name) {
+          const icon = opt.textContent.split(' ')[0] || '🏟️';
+          opt.textContent = icon + ' ' + c.name;
+        }
+      });
+    }
+
+    // Atualiza o texto dos botões de pílula em #movementCourtPillsContainer
+    const pills = document.querySelectorAll('#movementCourtPillsContainer .court-pill-btn[data-court-pill]');
+    pills.forEach(pill => {
+      const pillCourtId = pill.getAttribute('data-court-pill');
+      if (pillCourtId === 'all') return;
+      const matchedCourt = courtsList.find(c => c.id === pillCourtId);
+      if (matchedCourt && matchedCourt.name) {
+        const spanEl = pill.querySelector('span');
+        if (spanEl) {
+          const currentText = spanEl.textContent.trim();
+          const currentIcon = currentText.split(' ')[0] || '🏟️';
+          // Se o nome tiver hífen ou travessão, pega o prefixo principal (ex: "QUADRA – ARENA CENTRAL" -> "QUADRA")
+          let shortName = matchedCourt.name.split('–')[0].split('-')[0].trim();
+          if (!shortName) shortName = matchedCourt.name;
+          spanEl.textContent = currentIcon + ' ' + shortName;
+        }
+      }
+    });
+  };
+
+  window.selectMovementCourtPill = function(courtId) {
+    const courtSelect = document.getElementById('movementCourtFilter');
+    if (courtSelect) {
+      courtSelect.value = courtId;
+    }
+    if (window.adminGameState) {
+      window.adminGameState.movementFilterCourt = courtId;
+      window.adminGameState.selectedCourt = courtId;
+    }
+
+    // Atualiza estado visual de todas as pílulas
+    const pills = document.querySelectorAll('.court-pill-btn');
+    pills.forEach(p => {
+      const pCourt = p.getAttribute('data-court-pill');
+      if (pCourt === courtId) {
+        p.className = 'court-pill-btn active-court-pill shrink-0 px-3.5 py-1.5 rounded-xl font-black text-xs transition-all shadow-sm flex items-center gap-1.5 bg-emerald-700 text-white border-2 border-emerald-800 scale-[1.03] cursor-pointer';
+      } else {
+        p.className = 'court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer';
+      }
+    });
+
+    if (typeof renderMovementMatches === 'function') {
+      renderMovementMatches();
+    }
+  };
+
   window.filterMovementMatches = function() {
     const courtEl = document.getElementById('movementCourtFilter');
     const statusEl = document.getElementById('movementStatusFilter');
-    if (courtEl) window.adminGameState.movementFilterCourt = courtEl.value;
+    const cVal = courtEl ? courtEl.value : 'all';
+    if (courtEl) window.adminGameState.movementFilterCourt = cVal;
     if (statusEl) window.adminGameState.movementFilterStatus = statusEl.value;
+
+    // Sincroniza visual das pílulas de quadra
+    const pills = document.querySelectorAll('.court-pill-btn');
+    pills.forEach(p => {
+      if (p.getAttribute('data-court-pill') === cVal) {
+        p.className = 'court-pill-btn active-court-pill shrink-0 px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 bg-emerald-700 text-white border border-emerald-800 cursor-pointer';
+      } else {
+        p.className = 'court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer';
+      }
+    });
+
     renderMovementMatches();
   };
 
@@ -10196,10 +10654,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Dispara Dual-Write para Supabase DB1 + DB2
       await Promise.allSettled([
-        syncCustomerToDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        syncCustomerToDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
-        syncMonthlyToDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        syncMonthlyToDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+        syncCustomerToDb(cloudDbs.db2Url, cloudDbs.db2Key),
+        syncCustomerToDb(cloudDbs.db1Url, cloudDbs.db1Key),
+        syncMonthlyToDb(cloudDbs.db2Url, cloudDbs.db2Key),
+        syncMonthlyToDb(cloudDbs.db1Url, cloudDbs.db1Key)
       ]);
 
       // Atualiza estado local em memória
@@ -10438,12 +10896,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Dispara deleção simultânea no DB1 e DB2
       await Promise.allSettled([
-        deleteCustomer(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        deleteCustomer(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
-        deleteMonthly(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        deleteMonthly(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
-        deleteBookings(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        deleteBookings(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+        deleteCustomer(cloudDbs.db2Url, cloudDbs.db2Key),
+        deleteCustomer(cloudDbs.db1Url, cloudDbs.db1Key),
+        deleteMonthly(cloudDbs.db2Url, cloudDbs.db2Key),
+        deleteMonthly(cloudDbs.db1Url, cloudDbs.db1Key),
+        deleteBookings(cloudDbs.db2Url, cloudDbs.db2Key),
+        deleteBookings(cloudDbs.db1Url, cloudDbs.db1Key)
       ]);
 
       // 4. Limpar do estado em memória
@@ -10777,10 +11235,10 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       await Promise.allSettled([
-        insertCustomerDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        insertCustomerDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key),
-        insertMonthlyDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key),
-        insertMonthlyDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key)
+        insertCustomerDb(cloudDbs.db2Url, cloudDbs.db2Key),
+        insertCustomerDb(cloudDbs.db1Url, cloudDbs.db1Key),
+        insertMonthlyDb(cloudDbs.db2Url, cloudDbs.db2Key),
+        insertMonthlyDb(cloudDbs.db1Url, cloudDbs.db1Key)
       ]);
 
       window.adminGameState.customers.unshift(newCust);
@@ -10809,8 +11267,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const t0 = performance.now();
     try {
-      const r2 = await fetch(ARENA_CLOUD_DBS.db2Url + '/rest/v1/bookings?select=id&limit=1', {
-        headers: { apikey: ARENA_CLOUD_DBS.db2Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db2Key }
+      const r2 = await fetch(cloudDbs.db2Url + '/rest/v1/bookings?select=id&limit=1', {
+        headers: { apikey: cloudDbs.db2Key, Authorization: 'Bearer ' + cloudDbs.db2Key }
       });
       const t1 = performance.now();
       if (lat2El) lat2El.textContent = Math.round(t1 - t0) + 'ms (OK)';
@@ -10820,8 +11278,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const t2 = performance.now();
     try {
-      const r1 = await fetch(ARENA_CLOUD_DBS.db1Url + '/rest/v1/bookings?select=id&limit=1', {
-        headers: { apikey: ARENA_CLOUD_DBS.db1Key, Authorization: 'Bearer ' + ARENA_CLOUD_DBS.db1Key }
+      const r1 = await fetch(cloudDbs.db1Url + '/rest/v1/bookings?select=id&limit=1', {
+        headers: { apikey: cloudDbs.db1Key, Authorization: 'Bearer ' + cloudDbs.db1Key }
       });
       const t3 = performance.now();
       if (lat1El) lat1El.textContent = Math.round(t3 - t2) + 'ms (OK)';
@@ -11116,9 +11574,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const safeTipoJson = tipoLabel.replace(/'/g, "\\'");
         const safeHorarioJson = (conflict.startStr + ' às ' + conflict.endStr).replace(/'/g, "\\'");
 
-        html += '<button type="button" data-slot-min="' + m + '" onclick="window.showBalcaoOccupiedDetail(\'' + safeNomeJson + '\', \'' + slotTime + '\', \'' + safeHorarioJson + '\', \'' + safeTipoJson + '\')" title="Agendado: ' + agendadoPorCompleto + ' (' + tipoLabel + ') [' + conflict.startStr + ' às ' + conflict.endStr + '] - Toque para ver detalhes" class="p-2 rounded-xl text-[11px] font-bold bg-rose-50/95 text-rose-900 border-2 border-rose-300 shadow-2xs cursor-pointer opacity-95 text-center flex flex-col items-center justify-center select-none hover:bg-rose-100 hover:border-rose-400 active:scale-95 transition-all">';
-        html += '<span class="font-black text-rose-950">' + slotTime + '</span>';
-        html += '<span class="balcao-slot-badge text-[10px] font-extrabold uppercase tracking-tight text-rose-700 bg-rose-200/90 px-1 py-0.5 rounded truncate max-w-[72px] w-full block shadow-3xs" title="' + agendadoPorCompleto + '">' + nomeExibicao + '</span>';
+        const intervalStr = conflict.startStr + ' às ' + conflict.endStr;
+        html += '<button type="button" data-slot-min="' + m + '" onclick="window.showBalcaoOccupiedDetail(\'' + safeNomeJson + '\', \'' + slotTime + '\', \'' + safeHorarioJson + '\', \'' + safeTipoJson + '\')" title="Agendado: ' + agendadoPorCompleto + ' (' + tipoLabel + ') [' + intervalStr + '] - Toque para ver detalhes" class="p-2 min-h-[60px] rounded-xl text-[11px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-950 border-2 border-rose-500 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center gap-1 select-none active:scale-95 transition-all overflow-hidden">';
+        html += '<span class="font-black text-rose-950 text-xs leading-none">' + slotTime + '</span>';
+        html += '<span class="balcao-slot-badge text-[10px] font-black uppercase tracking-tight text-rose-900 bg-rose-200/90 px-1.5 py-0.5 rounded-md truncate max-w-full w-full block shadow-3xs leading-tight" title="' + agendadoPorCompleto + ' (' + intervalStr + ')">' + nomeExibicao + '</span>';
         html += '</button>';
       } else if (isPast) {
         html += '<button type="button" disabled data-slot-min="' + m + '" title="Horário já passou do relógio atual" class="p-2 rounded-xl text-[11px] font-bold bg-slate-100 text-slate-400 border border-slate-300 cursor-not-allowed opacity-65 text-center flex flex-col items-center justify-center select-none">';
@@ -11251,50 +11710,42 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!hasExistingSelection) {
       window.__balcaoHasUserInteracted = true;
       forceSelectValue(startSelect, slotTime);
-      const defEnd = !hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60);
+      // Padrão amigável: jogo de 1 hora (60 minutos) se não houver conflito, senão 30 minutos
+      const defEnd = !hasConflict(clickedMin, clickedMin + 60) ? (clickedMin + 60) : (!hasConflict(clickedMin, clickedMin + 30) ? (clickedMin + 30) : (clickedMin + 60));
       forceSelectValue(endSelect, formatMinutesToTime(defEnd));
     }
-    // 2. Clique ALÉM do Fim atual → EXPANDE para frente (sem limite de horas/blocos: 2h, 3h, 5h+)
-    else if (clickedMin > curEndMin) {
-      if (!hasConflict(curStartMin, clickedMin)) {
-        forceSelectValue(endSelect, slotTime);
+    // 2. Clique no mesmo horário de INÍCIO já selecionado:
+    else if (clickedMin === curStartMin) {
+      // Se for apenas 30 minutos, expande para 1 hora
+      if (curEndMin - curStartMin === 30 && !hasConflict(curStartMin, curStartMin + 60)) {
+        forceSelectValue(endSelect, formatMinutesToTime(curStartMin + 60));
+      } else {
+        // Limpa ou redefine o início
+        forceSelectValue(startSelect, slotTime);
+        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 60));
+      }
+    }
+    // 3. Clique em horário POSTERIOR ao início:
+    else if (clickedMin > curStartMin) {
+      // O horário clicado é o bloco desejado. Como cada bloco tem 30 min, o término do jogo abrange esse bloco até (clickedMin + 30)
+      const targetEndMin = (clickedMin === curEndMin) ? clickedMin : (clickedMin + 30);
+      if (!hasConflict(curStartMin, targetEndMin)) {
+        forceSelectValue(endSelect, formatMinutesToTime(targetEndMin));
       } else {
         // Conflito no caminho: inicia nova seleção no slot clicado
         forceSelectValue(startSelect, slotTime);
-        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
+        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 60));
       }
     }
-    // 3. Clique ANTES do Início atual → EXPANDE para trás (sem limite)
+    // 4. Clique em horário ANTERIOR ao início:
     else if (clickedMin < curStartMin) {
       if (!hasConflict(clickedMin, curEndMin)) {
         forceSelectValue(startSelect, slotTime);
       } else {
-        // Conflito: inicia nova seleção
+        // Conflito: inicia nova seleção a partir do horário clicado
         forceSelectValue(startSelect, slotTime);
-        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 30));
+        forceSelectValue(endSelect, formatMinutesToTime(clickedMin + 60));
       }
-    }
-    // 4. Clique NO slot de Fim exato → se > 30min reduz 30min; se já for 30min amplia para 1h
-    else if (clickedMin === curEndMin) {
-      const duration = curEndMin - curStartMin;
-      if (duration > 30) {
-        forceSelectValue(endSelect, formatMinutesToTime(curEndMin - 30));
-      } else if (!hasConflict(curEndMin, curEndMin + 30)) {
-        forceSelectValue(endSelect, formatMinutesToTime(curEndMin + 30));
-      }
-    }
-    // 5. Clique NO slot de Início exato → REMOVE 30min do início (avança o início)
-    else if (clickedMin === curStartMin) {
-      const duration = curEndMin - curStartMin;
-      if (duration > 30) {
-        forceSelectValue(startSelect, formatMinutesToTime(curStartMin + 30));
-      }
-    }
-    // 6. Clique em slot INTERMEDIÁRIO (dentro do intervalo) → CORTA o Fim naquele ponto (remove bloco completo)
-    else {
-      // curStartMin < clickedMin < curEndMin
-      // Reduz a seleção: o novo Fim passa a ser o slot clicado
-      forceSelectValue(endSelect, slotTime);
     }
 
     autoCalculateDirectBookingPrice();
@@ -11375,6 +11826,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const dayOfWeek = daysMap[dateObj.getDay()];
 
     const occupiedRanges = [];
+
+    // 0. Bloqueios de quadra (Treino / Manutenção cadastrados em Gestão de Espaços)
+    if (typeof courtState !== 'undefined' && Array.isArray(courtState.blocks)) {
+      courtState.blocks.forEach(bl => {
+        if (!bl || bl.date !== dateStr) return;
+        if (isMatchingCourt(bl.courtId)) {
+          const sm = parseTimeToMinutes(bl.start);
+          const em = parseTimeToMinutes(bl.end);
+          if (em > sm) {
+            occupiedRanges.push({
+              start: sm,
+              end: em,
+              startStr: bl.start,
+              endStr: bl.end,
+              name: '⛔ BLOQUEIO: ' + (bl.type || 'Manutenção').toUpperCase(),
+              type: 'Bloqueio Operacional',
+              status: 'blocked'
+            });
+          }
+        }
+      });
+    }
 
     // 1. Partidas já registradas em bookings
     let excluidosBalcao = {};
@@ -11617,12 +12090,58 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  
+  // Sincroniza dinamicamente as opções do select de Quadras na Reserva Balcão com os dados reais de Gestão de Espaços
+  window.syncDirectBookingCourtOptions = function() {
+    const courtSelect = document.getElementById('directBookingCourt');
+    if (!courtSelect) return;
+
+    // Se o elemento estiver com foco (usuário tocando ou com o menu suspenso aberto no APK/Android), NUNCA reescreva o DOM
+    if (document.activeElement === courtSelect) return;
+
+    // Busca a lista atualizada de quadras em courtState ou adminGameState ou ADMIN_COURTS
+    let activeCourts = [];
+    if (typeof courtState !== 'undefined' && Array.isArray(courtState.courts) && courtState.courts.length > 0) {
+      activeCourts = courtState.courts;
+    } else if (window.courtState && Array.isArray(window.courtState.courts) && window.courtState.courts.length > 0) {
+      activeCourts = window.courtState.courts;
+    } else if (window.adminGameState && Array.isArray(window.adminGameState.courts) && window.adminGameState.courts.length > 0) {
+      activeCourts = window.adminGameState.courts;
+    } else if (typeof ADMIN_COURTS !== 'undefined' && Array.isArray(ADMIN_COURTS)) {
+      activeCourts = ADMIN_COURTS;
+    }
+
+    if (!activeCourts || activeCourts.length === 0) return;
+
+    const previousVal = courtSelect.value;
+    let html = '';
+    activeCourts.forEach((c) => {
+      const priceVal = c.price ?? c.rate ?? c.normal ?? 100;
+      const courtName = c.name || c.id;
+      html += '<option value="' + c.id + '">' + courtName + ' (R$ ' + priceVal + '/h)</option>';
+    });
+
+    // Só atualiza o DOM se as opções realmente mudaram de valor ou texto (evita fechar dropdown aberto no mobile/APK)
+    if (courtSelect.innerHTML !== html) {
+      courtSelect.innerHTML = html;
+      if (previousVal && Array.from(courtSelect.options).some(o => o.value === previousVal)) {
+        courtSelect.value = previousVal;
+      }
+    }
+  };
+
   window.openDirectBookingModal = function() {
     window.__balcaoHasUserInteracted = false;
     window.__balcaoSelectionHistory = [];
     window.__balcaoClickState = null;
     const modal = document.getElementById('directBookingModal');
     if (!modal) return;
+    
+    // Atualiza opções do dropdown de quadras com os valores de Gestão de Espaços
+    if (typeof window.syncDirectBookingCourtOptions === 'function') {
+      window.syncDirectBookingCourtOptions();
+    }
+
     const dateInput = document.getElementById('directBookingDate');
     const courtSelect = document.getElementById('directBookingCourt');
     const startSelect = document.getElementById('directBookingStart');
@@ -11633,9 +12152,24 @@ document.addEventListener('DOMContentLoaded', () => {
       dateInput.value = window.adminGameState?.selectedDate || realTodayStr;
     }
 
+    // Sincroniza a quadra com a quadra atualmente visualizada no painel administrativo
+    if (courtSelect && window.adminGameState) {
+      const activeCourt = window.adminGameState.selectedCourt;
+      if (activeCourt && activeCourt !== 'all') {
+        courtSelect.value = activeCourt;
+      }
+    }
+
+    // Garante que o checkbox de ocultar indisponíveis sempre abra selecionado (checked = true)
+    const hideToggleEl = document.getElementById('balcaoHideOccupiedToggle');
+    if (hideToggleEl) hideToggleEl.checked = true;
+
     // Modal abre completamente LIMPO: nenhum bloco pré-selecionado pelo sistema
     if (startSelect) startSelect.value = '';
     if (endSelect) endSelect.value = '';
+
+    const paySelect = document.getElementById('directBookingPayment');
+    if (paySelect) paySelect.value = 'Pendente';
 
     autoCalculateDirectBookingPrice();
     if (courtSelect) {
@@ -11680,7 +12214,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const cId = courtSelect.value;
-    const court = ADMIN_COURTS.find(c => c.id === cId) || ADMIN_COURTS[0];
+    let liveCourt = null;
+    if (typeof courtState !== 'undefined' && Array.isArray(courtState.courts)) {
+      liveCourt = courtState.courts.find(c => c.id === cId);
+    } else if (window.courtState && Array.isArray(window.courtState.courts)) {
+      liveCourt = window.courtState.courts.find(c => c.id === cId);
+    }
+    const fallbackCourt = (typeof ADMIN_COURTS !== 'undefined' && Array.isArray(ADMIN_COURTS)) ? (ADMIN_COURTS.find(c => c.id === cId) || ADMIN_COURTS[0]) : null;
+    const court = liveCourt || fallbackCourt || {};
 
     const sMin = parseTimeToMinutes(sStr);
     let eMin = parseTimeToMinutes(eStr);
@@ -11689,7 +12230,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const durationHours = (eMin - sMin) / 60;
     const sH = Math.floor(sMin / 60);
 
-    const hourlyRate = court.normal || court.price || (court.name && court.name.includes("7") ? 110 : 90);
+    const hourlyRate = (court.price !== undefined) ? court.price : (court.normal !== undefined ? court.normal : (court.rate || (court.name && court.name.includes("7") ? 110 : 90)));
     priceInput.value = Math.round(hourlyRate * durationHours);
   };
 
@@ -11772,7 +12313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const start = document.getElementById('directBookingStart')?.value;
     const end = document.getElementById('directBookingEnd')?.value;
     const price = parseFloat(document.getElementById('directBookingPrice')?.value || 0);
-    const payment = document.getElementById('directBookingPayment')?.value || 'PIX Balcão';
+    const payment = document.getElementById('directBookingPayment')?.value || 'Pendente';
     const cpf = document.getElementById('directBookingCpf')?.value.trim() || '';
     const obs = document.getElementById('directBookingObs')?.value.trim() || 'Reserva Balcão Direta';
 
@@ -11800,6 +12341,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const dbCourtId = dbCourtMapping[court.id] || court.id;
 
+    const startM = parseTimeToMinutes(start);
+    let endM = parseTimeToMinutes(end);
+    let calcDuration = endM - startM;
+    if (calcDuration <= 0) calcDuration += 1440;
+
     const newBooking = {
       id: bookingId,
       court_id: dbCourtId,
@@ -11810,7 +12356,7 @@ document.addEventListener('DOMContentLoaded', () => {
       start_time: start,
       end_time: end,
       time: start + ' às ' + end,
-      duration: 60,
+      duration: calcDuration,
       total_price: price,
       status: 'confirmed',
       booking_type: 'avulso',
@@ -11905,10 +12451,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const targetTable = isMonthlyId ? 'monthly_members' : 'bookings';
     await Promise.allSettled([
-      dbDelete(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, targetTable, realId),
-      dbDelete(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, targetTable, realId),
-      dbDelete(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, 'bookings', id),
-      dbDelete(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, 'bookings', id)
+      dbDelete(cloudDbs.db2Url, cloudDbs.db2Key, targetTable, realId),
+      dbDelete(cloudDbs.db1Url, cloudDbs.db1Key, targetTable, realId),
+      dbDelete(cloudDbs.db2Url, cloudDbs.db2Key, 'bookings', id),
+      dbDelete(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', id)
     ]);
 
     // Força sincronização imediata na nuvem para propagar aos outros dispositivos
@@ -11966,6 +12512,10 @@ document.addEventListener('DOMContentLoaded', () => {
           window.adminGameState.bookings.unshift(b);
           renderMovementMatches();
           renderCadastrosBookingsList();
+        }
+      } else if (ev && ev.data && ev.data.type === 'courts_updated') {
+        if (typeof window.pullCourtsFromCloud === 'function') {
+          window.pullCourtsFromCloud();
         }
       }
     };
@@ -12160,6 +12710,12 @@ document.addEventListener('DOMContentLoaded', () => {
     g.start = newStart;
     g.end_time = newEnd;
     g.end = newEnd;
+    g.time = newStart + ' às ' + newEnd;
+    const editSm = parseTimeToMinutes(newStart);
+    let editEm = parseTimeToMinutes(newEnd);
+    let editDur = editEm - editSm;
+    if (editDur <= 0) editDur += 1440;
+    g.duration = editDur;
     g.late = newLate;
     g.lateReason = newLateReason;
     g.type = document.getElementById('editMatchType').value;
@@ -12302,9 +12858,9 @@ document.addEventListener('DOMContentLoaded', () => {
           // Remove campos indefinidos
           Object.keys(contractPayload).forEach(k => contractPayload[k] === undefined && delete contractPayload[k]);
 
-          [ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db1Url].forEach((dbUrl, idx) => {
+          [cloudDbs.db2Url, cloudDbs.db1Url].forEach((dbUrl, idx) => {
             if (!dbUrl) return;
-            const key = idx === 0 ? ARENA_CLOUD_DBS.db2Key : ARENA_CLOUD_DBS.db1Key;
+            const key = idx === 0 ? cloudDbs.db2Key : cloudDbs.db1Key;
             fetch(dbUrl + '/rest/v1/monthly_members?id=eq.' + encodeURIComponent(rawMonthlyId), {
               method: 'PATCH',
               headers: {
@@ -12550,15 +13106,15 @@ const cancelGame = window.cancelGame = async function(id, evt) {
 
       // Exclui em bookings e em monthly_members
       const tasks = [
-        deleteDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, 'bookings', targetId),
-        deleteDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, 'bookings', targetId)
+        deleteDb(cloudDbs.db2Url, cloudDbs.db2Key, 'bookings', targetId),
+        deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', targetId)
       ];
       if (isMonthly) {
         tasks.push(
-          deleteDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, 'monthly_members', rawMonthlyId),
-          deleteDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, 'monthly_members', rawMonthlyId),
-          deleteDb(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key, 'bookings', rawMonthlyId),
-          deleteDb(ARENA_CLOUD_DBS.db1Url, ARENA_CLOUD_DBS.db1Key, 'bookings', rawMonthlyId)
+          deleteDb(cloudDbs.db2Url, cloudDbs.db2Key, 'monthly_members', rawMonthlyId),
+          deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'monthly_members', rawMonthlyId),
+          deleteDb(cloudDbs.db2Url, cloudDbs.db2Key, 'bookings', rawMonthlyId),
+          deleteDb(cloudDbs.db1Url, cloudDbs.db1Key, 'bookings', rawMonthlyId)
         );
       }
       await Promise.allSettled(tasks);
@@ -12669,7 +13225,7 @@ const cancelGame = window.cancelGame = async function(id, evt) {
   function setupArenaRealtimeSync() {
     if (window.supabase && typeof window.supabase.createClient === 'function' && window.ARENA_CLOUD_DBS) {
       try {
-        const rtClient = window.supabase.createClient(ARENA_CLOUD_DBS.db2Url, ARENA_CLOUD_DBS.db2Key);
+        const rtClient = window.supabase.createClient(cloudDbs.db2Url, cloudDbs.db2Key);
         const channel = rtClient.channel('arena_live_system_sync');
         channel
           .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, (payload) => {
@@ -12694,7 +13250,12 @@ const cancelGame = window.cancelGame = async function(id, evt) {
     }
   }
 
-  // Loop ativo e resiliente de sincronização a cada 7 segundos (dual-cloud polling & virada de dia)
+  // Sincroniza quadras na nuvem no carregamento inicial
+    if (typeof window.pullCourtsFromCloud === 'function') {
+      window.pullCourtsFromCloud();
+    }
+
+    // Loop ativo e resiliente de sincronização a cada 7 segundos (dual-cloud polling & virada de dia)
   // Otimizado: suspende o loop quando a aba estiver em segundo plano (document.hidden) e reativa no foco
   if (!window.__arenaFeedAutoInterval) {
     // Checagem de expurgo contínuo a cada virada de dia ou ciclo
@@ -12732,16 +13293,24 @@ const cancelGame = window.cancelGame = async function(id, evt) {
         window.checkAndAutoExpireMatches();
       }
 
-      // 3. Sincronização contínua com os bancos de dados na nuvem (já renderiza partidas ao concluir)
+      // 3. Sincronização contínua com os bancos de dados na nuvem (partidas e quadras em tempo real)
       if (typeof window.pullDataFromCloudDatabases === 'function') {
         window.pullDataFromCloudDatabases();
+      }
+      if (typeof window.pullCourtsFromCloud === 'function') {
+        window.pullCourtsFromCloud();
       }
     }, 4000);
 
     // Sincronização instantânea ao reativar a aba
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && typeof window.pullDataFromCloudDatabases === 'function') {
-        window.pullDataFromCloudDatabases();
+      if (!document.hidden) {
+        if (typeof window.pullDataFromCloudDatabases === 'function') {
+          window.pullDataFromCloudDatabases();
+        }
+        if (typeof window.pullCourtsFromCloud === 'function') {
+          window.pullCourtsFromCloud();
+        }
       }
     });
   }
@@ -12794,9 +13363,17 @@ const cancelGame = window.cancelGame = async function(id, evt) {
     const targetDate = window.adminGameState.selectedDate || todayStr;
     window.selectMovementDay(targetDate);
 
-    // Inicializa renderizações do feed e cadastros
-    renderMovementMatches();
-    renderCadastrosBookingsList();
+    // Inicializa renderizações do feed e cadastros com try/catch protetor
+    try {
+      renderMovementMatches();
+    } catch(e) {
+      console.warn('[initAdminGames] Erro ao renderizar partidas:', e);
+    }
+    try {
+      renderCadastrosBookingsList();
+    } catch(e) {
+      console.warn('[initAdminGames] Erro ao renderizar cadastros:', e);
+    }
 
     if (window.location.hash === "#openModal" || window.location.search.includes("modal=direct")) {
       setTimeout(openDirectBookingModal, 50);

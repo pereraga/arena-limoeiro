@@ -1,10 +1,7 @@
 const fs = require('fs');
-const path = require('path');
+const path = 'C:/Users/PC/.gemini/antigravity/scratch/arena-booking-system/public/admin.html';
+const html = fs.readFileSync(path, 'utf8');
 
-const adminPath = path.join(__dirname, '..', 'public', 'admin.html');
-const content = fs.readFileSync(adminPath, 'utf8');
-
-// Extract ARENA_CLOUD_DBS definition
-const dbIdx = content.indexOf('const ARENA_CLOUD_DBS =');
-console.log('ARENA_CLOUD_DBS:');
-console.log(content.substring(dbIdx, dbIdx + 800));
+const pos = html.indexOf('ARENA_CLOUD_DBS =');
+console.log('ARENA_CLOUD_DBS pos:', pos);
+console.log(html.substring(pos, pos + 800));

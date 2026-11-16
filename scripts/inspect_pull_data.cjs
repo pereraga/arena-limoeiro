@@ -1,8 +1,6 @@
 const fs = require('fs');
-const path = require('path');
+const path = 'C:/Users/PC/.gemini/antigravity/scratch/arena-booking-system/public/admin.html';
+const html = fs.readFileSync(path, 'utf8');
 
-const adminPath = path.join(__dirname, '..', 'public', 'admin.html');
-const content = fs.readFileSync(adminPath, 'utf8');
-
-console.log('--- pullDataFromCloudDatabases (around 329632) ---');
-console.log(content.substring(329600, 333000));
+const pos = html.indexOf('window.pullDataFromCloudDatabases = async function');
+console.log(html.substring(pos, pos + 3500));

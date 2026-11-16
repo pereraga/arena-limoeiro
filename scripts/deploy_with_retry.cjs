@@ -1,9 +1,13 @@
 const { execSync } = require('child_process');
+const path = require('path');
+
+const projectDir = path.resolve(__dirname, '..');
 
 for (let attempt = 1; attempt <= 5; attempt++) {
-  console.log(`\n--- Vercel Deploy Attempt ${attempt}/5 ---`);
+  console.log(`\n--- Vercel Deploy Attempt ${attempt}/5 (cwd: ${projectDir}) ---`);
   try {
     const output = execSync('npx vercel --prod --yes', {
+      cwd: projectDir,
       encoding: 'utf8',
       timeout: 120000
     });

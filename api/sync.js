@@ -5,7 +5,7 @@ const GIST_ID = '6efecf2a30d0d73ed0a8144cdea6cee1';
 const GIST_TOKEN = String.fromCharCode(103,104,111,95,121,116,80,51,120,98,122,116,106,66,72,75,52,83,120,68,74,56,55,66,75,117,97,117,118,119,77,75,104,80,49,68,52,84,55,56);
 const FILE_NAME = 'arena_db.json';
 const SUPABASE_DB2_URL = process.env.SUPABASE_DB2_URL || 'https://aukrcnhuyultkjqsgvea.supabase.co';
-const SUPABASE_DB2_KEY = process.env.SUPABASE_DB2_KEY || Buffer.from('c2Jfc2VjcmV0XzR6V0dIbU93SktwTDI4eFJ5QjFMbFFfN1VfeVdTank=', 'base64').toString('utf8');
+const SUPABASE_DB2_KEY = process.env.SUPABASE_DB2_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 async function mirrorToSupabaseDB2(action, payload) {
   if (!payload) return;
@@ -73,6 +73,24 @@ async function mirrorToSupabaseDB2(action, payload) {
           observation: payload.observation || null
         })
       });
+    } else if (action === 'update_court' && payload && (payload.id || payload.dbId)) {
+      const targetCourtId = payload.dbId || payload.id;
+      const courtPayload = {
+        name: payload.name,
+        base_price_per_hour: parseFloat(payload.base_price_per_hour || payload.price || 100),
+        observation: payload.observation || payload.status || 'operacional'
+      };
+      if (payload.specs) courtPayload.specs = payload.specs;
+      await fetch(`${SUPABASE_DB2_URL}/rest/v1/courts?id=eq.${encodeURIComponent(targetCourtId)}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_DB2_KEY,
+          Authorization: `Bearer ${SUPABASE_DB2_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify(courtPayload)
+      }).catch(err => console.warn('[Sync Mirror DB2] Erro ao sincronizar quadra:', err));
     } else if ((action === 'delete_monthly' || action === 'delete_monthly_member') && payload.id) {
       await fetch(`${SUPABASE_DB2_URL}/rest/v1/monthly_members?id=eq.${payload.id}`, {
         method: 'DELETE',

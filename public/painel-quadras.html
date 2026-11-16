@@ -76,7 +76,111 @@ const initialCourts = [
 const STORE='arena_limoeiro_quadras_demo_v2';
 let state=loadState();
 function loadState(){try{const x=JSON.parse(localStorage.getItem(STORE));if(x&&Array.isArray(x.courts)&&Array.isArray(x.blocks))return x}catch(e){}return {courts:initialCourts.map(x=>({...x})),blocks:[]}}
-function persist(){localStorage.setItem(STORE,JSON.stringify(state));render()}
+const COURT_TO_DB_ID = {
+  'fut5': 'court-society-1',
+  'fut6': 'court-society-2',
+  'fut7': 'court-beach-1',
+  'futmesa': 'court-esportes-de-quadra-1788962671043',
+  'areia': 'court-beach-2',
+  'society': 'court-futsal-1788963178368'
+};
+const DB_TO_COURT_ID = {
+  'court-society-1': 'fut5',
+  'court-society-2': 'fut6',
+  'court-beach-1': 'fut7',
+  'court-esportes-de-quadra-1788962671043': 'futmesa',
+  'court-beach-2': 'areia',
+  'court-futsal-1788963178368': 'society'
+};
+const CLOUD_DBS = {
+  db1Url: 'https://brmclyukjfijommbxhks.supabase.co',
+  db1Key: 'sb_publishable__bNeBgn98phx-HCEAF1WLA_2L6XD-F7',
+  db2Url: 'https://aukrcnhuyultkjqsgvea.supabase.co',
+  db2Key: 'sb_publishable_fbvIo7C-gfP0pKRdvJcPIg_GfrizeAi'
+};
+
+async function syncCourtToCloud(c) {
+  if (!c) return;
+  const dbId = COURT_TO_DB_ID[c.id] || c.id;
+  const [openH, closeH] = (c.hours || '06:00 às 22:00').split(' às ');
+  const payload = {
+    name: c.name,
+    base_price_per_hour: parseFloat(c.price || 100),
+    observation: c.status || 'operacional',
+    specs: {
+      surface: c.floor || 'Grama Sintética',
+      capacity: c.capacity || '10 a 14 jogadores',
+      opening_time: openH || '06:00',
+      closing_time: closeH || '22:00',
+      discount_price_per_hour: parseFloat(c.promo || 0),
+      discount_start_time: c.promoStart || '09:00',
+      discount_end_time: c.promoEnd || '16:00'
+    }
+  };
+  const headers2 = { apikey: CLOUD_DBS.db2Key, Authorization: 'Bearer ' + CLOUD_DBS.db2Key, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+  const headers1 = { apikey: CLOUD_DBS.db1Key, Authorization: 'Bearer ' + CLOUD_DBS.db1Key, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+  try {
+    await Promise.all([
+      fetch(CLOUD_DBS.db2Url + '/rest/v1/courts?id=eq.' + encodeURIComponent(dbId), { method: 'PATCH', headers: headers2, body: JSON.stringify(payload) }),
+      fetch(CLOUD_DBS.db1Url + '/rest/v1/courts?id=eq.' + encodeURIComponent(dbId), { method: 'PATCH', headers: headers1, body: JSON.stringify(payload) })
+    ]);
+    console.log('[Quadras] Espaço ' + dbId + ' sincronizado no banco de dados com sucesso!');
+  } catch(e) {
+    console.warn('[Quadras] Erro ao sincronizar espaço:', e);
+  }
+}
+
+async function pullCourtsFromCloud() {
+  try {
+    const res = await fetch(CLOUD_DBS.db2Url + '/rest/v1/courts?select=*&order=order_index.asc', {
+      headers: { apikey: CLOUD_DBS.db2Key, Authorization: 'Bearer ' + CLOUD_DBS.db2Key }
+    });
+    if (res.ok) {
+      const cloudCourts = await res.json();
+      if (Array.isArray(cloudCourts) && cloudCourts.length > 0) {
+        cloudCourts.forEach(cc => {
+          const localId = DB_TO_COURT_ID[cc.id] || cc.id;
+          const existing = state.courts.find(c => c.id === localId || c.id === cc.id);
+          const priceNum = parseFloat(cc.base_price_per_hour) || 100;
+          const promoNum = parseFloat(cc.specs?.discount_price_per_hour) || parseFloat(cc.promo) || Math.round(priceNum * 0.6);
+          const pStart = cc.specs?.discount_start_time || '09:00';
+          const pEnd = cc.specs?.discount_end_time || '16:00';
+          const hOpen = cc.specs?.opening_time || '06:00';
+          const hClose = cc.specs?.closing_time || '22:00';
+          const cap = cc.specs?.capacity || '10 a 14 jogadores';
+          const fl = cc.specs?.surface || cc.specs?.type || 'Grama Sintética';
+          if (existing) {
+            existing.name = cc.name || existing.name;
+            existing.price = priceNum;
+            existing.promo = promoNum;
+            existing.promoStart = pStart;
+            existing.promoEnd = pEnd;
+            existing.hours = hOpen + ' às ' + hClose;
+            existing.capacity = cap;
+            existing.floor = fl;
+            existing.status = (cc.observation && cc.observation.toLowerCase().includes('manuten')) ? 'manutencao' : (existing.status || 'operacional');
+          }
+        });
+        localStorage.setItem(STORE, JSON.stringify(state));
+        render();
+      }
+    }
+  } catch(e) {}
+}
+
+function persist(specificCourt){
+  localStorage.setItem(STORE,JSON.stringify(state));
+  render();
+  try {
+    const bc = new BroadcastChannel('arena_limoeiro_sync');
+    bc.postMessage({ type: 'courts_updated', courts: state.courts });
+  } catch(e) {}
+  if (specificCourt) {
+    syncCourtToCloud(specificCourt);
+  } else {
+    state.courts.forEach(syncCourtToCloud);
+  }
+}
 function money(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function statusText(s){return s==='operacional'?'Operacional':s==='pausada'?'Pausada':'Em manutenção'}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -96,7 +200,7 @@ function openModal(title,subtitle,html,onSave,button='Salvar'){document.getEleme
 function closeModal(){backdrop.classList.remove('open');document.getElementById('modalForm').onsubmit=null}
 document.getElementById('closeModal').onclick=closeModal;document.getElementById('cancelModal').onclick=closeModal;backdrop.addEventListener('click',e=>{if(e.target===backdrop)closeModal()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
 function newCourt(){openModal('Cadastrar novo espaço','Adicione uma quadra ou área de lazer ao monitor.',`<div class="form-grid"><div class="field full"><label>Nome do espaço</label><input name="name" required placeholder="Ex.: Quadra de vôlei"></div><div class="field"><label>Tipo / modalidade</label><input name="type" required placeholder="Ex.: Vôlei"></div><div class="field"><label>Capacidade</label><input name="capacity" required placeholder="Ex.: 4 a 8 jogadores"></div><div class="field full"><label>Tipo de piso / descrição</label><input name="floor" placeholder="Descrição do espaço"></div><div class="field"><label>Valor normal por hora (R$)</label><input name="price" type="number" min="0" step="0.01" required></div><div class="field"><label>Valor promocional por hora (R$)</label><input name="promo" type="number" min="0" step="0.01" value="0"></div><div class="field"><label>Início da promoção</label><input name="promoStart" type="time" value="09:00"></div><div class="field"><label>Fim da promoção</label><input name="promoEnd" type="time" value="16:00"></div><div class="field"><label>Horário de abertura</label><input name="open" type="time" value="06:00"></div><div class="field"><label>Horário de fechamento</label><input name="close" type="time" value="22:00"></div></div>`,f=>{const name=f.get('name').trim();if(!name)return;state.courts.push({id:'court_'+Date.now(),name:name.toUpperCase(),type:f.get('type'),capacity:f.get('capacity'),floor:f.get('floor')||'Não informado',price:+f.get('price'),promo:+f.get('promo'),promoStart:f.get('promoStart'),promoEnd:f.get('promoEnd'),hours:f.get('open')+' às '+f.get('close'),status:'operacional'});persist();closeModal();toast('Espaço cadastrado neste navegador.');})}
-function editCourt(id){const c=state.courts.find(x=>x.id===id);if(!c)return;const [open,close]=c.hours.split(' às ');openModal('Editar espaço','Atualize os dados e a situação operacional.',`<div class="form-grid"><div class="field full"><label>Nome</label><input name="name" required value="${esc(c.name)}"></div><div class="field"><label>Tipo / modalidade</label><input name="type" required value="${esc(c.type)}"></div><div class="field"><label>Capacidade</label><input name="capacity" required value="${esc(c.capacity)}"></div><div class="field full"><label>Piso / descrição</label><input name="floor" value="${esc(c.floor)}"></div><div class="field"><label>Valor normal por hora (R$)</label><input name="price" type="number" min="0" step="0.01" required value="${c.price}"></div><div class="field"><label>Valor promocional por hora (R$)</label><input name="promo" type="number" min="0" step="0.01" value="${c.promo}"></div><div class="field"><label>Início da promoção</label><input name="promoStart" type="time" value="${c.promoStart}"></div><div class="field"><label>Fim da promoção</label><input name="promoEnd" type="time" value="${c.promoEnd}"></div><div class="field"><label>Abertura</label><input name="open" type="time" value="${open||'06:00'}"></div><div class="field"><label>Fechamento</label><input name="close" type="time" value="${close||'22:00'}"></div><div class="field full"><label>Status</label><select name="status"><option value="operacional" ${c.status==='operacional'?'selected':''}>Operacional</option><option value="pausada" ${c.status==='pausada'?'selected':''}>Pausada</option><option value="manutencao" ${c.status==='manutencao'?'selected':''}>Em manutenção</option></select></div></div>`,f=>{Object.assign(c,{name:f.get('name').toUpperCase(),type:f.get('type'),capacity:f.get('capacity'),floor:f.get('floor'),price:+f.get('price'),promo:+f.get('promo'),promoStart:f.get('promoStart'),promoEnd:f.get('promoEnd'),hours:f.get('open')+' às '+f.get('close'),status:f.get('status')});persist();closeModal();toast('Dados do espaço atualizados.');})}
+function editCourt(id){const c=state.courts.find(x=>x.id===id);if(!c)return;const [open,close]=c.hours.split(' às ');openModal('Editar espaço','Atualize os dados e a situação operacional.',`<div class="form-grid"><div class="field full"><label>Nome</label><input name="name" required value="${esc(c.name)}"></div><div class="field"><label>Tipo / modalidade</label><input name="type" required value="${esc(c.type)}"></div><div class="field"><label>Capacidade</label><input name="capacity" required value="${esc(c.capacity)}"></div><div class="field full"><label>Piso / descrição</label><input name="floor" value="${esc(c.floor)}"></div><div class="field"><label>Valor normal por hora (R$)</label><input name="price" type="number" min="0" step="0.01" required value="${c.price}"></div><div class="field"><label>Valor promocional por hora (R$)</label><input name="promo" type="number" min="0" step="0.01" value="${c.promo}"></div><div class="field"><label>Início da promoção</label><input name="promoStart" type="time" value="${c.promoStart}"></div><div class="field"><label>Fim da promoção</label><input name="promoEnd" type="time" value="${c.promoEnd}"></div><div class="field"><label>Abertura</label><input name="open" type="time" value="${open||'06:00'}"></div><div class="field"><label>Fechamento</label><input name="close" type="time" value="${close||'22:00'}"></div><div class="field full"><label>Status</label><select name="status"><option value="operacional" ${c.status==='operacional'?'selected':''}>Operacional</option><option value="pausada" ${c.status==='pausada'?'selected':''}>Pausada</option><option value="manutencao" ${c.status==='manutencao'?'selected':''}>Em manutenção</option></select></div></div>`,f=>{Object.assign(c,{name:f.get('name').toUpperCase(),type:f.get('type'),capacity:f.get('capacity'),floor:f.get('floor'),price:+f.get('price'),promo:+f.get('promo'),promoStart:f.get('promoStart'),promoEnd:f.get('promoEnd'),hours:f.get('open')+' às '+f.get('close'),status:f.get('status')});persist(c);closeModal();toast('Dados do espaço atualizados e sincronizados no banco de dados!');})}
 function newBlock(courtId=''){const courtOpts=state.courts.map(c=>`<option value="${c.id}" ${courtId===c.id?'selected':''}>${esc(c.name)}</option>`).join('');const today=new Date().toISOString().slice(0,10);openModal('Agendar treino ou manutenção','O período ficará bloqueado neste monitor de demonstração.',`<div class="form-grid"><div class="field full"><label>Espaço</label><select name="courtId" required>${courtOpts}</select></div><div class="field"><label>Tipo de bloqueio</label><select name="type"><option>Treino</option><option>Manutenção</option></select></div><div class="field"><label>Data</label><input name="date" type="date" min="${today}" value="${today}" required></div><div class="field"><label>Horário inicial</label><input name="start" type="time" value="17:00" required></div><div class="field"><label>Horário final</label><input name="end" type="time" value="18:00" required></div><div class="field full"><label>Observação</label><textarea name="note" placeholder="Ex.: treino interno, troca de iluminação, limpeza…"></textarea></div></div>`,f=>{const b={id:'block_'+Date.now(),courtId:f.get('courtId'),type:f.get('type'),date:f.get('date'),start:f.get('start'),end:f.get('end'),note:f.get('note').trim()};if(b.end<=b.start){toast('O horário final precisa ser depois do inicial.');return}const conflict=state.blocks.some(x=>x.courtId===b.courtId&&x.date===b.date&&b.start<x.end&&b.end>x.start);if(conflict){toast('Já existe um bloqueio nesse período para este espaço.');return}state.blocks.push(b);persist();closeModal();toast('Bloqueio agendado no protótipo.');})}
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(window._toastTimer);window._toastTimer=setTimeout(()=>t.classList.remove('show'),2600)}
 document.getElementById('newCourtBtn').onclick=newCourt;document.getElementById('mobileCourtBtn').onclick=newCourt;document.getElementById('newBlockBtn').onclick=()=>newBlock();document.getElementById('blockListBtn').onclick=()=>newBlock();document.getElementById('mobileBlockBtn').onclick=()=>newBlock();
@@ -105,7 +209,7 @@ document.getElementById('blockList').addEventListener('click',e=>{const b=e.targ
 document.getElementById('searchInput').addEventListener('input',render);document.getElementById('statusFilter').addEventListener('change',render);document.getElementById('sortFilter').addEventListener('change',render);
 document.getElementById('shareBtn').onclick=async()=>{try{if(navigator.share)await navigator.share({title:'Arena Limoeiro — Monitor de Quadras',url:location.href});else{await navigator.clipboard.writeText(location.href);toast('Link copiado.')}}catch(e){toast('Não foi possível compartilhar neste navegador.')}};
 document.getElementById('infoBtn').onclick=()=>openModal('Sobre este painel','Informações sobre a versão que você está visualizando.',`<div style="font-size:12px;line-height:1.7;color:#526258"><p><b>Arena Limoeiro — Monitor de Quadras</b></p><p>Protótipo local para organizar o cadastro de espaços, tarifas, status e bloqueios temporários.</p><p>As informações são salvas apenas neste navegador. Para uso oficial, será necessário conectar o painel ao banco de dados compartilhado com o sistema de agendamento.</p></div>`,()=>closeModal(),'Fechar');
-render();
+render(); pullCourtsFromCloud();
 </script>
 </body>
 </html>
