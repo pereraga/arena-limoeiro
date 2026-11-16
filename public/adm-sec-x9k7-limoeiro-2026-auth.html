@@ -9364,27 +9364,23 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
 
-          <!-- BOTÕES DE GESTÃO SECUNDÁRIA (EXATAMENTE COMO NA FOTO GRUPO VERDE) -->
-          <div class="flex flex-wrap items-center justify-between gap-2.5 pb-3">
-            <div class="flex flex-wrap items-center gap-2">
-              <button type="button" onclick="openEditGame('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                <i class="fa-solid fa-pencil text-slate-400"></i> Editar jogo
-              </button>
+          <!-- BOTÕES DE GESTÃO SECUNDÁRIA: GRADE 2x2 DE CANTO A CANTO NO MOBILE, EM LINHA NO DESKTOP -->
+          <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-2.5 pb-3 w-full">
+            <button type="button" onclick="openEditGame('${m.id}')" class="w-full sm:w-auto px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer truncate">
+              <i class="fa-solid fa-pencil text-slate-400"></i> Editar jogo
+            </button>
 
-              <button type="button" onclick="openContract('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                <i class="fa-solid fa-file-contract text-slate-400"></i> Editar contrato
-              </button>
-            </div>
+            <button type="button" onclick="openContract('${m.id}')" class="w-full sm:w-auto px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer truncate">
+              <i class="fa-solid fa-file-contract text-slate-400"></i> Editar contrato
+            </button>
 
-            <div class="flex items-center gap-2">
-              <button type="button" onclick="openNoShow('${m.id}')" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                <i class="fa-solid fa-user-slash text-amber-500"></i> Não compareceu
-              </button>
+            <button type="button" onclick="openNoShow('${m.id}')" class="w-full sm:w-auto px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-200 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer truncate">
+              <i class="fa-solid fa-user-slash text-amber-500"></i> Não compareceu
+            </button>
 
-              <button type="button" onclick="window.cancelGame('${m.id}', event)" class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition flex items-center gap-1.5 shadow-2xs cursor-pointer">
-                <i class="fa-solid fa-ban text-rose-500"></i> Cancelar partida
-              </button>
-            </div>
+            <button type="button" onclick="window.cancelGame('${m.id}', event)" class="w-full sm:w-auto px-3 py-2 sm:px-3.5 sm:py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer truncate">
+              <i class="fa-solid fa-ban text-rose-500"></i> Cancelar partida
+            </button>
           </div>
 
           <!-- HISTÓRICO E LINHA DO TEMPO DA PARTIDA (TIMELINE) -->
