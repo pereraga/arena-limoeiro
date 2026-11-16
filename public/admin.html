@@ -9038,9 +9038,60 @@ document.addEventListener('DOMContentLoaded', () => {
       else originDisplay = 'WhatsApp Oficial';
     }
 
-    const logs = Array.isArray(m.log) && m.log.length > 0 ? m.log : [
+    let logs = Array.isArray(m.log) && m.log.length > 0 ? [...m.log] : [
       { at: 'Reserva cadastrada', text: observation }
     ];
+
+    // Garante que o histórico sempre exiba todos os marcos importantes da partida:
+    const hasLog = (phrase) => logs.some(l => (l.at && l.at.toLowerCase().includes(phrase)) || (l.text && l.text.toLowerCase().includes(phrase)));
+
+    // 1. Início programado da partida
+    if (!hasLog('início programado') && !hasLog('horário reservado')) {
+      logs.push({ at: `Início programado às ${startT}`, text: `Horário agendado: ${startT} às ${endT} (${durStr}) • ${court.name}` });
+    }
+
+    // 2. Registro de chegada / atraso
+    if (m.arrival_time && !hasLog('chegada') && !hasLog('atraso')) {
+      logs.push({ 
+        at: `Chegada registrada às ${m.arrival_time}`, 
+        text: lateMin > 0 ? `Equipe com atraso de ${lateMin} min.` : 'Equipe chegou no horário acordado.' 
+      });
+    }
+
+    // 3. Jogo em andamento / iniciado na quadra
+    if (m.startedAt && !hasLog('iniciad')) {
+      logs.push({ at: `Partida iniciada às ${m.startedAt}`, text: 'Cronômetro em andamento e presença confirmada em quadra.' });
+    } else if ((st === 'live' || st === 'playing' || st === 'in_progress') && !hasLog('iniciad')) {
+      logs.push({ at: 'Partida em andamento', text: 'Presença confirmada e equipe jogando na quadra.' });
+    }
+
+    // 4. Horário estendido / tempo extra
+    if (extraMin > 0 && !hasLog('extra') && !hasLog('término estendido')) {
+      logs.push({ 
+        at: `Tempo extra adicionado (+${extraMin}m)`, 
+        text: `Término estendido para ${m.extended_end || endT} (+R$ ${computedExtraAmountStr}).` 
+      });
+    }
+
+    // 5. Finalização / Encerramento do jogo
+    if (m.finishedAt && !hasLog('finaliz') && !hasLog('encerrad') && !hasLog('concluíd')) {
+      logs.push({ 
+        at: `Partida finalizada às ${m.finishedAt}`, 
+        text: `Jogo concluído com sucesso.${m.payment ? ' Status financeiro: ' + m.payment : ''}` 
+      });
+    } else if (st === 'finished' && !hasLog('finaliz') && !hasLog('encerrad') && !hasLog('concluíd')) {
+      logs.push({ 
+        at: 'Partida finalizada', 
+        text: `Jogo concluído.${m.payment ? ' Status: ' + m.payment : ''}` 
+      });
+    }
+
+    // 6. Não comparecimento / Cancelamento
+    if (st === 'no-show' && !hasLog('não compareceu') && !hasLog('ausente')) {
+      logs.push({ at: 'Não compareceu', text: 'Equipe ausente / no-show registrado.' });
+    } else if (st === 'cancelled' && !hasLog('cancelad')) {
+      logs.push({ at: 'Partida cancelada', text: 'Reserva cancelada no sistema.' });
+    }
 
     const matchTimer = (typeof window.calcMatchTimer === 'function') 
       ? window.calcMatchTimer(startT, endT, extraMin, st, mDate) 
