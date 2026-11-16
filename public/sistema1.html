@@ -8819,9 +8819,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       g.status = 'live';
       g.attendance = 'Em Quadra';
-      if (!Array.isArray(g.log)) g.log = [];
       const nowTime = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      g.log.push({ at: 'Partida iniciada (' + nowTime + ')', text: 'Operador deu início à partida na quadra.' });
+      g.startedAt = nowTime;
+      if (!Array.isArray(g.log)) g.log = [];
+      g.log.push({ at: 'Início do jogo às ' + nowTime, text: 'Operador deu início à partida na quadra.' });
 
       // Transforma o botão imediatamente para Vermelho (Finalizar)
       const btn = document.getElementById('btn-main-action-' + id);
@@ -9052,11 +9053,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // 3. Jogo em andamento / iniciado na quadra
+    // 3. Início do jogo na quadra / Status de início
     if (m.startedAt && !hasLog('iniciad')) {
-      logs.push({ at: `Partida iniciada às ${m.startedAt}`, text: 'Cronômetro em andamento e presença confirmada em quadra.' });
+      logs.push({ at: `Início do jogo às ${m.startedAt}`, text: 'Bola rolando na quadra e cronômetro em andamento.' });
     } else if ((st === 'live' || st === 'playing' || st === 'in_progress') && !hasLog('iniciad')) {
-      logs.push({ at: 'Partida em andamento', text: 'Presença confirmada e equipe jogando na quadra.' });
+      logs.push({ at: `Início do jogo na quadra`, text: 'Presença confirmada e partida em andamento.' });
+    } else if (!hasLog('iniciad') && st !== 'finished' && st !== 'cancelled' && st !== 'no-show') {
+      logs.push({ at: `Aguardando início do jogo`, text: `Previsto para iniciar às ${startT}. Atendente pode iniciar manualmente ou aguardar tolerância.` });
     }
 
     // 4. Horário estendido / tempo extra
