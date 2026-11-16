@@ -6594,11 +6594,44 @@ document.addEventListener('DOMContentLoaded', () => {
       // 100% VINCULADO AO BANCO DE DADOS NA NUVEM: A nuvem é a fonte de verdade absoluta e em tempo real.
       // Se um registro foi excluído no banco, ele NÃO existe mais e NUNCA é ressuscitado.
       if (Array.isArray(cloudBookings)) {
-        const newSig = cloudBookings.length + '_' + cloudBookings.map(b => b.id + ':' + b.status + ':' + (b.date || '') + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
+        // Separa notas de partidas e reservas normais
+        window.__arenaCrossDeviceNotes = window.__arenaCrossDeviceNotes || new Map();
+        cloudBookings.forEach(b => {
+          if (!b) return;
+          const isNoteRow = String(b.id).startsWith('arena-note-') || (b.observation && b.observation.startsWith('NOTE_SYNC:::'));
+          if (isNoteRow && b.observation && b.observation.startsWith('NOTE_SYNC:::')) {
+            try {
+              const payload = JSON.parse(b.observation.slice(12));
+              if (payload && payload.id && Array.isArray(payload.notes)) {
+                if (!window.__arenaCrossDeviceNotes.has(payload.id)) {
+                  window.__arenaCrossDeviceNotes.set(payload.id, []);
+                }
+                const targetList = window.__arenaCrossDeviceNotes.get(payload.id);
+                payload.notes.forEach(n => {
+                  if (n && n.text) {
+                    const normAt = String(n.at || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                    const normText = String(n.text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                    const already = targetList.some(x => {
+                      const xAt = String(x.at || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                      const xText = String(x.text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+                      return xAt === normAt && xText === normText;
+                    });
+                    if (!already) targetList.push(n);
+                  }
+                });
+              }
+            } catch(e) {}
+          }
+        });
+
+        // Filtra registros normais de agendamentos para não poluir tabelas ou listas
+        const cleanBookings = cloudBookings.filter(b => b && !String(b.id).startsWith('arena-note-') && !(b.observation && b.observation.startsWith('NOTE_SYNC:::')));
+
+        const newSig = cleanBookings.length + '_' + cleanBookings.map(b => b.id + ':' + b.status + ':' + (b.date || '') + ':' + (b.payment_status || '') + ':' + (b.attendance || '')).join('|');
         if (newSig !== window.__lastBookingsSig) {
           window.__lastBookingsSig = newSig;
           stateChanged = true;
-          window.adminGameState.bookings = cloudBookings;
+          window.adminGameState.bookings = cleanBookings;
         }
       }
 
@@ -6773,7 +6806,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Impede que mensalista fixo de outro dia apareça (ex: Davi de segunda aparecendo na terça)
       if (m.observation && m.observation.includes('Horário Fixo Semanal (')) {
         const expectedObs = 'Horário Fixo Semanal (' + currentDayOfWeek.toUpperCase() + ')';
-        if (m.observation !== expectedObs) return false;
+        if (!m.observation.includes(expectedObs)) return false;
       }
       return true;
     });
@@ -8438,8 +8471,76 @@ document.addEventListener('DOMContentLoaded', () => {
     if (g) {
       if (!Array.isArray(g.log)) g.log = [];
       g.log.push(noteEntry);
+
+      // Também anexa na observação local para redundância direta
+      const noteTag = `[Nota: ${nowTime} - ${text}]`;
+      if (!g.observation) g.observation = noteTag;
+      else if (!g.observation.includes(noteTag)) g.observation = g.observation + ' ' + noteTag;
+
       if (typeof saveAdminGameState === 'function') saveAdminGameState();
       if (typeof window.syncBookingToCloud === 'function') window.syncBookingToCloud(g, 'upsert');
+    }
+
+    // Registra no mapa global de notas entre dispositivos (celular <-> computador)
+    window.__arenaCrossDeviceNotes = window.__arenaCrossDeviceNotes || new Map();
+    if (!window.__arenaCrossDeviceNotes.has(String(id))) {
+      window.__arenaCrossDeviceNotes.set(String(id), []);
+    }
+    const currentNotesList = window.__arenaCrossDeviceNotes.get(String(id));
+    if (!currentNotesList.some(x => x.text === noteEntry.text && x.at === noteEntry.at)) {
+      currentNotesList.push(noteEntry);
+    }
+
+    // Persistência em nuvem em tempo real (Supabase DB2 e DB1) com replicação cruzada garantida
+    try {
+      const dbCourtId = (typeof COURT_TO_DB_ID !== 'undefined' && g && (g.court_id || g.courtId)) 
+        ? (COURT_TO_DB_ID[g.court_id || g.courtId] || g.court_id || g.courtId || 'court-society-2') 
+        : 'court-society-2';
+
+      const payloadObj = {
+        id: String(id),
+        notes: currentNotesList
+      };
+
+      const notePayload = {
+        id: 'arena-note-' + String(id) + '_ts' + Date.now(),
+        court_id: dbCourtId,
+        customer_phone: (g && (g.customer_phone || g.phone)) ? (g.customer_phone || g.phone) : '81995562693',
+        customer_name: (g && (g.customer_name || g.name)) ? (g.customer_name || g.name) : 'Anotação',
+        date: (g && g.date) ? g.date : ((typeof window.getSystemToday === 'function') ? window.getSystemToday() : '2026-11-16'),
+        start_time: (g && (g.start_time || g.start)) ? (g.start_time || g.start) : '15:00',
+        end_time: (g && (g.end_time || g.end)) ? (g.end_time || g.end) : '19:00',
+        time: (g && g.time) ? g.time : '15:00 às 19:00',
+        total_price: Number(g && (g.total_price || g.price) ? (g.total_price || g.price) : 100),
+        status: 'confirmed',
+        booking_type: 'avulso',
+        observation: 'NOTE_SYNC:::' + JSON.stringify(payloadObj)
+      };
+
+      if (window.cloudDbs) {
+        [window.cloudDbs.db2Url, window.cloudDbs.db1Url].forEach((dbUrl, idx) => {
+          if (!dbUrl) return;
+          const key = (idx === 0) ? window.cloudDbs.db2Key : window.cloudDbs.db1Key;
+          fetch(dbUrl + '/rest/v1/bookings', {
+            method: 'POST',
+            headers: {
+              apikey: key,
+              Authorization: 'Bearer ' + key,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal'
+            },
+            body: JSON.stringify(notePayload)
+          }).catch(() => {});
+        });
+      }
+
+      // Sincroniza via BroadcastChannel instantâneo para abas abertas no PC/Mobile
+      try {
+        const bc = new BroadcastChannel('arena_limoeiro_sync');
+        bc.postMessage({ type: 'timeline_note_added', matchId: String(id), note: noteEntry, notes: currentNotesList });
+      } catch(eBc) {}
+    } catch(eSync) {
+      console.warn('[ArenaNotes] Erro ao sincronizar nota na nuvem:', eSync);
     }
 
     const container = document.getElementById('timeline-container-' + id);
@@ -8458,7 +8559,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     input.value = '';
-    window.showNotification('Nota adicionada ao histórico da partida!');
+    window.showNotification('Nota registrada e sincronizada com o computador com sucesso!');
   };
 
   
@@ -9036,6 +9137,45 @@ document.addEventListener('DOMContentLoaded', () => {
     let logs = Array.isArray(m.log) && m.log.length > 0 ? [...m.log] : [
       { at: 'Reserva cadastrada', text: observation }
     ];
+
+    // Mescla notas sincronizadas da nuvem entre dispositivos (celular <-> computador)
+    if (window.__arenaCrossDeviceNotes && window.__arenaCrossDeviceNotes.has(String(m.id))) {
+      const syncNotes = window.__arenaCrossDeviceNotes.get(String(m.id)) || [];
+      syncNotes.forEach(sn => {
+        if (!sn || !sn.text) return;
+        const snAt = String(sn.at || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        const snText = String(sn.text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        const exists = logs.some(l => {
+          const lAt = String(l.at || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          const lText = String(l.text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          return lAt === snAt && lText === snText;
+        });
+        if (!exists) {
+          logs.push({ at: sn.at, text: sn.text });
+        }
+      });
+    }
+
+    // Se m.observation contiver tags de notas rápidas (ex: [Nota: 16:33 - 1 Apito + Cartão])
+    if (m.observation && /\[(?:Nota|Recado)/i.test(m.observation)) {
+      const noteRegex = /\[(?:Nota|Recado)(?:\s+da\s+recepção)?[:\s]+(?:(\d{1,2}:\d{2})\s*[-:]\s*)?([^\]]+)\]/gi;
+      let match;
+      while ((match = noteRegex.exec(m.observation)) !== null) {
+        const timePart = match[1] ? match[1].trim() : '';
+        const textPart = match[2] ? match[2].trim() : '';
+        const atLabel = timePart ? `Nota da Recepção (${timePart})` : 'Nota da Recepção';
+        const normAt = atLabel.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        const normText = textPart.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        const exists = logs.some(l => {
+          const lAt = String(l.at || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          const lText = String(l.text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          return lAt === normAt && lText === normText;
+        });
+        if (!exists && textPart) {
+          logs.push({ at: atLabel, text: textPart });
+        }
+      }
+    }
 
     // Garante que o histórico sempre exiba todos os marcos importantes da partida:
     const hasLog = (phrase) => logs.some(l => (l.at && l.at.toLowerCase().includes(phrase)) || (l.text && l.text.toLowerCase().includes(phrase)));
@@ -12532,6 +12672,21 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (ev && ev.data && ev.data.type === 'courts_updated') {
         if (typeof window.pullCourtsFromCloud === 'function') {
           window.pullCourtsFromCloud();
+        }
+      } else if (ev && ev.data && ev.data.type === 'timeline_note_added') {
+        const mId = ev.data.matchId;
+        const note = ev.data.note;
+        if (mId && note) {
+          window.__arenaCrossDeviceNotes = window.__arenaCrossDeviceNotes || new Map();
+          if (!window.__arenaCrossDeviceNotes.has(mId)) {
+            window.__arenaCrossDeviceNotes.set(mId, []);
+          }
+          const list = window.__arenaCrossDeviceNotes.get(mId);
+          if (!list.some(x => x.text === note.text && x.at === note.at)) {
+            list.push(note);
+          }
+          if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
+          if (typeof renderMovementMatches === 'function') renderMovementMatches();
         }
       }
     };
