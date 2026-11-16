@@ -1980,7 +1980,7 @@
                   <option value="fut7">FUT 7 – SOCCER 7</option>
                   <option value="futmesa">FOOT TABLE – FUTMESA</option>
                   <option value="areia">AREIA – BEACH SPORTS</option>
-                  <option value="society">SOCIETY – ARENA CENTRAL</option>
+                  <option value="society">QUADRA – ARENA CENTRAL</option>
                 </select>
 
                 <select id="courtsBookingStatusFilter" onchange="renderCourtsBookingsTable()" class="p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
@@ -2112,7 +2112,7 @@
               <option value="fut7">FUT 7 – SOCCER 7</option>
               <option value="futmesa">FOOT TABLE – FUTMESA</option>
               <option value="areia">AREIA – BEACH SPORTS</option>
-              <option value="society">SOCIETY – ARENA CENTRAL</option>
+              <option value="society">QUADRA – ARENA CENTRAL</option>
             </select>
 
             <select id="subtabBookingStatusFilter" onchange="filterSubtabBookingsList()" class="p-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer">
@@ -3351,7 +3351,7 @@ print(resp.json())</code></pre>
       lucide.createIcons();
       if (typeof renderCadastrosClientes === 'function' && targetTab === 'cadastros') renderCadastrosClientes();
       if (typeof renderCourtsMonitor === 'function' && targetTab === 'courts') renderCourtsMonitor();
-      if (typeof window.syncMovementCourtPillsAndFilter === 'function') window.syncMovementCourtPillsAndFilter();
+      if (typeof window.syncAllCourtSelectsAndPills === "function") window.syncAllCourtSelectsAndPills(); else if (typeof window.syncMovementCourtPillsAndFilter === "function") window.syncMovementCourtPillsAndFilter();
     }
 
     try {
@@ -4087,7 +4087,7 @@ window.pullCourtsFromCloud = async function() {
 
       if (typeof renderCourtsMonitor === 'function') renderCourtsMonitor();
       if (typeof window.syncDirectBookingCourtOptions === 'function') window.syncDirectBookingCourtOptions();
-      if (typeof window.syncMovementCourtPillsAndFilter === 'function') window.syncMovementCourtPillsAndFilter();
+      if (typeof window.syncAllCourtSelectsAndPills === "function") window.syncAllCourtSelectsAndPills(); else if (typeof window.syncMovementCourtPillsAndFilter === "function") window.syncMovementCourtPillsAndFilter();
       if (typeof autoCalculateDirectBookingPrice === 'function') autoCalculateDirectBookingPrice();
       if (typeof renderBalcaoTimeSlots === 'function') renderBalcaoTimeSlots();
     }
@@ -4734,7 +4734,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <option value="fut7">FUT 7 – SOCCER 7</option>
               <option value="futmesa">FOOT TABLE – FUTMESA</option>
               <option value="areia">AREIA – BEACH SPORTS</option>
-              <option value="society">SOCIETY – ARENA CENTRAL</option>
+              <option value="society">QUADRA – ARENA CENTRAL</option>
             </select>
           </div>
           <div>
@@ -5128,7 +5128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="fut7" selected>FUT 7 – SOCCER 7 (R$ 110/h)</option>
             <option value="futmesa">FOOT TABLE – FUTMESA (R$ 35/h)</option>
             <option value="areia">AREIA – BEACH SPORTS (R$ 60/h)</option>
-            <option value="society">SOCIETY – ARENA CENTRAL (R$ 120/h)</option>
+            <option value="society">QUADRA – ARENA CENTRAL (R$ 120/h)</option>
           </select>
         </div>
 
@@ -5447,7 +5447,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <option value="fut7">FUT 7 – SOCCER 7</option>
             <option value="futmesa">FOOT TABLE – FUTMESA</option>
             <option value="areia">AREIA – BEACH SPORTS</option>
-            <option value="society">SOCIETY – ARENA CENTRAL</option>
+            <option value="society">QUADRA – ARENA CENTRAL</option>
           </select>
         </div>
       </div>
@@ -9848,7 +9848,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function renderMovementMatches() {
-    if (typeof window.syncMovementCourtPillsAndFilter === 'function') window.syncMovementCourtPillsAndFilter();
+    if (typeof window.syncAllCourtSelectsAndPills === "function") window.syncAllCourtSelectsAndPills(); else if (typeof window.syncMovementCourtPillsAndFilter === "function") window.syncMovementCourtPillsAndFilter();
     // Trava de recursão para evitar re-entrâncias durante a montagem do feed
     if (window.__isRenderingMovementMatches) return;
     window.__isRenderingMovementMatches = true;
@@ -10036,7 +10036,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Função para seleção rápida de quadras por pílulas / botões rolando com ativação touch e clique imediato
   
   // Sincroniza dinamicamente as pílulas de quadra e o dropdown da aba Movimentação com os nomes atualizados de Gestão de Espaços
-  window.syncMovementCourtPillsAndFilter = function() {
+  window.syncAllCourtSelectsAndPills = function() {
     let courtsList = [];
     if (typeof courtState !== 'undefined' && Array.isArray(courtState.courts) && courtState.courts.length > 0) {
       courtsList = courtState.courts;
@@ -10048,16 +10048,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!courtsList || courtsList.length === 0) return;
 
-    // Atualiza opções do select movementCourtFilter
-    const courtFilterEl = document.getElementById('movementCourtFilter');
-    if (courtFilterEl && document.activeElement !== courtFilterEl) {
-      courtsList.forEach(c => {
-        const opt = courtFilterEl.querySelector(`option[value="${c.id}"]`);
-        if (opt && c.name) {
-          const icon = opt.textContent.split(' ')[0] || '🏟️';
-          opt.textContent = icon + ' ' + c.name;
-        }
-      });
+    // Lista de todos os selects de quadra da aplicação
+    const selectIds = [
+      'movementCourtFilter',
+      'courtsBookingCourtFilter',
+      'subtabBookingCourtFilter',
+      'modalGerenciarQuadra',
+      'editMatchCourt',
+      'contractCourt'
+    ];
+
+    selectIds.forEach(selId => {
+      const selectEl = document.getElementById(selId);
+      if (selectEl && document.activeElement !== selectEl) {
+        courtsList.forEach(c => {
+          const opt = selectEl.querySelector(`option[value="${c.id}"]`);
+          if (opt && c.name) {
+            if (selId === 'contractCourt') {
+              opt.textContent = `${c.name} (Espaço ${c.id.toUpperCase()})`;
+            } else if (selId === 'movementCourtFilter') {
+              const icon = opt.textContent.split(' ')[0] || '🏟️';
+              opt.textContent = icon + ' ' + c.name;
+            } else {
+              opt.textContent = c.name;
+            }
+          }
+        });
+      }
+    });
+
+    // Atualiza o select de Reserva de Balcão (directBookingCourt) se existir
+    if (typeof window.syncDirectBookingCourtOptions === 'function') {
+      window.syncDirectBookingCourtOptions();
     }
 
     // Atualiza o texto dos botões de pílula em #movementCourtPillsContainer
@@ -10071,7 +10093,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (spanEl) {
           const currentText = spanEl.textContent.trim();
           const currentIcon = currentText.split(' ')[0] || '🏟️';
-          // Se o nome tiver hífen ou travessão, pega o prefixo principal (ex: "QUADRA – ARENA CENTRAL" -> "QUADRA")
           let shortName = matchedCourt.name.split('–')[0].split('-')[0].trim();
           if (!shortName) shortName = matchedCourt.name;
           spanEl.textContent = currentIcon + ' ' + shortName;
@@ -10079,7 +10100,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   };
-
+  window.syncMovementCourtPillsAndFilter = window.syncAllCourtSelectsAndPills;
   window.selectMovementCourtPill = function(courtId) {
     const courtSelect = document.getElementById('movementCourtFilter');
     if (courtSelect) {
