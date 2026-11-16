@@ -9240,8 +9240,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- SEÇÃO RECOLHÍVEL: DETALHES, AJUSTES DE TEMPO E OUTROS BOTÕES -->
         <div class="booking-expanded-panel ${isPanelOpen ? '' : 'hidden'}" id="details-${m.id}" style="${isPanelOpen ? 'display:block;' : 'display:none;'} margin-top: 1.25rem; padding-top: 1rem;">
           
-          <!-- PAINEL MODULAR DE INFORMAÇÕES BÁSICAS (4 Cards de Resumo) -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mb-5">
+          <!-- PAINEL MODULAR DE INFORMAÇÕES BÁSICAS (2 Cards de Resumo) -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-5">
             
             <!-- Card 1: Campo e Modalidade -->
             <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group">
@@ -9253,31 +9253,7 @@ document.addEventListener('DOMContentLoaded', () => {
               <div class="text-[11px] text-slate-500 mt-0.5">${court.type || 'Grama Sintética Profissional'}</div>
             </div>
 
-            <!-- Card 2: Tipo de Reserva -->
-            <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group">
-              <div class="flex items-center justify-between text-slate-400 mb-1">
-                <span class="text-[10px] font-bold uppercase tracking-wider">Tipo de Reserva</span>
-                <i class="fa-solid fa-id-card text-purple-600 text-xs"></i>
-              </div>
-              <div class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                <i class="fa-solid fa-star text-purple-500 text-xs"></i> ${typeLabel}
-              </div>
-              <div class="text-[11px] text-slate-500 mt-0.5">${isMensalista ? 'Contrato Mensalista Ativo' : 'Reserva Avulsa'}</div>
-            </div>
-
-            <!-- Card 3: Status de Presença -->
-            <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group">
-              <div class="flex items-center justify-between text-slate-400 mb-1">
-                <span class="text-[10px] font-bold uppercase tracking-wider">Presença em Quadra</span>
-                <i class="fa-solid fa-user-clock ${attendanceIconColor} text-xs"></i>
-              </div>
-              <div class="font-bold ${attendanceTextColor} text-sm flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full ${attendanceDotColor}"></span> ${attendance}
-              </div>
-              <div class="text-[11px] text-slate-500 mt-0.5">${attendanceSubtext}</div>
-            </div>
-
-            <!-- Card 4: Faturamento e Pagamento -->
+            <!-- Card 2: Faturamento e Pagamento -->
             <div class="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-200/80 hover:border-emerald-300 transition group">
               <div class="flex items-center justify-between text-slate-400 mb-1">
                 <span class="text-[10px] font-bold uppercase tracking-wider">Status Financeiro</span>
