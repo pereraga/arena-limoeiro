@@ -9292,19 +9292,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="flex items-center justify-between gap-1">
                   <span class="text-[9.5px] sm:text-[11px] font-bold uppercase text-slate-500 truncate">Atraso</span>
                   <div class="flex gap-0.5 shrink-0">
-                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 15)" class="text-[9px] sm:text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+15m</button>
-                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+30m</button>
+                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 15)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+15m</button>
+                    <button type="button" onclick="quickAddAtrasoCard('${m.id}', 30)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+30m</button>
                   </div>
                 </div>
                 <!-- Seletor de Horário de Chegada com relógio -->
-                <label for="input-arr-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-amber-300 rounded-lg px-2 py-1 w-full gap-1 transition cursor-pointer">
+                <label for="input-arr-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-amber-300 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 w-full gap-1 transition cursor-pointer">
                   <div class="flex items-center gap-1 text-slate-600 shrink-0 pointer-events-none">
                     <i class="fa-regular fa-clock text-amber-600 text-xs"></i>
                     <span class="text-[10px] sm:text-xs font-bold text-slate-500 hidden xxs:inline">Chegada</span>
                   </div>
                   <input type="time" id="input-arr-${m.id}" value="${initialArrTime || startT}" onchange="onGameArrivalInput('${m.id}', this.value)" class="text-xs sm:text-sm font-black text-slate-900 bg-transparent focus:outline-none cursor-pointer w-full text-right outline-none">
                 </label>
-                <div id="status-delay-${m.id}" class="text-[9.5px] sm:text-[10.5px] font-semibold truncate ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'}">
+                <div id="status-delay-${m.id}" class="text-[9px] sm:text-[10.5px] font-semibold truncate ${lateMin > 0 ? 'text-rose-600' : 'text-emerald-600'}">
                   ${lateMin > 0 ? `Atraso: ${lateMin}m` : `✓ No horário`}
                 </div>
               </div>
@@ -9314,19 +9314,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="flex items-center justify-between gap-1">
                   <span class="text-[9.5px] sm:text-[11px] font-bold uppercase text-slate-500 truncate">Extra</span>
                   <div class="flex gap-0.5 shrink-0">
-                    <button type="button" onclick="quickAddExtraCard('${m.id}', 30)" class="text-[9px] sm:text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+30m</button>
-                    <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[9px] sm:text-[9.5px] bg-slate-50 border border-slate-200 px-1 py-0.2 rounded text-slate-600 hover:bg-slate-100 font-bold cursor-pointer">+1h</button>
+                    <button type="button" onclick="quickAddExtraCard('${m.id}', 30)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+30m</button>
+                    <button type="button" onclick="quickAddExtraCard('${m.id}', 60)" class="text-[8px] sm:text-[9.5px] leading-none bg-slate-50 hover:bg-slate-100 border border-slate-200 px-1 py-0.5 rounded text-slate-600 font-bold cursor-pointer transition active:scale-95">+1h</button>
                   </div>
                 </div>
                 <!-- Seletor de Término Estendido com relógio -->
-                <label for="input-extended-end-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-lg px-2 py-1 w-full gap-1 transition cursor-pointer">
+                <label for="input-extended-end-${m.id}" class="flex items-center justify-between bg-slate-50 border border-slate-200 hover:border-emerald-300 rounded-lg px-1.5 py-0.5 sm:px-2 sm:py-1 w-full gap-1 transition cursor-pointer">
                   <div class="flex items-center gap-1 text-slate-600 shrink-0 pointer-events-none">
                     <i class="fa-regular fa-clock text-emerald-600 text-xs"></i>
                     <span class="text-[10px] sm:text-xs font-bold text-slate-500 hidden xxs:inline">Término</span>
                   </div>
                   <input type="time" id="input-extended-end-${m.id}" value="${initialExtEndTime || endT}" onchange="onGameExtendedEndInput('${m.id}', this.value)" class="text-xs sm:text-sm font-black text-slate-900 bg-transparent focus:outline-none cursor-pointer w-full text-right outline-none">
                 </label>
-                <div id="status-extra-${m.id}" class="text-[9.5px] sm:text-[10.5px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
+                <div id="status-extra-${m.id}" class="text-[9px] sm:text-[10.5px] font-semibold truncate ${extraMin > 0 ? 'text-amber-600' : 'text-slate-400'}">
                   ${extraMin > 0 ? `+${extraMin}m (+R$${computedExtraAmountStr})` : 'Sem tempo extra'}
                 </div>
               </div>
