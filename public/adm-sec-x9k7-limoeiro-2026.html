@@ -4247,9 +4247,11 @@ function loadCourtState() {
     const raw = localStorage.getItem(COURT_STORAGE_KEY);
     if (!raw) return { courts: courtInitialData, blocks: [] };
     const parsed = JSON.parse(raw);
+    let blList = Array.isArray(parsed.blocks) ? parsed.blocks : [];
+    blList = blList.filter(b => b && b.id !== 'block_1794921927373');
     return {
       courts: Array.isArray(parsed.courts) && parsed.courts.length ? parsed.courts : courtInitialData,
-      blocks: Array.isArray(parsed.blocks) ? parsed.blocks : []
+      blocks: blList
     };
   } catch(e) {
     return { courts: courtInitialData, blocks: [] };
@@ -7071,6 +7073,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
 
         // Sobrescrita específica de jogo desta data: busca correspondência por ID, ID de mensalista ou vinculação de horário
+        if (b.id && (b.id === 'block_1794921927373' || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))))) return;
         const existing = matches.find(m => String(m.id) === String(b.id) || (m.isMensalista && (String(m.id) === 'monthly-' + b.id || (m.court_id === court.id && m.start_time === startT))));
         if (existing) {
           existing.status = (isPast ? 'finished' : (b.status || existing.status));
@@ -12318,6 +12321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof courtState !== 'undefined' && Array.isArray(courtState.blocks)) {
       courtState.blocks.forEach(bl => {
         if (!bl || bl.date !== dateStr) return;
+        if (bl.id && (bl.id === 'block_1794921927373' || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(bl.id)))) return;
         if (isMatchingCourt(bl.courtId)) {
           const sm = parseTimeToMinutes(bl.start);
           const em = parseTimeToMinutes(bl.end);
@@ -12348,7 +12352,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const bDate = b.date;
       const bCourt = b.court_id || b.courtId;
       const st = (b.status || '').toLowerCase();
-      if (b.id && excluidosBalcao[b.id + '_' + dateStr]) return;
+      if (b.id && (b.id === 'block_1794921927373' || excluidosBalcao[b.id + '_' + dateStr] || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))))) return;
+      if (b.booking_type === 'bloqueio' && (st === 'cancelled' || b.id === 'block_1794921927373')) return;
       if (bDate === dateStr && st !== 'cancelled' && isMatchingCourt(bCourt)) {
         const sm = parseTimeToMinutes(b.start_time || (b.time ? b.time.split(' ')[0] : ''));
         const em = parseTimeToMinutes(b.end_time || (b.time && b.time.includes('às') ? b.time.split('às')[1].trim() : ''));
