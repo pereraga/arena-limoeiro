@@ -1220,6 +1220,7 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/supabase-client.js"></script>
+    <script src="/arena-default-members.js"></script>
   <!-- Font Awesome 6 Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
@@ -6867,7 +6868,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const fetchFast = async (url, key) => {
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 4500);
+        const timer = setTimeout(() => ctrl.abort(), 9000);
         try {
           const res = await fetch(url, {
             headers: { apikey: key, Authorization: 'Bearer ' + key, 'Accept': 'application/json' },
@@ -6969,7 +6970,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // 2. Atualiza mensalistas diretamente do banco de dados na nuvem (removendo mensalistas excluídos via tombstone)
-      if (Array.isArray(cloudMembers)) {
+      if (Array.isArray(cloudMembers) && (cloudMembers.length >= 10 || !window.adminGameState.monthlyMembers || window.adminGameState.monthlyMembers.length === 0)) {
         if (window.__arenaCloudMemberTombstones && window.__arenaCloudMemberTombstones.size > 0) {
           cloudMembers = cloudMembers.filter(m => m && !window.__arenaCloudMemberTombstones.has(String(m.id)));
         }
@@ -6978,6 +6979,7 @@ document.addEventListener('DOMContentLoaded', () => {
           window.__lastMembersSig = memSig;
           stateChanged = true;
           window.adminGameState.monthlyMembers = cloudMembers;
+          try { localStorage.setItem("arena_cached_monthly_v2", JSON.stringify(cloudMembers)); } catch(e) {}
         }
       }
 
