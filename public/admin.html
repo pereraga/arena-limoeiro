@@ -5456,7 +5456,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
 
         <!-- Lista de Jogos e Mensalistas Agendados nesta Quadra -->
-        <div id="balcaoScheduledGamesContainer" class="p-1.5 bg-rose-50/90 border border-rose-200 rounded-lg space-y-0.5 text-[9.5px]">
+        <div id="balcaoScheduledGamesContainer" style="display:none;" class="p-1.5 bg-rose-50/90 border border-rose-200 rounded-lg space-y-0.5 text-[9.5px]">
           <div class="flex items-center justify-between text-[9px] font-bold text-rose-900">
             <span class="flex items-center gap-1.5"><i data-lucide="users" class="w-3.5 h-3.5 text-rose-600"></i> Agendamentos / Fixos nesta Quadra:</span>
             <span id="balcaoScheduledGamesCount" class="text-[8px] bg-rose-200 text-rose-800 px-1 py-0.2 rounded-full font-black">0 agendados</span>
@@ -11996,19 +11996,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const occupiedRanges = window.getBalcaoOccupiedRanges(courtId, dateStr);
 
     // Atualiza o Card Informativo de Jogos Agendados
-    if (gamesListEl) {
+    const gamesContainerEl = document.getElementById('balcaoScheduledGamesContainer');
+    if (gamesContainerEl) {
       if (occupiedRanges.length === 0) {
-        gamesListEl.innerHTML = '<span class="text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">✨ Nenhum jogo agendado nesta quadra neste dia. Todos os horários estão livres!</span>';
+        gamesContainerEl.style.display = 'none';
+        if (gamesListEl) gamesListEl.innerHTML = '';
         if (gamesCountEl) gamesCountEl.textContent = '0 agendados';
       } else {
+        gamesContainerEl.style.display = 'block';
         if (gamesCountEl) gamesCountEl.textContent = occupiedRanges.length + (occupiedRanges.length === 1 ? ' agendado' : ' agendados');
-        let listHtml = '';
-        occupiedRanges.forEach(g => {
-          listHtml += '<span class="inline-flex items-center gap-1 bg-amber-100/90 text-amber-950 font-extrabold px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs">';
-          listHtml += '🕒 ' + g.startStr + ' às ' + g.endStr + ' — <strong class="text-amber-900">' + g.name + '</strong> (' + g.type + ')';
-          listHtml += '</span>';
-        });
-        gamesListEl.innerHTML = listHtml;
+        if (gamesListEl) {
+          let listHtml = '';
+          occupiedRanges.forEach(g => {
+            listHtml += '<span class="inline-flex items-center gap-1 bg-amber-100/90 text-amber-950 font-extrabold px-2.5 py-1 rounded-lg border border-amber-300 shadow-2xs">';
+            listHtml += '🕒 ' + g.startStr + ' às ' + g.endStr + ' — <strong class="text-amber-900">' + g.name + '</strong> (' + g.type + ')';
+            listHtml += '</span>';
+          });
+          gamesListEl.innerHTML = listHtml;
+        }
       }
     }
 
