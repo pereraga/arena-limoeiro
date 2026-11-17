@@ -5477,21 +5477,21 @@ document.addEventListener('DOMContentLoaded', () => {
         <!-- Legenda e Resumo da Seleção -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 text-[11px]">
           <div class="flex items-center gap-1 flex-wrap text-[8px]">
-            <span class="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-300">
+            <span class="inline-flex items-center gap-1 text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-lg border border-emerald-300">
               <span class="w-2 h-2 rounded-xs bg-emerald-500"></span> Livre
             </span>
-            <span class="inline-flex items-center gap-1 text-emerald-900 font-black bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-600">
+            <span class="inline-flex items-center gap-1 text-emerald-900 font-black bg-emerald-100 px-1.5 py-0.5 rounded-lg border border-emerald-600">
               <span class="w-2 h-2 rounded-xs bg-emerald-700"></span> Selecionado
             </span>
-            <span class="inline-flex items-center gap-1 text-rose-800 font-bold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-300">
+            <span class="inline-flex items-center gap-1 text-rose-800 font-bold bg-rose-50 px-1.5 py-0.5 rounded-lg border border-rose-300">
               <span class="w-2 h-2 rounded-xs bg-rose-500"></span> Ocupado (Nome)
             </span>
-            <span class="inline-flex items-center gap-1 text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-300">
+            <span class="inline-flex items-center gap-1 text-slate-500 font-semibold bg-slate-100 px-1.5 py-0.5 rounded-lg border border-slate-300">
               <span class="w-2 h-2 rounded-xs bg-slate-400"></span> Horário Passado
             </span>
           </div>
 
-          <div id="balcaoSlotSelectionSummary" class="text-[9.5px] font-bold text-emerald-900 bg-emerald-100/90 px-1.5 py-0.5 rounded border border-emerald-300 flex items-center gap-1 whitespace-nowrap overflow-hidden">
+          <div id="balcaoSlotSelectionSummary" class="text-[9.5px] font-bold text-emerald-900 bg-emerald-100/90 px-2 py-1 rounded-xl border border-emerald-300 flex items-center gap-1 whitespace-nowrap overflow-hidden">
             <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
             <span class="truncate">Horário: <strong id="summarySelectedTime">Nenhum horário selecionado</strong> (<span id="summaryDuration">Toque abaixo</span>)</span>
           </div>
@@ -12065,32 +12065,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const safeHorarioJson = (conflict.startStr + ' às ' + conflict.endStr).replace(/'/g, "\\'");
 
         const intervalStr = conflict.startStr + ' às ' + conflict.endStr;
-        html += '<button type="button" data-slot-min="' + m + '" onclick="window.showBalcaoOccupiedDetail(\'' + safeNomeJson + '\', \'' + slotTime + '\', \'' + safeHorarioJson + '\', \'' + safeTipoJson + '\')" title="Agendado: ' + agendadoPorCompleto + ' (' + tipoLabel + ') [' + intervalStr + '] - Toque para ver detalhes" class="py-0.5 px-0.5 rounded text-[8.5px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-400 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center gap-0.2 select-none active:scale-95 transition-all overflow-hidden">';
+        html += '<button type="button" data-slot-min="' + m + '" onclick="window.showBalcaoOccupiedDetail(\'' + safeNomeJson + '\', \'' + slotTime + '\', \'' + safeHorarioJson + '\', \'' + safeTipoJson + '\')" title="Agendado: ' + agendadoPorCompleto + ' (' + tipoLabel + ') [' + intervalStr + '] - Toque para ver detalhes" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-400 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center gap-0.2 select-none active:scale-95 transition-all overflow-hidden">';
         html += '<span class="font-black text-rose-950 text-[10.5px] leading-none">' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[10px] font-black uppercase tracking-tight text-rose-900 bg-rose-200/90 px-1.5 py-0.5 rounded-md truncate max-w-full w-full block shadow-3xs leading-tight" title="' + agendadoPorCompleto + ' (' + intervalStr + ')">' + nomeExibicao + '</span>';
         html += '</button>';
       } else if (isPast) {
-        html += '<button type="button" disabled data-slot-min="' + m + '" title="Horário já passou do relógio atual" class="py-0.5 px-0.5 rounded text-[8.5px] font-bold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 text-center flex flex-col items-center justify-center select-none">';
+        html += '<button type="button" disabled data-slot-min="' + m + '" title="Horário já passou do relógio atual" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-bold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 text-center flex flex-col items-center justify-center select-none">';
         html += '<span class="font-extrabold text-slate-500">' + slotTime + '</span>';
-        html += '<span class="balcao-slot-badge text-[7px] font-black uppercase tracking-tighter text-slate-400 bg-slate-200/90 px-0.5 rounded leading-none">Passado</span>';
+        html += '<span class="balcao-slot-badge text-[7px] font-black uppercase tracking-tighter text-slate-400 bg-slate-200/90 px-0.5 rounded-md leading-none">Passado</span>';
         html += '</button>';
       } else if (isStart) {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Início do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded text-[8.5px] font-black bg-emerald-600 text-white border border-emerald-800 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Início do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-black bg-emerald-600 text-white border border-emerald-800 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
-        html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter bg-emerald-800 text-emerald-100 font-black px-1 rounded leading-none">Início</span>';
+        html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter bg-emerald-800 text-emerald-100 font-black px-1 rounded-md leading-none">Início</span>';
         html += '</button>';
       } else if (isEnd) {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Término do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded text-[8.5px] font-black bg-emerald-700 text-white border border-emerald-900 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Término do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-black bg-emerald-700 text-white border border-emerald-900 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
-        html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter bg-emerald-950 text-emerald-100 font-black px-1 rounded leading-none">Fim</span>';
+        html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter bg-emerald-950 text-emerald-100 font-black px-1 rounded-md leading-none">Fim</span>';
         html += '</button>';
       } else if (isBetween) {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Horário em jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded text-[8.5px] font-black bg-emerald-500 text-white border border-emerald-600 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Horário em jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-black bg-emerald-500 text-white border border-emerald-600 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter text-emerald-100 font-bold leading-none">✓ Selec.</span>';
         html += '</button>';
       } else {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ') - Toque para selecionar" class="py-0.5 px-0.5 rounded text-[8.5px] font-bold bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ') - Toque para selecionar" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-bold bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter text-emerald-600 font-semibold leading-none">Livre</span>';
         html += '</button>';
