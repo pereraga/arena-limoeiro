@@ -5371,7 +5371,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <!-- ========================================================================= -->
 <!-- MODAL: NOVA RESERVA BALCÃO (DIRETA E SINCRONIZADA EM TODAS AS PLATAFORMAS) -->
 <!-- ========================================================================= -->
-<div id="directBookingModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+<div id="directBookingModal" style="display:none;" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in overscroll-none">
   <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
     
     <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 px-4 py-3 text-white flex items-center justify-between">
@@ -5389,7 +5389,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </button>
     </div>
 
-    <form onsubmit="handleSaveDirectBooking(event)" class="p-2.5 sm:p-3 space-y-1.5 overflow-y-auto text-xs">
+    <form onsubmit="handleSaveDirectBooking(event)" class="p-2.5 sm:p-3 space-y-1.5 overflow-y-auto text-xs overscroll-contain touch-pan-y">
       
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div>
@@ -12674,6 +12674,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderBalcaoTimeSlots();
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     if (window.lucide) lucide.createIcons();
   };
 
@@ -12682,6 +12684,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) {
       modal.classList.add('hidden');
       modal.style.display = 'none';
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
     }
   };
 
