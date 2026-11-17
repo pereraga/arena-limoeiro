@@ -1,12 +1,9 @@
 const fs = require('fs');
-const path = require('path');
+const path = 'C:/Users/PC/.gemini/antigravity/scratch/arena-booking-system/public/admin.html';
+const code = fs.readFileSync(path, 'utf8');
 
-const adminPath = path.join(__dirname, '..', 'public', 'admin.html');
-const lines = fs.readFileSync(adminPath, 'utf8').split('\n');
-
-console.log('=== Lines 5500 to 6000 searching for monthlyMembers / getMatchesForDate / getGame ===');
-lines.forEach((l, i) => {
-  if (l.includes('function getGame') || l.includes('getMatchesForDate') || l.includes('syncBookingToCloud') || l.includes('syncMemberToCloud')) {
-    console.log(`Line ${i+1}: ${l.trim().slice(0, 140)}`);
-  }
-});
+const regex = /getGame\s*=\s*function|function\s+getGame\s*\(/g;
+let m;
+while ((m = regex.exec(code)) !== null) {
+  console.log('pos:', m.index, code.substring(m.index, m.index + 500));
+}

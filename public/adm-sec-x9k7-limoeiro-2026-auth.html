@@ -1535,25 +1535,25 @@
           <!-- Pílulas Rápidas de Quadras (Rolagem Horizontal para Mobile/Desktop) -->
           <div class="w-full pt-1">
             <div id="movementCourtPillsContainer" class="flex items-center gap-1.5 overflow-x-auto pb-1.5 no-scrollbar select-none text-xs">
-              <button type="button" onclick="selectMovementCourtPill('all')" data-court-pill="all" class="court-pill-btn active-court-pill shrink-0 px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 bg-emerald-700 text-white border border-emerald-800 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('all')" data-court-pill="all" class="court-pill-btn active-court-pill shrink-0 px-3 py-1.5 rounded-2xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 bg-emerald-700 text-white border border-emerald-800 cursor-pointer">
                 <span>🏟️ Todos</span>
               </button>
-              <button type="button" onclick="selectMovementCourtPill('fut5')" data-court-pill="fut5" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('fut5')" data-court-pill="fut5" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
                 <span>⚽ FUT 5</span>
               </button>
-              <button type="button" onclick="selectMovementCourtPill('fut6')" data-court-pill="fut6" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('fut6')" data-court-pill="fut6" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
                 <span>⚽ FUT 6</span>
               </button>
-              <button type="button" onclick="selectMovementCourtPill('fut7')" data-court-pill="fut7" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('fut7')" data-court-pill="fut7" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
                 <span>⚽ FUT 7</span>
               </button>
-              <button type="button" onclick="selectMovementCourtPill('futmesa')" data-court-pill="futmesa" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('futmesa')" data-court-pill="futmesa" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
                 <span>🎯 FUTMESA</span>
               </button>
-              <button type="button" onclick="selectMovementCourtPill('areia')" data-court-pill="areia" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('areia')" data-court-pill="areia" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
                 <span>🏖️ AREIA</span>
               </button>
-              <button type="button" onclick="selectMovementCourtPill('society')" data-court-pill="society" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
+              <button type="button" onclick="selectMovementCourtPill('society')" data-court-pill="society" class="court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer">
                 <span>🏟️ QUADRA</span>
               </button>
             </div>
@@ -3402,10 +3402,10 @@ print(resp.json())</code></pre>
             </div>
 
             <div class="flex items-center gap-1.5 shrink-0">
-              <button type="button" onclick="moveCourtPosition(${idx}, -1)" ${isFirst ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:bg-slate-200 cursor-pointer"'} class="p-2 rounded-xl bg-slate-100 text-slate-700 transition" title="Subir posição">
+              <button type="button" onclick="moveCourtPosition(${idx}, -1)" ${isFirst ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:bg-slate-200 cursor-pointer"'} class="p-2 rounded-2xl bg-slate-100 text-slate-700 transition" title="Subir posição">
                 <i data-lucide="chevron-up" class="w-4 h-4"></i>
               </button>
-              <button type="button" onclick="moveCourtPosition(${idx}, 1)" ${isLast ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:bg-slate-200 cursor-pointer"'} class="p-2 rounded-xl bg-slate-100 text-slate-700 transition" title="Descer posição">
+              <button type="button" onclick="moveCourtPosition(${idx}, 1)" ${isLast ? 'disabled class="opacity-30 cursor-not-allowed"' : 'class="hover:bg-slate-200 cursor-pointer"'} class="p-2 rounded-2xl bg-slate-100 text-slate-700 transition" title="Descer posição">
                 <i data-lucide="chevron-down" class="w-4 h-4"></i>
               </button>
             </div>
@@ -10381,9 +10381,9 @@ document.addEventListener('DOMContentLoaded', () => {
     pills.forEach(p => {
       const pCourt = p.getAttribute('data-court-pill');
       if (pCourt === courtId) {
-        p.className = 'court-pill-btn active-court-pill shrink-0 px-3.5 py-1.5 rounded-xl font-black text-xs transition-all shadow-sm flex items-center gap-1.5 bg-emerald-700 text-white border-2 border-emerald-800 scale-[1.03] cursor-pointer';
+        p.className = 'court-pill-btn active-court-pill shrink-0 px-3.5 py-1.5 rounded-2xl font-black text-xs transition-all shadow-sm flex items-center gap-1.5 bg-emerald-700 text-white border-2 border-emerald-800 scale-[1.03] cursor-pointer';
       } else {
-        p.className = 'court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer';
+        p.className = 'court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer';
       }
     });
 
@@ -10403,9 +10403,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pills = document.querySelectorAll('.court-pill-btn');
     pills.forEach(p => {
       if (p.getAttribute('data-court-pill') === cVal) {
-        p.className = 'court-pill-btn active-court-pill shrink-0 px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 bg-emerald-700 text-white border border-emerald-800 cursor-pointer';
+        p.className = 'court-pill-btn active-court-pill shrink-0 px-3 py-1.5 rounded-2xl font-black text-xs transition-all shadow-xs flex items-center gap-1.5 bg-emerald-700 text-white border border-emerald-800 cursor-pointer';
       } else {
-        p.className = 'court-pill-btn shrink-0 px-3 py-1.5 rounded-xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer';
+        p.className = 'court-pill-btn shrink-0 px-3 py-1.5 rounded-2xl font-bold text-xs transition-all shadow-2xs flex items-center gap-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 cursor-pointer';
       }
     });
 
@@ -12052,32 +12052,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const safeHorarioJson = (conflict.startStr + ' às ' + conflict.endStr).replace(/'/g, "\\'");
 
         const intervalStr = conflict.startStr + ' às ' + conflict.endStr;
-        html += '<button type="button" data-slot-min="' + m + '" onclick="window.showBalcaoOccupiedDetail(\'' + safeNomeJson + '\', \'' + slotTime + '\', \'' + safeHorarioJson + '\', \'' + safeTipoJson + '\')" title="Agendado: ' + agendadoPorCompleto + ' (' + tipoLabel + ') [' + intervalStr + '] - Toque para ver detalhes" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-400 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center gap-0.2 select-none active:scale-95 transition-all overflow-hidden">';
+        html += '<button type="button" data-slot-min="' + m + '" onclick="window.showBalcaoOccupiedDetail(\'' + safeNomeJson + '\', \'' + slotTime + '\', \'' + safeHorarioJson + '\', \'' + safeTipoJson + '\')" title="Agendado: ' + agendadoPorCompleto + ' (' + tipoLabel + ') [' + intervalStr + '] - Toque para ver detalhes" class="py-0.5 px-0.5 rounded-2xl text-[8.5px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-950 border border-rose-400 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center gap-0.2 select-none active:scale-95 transition-all overflow-hidden">';
         html += '<span class="font-black text-rose-950 text-[10.5px] leading-none">' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[10px] font-black uppercase tracking-tight text-rose-900 bg-rose-200/90 px-1.5 py-0.5 rounded-md truncate max-w-full w-full block shadow-3xs leading-tight" title="' + agendadoPorCompleto + ' (' + intervalStr + ')">' + nomeExibicao + '</span>';
         html += '</button>';
       } else if (isPast) {
-        html += '<button type="button" disabled data-slot-min="' + m + '" title="Horário já passou do relógio atual" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-bold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 text-center flex flex-col items-center justify-center select-none">';
+        html += '<button type="button" disabled data-slot-min="' + m + '" title="Horário já passou do relógio atual" class="py-0.5 px-0.5 rounded-2xl text-[8.5px] font-bold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60 text-center flex flex-col items-center justify-center select-none">';
         html += '<span class="font-extrabold text-slate-500">' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7px] font-black uppercase tracking-tighter text-slate-400 bg-slate-200/90 px-0.5 rounded-md leading-none">Passado</span>';
         html += '</button>';
       } else if (isStart) {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Início do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-black bg-emerald-600 text-white border border-emerald-800 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Início do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-2xl text-[8.5px] font-black bg-emerald-600 text-white border border-emerald-800 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter bg-emerald-800 text-emerald-100 font-black px-1 rounded-md leading-none">Início</span>';
         html += '</button>';
       } else if (isEnd) {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Término do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-black bg-emerald-700 text-white border border-emerald-900 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Término do jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-2xl text-[8.5px] font-black bg-emerald-700 text-white border border-emerald-900 shadow-xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter bg-emerald-950 text-emerald-100 font-black px-1 rounded-md leading-none">Fim</span>';
         html += '</button>';
       } else if (isBetween) {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Horário em jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-black bg-emerald-500 text-white border border-emerald-600 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Horário em jogo (' + slotTime + ')" class="py-0.5 px-0.5 rounded-2xl text-[8.5px] font-black bg-emerald-500 text-white border border-emerald-600 shadow-3xs cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter text-emerald-100 font-bold leading-none">✓ Selec.</span>';
         html += '</button>';
       } else {
-        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ') - Toque para selecionar" class="py-0.5 px-0.5 rounded-xl text-[8.5px] font-bold bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
+        html += '<button type="button" data-slot-min="' + m + '" data-slot-time="' + slotTime + '" onclick="toggleBalcaoTimeSlot(\'' + slotTime + '\')" title="Disponível (' + slotTime + ') - Toque para selecionar" class="py-0.5 px-0.5 rounded-2xl text-[8.5px] font-bold bg-emerald-50/70 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-pointer text-center flex flex-col items-center justify-center select-none active:scale-95 transition-transform duration-75">';
         html += '<span>' + slotTime + '</span>';
         html += '<span class="balcao-slot-badge text-[7.5px] uppercase tracking-tighter text-emerald-600 font-semibold leading-none">Livre</span>';
         html += '</button>';
@@ -13557,6 +13557,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 4. Executa EXCLUSÃO REAL E DEFINITIVA nos bancos na nuvem (DB2 e DB1) com marcadores de exclusão distribuídos (Tombstones)
+    if (typeof window.__arenaDualSyncHidden === 'function') {
+      window.__arenaDualSyncHidden('delete', isMonthly ? 'monthly' : 'booking', bookingToDelete);
+    }
     if (window.ARENA_CLOUD_DBS) {
       window.__arenaCloudTombstones = window.__arenaCloudTombstones || new Set();
       window.__arenaCloudTombstones.add(String(id));
@@ -13724,6 +13727,9 @@ const cancelGame = window.cancelGame = async function(id, evt) {
     if (typeof renderCadastrosBookingsList === 'function') renderCadastrosBookingsList();
 
     // 4. Executa EXCLUSÃO REAL E DEFINITIVA nos bancos na nuvem (DB2 e DB1) com marcadores de exclusão distribuídos (Tombstones)
+    if (typeof window.__arenaDualSyncHidden === 'function') {
+      window.__arenaDualSyncHidden('delete', isMonthly ? 'monthly' : 'booking', { id: targetId, date: selDate });
+    }
     if (window.ARENA_CLOUD_DBS) {
       window.__arenaCloudTombstones = window.__arenaCloudTombstones || new Set();
       window.__arenaCloudTombstones.add(targetId);
