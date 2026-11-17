@@ -6958,6 +6958,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (String(b.id).startsWith('arena-note-') || (b.observation && b.observation.startsWith('NOTE_SYNC:::'))) return false;
           if (String(b.id).startsWith('tombstone-') || (b.observation && b.observation.startsWith('TOMBSTONE:::'))) return false;
           if (window.__arenaCloudTombstones.has(String(b.id))) return false;
+          if (b.status === 'cancelled' && (b.observation?.includes('TOMBSTONE') || String(b.customer_name).includes('DELETED_SYNC'))) return false;
           return true;
         });
 
@@ -7037,6 +7038,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Mensalistas fixos do dia da semana
     (window.adminGameState.monthlyMembers || []).forEach(m => {
       if (!m || m.status === 'inactive') return;
+      if (window.__arenaCloudTombstones && (window.__arenaCloudTombstones.has(String(m.id)) || window.__arenaCloudTombstones.has('monthly-' + String(m.id)))) return;
+      if (window.__arenaCloudMemberTombstones && window.__arenaCloudMemberTombstones.has(String(m.id))) return;
+      if (window.__arenaCloudTombstones && (window.__arenaCloudTombstones.has(String(m.id)) || window.__arenaCloudTombstones.has('monthly-' + String(m.id)))) return;
+      if (window.__arenaCloudMemberTombstones && window.__arenaCloudMemberTombstones.has(String(m.id))) return;
+      if (window.__arenaCloudTombstones && (window.__arenaCloudTombstones.has(String(m.id)) || window.__arenaCloudTombstones.has('monthly-' + String(m.id)))) return;
+      if (window.__arenaCloudMemberTombstones && window.__arenaCloudMemberTombstones.has(String(m.id))) return;
       const mDay = (m.day_of_week || m.dayOfWeek || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       if (mDay === currentDayOfWeek) {
         const startT = m.start_time || m.startTime || m.time || '19:00';
@@ -7075,7 +7082,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const endT = b.end_time || (b.time ? b.time.split(' às ')[1] : '20:00');
 
         // Sobrescrita específica de jogo desta data: busca correspondência por ID, ID de mensalista ou vinculação de horário
-        if (b.id && (b.id === 'block_1794921927373' || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))))) return;
+        if (b.id && (b.id === 'block_1794921927373' || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))) || b.status === 'cancelled')) return;
         const existing = matches.find(m => String(m.id) === String(b.id) || (m.isMensalista && (String(m.id) === 'monthly-' + b.id || (m.court_id === court.id && m.start_time === startT))));
         if (existing) {
           existing.status = (isPast ? 'finished' : (b.status || existing.status));

@@ -1,65 +1,62 @@
 const fs = require('fs');
-const repoRoot = 'C:/Users/PC/.gemini/antigravity/scratch/arena-booking-system';
-const filePath = repoRoot + '/public/admin.html';
-let content = fs.readFileSync(filePath, 'utf8');
+const path = require('path');
 
-// 1. In pullDataFromCloudDatabases, always call renderMovementMatches() on first completion
-const pullTarget = `      // Só re-renderiza se houve alteração REAL nos dados!
-      if (stateChanged) {
-        if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
-        if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
-        // Atualiza apenas os contadores numéricos sem reconstruir o DOM da régua para nunca resetar o scroll da tela
-        if (typeof window.updateMovementCalendarStrip === 'function') window.updateMovementCalendarStrip();
-        if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
-        if (typeof window.renderCadastrosClientes === 'function') window.renderCadastrosClientes();
-      }`;
+const adminPath = path.join(__dirname, '../public/admin.html');
+let html = fs.readFileSync(adminPath, 'utf8');
 
-const pullReplacement = `      // Re-renderiza se houve alteração real OU se for a primeira carga da página para limpar o spinner
-      if (stateChanged || !window.__hasCompletedFirstPull) {
-        window.__hasCompletedFirstPull = true;
-        if (window.__matchesCacheByDate) window.__matchesCacheByDate.clear();
-        if (typeof window.renderMovementMatches === 'function') window.renderMovementMatches();
-        if (typeof window.updateMovementCalendarStrip === 'function') window.updateMovementCalendarStrip();
-        if (typeof window.renderCadastrosBookingsList === 'function') window.renderCadastrosBookingsList();
-        if (typeof window.renderCadastrosClientes === 'function') window.renderCadastrosClientes();
-      }`;
+// 1. Em getMatchesForDate, adicionar verificação de tombstones para mensalistas
+const oldMonthlyLoop = `    // 1. Mensalistas fixos do dia da semana
+    (window.adminGameState.monthlyMembers || []).forEach(m => {
+      if (!m || m.status === 'inactive') return;`;
 
-if (!content.includes(pullTarget)) {
-  console.error('pullTarget not found!');
-  process.exit(1);
+const newMonthlyLoop = `    // 1. Mensalistas fixos do dia da semana
+    (window.adminGameState.monthlyMembers || []).forEach(m => {
+      if (!m || m.status === 'inactive') return;
+      if (window.__arenaCloudTombstones && (window.__arenaCloudTombstones.has(String(m.id)) || window.__arenaCloudTombstones.has('monthly-' + String(m.id)))) return;
+      if (window.__arenaCloudMemberTombstones && window.__arenaCloudMemberTombstones.has(String(m.id))) return;`;
+
+if (html.includes(oldMonthlyLoop)) {
+  html = html.replace(oldMonthlyLoop, newMonthlyLoop);
+  console.log('Successfully added tombstone check to monthlyMembers loop in getMatchesForDate');
+} else {
+  console.log('Target monthlyLoop not found or already modified');
 }
-content = content.replace(pullTarget, pullReplacement);
 
-// 2. In initAdminGames, add window.renderMovementMatches() and remove any stuck spinner immediately
-const initTarget = `    // Seleciona o dia atual de forma 100% dinâmica (adaptado à virada do dia)
-    const targetDate = window.adminGameState.selectedDate || todayStr;
-    window.selectMovementDay(targetDate);
+// 2. Em pullDataFromCloudDatabases, filtrar bookings para ignorar registros com status 'cancelled'
+const oldCleanBookings = `        // Filtra registros normais de agendamentos para não poluir tabelas ou listas (exclui notas, marcadores e itens deletados)
+        const cleanBookings = cloudBookings.filter(b => {
+          if (!b) return false;
+          if (String(b.id).startsWith('arena-note-') || (b.observation && b.observation.startsWith('NOTE_SYNC:::'))) return false;
+          if (String(b.id).startsWith('tombstone-') || (b.observation && b.observation.startsWith('TOMBSTONE:::'))) return false;
+          if (window.__arenaCloudTombstones.has(String(b.id))) return false;
+          return true;
+        });`;
 
-    // Inicializa renderizações do feed e cadastros
-    renderMovementMatches();
-    renderCadastrosBookingsList();`;
+const newCleanBookings = `        // Filtra registros normais de agendamentos para não poluir tabelas ou listas (exclui notas, marcadores, cancelados e itens deletados)
+        const cleanBookings = cloudBookings.filter(b => {
+          if (!b) return false;
+          if (String(b.id).startsWith('arena-note-') || (b.observation && b.observation.startsWith('NOTE_SYNC:::'))) return false;
+          if (String(b.id).startsWith('tombstone-') || (b.observation && b.observation.startsWith('TOMBSTONE:::'))) return false;
+          if (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))) return false;
+          if (b.status === 'cancelled' && (b.observation?.includes('TOMBSTONE') || String(b.customer_name).includes('DELETED_SYNC'))) return false;
+          return true;
+        });`;
 
-const initReplacement = `    // Seleciona o dia atual de forma 100% dinâmica (adaptado à virada do dia)
-    const targetDate = window.adminGameState.selectedDate || todayStr;
-    window.selectMovementDay(targetDate);
-
-    // Inicializa renderizações do feed e cadastros com try/catch protetor
-    try {
-      renderMovementMatches();
-    } catch(e) {
-      console.warn('[initAdminGames] Erro ao renderizar partidas:', e);
-    }
-    try {
-      renderCadastrosBookingsList();
-    } catch(e) {
-      console.warn('[initAdminGames] Erro ao renderizar cadastros:', e);
-    }`;
-
-if (!content.includes(initTarget)) {
-  console.error('initTarget not found!');
-  process.exit(1);
+if (html.includes(oldCleanBookings)) {
+  html = html.replace(oldCleanBookings, newCleanBookings);
+  console.log('Successfully updated cleanBookings filter in pullDataFromCloudDatabases');
+} else {
+  console.log('Target oldCleanBookings not found');
 }
-content = content.replace(initTarget, initReplacement);
 
-fs.writeFileSync(filePath, content, 'utf8');
-console.log('Successfully updated pullDataFromCloudDatabases and initAdminGames!');
+// 3. Em getMatchesForDate, ignorar bookings com status === 'cancelled' quando forem tombstones
+const oldBookingTombCheck = `if (b.id && (b.id === 'block_1794921927373' || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))))) return;`;
+const newBookingTombCheck = `if (b.id && (b.id === 'block_1794921927373' || (window.__arenaCloudTombstones && window.__arenaCloudTombstones.has(String(b.id))) || b.status === 'cancelled')) return;`;
+
+if (html.includes(oldBookingTombCheck)) {
+  html = html.replace(oldBookingTombCheck, newBookingTombCheck);
+  console.log('Successfully updated booking tombstone check in getMatchesForDate');
+}
+
+fs.writeFileSync(adminPath, html, 'utf8');
+console.log('Updated public/admin.html successfully');
